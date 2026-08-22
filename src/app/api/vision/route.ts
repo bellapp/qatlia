@@ -136,10 +136,18 @@ Règles :
     if (!res.ok) {
       const errText = await res.text();
       console.error('Vision API error:', errText);
-      return NextResponse.json(
-        { error: 'AI_SERVICE_ERROR', message: `Erreur API IA (${res.status}): ${errText}` },
-        { status: 502 }
-      );
+        // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+        // @ts-ignore
+        if (errText.includes('rate limit') || errText.includes('429')) {
+          return NextResponse.json(
+            { error: 'AI_RATE_LIMIT', message: 'Quota ou limite OpenRouter atteinte. Réessayez dans un instant.' },
+            { status: 429 }
+          );
+        }
+        return NextResponse.json(
+          { error: 'AI_SERVICE_ERROR', message: `Erreur API OpenRouter (${res.status}): ${errText}` },
+          { status: 502 }
+        );
     }
 
     const data = await res.json();
