@@ -365,7 +365,7 @@ export default function QatlIADashboard() {
                       Capture Photo & IA Vision
                     </h2>
                     <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-sky-500/10 text-sky-400 border border-sky-500/20">
-                      GPT-4o Vision
+                      Gemini 3.7 Flash
                     </span>
                   </div>
                   <p className="text-xs text-[#94A3B8] leading-relaxed mb-6">
