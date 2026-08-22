@@ -9,7 +9,7 @@ const VisionSchema = z.object({
 export const maxDuration = 60; // 60s timeout Vercel
 export const dynamic = 'force-dynamic';
 
-function extractJson(text: string): any {
+function extractJson(text: string): { pieces?: Array<{ name?: string; width: number | string; height: number | string; quantity?: number | string }> } | null {
   let cleaned = text.trim();
   // Strip Markdown code fences
   cleaned = cleaned.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '').trim();
@@ -158,11 +158,12 @@ Règles :
     }
 
     // Normalisation des pièces
-    const pieces = parsedJson.pieces.map((p: any, i: number) => ({
+    const rawPieces = parsedJson.pieces || [];
+    const pieces = rawPieces.map((p: { name?: string; width: number | string; height: number | string; quantity?: number | string }, i: number) => ({
       name: p.name ? String(p.name).trim() : `Pièce ${i + 1}`,
-      width: Math.abs(parseFloat(p.width)) || 10,
-      height: Math.abs(parseFloat(p.height)) || 10,
-      quantity: Math.max(1, parseInt(p.quantity, 10) || 1),
+      width: Math.abs(parseFloat(String(p.width))) || 10,
+      height: Math.abs(parseFloat(String(p.height))) || 10,
+      quantity: Math.max(1, parseInt(String(p.quantity || 1), 10) || 1),
     }));
 
     return NextResponse.json({
