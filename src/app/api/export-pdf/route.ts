@@ -112,33 +112,7 @@ export async function POST(req: Request) {
       margin: { left: 14, right: 14 },
     });
 
-    // 4. Page 2 : Schéma Visuel
-    doc.addPage('a4', 'landscape');
-
-    doc.setFillColor(30, 58, 95);
-    doc.rect(0, 0, pageWidth, 16, 'F');
-    doc.setTextColor(255, 255, 255);
-    doc.setFontSize(12);
-    doc.setFont('helvetica', 'bold');
-    doc.text(`Schéma Visuel — ${projectName} (Feuille 1 / ${result.sheetsUsed})`, 14, 11);
-
-    // Dessin du panneau à l'échelle sur le PDF
-    const canvasX = 20;
-    const canvasY = 28;
-    const maxDrawWidth = pageWidth - 40;
-    const maxDrawHeight = pageHeight - 45;
-
-    const scale = Math.min(maxDrawWidth / sheet.width, maxDrawHeight / sheet.height);
-    const drawW = sheet.width * scale;
-    const drawH = sheet.height * scale;
-
-    // Panneau brut
-    doc.setFillColor(241, 245, 249);
-    doc.setDrawColor(71, 85, 105);
-    doc.rect(canvasX, canvasY, drawW, drawH, 'FD');
-
-    // Pièces du premier panneau
-    const firstSheetPieces = result.placedPieces.filter((p) => p.sheetIndex === 0);
+    // 4. Pages Schémas Visuels : Générer UNE PAGE PAR FEUILLE / PANNEAU
     const colors = [
       [56, 189, 248], // Sky Blue
       [245, 166, 35], // Amber
@@ -146,26 +120,72 @@ export async function POST(req: Request) {
       [248, 113, 113], // Red
       [167, 139, 250], // Purple
       [251, 191, 36], // Gold
+      [45, 212, 191], // Teal
+      [129, 140, 248], // Indigo
     ];
 
-    firstSheetPieces.forEach((p, i) => {
-      const px = canvasX + p.x * scale;
-      const py = canvasY + p.y * scale;
-      const pw = p.width * scale;
-      const ph = p.height * scale;
-      const c = colors[i % colors.length];
+    for (let sheetIdx = 0; sheetIdx < result.sheetsUsed; sheetIdx++) {
+      doc.addPage('a4', 'landscape');
 
-      doc.setFillColor(c[0], c[1], c[2]);
-      doc.setDrawColor(15, 23, 42);
-      doc.rect(px, py, pw, ph, 'FD');
-
-      doc.setTextColor(0, 0, 0);
-      doc.setFontSize(Math.min(9, Math.max(5, ph / 2.5)));
+      // Header du panneau
+      doc.setFillColor(30, 58, 95);
+      doc.rect(0, 0, pageWidth, 16, 'F');
+      doc.setTextColor(255, 255, 255);
+      doc.setFontSize(12);
       doc.setFont('helvetica', 'bold');
-      doc.text(`#${p.pieceNumber}`, px + pw / 2, py + ph / 2 - 1, { align: 'center' });
-      doc.setFontSize(Math.min(7, Math.max(4, ph / 3.5)));
-      doc.text(`${p.width}×${p.height}`, px + pw / 2, py + ph / 2 + 3, { align: 'center' });
-    });
+      doc.text(`Schéma Visuel — ${projectName} (Panneau ${sheetIdx + 1} / ${result.sheetsUsed})`, 14, 11);
+
+      const sheetPieces = result.placedPieces.filter((p) => p.sheetIndex === sheetIdx);
+      const sheetAreaUsed = sheetPieces.reduce((sum, p) => sum + p.width * p.height, 0);
+      const sheetTotalArea = sheet.width * sheet.height;
+      const sheetWaste = Math.max(0, Math.round(((sheetTotalArea - sheetAreaUsed) / sheetTotalArea) * 1000) / 10);
+
+      doc.setFontSize(9);
+      doc.setFont('helvetica', 'normal');
+      doc.text(
+        `Pièces sur ce panneau : ${sheetPieces.length}  |  Chute : ${sheetWaste}%  |  Format : ${sheet.width} × ${sheet.height} cm`,
+        pageWidth - 14,
+        11,
+        { align: 'right' }
+      );
+
+      // Zone de dessin à l'échelle
+      const canvasX = 20;
+      const canvasY = 26;
+      const maxDrawWidth = pageWidth - 40;
+      const maxDrawHeight = pageHeight - 40;
+
+      const scale = Math.min(maxDrawWidth / sheet.width, maxDrawHeight / sheet.height);
+      const drawW = sheet.width * scale;
+      const drawH = sheet.height * scale;
+
+      // Panneau brut
+      doc.setFillColor(241, 245, 249);
+      doc.setDrawColor(71, 85, 105);
+      doc.setLineWidth(0.5);
+      doc.rect(canvasX, canvasY, drawW, drawH, 'FD');
+
+      // Découpes de ce panneau
+      sheetPieces.forEach((p) => {
+        const px = canvasX + p.x * scale;
+        const py = canvasY + p.y * scale;
+        const pw = p.width * scale;
+        const ph = p.height * scale;
+        const c = colors[(p.pieceNumber - 1) % colors.length];
+
+        doc.setFillColor(c[0], c[1], c[2]);
+        doc.setDrawColor(15, 23, 42);
+        doc.setLineWidth(0.3);
+        doc.rect(px, py, pw, ph, 'FD');
+
+        doc.setTextColor(0, 0, 0);
+        doc.setFontSize(Math.min(9, Math.max(5, ph / 2.5)));
+        doc.setFont('helvetica', 'bold');
+        doc.text(`#${p.pieceNumber}`, px + pw / 2, py + ph / 2 - 1, { align: 'center' });
+        doc.setFontSize(Math.min(7, Math.max(4, ph / 3.5)));
+        doc.text(`${p.width}×${p.height}`, px + pw / 2, py + ph / 2 + 3, { align: 'center' });
+      });
+    }
 
     const pdfBuffer = doc.output('arraybuffer');
 
