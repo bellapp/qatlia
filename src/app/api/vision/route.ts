@@ -6,6 +6,9 @@ const VisionSchema = z.object({
   sheetMaterial: z.string().default('mdf'),
 });
 
+export const maxDuration = 60; // 60 secondes pour les appels vision IA sur Vercel
+export const dynamic = 'force-dynamic';
+
 export async function POST(req: Request) {
   try {
     const body = await req.json();
@@ -69,6 +72,8 @@ Retourne un JSON avec le format exact suivant, rien d'autre :
     const model = isUsingOpenRouter
       ? (process.env.OPENROUTER_MODEL || 'openai/gpt-4o-mini')
       : 'gpt-4o-mini';
+
+    console.log(`[Vision API] Appel ${isUsingOpenRouter ? 'OpenRouter' : 'OpenAI'} avec model=${model}`);
 
     const res = await fetch(endpoint, {
       method: 'POST',
