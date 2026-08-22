@@ -89,6 +89,7 @@ export default function QatlIADashboard() {
 
   // Vision IA Upload handler
   const [visionError, setVisionError] = useState<string | null>(null);
+  const [previewImage, setPreviewImage] = useState<string | null>(null);
 
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -114,6 +115,7 @@ export default function QatlIADashboard() {
 
           const data = await res.json();
           if (data.success && Array.isArray(data.pieces) && data.pieces.length > 0) {
+            setPreviewImage(base64);
             const newPieces: Piece[] = data.pieces.map((p: { name?: string; width: number | string; height: number | string; quantity?: number | string }, i: number) => ({
               id: `ext_${Date.now()}_${i}`,
               name: p.name || `Pièce ${i + 1}`,
@@ -391,6 +393,30 @@ export default function QatlIADashboard() {
                       JPG, PNG, HEIC ou scan • 1 crédit utilisé
                     </span>
                   </label>
+
+                  {/* Image Preview if uploaded */}
+                  {previewImage && (
+                    <div className="mt-4 p-3 rounded-xl bg-[#0F172A] border border-[#334155] flex items-center justify-between">
+                      <div className="flex items-center gap-3 min-w-0">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
+                          src={previewImage}
+                          alt="Aperçu des mesures"
+                          className="w-12 h-12 rounded-lg object-cover border border-[#475569] shrink-0"
+                        />
+                        <div className="truncate text-xs">
+                          <p className="font-bold text-white truncate">Image de mesures chargée</p>
+                          <p className="text-[#34D399] font-semibold text-[11px]">✓ Extraction IA réussie</p>
+                        </div>
+                      </div>
+                      <button
+                        onClick={() => setPreviewImage(null)}
+                        className="text-xs text-rose-400 hover:text-rose-300 font-bold px-2 py-1"
+                      >
+                        Changer
+                      </button>
+                    </div>
+                  )}
 
                   {visionError && (
                     <div className="mt-4 p-3 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-400 text-xs font-semibold text-center">

@@ -48,21 +48,27 @@ export async function POST(req: Request) {
       });
     }
 
-    const systemPrompt = `Tu es un assistant spécialisé dans la lecture de listes de mesures manuscrites pour menuisiers et artisans.
-Extrais UNIQUEMENT les dimensions et quantités. Format de sortie : JSON strict.
-Chaque ligne : largeur × hauteur = quantité (en centimètres).
-Ignore les lignes barrées. Si une ligne est illisible, omets-la.
-Ne jamais inventer des dimensions non visibles dans l'image.`;
+    const systemPrompt = `Tu es un expert en lecture de fiches de débit et de listes de mesures manuscrites pour menuisiers et artisans du bois.
+Analyse attentivement l'image et extrais TOUTES les pièces à découper.
+Chaque ligne manuscrite contient généralement :
+- Des dimensions (longueur / hauteur × largeur en centimètres)
+- Une quantité (souvent notée "x2", "2 pcs", "= 4", ou un chiffre dans une colonne quantité)
+- Éventuellement un nom de pièce (ex: "étagère", "porte", "côté", "socle", "tiroir")
 
-    const userPrompt = `Lis cette image et extrais la liste de toutes les pièces à découper.
-Retourne un JSON avec le format exact suivant, rien d'autre :
+Règles impératives :
+1. Dimensions en CENTIMÈTRES (ex: 237 cm, 59.5 cm).
+2. Si une quantité n'est pas spécifiée, mets 1 par défaut.
+3. Si un nom n'est pas précisé, nomme-le "Pièce 1", "Pièce 2", etc.
+4. Réponds UNIQUEMENT en JSON strict valide sans texte avant ou après.`;
+
+    const userPrompt = `Analyse cette image de mesures et extrais la liste complète des pièces sous ce format JSON exact :
 {
   "pieces": [
-    { "name": "Pièce 1", "width": 246, "height": 59.5, "quantity": 1 },
-    { "name": "Pièce 2", "width": 246, "height": 7, "quantity": 5 }
+    { "name": "Panneau Latéral", "width": 237, "height": 56, "quantity": 1 },
+    { "name": "Étagère", "width": 88, "height": 88, "quantity": 2 }
   ],
-  "confidence": 0.95,
-  "notes": "Mesures manuscrites extraites"
+  "confidence": 0.98,
+  "notes": "Toutes les mesures manuscrites ont été extraites avec précision."
 }`;
 
     const endpoint = isUsingOpenRouter
@@ -70,7 +76,7 @@ Retourne un JSON avec le format exact suivant, rien d'autre :
       : 'https://api.openai.com/v1/chat/completions';
 
     const model = isUsingOpenRouter
-      ? (process.env.OPENROUTER_MODEL || 'openai/gpt-4o-mini')
+      ? (process.env.OPENROUTER_MODEL || 'google/gemini-2.5-flash')
       : 'gpt-4o-mini';
 
     console.log(`[Vision API] Appel ${isUsingOpenRouter ? 'OpenRouter' : 'OpenAI'} avec model=${model}`);
