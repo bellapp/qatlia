@@ -88,41 +88,55 @@ export default function QatlIADashboard() {
   const [result, setResult] = useState<OptimizationResult | null>(null);
 
   // Vision IA Upload handler
+  const [visionError, setVisionError] = useState<string | null>(null);
+
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
     setIsProcessingVision(true);
+    setVisionError(null);
+
     try {
       const reader = new FileReader();
       reader.onload = async () => {
-        const base64 = reader.result as string;
+        try {
+          const base64 = reader.result as string;
 
-        const res = await fetch('/api/vision', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            imageBase64: base64,
-            sheetMaterial: 'mdf',
-          }),
-        });
+          const res = await fetch('/api/vision', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              imageBase64: base64,
+              sheetMaterial: 'mdf',
+            }),
+          });
 
-        const data = await res.json();
-        if (data.success && Array.isArray(data.pieces) && data.pieces.length > 0) {
-          const newPieces: Piece[] = data.pieces.map((p: { name?: string; width: number | string; height: number | string; quantity?: number | string }, i: number) => ({
-            id: `ext_${Date.now()}_${i}`,
-            name: p.name || `Pièce ${i + 1}`,
-            width: Number(p.width),
-            height: Number(p.height),
-            quantity: Number(p.quantity) || 1,
-            rotatable: true,
-          }));
-          setPieces(newPieces);
+          const data = await res.json();
+          if (data.success && Array.isArray(data.pieces) && data.pieces.length > 0) {
+            const newPieces: Piece[] = data.pieces.map((p: { name?: string; width: number | string; height: number | string; quantity?: number | string }, i: number) => ({
+              id: `ext_${Date.now()}_${i}`,
+              name: p.name || `Pièce ${i + 1}`,
+              width: Number(p.width),
+              height: Number(p.height),
+              quantity: Number(p.quantity) || 1,
+              rotatable: true,
+            }));
+            setPieces(newPieces);
+          } else {
+            setVisionError(data.message || data.error || 'Aucune pièce détectée sur l\'image.');
+          }
+        } catch (err: unknown) {
+          const msg = err instanceof Error ? err.message : 'Erreur de connexion API';
+          setVisionError(msg);
+        } finally {
+          setIsProcessingVision(false);
         }
-        setIsProcessingVision(false);
       };
       reader.readAsDataURL(file);
-    } catch {
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Erreur de lecture du fichier';
+      setVisionError(msg);
       setIsProcessingVision(false);
     }
   };
@@ -377,6 +391,12 @@ export default function QatlIADashboard() {
                       JPG, PNG, HEIC ou scan • 1 crédit utilisé
                     </span>
                   </label>
+
+                  {visionError && (
+                    <div className="mt-4 p-3 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-400 text-xs font-semibold text-center">
+                      ⚠️ {visionError}
+                    </div>
+                  )}
                 </div>
 
                 <div className="mt-6 p-3.5 rounded-xl bg-sky-950/40 border border-sky-500/20 text-xs text-sky-200 flex items-start gap-2.5">

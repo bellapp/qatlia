@@ -77,7 +77,7 @@ Retourne un JSON avec le format exact suivant, rien d'autre :
         Authorization: `Bearer ${apiKey}`,
         ...(isUsingOpenRouter
           ? {
-              'HTTP-Referer': 'https://qatlia.app',
+              'HTTP-Referer': 'https://qatlia.vercel.app',
               'X-Title': 'QatlIA Cutting Optimization',
             }
           : {}),
@@ -95,28 +95,47 @@ Retourne un JSON avec le format exact suivant, rien d'autre :
             ],
           },
         ],
-        response_format: { type: 'json_object' },
       }),
     });
 
     if (!res.ok) {
       const errText = await res.text();
+      console.error('AI error response:', errText);
       return NextResponse.json(
-        { error: 'AI_SERVICE_ERROR', message: errText },
+        { error: 'AI_SERVICE_ERROR', message: `Erreur du modèle IA (${res.status}): ${errText}` },
         { status: 502 }
       );
     }
 
     const data = await res.json();
-    const content = JSON.parse(data.choices[0].message.content);
+    const rawContent = data.choices?.[0]?.message?.content || '';
+    
+    // Nettoyage Markdown ```json ... ``` si présent
+    let cleaned = rawContent.trim();
+    if (cleaned.startsWith('```json')) {
+      cleaned = cleaned.replace(/^```json\s*/, '').replace(/\s*```$/, '');
+    } else if (cleaned.startsWith('```')) {
+      cleaned = cleaned.replace(/^```\s*/, '').replace(/\s*```$/, '');
+    }
+
+    let parsedContent: { pieces?: Array<{ name?: string; width: number; height: number; quantity?: number }>; confidence?: number; notes?: string } = {};
+    try {
+      parsedContent = JSON.parse(cleaned);
+    } catch {
+      console.error('Failed to parse AI JSON:', rawContent);
+      return NextResponse.json(
+        { error: 'AI_PARSE_ERROR', message: 'Le modèle IA n\'a pas renvoyé un format JSON lisible.' },
+        { status: 502 }
+      );
+    }
 
     return NextResponse.json({
       success: true,
       extractionId: 'ext_' + Date.now(),
-      pieces: content.pieces || [],
-      confidence: content.confidence || 0.9,
+      pieces: parsedContent.pieces || [],
+      confidence: parsedContent.confidence || 0.9,
       creditsRemaining: 4,
-      notes: content.notes || 'Extraction terminée',
+      notes: parsedContent.notes || 'Extraction terminée',
     });
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : 'Erreur inconnue';
