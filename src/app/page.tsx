@@ -686,7 +686,7 @@ export default function Dashboard() {
                       className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-[#1E3A5F] hover:bg-[#2A4F82] text-white font-bold text-xs shadow-md transition-all border border-sky-400/30"
                     >
                       <Download className="w-4 h-4 text-sky-400" />
-                      <span>PLAN PDF COMPLET (A4)</span>
+                      <span>RAPPORT INDUSTRIEL (STYLE OPTICOUPE)</span>
                     </button>
                   </div>
                 </div>

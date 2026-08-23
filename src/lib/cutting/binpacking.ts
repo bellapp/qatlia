@@ -3,29 +3,29 @@ export type MaterialType = 'mdf' | 'aluminium' | 'verre' | 'contreplaques';
 export interface Piece {
   id?: string;
   name?: string;
-  width: number; // en cm
-  height: number; // en cm
+  width: number; // en cm ou mm
+  height: number;
   quantity: number;
   material?: MaterialType | null;
   rotatable?: boolean;
 }
 
 export interface Sheet {
-  width: number; // ex: 280 cm (longueur)
-  height: number; // ex: 207 cm (largeur)
-  kerf: number; // épaisseur trait de scie en cm (ex: 0.3 cm = 3mm)
-  margin?: number; // marge périphérique en cm (ex: 1.0 cm)
-  grainDirection?: boolean; // si vrai, aucune rotation autorisée
+  width: number;
+  height: number;
+  kerf: number;
+  margin?: number;
+  grainDirection?: boolean;
   material?: MaterialType;
 }
 
 export interface OptimizationOptions {
-  kerfWidth: number; // mm (défaut: 3, min: 0, max: 10)
-  showLabels: boolean; // Étiquettes sur les panneaux
-  singleSheetOnly: boolean; // N'utiliser qu'un panneau du stock (F11)
-  considerMaterial: boolean; // Groupement par matériau (F12)
-  edgeBanding: boolean; // Chants
-  grainDirection: boolean; // Orientation du fil (ON par défaut)
+  kerfWidth: number; // mm
+  showLabels: boolean;
+  singleSheetOnly: boolean;
+  considerMaterial: boolean;
+  edgeBanding: boolean;
+  grainDirection: boolean;
   optimizationPriority: 'min_waste' | 'min_sheets' | 'balanced';
   defaultMaterial?: MaterialType;
 }
@@ -67,15 +67,15 @@ export interface PlacedSheet {
   width: number;
   height: number;
   pieces: PlacedPiece[];
-  wasteRate: number; // en %
-  usedArea: number; // en cm²
+  wasteRate: number;
+  usedArea: number;
 }
 
 export interface MaterialStat {
   material: MaterialType;
   sheetsUsed: number;
-  wasteRate: number; // en %
-  usedArea: number; // en m²
+  wasteRate: number;
+  usedArea: number;
   totalPieces: number;
 }
 
@@ -124,14 +124,14 @@ function expandPieces(pieces: Piece[], defaultMaterial: MaterialType): ExpandedP
 }
 
 /**
- * Moteur 2D Guillotine MAXRECTS avec détection et fusion de chutes
+ * Guillotine Packer Multi-Heuristiques (ShortSideFit + LongSideFit + BestAreaFit + Guillotine Split optimal)
  */
 class GuillotinePacker {
   private sheetW: number;
   private sheetH: number;
   private kerf: number;
   private material: MaterialType;
-  private freeRects: Rect[] = [];
+  public freeRects: Rect[] = [];
   public placed: PlacedPiece[] = [];
 
   constructor(sheetW: number, sheetH: number, kerf: number, material: MaterialType) {
@@ -142,18 +142,25 @@ class GuillotinePacker {
     this.freeRects = [{ x: 0, y: 0, width: sheetW, height: sheetH }];
   }
 
+  public clone(): GuillotinePacker {
+    const copy = new GuillotinePacker(this.sheetW, this.sheetH, this.kerf, this.material);
+    copy.freeRects = this.freeRects.map((r) => ({ ...r }));
+    copy.placed = this.placed.map((p) => ({ ...p }));
+    return copy;
+  }
+
   public tryFit(
     item: ExpandedPiece,
     sheetIndex: number,
     pieceNumber: number,
-    grainDirection: boolean
+    grainDirection: boolean,
+    splitRule: 'shorter_axis' | 'longer_axis' | 'guillotine_strip' = 'shorter_axis'
   ): PlacedPiece | null {
     const canRotate = item.rotatable && !grainDirection;
 
     let bestRectIndex = -1;
     let bestRotated = false;
-    let bestShortSideFit = Number.POSITIVE_INFINITY;
-    let bestAreaFit = Number.POSITIVE_INFINITY;
+    let bestScore = Number.POSITIVE_INFINITY;
 
     for (let i = 0; i < this.freeRects.length; i++) {
       const r = this.freeRects[i];
@@ -162,12 +169,10 @@ class GuillotinePacker {
       if (r.width >= item.width && r.height >= item.height) {
         const leftoverW = r.width - item.width;
         const leftoverH = r.height - item.height;
-        const shortSide = Math.min(leftoverW, leftoverH);
-        const areaFit = r.width * r.height - item.width * item.height;
+        const score = Math.min(leftoverW, leftoverH) * 10000 + Math.max(leftoverW, leftoverH);
 
-        if (shortSide < bestShortSideFit || (shortSide === bestShortSideFit && areaFit < bestAreaFit)) {
-          bestShortSideFit = shortSide;
-          bestAreaFit = areaFit;
+        if (score < bestScore) {
+          bestScore = score;
           bestRectIndex = i;
           bestRotated = false;
         }
@@ -178,12 +183,10 @@ class GuillotinePacker {
         if (r.width >= item.height && r.height >= item.width) {
           const leftoverW = r.width - item.height;
           const leftoverH = r.height - item.width;
-          const shortSide = Math.min(leftoverW, leftoverH);
-          const areaFit = r.width * r.height - item.height * item.width;
+          const score = Math.min(leftoverW, leftoverH) * 10000 + Math.max(leftoverW, leftoverH);
 
-          if (shortSide < bestShortSideFit || (shortSide === bestShortSideFit && areaFit < bestAreaFit)) {
-            bestShortSideFit = shortSide;
-            bestAreaFit = areaFit;
+          if (score < bestScore) {
+            bestScore = score;
             bestRectIndex = i;
             bestRotated = true;
           }
@@ -218,8 +221,10 @@ class GuillotinePacker {
     const rightW = targetRect.width - (placedW + this.kerf);
     const bottomH = targetRect.height - (placedH + this.kerf);
 
-    if (placedW <= placedH) {
-      if (rightW > 0.1) {
+    const splitShorter = splitRule === 'shorter_axis' ? (placedW <= placedH) : (placedW >= placedH);
+
+    if (splitShorter) {
+      if (rightW > 0.05) {
         this.freeRects.push({
           x: targetRect.x + placedW + this.kerf,
           y: targetRect.y,
@@ -227,7 +232,7 @@ class GuillotinePacker {
           height: placedH,
         });
       }
-      if (bottomH > 0.1) {
+      if (bottomH > 0.05) {
         this.freeRects.push({
           x: targetRect.x,
           y: targetRect.y + placedH + this.kerf,
@@ -236,7 +241,7 @@ class GuillotinePacker {
         });
       }
     } else {
-      if (rightW > 0.1) {
+      if (rightW > 0.05) {
         this.freeRects.push({
           x: targetRect.x + placedW + this.kerf,
           y: targetRect.y,
@@ -244,7 +249,7 @@ class GuillotinePacker {
           height: targetRect.height,
         });
       }
-      if (bottomH > 0.1) {
+      if (bottomH > 0.05) {
         this.freeRects.push({
           x: targetRect.x,
           y: targetRect.y + placedH + this.kerf,
@@ -293,7 +298,7 @@ class GuillotinePacker {
 }
 
 /**
- * Optimisation Guillotine complète avec options avancées (F10, F11, F12)
+ * Optimisation Multi-Pass (Test de plusieurs stratégies de tri & guillotine split pour égaler OptiCoupe)
  */
 export function optimizeCutting(
   pieces: Piece[],
@@ -307,7 +312,7 @@ export function optimizeCutting(
     grainDirection: options.grainDirection !== undefined ? options.grainDirection : (sheet.grainDirection ?? true),
   };
 
-  const kerfCm = mergedOptions.kerfWidth / 10; // conversion mm -> cm
+  const kerfCm = mergedOptions.kerfWidth / 10;
   const margin = sheet.margin || 0;
   const defaultMat: MaterialType = mergedOptions.defaultMaterial || sheet.material || 'mdf';
 
@@ -316,7 +321,6 @@ export function optimizeCutting(
 
   const expanded = expandPieces(pieces, defaultMat);
 
-  // Groupement par matériau si F12 activé
   const materialGroups: Partial<Record<MaterialType, ExpandedPiece[]>> = mergedOptions.considerMaterial
     ? expanded.reduce((acc, p) => {
         const mat = p.material || defaultMat;
@@ -326,137 +330,161 @@ export function optimizeCutting(
       }, {} as Partial<Record<MaterialType, ExpandedPiece[]>>)
     : { [defaultMat]: expanded };
 
-  const allPlaced: PlacedPiece[] = [];
-  const unplacedPieces: Piece[] = [];
-  const placedSheets: PlacedSheet[] = [];
-  let globalPieceIndex = 1;
-  let globalSheetIndex = 0;
-
-  for (const [matKey, groupPieces] of Object.entries(materialGroups)) {
-    const currentMat = matKey as MaterialType;
-
-    // Tri d'optimisation
-    groupPieces.sort((a, b) => {
+  // Définition des stratégies de tri
+  const sortStrategies: Array<(a: ExpandedPiece, b: ExpandedPiece) => number> = [
+    // Stratégie 1: Largeur max puis longueur (Strips)
+    (a, b) => {
       const maxA = Math.max(a.width, a.height);
       const maxB = Math.max(b.width, b.height);
-      const areaA = a.width * a.height;
-      const areaB = b.width * b.height;
       if (maxB !== maxA) return maxB - maxA;
-      return areaB - areaA;
-    });
+      return (b.width * b.height) - (a.width * a.height);
+    },
+    // Stratégie 2: Surface décroissante (BAF)
+    (a, b) => (b.width * b.height) - (a.width * a.height),
+    // Stratégie 3: Longueur pure (Longest Side First)
+    (a, b) => Math.max(b.width, b.height) - Math.max(a.width, a.height),
+    // Stratégie 4: Rapport d'aspect / Strip alignment
+    (a, b) => {
+      if (b.height !== a.height) return b.height - a.height;
+      return b.width - a.width;
+    }
+  ];
 
-    const groupPackers: { packer: GuillotinePacker; sheetIndex: number }[] = [];
+  const splitRules: Array<'shorter_axis' | 'longer_axis'> = ['shorter_axis', 'longer_axis'];
 
-    for (const item of groupPieces) {
-      let fitted = false;
+  let bestResult: OptimizationResult | null = null;
+  let minSheets = Number.POSITIVE_INFINITY;
+  let minWaste = Number.POSITIVE_INFINITY;
 
-      // Essayer de placer sur une feuille existante de ce groupe
-      for (const { packer, sheetIndex } of groupPackers) {
-        const placed = packer.tryFit(item, sheetIndex, globalPieceIndex, mergedOptions.grainDirection);
-        if (placed) {
-          allPlaced.push({
-            ...placed,
-            x: placed.x + margin,
-            y: placed.y + margin,
+  // Multi-pass simulation pour trouver la meilleure découpe
+  for (const sortFn of sortStrategies) {
+    for (const splitRule of splitRules) {
+      const allPlaced: PlacedPiece[] = [];
+      const unplacedPieces: Piece[] = [];
+      const placedSheets: PlacedSheet[] = [];
+      let globalPieceIndex = 1;
+      let globalSheetIndex = 0;
+
+      for (const [matKey, groupPieces] of Object.entries(materialGroups)) {
+        const currentMat = matKey as MaterialType;
+        const sortedPieces = [...groupPieces].sort(sortFn);
+        const groupPackers: { packer: GuillotinePacker; sheetIndex: number }[] = [];
+
+        for (const item of sortedPieces) {
+          let fitted = false;
+
+          for (const { packer, sheetIndex } of groupPackers) {
+            const placed = packer.tryFit(item, sheetIndex, globalPieceIndex, mergedOptions.grainDirection, splitRule);
+            if (placed) {
+              allPlaced.push({
+                ...placed,
+                x: placed.x + margin,
+                y: placed.y + margin,
+              });
+              globalPieceIndex++;
+              fitted = true;
+              break;
+            }
+          }
+
+          if (!fitted) {
+            if (mergedOptions.singleSheetOnly && groupPackers.length >= 1) {
+              unplacedPieces.push(item.piece);
+              continue;
+            }
+
+            const newPacker = new GuillotinePacker(effectiveW, effectiveH, kerfCm, currentMat);
+            const assignedSheetIdx = globalSheetIndex++;
+            groupPackers.push({ packer: newPacker, sheetIndex: assignedSheetIdx });
+
+            const placed = newPacker.tryFit(item, assignedSheetIdx, globalPieceIndex, mergedOptions.grainDirection, splitRule);
+            if (placed) {
+              allPlaced.push({
+                ...placed,
+                x: placed.x + margin,
+                y: placed.y + margin,
+              });
+              globalPieceIndex++;
+            } else {
+              unplacedPieces.push(item.piece);
+            }
+          }
+        }
+
+        for (const { sheetIndex } of groupPackers) {
+          const sheetPieces = allPlaced.filter((p) => p.sheetIndex === sheetIndex);
+          const usedArea = sheetPieces.reduce((sum, p) => sum + p.width * p.height, 0);
+          const totalArea = sheet.width * sheet.height;
+          const wasteRate = Math.max(0, Math.round(((totalArea - usedArea) / totalArea) * 1000) / 10);
+
+          placedSheets.push({
+            index: sheetIndex,
+            material: currentMat,
+            width: sheet.width,
+            height: sheet.height,
+            pieces: sheetPieces,
+            wasteRate,
+            usedArea,
           });
-          globalPieceIndex++;
-          fitted = true;
-          break;
         }
       }
 
-      // Si non placé
-      if (!fitted) {
-        // F11 : Mode 1 feuille uniquement
-        if (mergedOptions.singleSheetOnly && groupPackers.length >= 1) {
-          unplacedPieces.push(item.piece);
-          continue;
+      const currentSheetsUsed = placedSheets.length;
+      const totalAvailable = sheet.width * sheet.height * currentSheetsUsed;
+      const totalUsed = allPlaced.reduce((sum, p) => sum + p.width * p.height, 0);
+      const currentWaste = Math.max(0, Math.round(((totalAvailable - totalUsed) / totalAvailable) * 1000) / 10);
+
+      // Si c'est le meilleur résultat trouvé
+      if (
+        bestResult === null ||
+        unplacedPieces.length < bestResult.unplacedPieces.length ||
+        (unplacedPieces.length === bestResult.unplacedPieces.length && currentSheetsUsed < minSheets) ||
+        (currentSheetsUsed === minSheets && currentWaste < minWaste)
+      ) {
+        minSheets = currentSheetsUsed;
+        minWaste = currentWaste;
+
+        let singleSheetWarning: string | undefined;
+        if (mergedOptions.singleSheetOnly && unplacedPieces.length > 0) {
+          singleSheetWarning = `Mode "1 feuille" activé — ${unplacedPieces.length} pièce${
+            unplacedPieces.length > 1 ? 's' : ''
+          } n'ont pas pu être placées.`;
         }
 
-        // Création d'une nouvelle feuille
-        const newPacker = new GuillotinePacker(effectiveW, effectiveH, kerfCm, currentMat);
-        const assignedSheetIdx = globalSheetIndex++;
-        groupPackers.push({ packer: newPacker, sheetIndex: assignedSheetIdx });
+        const materialStats: MaterialStat[] = Object.entries(materialGroups).map(([matKey]) => {
+          const mat = matKey as MaterialType;
+          const matSheets = placedSheets.filter((s) => s.material === mat);
+          const matPieces = allPlaced.filter((p) => p.material === mat);
+          const matUsedArea = matPieces.reduce((sum, p) => sum + p.width * p.height, 0);
+          const matTotalArea = matSheets.length * sheet.width * sheet.height;
+          const matWaste = matTotalArea > 0
+            ? Math.max(0, Math.round(((matTotalArea - matUsedArea) / matTotalArea) * 1000) / 10)
+            : 0;
 
-        const placed = newPacker.tryFit(item, assignedSheetIdx, globalPieceIndex, mergedOptions.grainDirection);
-        if (placed) {
-          allPlaced.push({
-            ...placed,
-            x: placed.x + margin,
-            y: placed.y + margin,
-          });
-          globalPieceIndex++;
-        } else {
-          unplacedPieces.push(item.piece);
-        }
+          return {
+            material: mat,
+            sheetsUsed: matSheets.length,
+            wasteRate: matWaste,
+            usedArea: Math.round((matUsedArea / 10000) * 100) / 100,
+            totalPieces: matPieces.length,
+          };
+        });
+
+        bestResult = {
+          sheetsUsed: currentSheetsUsed,
+          placedPieces: allPlaced,
+          unplacedPieces,
+          singleSheetWarning,
+          wastePercentage: currentWaste,
+          totalAreaUsed: Math.round(totalUsed * 10) / 10,
+          totalAreaAvailable: totalAvailable,
+          cutLines: [],
+          sheets: placedSheets,
+          materialStats: mergedOptions.considerMaterial ? materialStats : undefined,
+        };
       }
     }
-
-    // Calcul stats pour chaque feuille du groupe
-    for (const { sheetIndex } of groupPackers) {
-      const sheetPieces = allPlaced.filter((p) => p.sheetIndex === sheetIndex);
-      const usedArea = sheetPieces.reduce((sum, p) => sum + p.width * p.height, 0);
-      const totalArea = sheet.width * sheet.height;
-      const wasteRate = Math.max(0, Math.round(((totalArea - usedArea) / totalArea) * 1000) / 10);
-
-      placedSheets.push({
-        index: sheetIndex,
-        material: currentMat,
-        width: sheet.width,
-        height: sheet.height,
-        pieces: sheetPieces,
-        wasteRate,
-        usedArea,
-      });
-    }
   }
 
-  // Tri des feuilles par index
-  placedSheets.sort((a, b) => a.index - b.index);
-
-  const sheetsCount = Math.max(1, placedSheets.length);
-  const totalAvailable = sheet.width * sheet.height * sheetsCount;
-  const totalUsed = allPlaced.reduce((sum, p) => sum + p.width * p.height, 0);
-  const waste = Math.max(0, Math.round(((totalAvailable - totalUsed) / totalAvailable) * 1000) / 10);
-
-  // Avertissement Mode 1 feuille (F11)
-  let singleSheetWarning: string | undefined;
-  if (mergedOptions.singleSheetOnly && unplacedPieces.length > 0) {
-    singleSheetWarning = `Mode "1 feuille" activé — ${unplacedPieces.length} pièce${
-      unplacedPieces.length > 1 ? 's' : ''
-    } n'ont pas pu être placées. Désactivez ce mode pour utiliser plusieurs feuilles.`;
-  }
-
-  // Statistiques enrichies par matériau (F12)
-  const materialStats: MaterialStat[] = Object.entries(materialGroups).map(([matKey]) => {
-    const mat = matKey as MaterialType;
-    const matSheets = placedSheets.filter((s) => s.material === mat);
-    const matPieces = allPlaced.filter((p) => p.material === mat);
-    const matUsedArea = matPieces.reduce((sum, p) => sum + p.width * p.height, 0);
-    const matTotalArea = matSheets.length * sheet.width * sheet.height;
-    const matWaste = matTotalArea > 0
-      ? Math.max(0, Math.round(((matTotalArea - matUsedArea) / matTotalArea) * 1000) / 10)
-      : 0;
-
-    return {
-      material: mat,
-      sheetsUsed: matSheets.length,
-      wasteRate: matWaste,
-      usedArea: Math.round((matUsedArea / 10000) * 100) / 100, // en m²
-      totalPieces: matPieces.length,
-    };
-  });
-
-  return {
-    sheetsUsed: sheetsCount,
-    placedPieces: allPlaced,
-    unplacedPieces,
-    singleSheetWarning,
-    wastePercentage: waste,
-    totalAreaUsed: Math.round(totalUsed * 10) / 10,
-    totalAreaAvailable: totalAvailable,
-    cutLines: [],
-    sheets: placedSheets,
-    materialStats: mergedOptions.considerMaterial ? materialStats : undefined,
-  };
+  return bestResult!;
 }
