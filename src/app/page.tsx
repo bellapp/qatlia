@@ -16,131 +16,83 @@ import {
   ZoomOut,
   ChevronLeft,
   ChevronRight,
-  ShieldCheck,
   Zap,
-  LogIn,
-  User as UserIcon,
+  AlertTriangle,
+  Info,
 } from 'lucide-react';
-import { Piece, Sheet, OptimizationResult } from '@/lib/cutting/binpacking';
+import {
+  Piece,
+  Sheet,
+  OptimizationResult,
+  OptimizationOptions,
+  OPTIONS_DEFAULTS,
+  MaterialType,
+} from '@/lib/cutting/binpacking';
+import { OptionsPanel } from '@/components/OptionsPanel';
 
-// Palette officielle QatlIA
-const PIECE_COLORS = [
-  '#38BDF8', // Sky Blue
-  '#F5A623', // Amber / Orange QatlIA
-  '#34D399', // Emerald
-  '#F87171', // Red coral
-  '#A78BFA', // Purple soft
-  '#FBBF24', // Yellow gold
-  '#2DD4BF', // Teal
-  '#818CF8', // Indigo light
-  '#FB923C', // Orange soft
-  '#60A5FA', // Blue bright
+const DEFAULT_SHEET: Sheet = {
+  width: 280, // cm
+  height: 207, // cm
+  kerf: 0.3, // cm = 3mm
+  margin: 1.0, // cm
+  grainDirection: true,
+  material: 'mdf',
+};
+
+const INITIAL_PIECES: Piece[] = [
+  { id: '1', name: 'Panneau Latéral G', width: 200, height: 58, quantity: 2, material: 'mdf', rotatable: false },
+  { id: '2', name: 'Panneau Latéral D', width: 200, height: 58, quantity: 2, material: 'mdf', rotatable: false },
+  { id: '3', name: 'Dessus / Dessous', width: 116.4, height: 58, quantity: 2, material: 'mdf', rotatable: false },
+  { id: '4', name: 'Étagère Mobile', width: 116.4, height: 55, quantity: 4, material: 'mdf', rotatable: false },
+  { id: '5', name: 'Séparation Centrale', width: 190, height: 55, quantity: 1, material: 'mdf', rotatable: false },
 ];
 
-export default function QatlIADashboard() {
-  const [step, setStep] = useState<'capture' | 'results'>('capture');
-  const [isProcessingVision, setIsProcessingVision] = useState(false);
+export default function Dashboard() {
+  const [sheet, setSheet] = useState<Sheet>(DEFAULT_SHEET);
+  const [pieces, setPieces] = useState<Piece[]>(INITIAL_PIECES);
+  const [options, setOptions] = useState<OptimizationOptions>(OPTIONS_DEFAULTS);
+  const [result, setResult] = useState<OptimizationResult | null>(null);
   const [isOptimizing, setIsOptimizing] = useState(false);
+  const [isProcessingVision, setIsProcessingVision] = useState(false);
   const [activeSheetIndex, setActiveSheetIndex] = useState(0);
   const [zoomLevel, setZoomLevel] = useState(1);
-  const [userProfile, setUserProfile] = useState<{ email?: string; credits: number } | null>(null);
-
-  useEffect(() => {
-    const fetchUser = async () => {
-      const supabase = createClient();
-      const { data: { session } } = await supabase.auth.getSession();
-      if (session?.user) {
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('credits')
-          .eq('id', session.user.id)
-          .single();
-
-        setUserProfile({
-          email: session.user.email,
-          credits: profile?.credits ?? 5,
-        });
-      }
-    };
-    fetchUser();
-  }, []);
-
-  // Paramètres de panneau par défaut (MDF standard Maghreb)
-  const [sheet, setSheet] = useState<Sheet>({
-    width: 280, // cm
-    height: 207, // cm
-    kerf: 0.4, // cm (4 mm)
-    margin: 1.0, // cm
-    grainDirection: true,
-  });
-
-  // Liste de pièces à découper
-  const [pieces, setPieces] = useState<Piece[]>([
-    { id: '1', name: 'Panneau Latéral G', width: 200, height: 58, quantity: 2, rotatable: false },
-    { id: '2', name: 'Panneau Latéral D', width: 200, height: 58, quantity: 2, rotatable: false },
-    { id: '3', name: 'Base / Plafond', width: 120, height: 58, quantity: 2, rotatable: true },
-    { id: '4', name: 'Étagères Mobiles', width: 116.4, height: 55, quantity: 4, rotatable: true },
-    { id: '5', name: 'Façades Tiroirs', width: 59.5, height: 25, quantity: 4, rotatable: true },
-    { id: '6', name: 'Socle Inférieur', width: 120, height: 10, quantity: 2, rotatable: false },
-  ]);
-
-  // Résultat d'optimisation
-  const [result, setResult] = useState<OptimizationResult | null>(null);
-
-  // Vision IA Upload handler
+  const [userCredits, setUserCredits] = useState<number>(5);
+  const [userEmail, setUserEmail] = useState<string | null>(null);
   const [visionError, setVisionError] = useState<string | null>(null);
   const [previewImage, setPreviewImage] = useState<string | null>(null);
 
-  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    setIsProcessingVision(true);
-    setVisionError(null);
-
-    try {
-      const reader = new FileReader();
-      reader.onload = async () => {
-        try {
-          const base64 = reader.result as string;
-
-          const res = await fetch('/api/vision', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              imageBase64: base64,
-              sheetMaterial: 'mdf',
-            }),
-          });
-
-          const data = await res.json();
-          if (data.success && Array.isArray(data.pieces) && data.pieces.length > 0) {
-            setPreviewImage(base64);
-            const newPieces: Piece[] = data.pieces.map((p: { name?: string; width: number | string; height: number | string; quantity?: number | string }, i: number) => ({
-              id: `ext_${Date.now()}_${i}`,
-              name: p.name || `Pièce ${i + 1}`,
-              width: Number(p.width),
-              height: Number(p.height),
-              quantity: Number(p.quantity) || 1,
-              rotatable: true,
-            }));
-            setPieces(newPieces);
-          } else {
-            setVisionError(data.message || data.error || 'Aucune pièce détectée sur l\'image.');
+  // Sync Supabase User & Credits
+  useEffect(() => {
+    async function loadUser() {
+      try {
+        const supabase = createClient();
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) {
+          setUserEmail(user.email || null);
+          const { data: profile } = await supabase
+            .from('profiles')
+            .select('credits')
+            .eq('id', user.id)
+            .single();
+          if (profile) {
+            setUserCredits(profile.credits);
           }
-        } catch (err: unknown) {
-          const msg = err instanceof Error ? err.message : 'Erreur de connexion API';
-          setVisionError(msg);
-        } finally {
-          setIsProcessingVision(false);
         }
-      };
-      reader.readAsDataURL(file);
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'Erreur de lecture du fichier';
-      setVisionError(msg);
-      setIsProcessingVision(false);
+      } catch (err) {
+        console.error('Erreur chargement profil Supabase:', err);
+      }
     }
+    loadUser();
+  }, []);
+
+  // Sync options.kerfWidth and options.grainDirection with sheet
+  const handleOptionsChange = (newOpts: OptimizationOptions) => {
+    setOptions(newOpts);
+    setSheet((prev) => ({
+      ...prev,
+      kerf: newOpts.kerfWidth / 10,
+      grainDirection: newOpts.grainDirection,
+    }));
   };
 
   // Run Optimization
@@ -150,19 +102,69 @@ export default function QatlIADashboard() {
       const res = await fetch('/api/optimize', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ sheet, pieces }),
+        body: JSON.stringify({
+          sheet,
+          pieces,
+          options,
+        }),
       });
       const data = await res.json();
       if (data.success && data.result) {
         setResult(data.result);
         setActiveSheetIndex(0);
-        setStep('results');
       }
-    } catch (e) {
-      console.error(e);
+    } catch (err) {
+      console.error('Erreur optimisation:', err);
     } finally {
       setIsOptimizing(false);
     }
+  };
+
+  // Vision IA Upload handler
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setIsProcessingVision(true);
+    setVisionError(null);
+
+    const reader = new FileReader();
+    reader.onload = async () => {
+      try {
+        const base64 = reader.result as string;
+        const res = await fetch('/api/vision', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            imageBase64: base64,
+            sheetMaterial: sheet.material || 'mdf',
+          }),
+        });
+
+        const data = await res.json();
+        if (data.success && Array.isArray(data.pieces) && data.pieces.length > 0) {
+          setPreviewImage(base64);
+          const newPieces: Piece[] = data.pieces.map((p: { name?: string; width: number | string; height: number | string; quantity?: number | string; material?: string }, i: number) => ({
+            id: `ext_${Date.now()}_${i}`,
+            name: p.name || `Pièce ${i + 1}`,
+            width: Number(p.width),
+            height: Number(p.height),
+            quantity: Number(p.quantity) || 1,
+            material: (p.material as MaterialType) || (sheet.material || 'mdf'),
+            rotatable: true,
+          }));
+          setPieces(newPieces);
+        } else {
+          setVisionError(data.message || 'Aucune mesure détectée dans l\'image.');
+        }
+      } catch (err) {
+        setVisionError('Erreur réseau lors de l\'analyse de l\'image.');
+        console.error(err);
+      } finally {
+        setIsProcessingVision(false);
+      }
+    };
+    reader.readAsDataURL(file);
   };
 
   const handleDownloadPdf = async () => {
@@ -172,24 +174,31 @@ export default function QatlIADashboard() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          projectName: 'Cuisine Moderne',
-          material: 'MDF',
-          sheet,
+          projectName: 'Cuisine Moderne Pro',
+          material: sheet.material || 'MDF',
+          sheet: {
+            width: sheet.width,
+            height: sheet.height,
+            kerf: options.kerfWidth / 10,
+            grainDirection: options.grainDirection,
+          },
           result,
         }),
       });
 
-      if (!res.ok) throw new Error('Export failed');
-
-      const blob = await res.blob();
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `qatlia_schema_${Date.now()}.pdf`;
-      document.body.appendChild(a);
-      a.click();
-      window.URL.revokeObjectURL(url);
-      document.body.removeChild(a);
+      if (res.ok) {
+        const blob = await res.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `qatlia_schema_${Date.now()}.pdf`;
+        document.body.appendChild(a);
+        a.click();
+        window.URL.revokeObjectURL(url);
+        document.body.removeChild(a);
+      } else {
+        window.print();
+      }
     } catch (err) {
       console.error(err);
       window.print();
@@ -200,542 +209,559 @@ export default function QatlIADashboard() {
     const newId = `p_${Date.now()}`;
     setPieces([
       ...pieces,
-      { id: newId, name: `Pièce ${pieces.length + 1}`, width: 60, height: 40, quantity: 1, rotatable: true },
+      { id: newId, name: `Pièce ${pieces.length + 1}`, width: 100, height: 50, quantity: 1, material: sheet.material || 'mdf', rotatable: true },
     ]);
   };
 
-  const handleUpdatePiece = (index: number, field: keyof Piece, val: string | number | boolean) => {
+  const handleRemovePiece = (index: number) => {
+    const copy = [...pieces];
+    copy.splice(index, 1);
+    setPieces(copy);
+  };
+
+  const handleUpdatePiece = (index: number, field: keyof Piece, val: string | number | boolean | null) => {
     const copy = [...pieces];
     copy[index] = { ...copy[index], [field]: val };
     setPieces(copy);
   };
 
-  const handleDeletePiece = (index: number) => {
-    setPieces(pieces.filter((_, i) => i !== index));
+  const currentSheet = result?.sheets[activeSheetIndex] || (result ? {
+    index: 0,
+    material: sheet.material || 'mdf',
+    width: sheet.width,
+    height: sheet.height,
+    pieces: result.placedPieces.filter((p) => p.sheetIndex === activeSheetIndex),
+    wasteRate: result.wastePercentage,
+    usedArea: result.totalAreaUsed,
+  } : null);
+
+  const getMaterialBadge = (mat?: MaterialType | null) => {
+    switch (mat) {
+      case 'aluminium':
+        return <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-slate-500/20 text-slate-300 border border-slate-500/30">Aluminium</span>;
+      case 'verre':
+        return <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-sky-500/20 text-sky-300 border border-sky-500/30">Verre</span>;
+      case 'contreplaques':
+        return <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-amber-600/20 text-amber-300 border border-amber-600/30">Contreplaqué</span>;
+      default:
+        return <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">MDF</span>;
+    }
   };
 
   return (
-    <div className="min-h-screen bg-[#0F172A] text-[#E2E8F0] font-sans antialiased selection:bg-[#F5A623] selection:text-black">
-      {/* HEADER TOP BAR */}
-      <header className="sticky top-0 z-50 flex h-16 items-center justify-between border-b border-[#1E293B] bg-[#0F172A]/90 px-6 backdrop-blur-md">
+    <div className="min-h-screen bg-[#0F172A] text-[#F1F5F9] font-sans antialiased selection:bg-amber-500 selection:text-black pb-16">
+      {/* Top Navbar */}
+      <header className="sticky top-0 z-50 backdrop-blur-md bg-[#0F172A]/90 border-b border-[#334155]/80 px-4 lg:px-8 py-3.5 flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-tr from-[#1E3A5F] to-[#0284C7] shadow-lg shadow-sky-500/20 border border-sky-400/30 text-white font-black">
+          <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-[#1E3A5F] to-[#F5A623] flex items-center justify-center font-black text-xl text-white shadow-lg shadow-amber-500/10">
             Q
           </div>
           <div>
-            <h1 className="text-xl font-extrabold tracking-tight text-white flex items-center gap-1.5">
-              Qatl<span className="text-[#F5A623]">IA</span>
-              <span className="text-[10px] uppercase font-bold tracking-widest bg-sky-500/10 text-sky-400 border border-sky-500/20 rounded-full px-2 py-0.5">
-                Pro
+            <div className="flex items-center gap-2">
+              <span className="font-extrabold tracking-tight text-lg text-white">QatlIA</span>
+              <span className="text-xs px-2 py-0.5 rounded-full bg-amber-500/10 text-[#F5A623] font-bold border border-amber-500/20">
+                PRO 2026
               </span>
-            </h1>
+            </div>
+            <p className="text-[11px] text-[#94A3B8]">Optimisation de découpe de panneaux & Débit IA</p>
           </div>
-        </div>
-
-        {/* Top Navigation Steps */}
-        <div className="flex items-center gap-2 bg-[#1E293B]/80 p-1 rounded-xl border border-[#334155]">
-          <button
-            onClick={() => setStep('capture')}
-            className={`flex items-center gap-2 px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${
-              step === 'capture'
-                ? 'bg-[#0284C7] text-white shadow-md'
-                : 'text-[#94A3B8] hover:text-white'
-            }`}
-          >
-            <Layers className="w-3.5 h-3.5" />
-            1. Mesures & IA
-          </button>
-          <button
-            onClick={() => {
-              if (result) setStep('results');
-              else handleRunOptimization();
-            }}
-            className={`flex items-center gap-2 px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${
-              step === 'results'
-                ? 'bg-[#F5A623] text-black shadow-md'
-                : 'text-[#94A3B8] hover:text-white'
-            }`}
-          >
-            <Sparkles className="w-3.5 h-3.5" />
-            2. Schéma de Découpe
-          </button>
         </div>
 
         {/* User Credits / Status */}
         <div className="flex items-center gap-3">
           <Link
             href="/credits"
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 text-amber-300 text-xs font-bold transition-colors cursor-pointer"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-500/10 border border-amber-500/30 text-[#F5A623] text-xs font-bold hover:bg-amber-500/20 transition-all shadow-sm"
           >
-            <Zap className="w-3.5 h-3.5 text-[#F5A623]" />
-            <span>{userProfile ? `${userProfile.credits} Crédits` : '5 Crédits IA'}</span>
+            <Zap className="w-3.5 h-3.5 fill-current" />
+            <span>{userCredits} crédits IA</span>
           </Link>
 
-          {userProfile ? (
-            <div className="flex items-center gap-2 text-xs text-[#94A3B8] font-bold bg-[#1E293B] px-3 py-1.5 rounded-xl border border-[#334155]">
-              <UserIcon className="w-3.5 h-3.5 text-sky-400" />
-              <span className="max-w-[120px] truncate text-white">{userProfile.email}</span>
+          {userEmail ? (
+            <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-xl bg-[#1E293B] border border-[#334155] text-xs text-[#94A3B8]">
+              <span className="w-2 h-2 rounded-full bg-emerald-400"></span>
+              <span className="truncate max-w-[130px]">{userEmail}</span>
             </div>
           ) : (
             <Link
               href="/auth/login"
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#0284C7] hover:bg-[#0369A1] text-white text-xs font-bold transition-colors"
+              className="px-3.5 py-1.5 rounded-xl bg-[#1E3A5F] hover:bg-[#2A4F82] text-xs font-bold text-white transition-all shadow-sm"
             >
-              <LogIn className="w-3.5 h-3.5" />
-              <span>Connexion</span>
+              Connexion
             </Link>
           )}
         </div>
       </header>
 
-      {/* MAIN CONTENT AREA */}
-      <main className="max-w-7xl mx-auto p-6 md:p-8">
-        {step === 'capture' ? (
-          <div className="space-y-6">
-            {/* Project Parameters Banner */}
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 p-5 rounded-2xl bg-[#1E293B]/60 border border-[#334155] backdrop-blur-sm">
-              <div>
-                <label className="text-xs font-bold text-[#94A3B8] uppercase">Format Panneau (cm)</label>
-                <div className="flex items-center gap-2 mt-1.5">
+      {/* Main Grid */}
+      <main className="max-w-7xl mx-auto px-4 lg:px-8 pt-6">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+          
+          {/* LEFT COLUMN: Input & AI & Options (5 cols) */}
+          <div className="lg:col-span-5 space-y-6">
+            
+            {/* Options Panel (F10, F11, F12) */}
+            <OptionsPanel
+              options={options}
+              onChange={handleOptionsChange}
+              disabled={isOptimizing}
+            />
+
+            {/* Panel Stock Setup */}
+            <div className="rounded-2xl bg-[#1E293B] border border-[#334155] p-5 shadow-lg">
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-2">
+                  <Layers className="w-4 h-4 text-amber-400" />
+                  <h2 className="text-sm font-bold text-white uppercase tracking-wider">
+                    Dimensions du Panneau Brut
+                  </h2>
+                </div>
+                <span className="text-xs text-[#94A3B8] font-mono">cm</span>
+              </div>
+
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 text-xs">
+                <div>
+                  <label htmlFor="sheetWidthInput" className="block text-[#94A3B8] font-medium mb-1">Longueur (X)</label>
                   <input
+                    id="sheetWidthInput"
                     type="number"
                     value={sheet.width}
-                    onChange={(e) => setSheet({ ...sheet, width: Number(e.target.value) })}
-                    className="w-20 bg-[#0F172A] border border-[#334155] rounded-lg px-2.5 py-1.5 text-sm font-bold text-white text-center"
+                    onChange={(e) => setSheet({ ...sheet, width: parseFloat(e.target.value) || 0 })}
+                    className="w-full px-3 py-2 rounded-xl bg-[#0F172A] border border-[#334155] text-white font-mono font-bold focus:border-amber-400 outline-none"
                   />
-                  <span className="text-[#64748B]">×</span>
+                </div>
+                <div>
+                  <label htmlFor="sheetHeightInput" className="block text-[#94A3B8] font-medium mb-1">Largeur (Y)</label>
                   <input
+                    id="sheetHeightInput"
                     type="number"
                     value={sheet.height}
-                    onChange={(e) => setSheet({ ...sheet, height: Number(e.target.value) })}
-                    className="w-20 bg-[#0F172A] border border-[#334155] rounded-lg px-2.5 py-1.5 text-sm font-bold text-white text-center"
+                    onChange={(e) => setSheet({ ...sheet, height: parseFloat(e.target.value) || 0 })}
+                    className="w-full px-3 py-2 rounded-xl bg-[#0F172A] border border-[#334155] text-white font-mono font-bold focus:border-amber-400 outline-none"
                   />
                 </div>
-              </div>
-
-              <div>
-                <label className="text-xs font-bold text-[#94A3B8] uppercase">Trait de Scie (Kerf)</label>
-                <div className="flex items-center gap-2 mt-1.5">
-                  <input
-                    type="number"
-                    step="0.1"
-                    value={sheet.kerf}
-                    onChange={(e) => setSheet({ ...sheet, kerf: Number(e.target.value) })}
-                    className="w-24 bg-[#0F172A] border border-[#334155] rounded-lg px-2.5 py-1.5 text-sm font-bold text-white text-center"
-                  />
-                  <span className="text-xs text-[#64748B]">cm (4mm)</span>
+                <div>
+                  <label htmlFor="sheetMaterialSelect" className="block text-[#94A3B8] font-medium mb-1">Matériau</label>
+                  <select
+                    id="sheetMaterialSelect"
+                    value={sheet.material || 'mdf'}
+                    onChange={(e) => setSheet({ ...sheet, material: e.target.value as MaterialType })}
+                    className="w-full px-2.5 py-2 rounded-xl bg-[#0F172A] border border-[#334155] text-white text-xs outline-none focus:border-amber-400"
+                  >
+                    <option value="mdf">MDF / Bois</option>
+                    <option value="aluminium">Aluminium</option>
+                    <option value="verre">Verre</option>
+                    <option value="contreplaques">Contreplaqué</option>
+                  </select>
                 </div>
-              </div>
-
-              <div>
-                <label className="text-xs font-bold text-[#94A3B8] uppercase">Marge Débit</label>
-                <div className="flex items-center gap-2 mt-1.5">
-                  <input
-                    type="number"
-                    step="0.5"
-                    value={sheet.margin || 0}
-                    onChange={(e) => setSheet({ ...sheet, margin: Number(e.target.value) })}
-                    className="w-20 bg-[#0F172A] border border-[#334155] rounded-lg px-2.5 py-1.5 text-sm font-bold text-white text-center"
-                  />
-                  <span className="text-xs text-[#64748B]">cm</span>
-                </div>
-              </div>
-
-              <div className="flex items-center justify-between md:justify-end gap-3 pt-4 md:pt-0">
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={sheet.grainDirection}
-                    onChange={(e) => setSheet({ ...sheet, grainDirection: e.target.checked })}
-                    className="w-4 h-4 rounded border-[#334155] text-[#F5A623] focus:ring-[#F5A623]"
-                  />
-                  <span className="text-xs font-bold text-[#CBD5E1]">Sens Veinage</span>
-                </label>
               </div>
             </div>
 
-            {/* Split Screen : AI Photo Upload + Extracted Table */}
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-              {/* Photo Upload Box */}
-              <div className="lg:col-span-5 rounded-2xl bg-[#1E293B]/60 border border-[#334155] p-6 flex flex-col justify-between">
-                <div>
-                  <div className="flex items-center justify-between mb-4">
-                    <h2 className="text-base font-bold text-white flex items-center gap-2">
-                      <Sparkles className="w-5 h-5 text-[#F5A623]" />
-                      Capture Photo & IA Vision
-                    </h2>
-                    <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-sky-500/10 text-sky-400 border border-sky-500/20">
-                      Gemini 3.7 Flash
-                    </span>
-                  </div>
-                  <p className="text-xs text-[#94A3B8] leading-relaxed mb-6">
-                    Prends en photo ta liste de mesures manuscrite sur papier ou ton plan. L&apos;IA extrait automatiquement les cotes et quantités en un instant.
-                  </p>
-
-                  <label className="group relative flex flex-col items-center justify-center min-h-[220px] rounded-2xl border-2 border-dashed border-[#475569] hover:border-sky-400 bg-[#0F172A]/80 hover:bg-[#0F172A] p-6 text-center cursor-pointer transition-all">
-                    <input
-                      type="file"
-                      accept="image/*"
-                      onChange={handleImageUpload}
-                      className="hidden"
-                    />
-                    <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-sky-500/10 text-sky-400 border border-sky-500/20 mb-3 group-hover:scale-110 transition-transform">
-                      {isProcessingVision ? (
-                        <RefreshCw className="w-6 h-6 animate-spin" />
-                      ) : (
-                        <Upload className="w-6 h-6" />
-                      )}
-                    </div>
-                    <span className="text-sm font-bold text-white">
-                      {isProcessingVision ? 'Extraction des cotes par IA...' : 'Dépose la photo de mesures'}
-                    </span>
-                    <span className="text-xs text-[#64748B] mt-1">
-                      JPG, PNG, HEIC ou scan • 1 crédit utilisé
-                    </span>
-                  </label>
-
-                  {/* Image Preview if uploaded */}
-                  {previewImage && (
-                    <div className="mt-4 p-3 rounded-xl bg-[#0F172A] border border-[#334155] flex items-center justify-between">
-                      <div className="flex items-center gap-3 min-w-0">
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img
-                          src={previewImage}
-                          alt="Aperçu des mesures"
-                          className="w-12 h-12 rounded-lg object-cover border border-[#475569] shrink-0"
-                        />
-                        <div className="truncate text-xs">
-                          <p className="font-bold text-white truncate">Image de mesures chargée</p>
-                          <p className="text-[#34D399] font-semibold text-[11px]">✓ Extraction IA réussie</p>
-                        </div>
-                      </div>
-                      <button
-                        onClick={() => setPreviewImage(null)}
-                        className="text-xs text-rose-400 hover:text-rose-300 font-bold px-2 py-1"
-                      >
-                        Changer
-                      </button>
-                    </div>
-                  )}
-
-                  {visionError && (
-                    <div className="mt-4 p-3 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-400 text-xs font-semibold text-center">
-                      ⚠️ {visionError}
-                    </div>
-                  )}
+            {/* AI Vision Extraction Card */}
+            <div className="rounded-2xl bg-[#1E293B] border border-[#334155] p-5 shadow-lg relative overflow-hidden">
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-2">
+                  <Sparkles className="w-4 h-4 text-sky-400" />
+                  <h2 className="text-sm font-bold text-white uppercase tracking-wider">
+                    Capture Photo & IA Vision
+                  </h2>
                 </div>
-
-                <div className="mt-6 p-3.5 rounded-xl bg-sky-950/40 border border-sky-500/20 text-xs text-sky-200 flex items-start gap-2.5">
-                  <ShieldCheck className="w-4 h-4 text-sky-400 shrink-0 mt-0.5" />
-                  <span>
-                    <strong>Astuce pro :</strong> Veille à ce que les chiffres soient bien lisibles et sans ombres portées pour une précision maximale (98%+).
-                  </span>
-                </div>
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-sky-500/10 text-sky-400 border border-sky-500/20">
+                  Gemini 3.7 Flash
+                </span>
               </div>
+              <p className="text-xs text-[#94A3B8] mb-4">
+                Photographiez votre carnet de mesures manuscrites. L&apos;IA extrait automatiquement les cotes et quantités.
+              </p>
 
-              {/* Pieces Table */}
-              <div className="lg:col-span-7 rounded-2xl bg-[#1E293B]/60 border border-[#334155] p-6 flex flex-col justify-between">
-                <div>
-                  <div className="flex items-center justify-between mb-4">
-                    <div>
-                      <h2 className="text-base font-bold text-white">Nomenclature des Pièces</h2>
-                      <p className="text-xs text-[#94A3B8]">
-                        {pieces.length} types de pièces • {pieces.reduce((s, p) => s + (p.quantity || 1), 0)} panneaux au total
-                      </p>
+              <label className="group relative flex flex-col items-center justify-center min-h-[140px] rounded-2xl border-2 border-dashed border-[#475569] hover:border-sky-400 bg-[#0F172A]/80 hover:bg-[#0F172A] transition-all cursor-pointer p-4 text-center">
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={handleImageUpload}
+                  disabled={isProcessingVision}
+                  className="absolute inset-0 opacity-0 cursor-pointer disabled:cursor-not-allowed"
+                />
+                {isProcessingVision ? (
+                  <div className="flex flex-col items-center gap-3">
+                    <RefreshCw className="w-8 h-8 text-sky-400 animate-spin" />
+                    <span className="text-xs font-bold text-sky-300">Analyse Gemini 3.7 Flash en cours...</span>
+                  </div>
+                ) : (
+                  <div className="flex flex-col items-center gap-2">
+                    <div className="w-10 h-10 rounded-full bg-sky-500/10 flex items-center justify-center text-sky-400 group-hover:scale-110 transition-transform">
+                      <Upload className="w-5 h-5" />
                     </div>
-                    <button
-                      onClick={handleAddPiece}
-                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#0284C7] hover:bg-[#0369A1] text-white text-xs font-bold transition-all shadow-sm"
-                    >
-                      <Plus className="w-4 h-4" />
-                      Ajouter une pièce
-                    </button>
+                    <span className="text-xs font-bold text-white">Importer ou Scanner une fiche de mesures</span>
+                    <span className="text-[10px] text-[#64748B]">Photo, scan ou capture de notes</span>
                   </div>
+                )}
+              </label>
 
-                  {/* Table */}
-                  <div className="overflow-x-auto max-h-[340px] overflow-y-auto rounded-xl border border-[#334155]">
-                    <table className="w-full text-left text-xs text-[#CBD5E1]">
-                      <thead className="sticky top-0 bg-[#0F172A] uppercase tracking-wider font-bold text-[#64748B] border-b border-[#334155]">
-                        <tr>
-                          <th className="p-3">Nom</th>
-                          <th className="p-3 text-center">Longueur (cm)</th>
-                          <th className="p-3 text-center">Largeur (cm)</th>
-                          <th className="p-3 text-center">Qté</th>
-                          <th className="p-3 text-right">Actions</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-[#334155]/60 bg-[#1E293B]/40">
-                        {pieces.map((p, idx) => (
-                          <tr key={p.id || idx} className="hover:bg-[#1E293B]/80 transition-colors">
-                            <td className="p-2.5">
-                              <input
-                                type="text"
-                                value={p.name}
-                                onChange={(e) => handleUpdatePiece(idx, 'name', e.target.value)}
-                                className="w-full bg-[#0F172A] border border-[#334155] rounded-lg px-2.5 py-1 text-xs font-semibold text-white"
-                              />
-                            </td>
-                            <td className="p-2.5 text-center">
-                              <input
-                                type="number"
-                                value={p.width}
-                                onChange={(e) => handleUpdatePiece(idx, 'width', Number(e.target.value))}
-                                className="w-20 bg-[#0F172A] border border-[#334155] rounded-lg px-2 py-1 text-xs font-bold text-white text-center"
-                              />
-                            </td>
-                            <td className="p-2.5 text-center">
-                              <input
-                                type="number"
-                                value={p.height}
-                                onChange={(e) => handleUpdatePiece(idx, 'height', Number(e.target.value))}
-                                className="w-20 bg-[#0F172A] border border-[#334155] rounded-lg px-2 py-1 text-xs font-bold text-white text-center"
-                              />
-                            </td>
-                            <td className="p-2.5 text-center">
-                              <input
-                                type="number"
-                                value={p.quantity}
-                                onChange={(e) => handleUpdatePiece(idx, 'quantity', Number(e.target.value))}
-                                className="w-14 bg-[#0F172A] border border-[#334155] rounded-lg px-2 py-1 text-xs font-bold text-white text-center"
-                              />
-                            </td>
-                            <td className="p-2.5 text-right">
-                              <button
-                                onClick={() => handleDeletePiece(idx)}
-                                className="p-1.5 text-rose-400 hover:text-rose-300 hover:bg-rose-500/10 rounded-lg transition-colors"
-                              >
-                                <Trash2 className="w-4 h-4" />
-                              </button>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
+              {previewImage && (
+                <div className="mt-3 p-2.5 rounded-xl bg-[#0F172A] border border-[#334155] flex items-center justify-between">
+                  <div className="flex items-center gap-2.5 truncate">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={previewImage} alt="Aperçu" className="w-10 h-10 rounded-lg object-cover border border-[#475569]" />
+                    <div className="truncate text-xs">
+                      <p className="font-bold text-white truncate">Photo de mesures</p>
+                      <p className="text-emerald-400 font-semibold text-[10px]">✓ Extraction réussie</p>
+                    </div>
                   </div>
-                </div>
-
-                {/* Optimize Action Button */}
-                <div className="mt-6 pt-4 border-t border-[#334155] flex items-center justify-between">
-                  <div className="text-xs text-[#94A3B8]">
-                    Algorithme : <span className="font-bold text-sky-400">Guillotine 2D Optimisé</span>
-                  </div>
-                  <button
-                    onClick={handleRunOptimization}
-                    disabled={isOptimizing || pieces.length === 0}
-                    className="flex items-center gap-2 px-6 py-3.5 rounded-xl bg-gradient-to-r from-[#F5A623] to-[#EA580C] hover:from-[#EA580C] hover:to-[#C2410C] text-black font-extrabold text-sm tracking-wide shadow-lg shadow-orange-500/20 transition-all disabled:opacity-50"
-                  >
-                    {isOptimizing ? (
-                      <>
-                        <RefreshCw className="w-4 h-4 animate-spin" />
-                        Calcul du plan...
-                      </>
-                    ) : (
-                      <>
-                        <Play className="w-4 h-4 fill-black" />
-                        GÉNÉRER LE PLAN DE DÉCOUPE
-                      </>
-                    )}
+                  <button onClick={() => setPreviewImage(null)} className="text-xs text-rose-400 font-bold px-2 py-1">
+                    Changer
                   </button>
                 </div>
+              )}
+
+              {visionError && (
+                <div className="mt-3 p-3 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-400 text-xs font-semibold text-center">
+                  ⚠️ {visionError}
+                </div>
+              )}
+            </div>
+
+            {/* Pieces Table Input */}
+            <div className="rounded-2xl bg-[#1E293B] border border-[#334155] p-5 shadow-lg">
+              <div className="flex items-center justify-between mb-4">
+                <div>
+                  <h2 className="text-sm font-bold text-white uppercase tracking-wider">
+                    Liste des Pièces à Découper ({pieces.reduce((s, p) => s + (p.quantity || 1), 0)})
+                  </h2>
+                  <p className="text-[11px] text-[#94A3B8]">Dimensions en cm</p>
+                </div>
+                <button
+                  onClick={handleAddPiece}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 text-[#F5A623] text-xs font-bold transition-all border border-amber-500/30"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  <span>Ajouter</span>
+                </button>
               </div>
+
+              <div className="space-y-2 max-h-[340px] overflow-y-auto pr-1">
+                {pieces.map((p, idx) => (
+                  <div key={p.id || idx} className="p-3 rounded-xl bg-[#0F172A] border border-[#334155] flex flex-wrap sm:flex-nowrap items-center gap-2 text-xs">
+                    <span className="font-mono text-[#64748B] w-5 text-center shrink-0">#{idx + 1}</span>
+                    <input
+                      type="text"
+                      placeholder="Nom"
+                      value={p.name}
+                      onChange={(e) => handleUpdatePiece(idx, 'name', e.target.value)}
+                      className="flex-1 min-w-[90px] px-2.5 py-1.5 rounded-lg bg-[#1E293B] border border-[#334155] text-white font-medium outline-none focus:border-amber-400"
+                    />
+                    <div className="flex items-center gap-1 shrink-0">
+                      <input
+                        type="number"
+                        placeholder="Long."
+                        value={p.width}
+                        onChange={(e) => handleUpdatePiece(idx, 'width', parseFloat(e.target.value) || 0)}
+                        className="w-16 px-2 py-1.5 rounded-lg bg-[#1E293B] border border-[#334155] text-white font-mono font-bold text-right outline-none focus:border-amber-400"
+                      />
+                      <span className="text-[#64748B]">×</span>
+                      <input
+                        type="number"
+                        placeholder="Larg."
+                        value={p.height}
+                        onChange={(e) => handleUpdatePiece(idx, 'height', parseFloat(e.target.value) || 0)}
+                        className="w-16 px-2 py-1.5 rounded-lg bg-[#1E293B] border border-[#334155] text-white font-mono font-bold text-right outline-none focus:border-amber-400"
+                      />
+                    </div>
+                    <div className="flex items-center gap-1 shrink-0">
+                      <span className="text-[#64748B] text-[10px]">Qté:</span>
+                      <input
+                        type="number"
+                        min="1"
+                        value={p.quantity}
+                        onChange={(e) => handleUpdatePiece(idx, 'quantity', parseInt(e.target.value, 10) || 1)}
+                        className="w-12 px-1.5 py-1.5 rounded-lg bg-[#1E293B] border border-[#334155] text-white font-mono font-bold text-center outline-none focus:border-amber-400"
+                      />
+                    </div>
+                    {options.considerMaterial && (
+                      <select
+                        value={p.material || sheet.material || 'mdf'}
+                        onChange={(e) => handleUpdatePiece(idx, 'material', e.target.value as MaterialType)}
+                        className="px-1.5 py-1.5 rounded-lg bg-[#1E293B] border border-[#334155] text-white text-[11px] outline-none"
+                      >
+                        <option value="mdf">MDF</option>
+                        <option value="aluminium">Alu</option>
+                        <option value="verre">Verre</option>
+                        <option value="contreplaques">CP</option>
+                      </select>
+                    )}
+                    <button
+                      onClick={() => handleRemovePiece(idx)}
+                      className="p-1.5 rounded-lg hover:bg-rose-500/20 text-[#64748B] hover:text-rose-400 transition-colors shrink-0"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+
+              <button
+                onClick={handleRunOptimization}
+                disabled={isOptimizing || pieces.length === 0}
+                className="w-full mt-4 py-3 rounded-xl bg-gradient-to-r from-[#F5A623] to-[#E09015] hover:brightness-110 text-slate-950 font-black text-sm flex items-center justify-center gap-2 shadow-lg shadow-amber-500/20 transition-all disabled:opacity-50"
+              >
+                {isOptimizing ? <RefreshCw className="w-5 h-5 animate-spin" /> : <Play className="w-5 h-5 fill-current" />}
+                <span>GÉNÉRER LE PLAN DE DÉCOUPE OPTIMAL</span>
+              </button>
             </div>
           </div>
-        ) : (
-          /* RESULTS & CUTTING PLAN VIEW */
-          <div className="space-y-6">
-            {/* Top Bar Summary */}
-            {result && (
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                <div className="p-4 rounded-2xl bg-[#1E293B]/60 border border-[#334155]">
-                  <p className="text-xs font-bold text-[#94A3B8]">FEUILLES UTILISÉES</p>
-                  <p className="text-2xl font-black text-white mt-1">{result.sheetsUsed} Panneaux</p>
-                </div>
-                <div className="p-4 rounded-2xl bg-[#1E293B]/60 border border-[#334155]">
-                  <p className="text-xs font-bold text-[#94A3B8]">TAUX DE CHUTE</p>
-                  <p className="text-2xl font-black text-[#F5A623] mt-1">{result.wastePercentage}%</p>
-                </div>
-                <div className="p-4 rounded-2xl bg-[#1E293B]/60 border border-[#334155]">
-                  <p className="text-xs font-bold text-[#94A3B8]">SURFACE UTILE</p>
-                  <p className="text-2xl font-black text-emerald-400 mt-1">
-                    {(100 - result.wastePercentage).toFixed(1)}%
-                  </p>
-                </div>
-                <div className="p-4 rounded-2xl bg-[#1E293B]/60 border border-[#334155]">
-                  <p className="text-xs font-bold text-[#94A3B8]">TOTAL PIÈCES</p>
-                  <p className="text-2xl font-black text-sky-400 mt-1">{result.placedPieces.length} Découpes</p>
+
+          {/* RIGHT COLUMN: Interactive 2D Visualizer & Results (7 cols) */}
+          <div className="lg:col-span-7 space-y-6">
+            
+            {/* Warning Single Sheet (F11) */}
+            {result?.singleSheetWarning && (
+              <div className="p-4 rounded-2xl bg-amber-500/10 border border-amber-500/30 flex items-start gap-3">
+                <AlertTriangle className="w-5 h-5 text-[#F5A623] shrink-0 mt-0.5" />
+                <div className="text-xs">
+                  <p className="font-bold text-white mb-1">Avertissement Mode &quot;1 Feuille&quot;</p>
+                  <p className="text-amber-200/90 leading-relaxed">{result.singleSheetWarning}</p>
                 </div>
               </div>
             )}
 
-            {/* Canvas SVG Cutting Diagram + Legend */}
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-              {/* Interactive SVG Diagram Viewport */}
-              <div className="lg:col-span-8 rounded-2xl bg-[#1E293B]/60 border border-[#334155] p-6 flex flex-col">
-                <div className="flex items-center justify-between mb-4">
-                  <div className="flex items-center gap-2">
-                    <button
-                      onClick={() => setActiveSheetIndex(Math.max(0, activeSheetIndex - 1))}
-                      disabled={activeSheetIndex === 0}
-                      className="p-2 rounded-lg bg-[#0F172A] border border-[#334155] text-white disabled:opacity-40"
-                    >
-                      <ChevronLeft className="w-4 h-4" />
-                    </button>
-                    <span className="text-sm font-bold text-white px-2">
-                      Panneau {activeSheetIndex + 1} / {result?.sheetsUsed || 1}
-                    </span>
-                    <button
-                      onClick={() =>
-                        setActiveSheetIndex(Math.min((result?.sheetsUsed || 1) - 1, activeSheetIndex + 1))
-                      }
-                      disabled={activeSheetIndex >= (result?.sheetsUsed || 1) - 1}
-                      className="p-2 rounded-lg bg-[#0F172A] border border-[#334155] text-white disabled:opacity-40"
-                    >
-                      <ChevronRight className="w-4 h-4" />
-                    </button>
-                  </div>
+            {/* Results Summary Bar */}
+            {result && (
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                <div className="p-4 rounded-2xl bg-[#1E293B] border border-[#334155] shadow-lg">
+                  <span className="text-[11px] text-[#94A3B8] uppercase font-bold">Feuilles Requises</span>
+                  <p className="text-2xl font-black text-white font-mono mt-1">{result.sheetsUsed}</p>
+                  <span className="text-[10px] text-[#64748B]">{sheet.width} × {sheet.height} cm</span>
+                </div>
+                <div className="p-4 rounded-2xl bg-[#1E293B] border border-[#334155] shadow-lg">
+                  <span className="text-[11px] text-[#94A3B8] uppercase font-bold">Surface Utile</span>
+                  <p className="text-2xl font-black text-emerald-400 font-mono mt-1">
+                    {(100 - result.wastePercentage).toFixed(1)}%
+                  </p>
+                  <span className="text-[10px] text-emerald-500/80">Efficacité de coupe</span>
+                </div>
+                <div className="p-4 rounded-2xl bg-[#1E293B] border border-[#334155] shadow-lg">
+                  <span className="text-[11px] text-[#94A3B8] uppercase font-bold">Taux de Chute</span>
+                  <p className="text-2xl font-black text-amber-400 font-mono mt-1">
+                    {result.wastePercentage.toFixed(1)}%
+                  </p>
+                  <span className="text-[10px] text-amber-500/80">Pertes de matière</span>
+                </div>
+                <div className="p-4 rounded-2xl bg-[#1E293B] border border-[#334155] shadow-lg">
+                  <span className="text-[11px] text-[#94A3B8] uppercase font-bold">Pièces Placées</span>
+                  <p className="text-2xl font-black text-sky-400 font-mono mt-1">
+                    {result.placedPieces.length}
+                  </p>
+                  <span className="text-[10px] text-sky-500/80">
+                    {result.unplacedPieces.length > 0 ? `${result.unplacedPieces.length} non placées` : '100% complété'}
+                  </span>
+                </div>
+              </div>
+            )}
 
-                  {/* Zoom controls */}
-                  <div className="flex items-center gap-2">
+            {/* Material breakdown if F12 active */}
+            {result?.materialStats && result.materialStats.length > 0 && (
+              <div className="p-4 rounded-2xl bg-[#1E293B] border border-[#334155] shadow-lg">
+                <h3 className="text-xs font-bold text-white uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                  <Info className="w-3.5 h-3.5 text-sky-400" />
+                  Répartition Multi-Matériaux (F12)
+                </h3>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-xs">
+                  {result.materialStats.map((ms) => (
+                    <div key={ms.material} className="p-2.5 rounded-xl bg-[#0F172A] border border-[#334155] flex items-center justify-between">
+                      <div>
+                        <div className="flex items-center gap-1.5 mb-0.5">
+                          {getMaterialBadge(ms.material)}
+                        </div>
+                        <p className="text-[11px] text-[#94A3B8]">{ms.totalPieces} pièces • {ms.usedArea} m²</p>
+                      </div>
+                      <div className="text-right">
+                        <span className="font-mono font-bold text-white text-sm">{ms.sheetsUsed} f.</span>
+                        <p className="text-[10px] text-amber-400">{ms.wasteRate}% chute</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Interactive 2D SVG Cutting Plan Visualizer */}
+            <div className="rounded-2xl bg-[#1E293B] border border-[#334155] p-5 shadow-lg">
+              <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+                <div className="flex items-center gap-2">
+                  <h3 className="text-sm font-bold text-white uppercase tracking-wider">
+                    Plan de Coupe Interactif {result && `— Panneau ${activeSheetIndex + 1} / ${result.sheetsUsed}`}
+                  </h3>
+                  {currentSheet && getMaterialBadge(currentSheet.material)}
+                </div>
+
+                {/* Sheet Selector & Zoom Controls */}
+                <div className="flex items-center gap-2">
+                  {result && result.sheetsUsed > 1 && (
+                    <div className="flex items-center bg-[#0F172A] rounded-xl border border-[#334155] p-1">
+                      <button
+                        onClick={() => setActiveSheetIndex(Math.max(0, activeSheetIndex - 1))}
+                        disabled={activeSheetIndex === 0}
+                        className="p-1 rounded-lg hover:bg-[#1E293B] text-white disabled:opacity-30"
+                      >
+                        <ChevronLeft className="w-4 h-4" />
+                      </button>
+                      <span className="text-xs font-mono font-bold text-white px-2">
+                        {activeSheetIndex + 1} / {result.sheetsUsed}
+                      </span>
+                      <button
+                        onClick={() => setActiveSheetIndex(Math.min(result.sheetsUsed - 1, activeSheetIndex + 1))}
+                        disabled={activeSheetIndex === result.sheetsUsed - 1}
+                        className="p-1 rounded-lg hover:bg-[#1E293B] text-white disabled:opacity-30"
+                      >
+                        <ChevronRight className="w-4 h-4" />
+                      </button>
+                    </div>
+                  )}
+
+                  <div className="flex items-center bg-[#0F172A] rounded-xl border border-[#334155] p-1">
                     <button
-                      onClick={() => setZoomLevel(Math.max(0.6, zoomLevel - 0.15))}
-                      className="p-2 rounded-lg bg-[#0F172A] border border-[#334155] text-white"
+                      onClick={() => setZoomLevel(Math.max(0.6, zoomLevel - 0.2))}
+                      className="p-1 rounded-lg hover:bg-[#1E293B] text-white"
                     >
                       <ZoomOut className="w-4 h-4" />
                     </button>
-                    <span className="text-xs font-bold text-[#94A3B8] w-12 text-center">
-                      {Math.round(zoomLevel * 100)}%
-                    </span>
+                    <span className="text-xs font-mono text-[#94A3B8] px-1.5">{Math.round(zoomLevel * 100)}%</span>
                     <button
-                      onClick={() => setZoomLevel(Math.min(1.8, zoomLevel + 0.15))}
-                      className="p-2 rounded-lg bg-[#0F172A] border border-[#334155] text-white"
+                      onClick={() => setZoomLevel(Math.min(2.0, zoomLevel + 0.2))}
+                      className="p-1 rounded-lg hover:bg-[#1E293B] text-white"
                     >
                       <ZoomIn className="w-4 h-4" />
                     </button>
                   </div>
                 </div>
+              </div>
 
-                {/* SVG Visual Container */}
-                <div className="flex-1 min-h-[420px] rounded-xl bg-[#0B1120] border border-[#334155] p-6 flex items-center justify-center overflow-auto">
-                  {result && (
-                    <div
-                      style={{ transform: `scale(${zoomLevel})`, transformOrigin: 'center center' }}
-                      className="transition-transform duration-200 shadow-2xl rounded-lg overflow-hidden border-4 border-[#334155]"
+              {/* SVG Canvas */}
+              <div className="relative w-full rounded-xl bg-[#0F172A] border border-[#334155] p-4 flex items-center justify-center min-h-[380px] overflow-auto">
+                {result ? (
+                  <div
+                    style={{
+                      transform: `scale(${zoomLevel})`,
+                      transformOrigin: 'center center',
+                      transition: 'transform 0.15s ease',
+                    }}
+                    className="flex flex-col items-center"
+                  >
+                    <svg
+                      viewBox={`0 0 ${sheet.width} ${sheet.height}`}
+                      className="w-full max-w-[620px] aspect-[280/207] bg-slate-900 rounded-lg shadow-2xl border-2 border-slate-600"
                     >
-                      <svg
-                        width={sheet.width * 2.6}
-                        height={sheet.height * 2.6}
-                        viewBox={`0 0 ${sheet.width} ${sheet.height}`}
-                        className="bg-[#1E293B]"
-                      >
-                        {/* Background Sheet Grid */}
-                        <rect
-                          x="0"
-                          y="0"
-                          width={sheet.width}
-                          height={sheet.height}
-                          fill="#1E293B"
-                          stroke="#475569"
-                          strokeWidth="0.5"
-                        />
+                      {/* Panneau Brut Background */}
+                      <rect x="0" y="0" width={sheet.width} height={sheet.height} fill="#1E293B" stroke="#475569" strokeWidth="0.5" />
 
-                        {/* Placed Pieces for current Sheet */}
-                        {result.sheets[activeSheetIndex]?.pieces.map((piece, i) => {
-                          const color = PIECE_COLORS[(piece.pieceNumber - 1) % PIECE_COLORS.length];
+                      {/* Placed Pieces on this sheet */}
+                      {result.placedPieces
+                        .filter((p) => p.sheetIndex === activeSheetIndex)
+                        .map((p) => {
+                          const colors = [
+                            '#38BDF8', '#F5A623', '#34D399', '#F87171', '#A78BFA', '#FBBF24', '#2DD4BF', '#818CF8'
+                          ];
+                          const color = colors[(p.pieceNumber - 1) % colors.length];
+
                           return (
-                            <g key={i}>
+                            <g key={`${p.sheetIndex}_${p.pieceNumber}`}>
                               <rect
-                                x={piece.x}
-                                y={piece.y}
-                                width={piece.width}
-                                height={piece.height}
+                                x={p.x}
+                                y={p.y}
+                                width={p.width}
+                                height={p.height}
                                 fill={color}
-                                fillOpacity="0.85"
                                 stroke="#0F172A"
-                                strokeWidth="0.6"
-                                rx="1"
+                                strokeWidth={Math.max(0.2, options.kerfWidth / 10)}
+                                rx={0.5}
+                                opacity="0.9"
                               />
-                              <text
-                                x={piece.x + piece.width / 2}
-                                y={piece.y + piece.height / 2 - 2}
-                                textAnchor="middle"
-                                dominantBaseline="central"
-                                fill="#000000"
-                                fontSize={Math.min(12, Math.max(6, piece.height / 3.5))}
-                                fontWeight="900"
-                              >
-                                #{piece.pieceNumber}
-                              </text>
-                              <text
-                                x={piece.x + piece.width / 2}
-                                y={piece.y + piece.height / 2 + 8}
-                                textAnchor="middle"
-                                dominantBaseline="central"
-                                fill="#000000"
-                                fontSize={Math.min(8, Math.max(4, piece.height / 5))}
-                                fontWeight="bold"
-                              >
-                                {piece.width}×{piece.height}
-                              </text>
+                              {options.showLabels && (
+                                <>
+                                  <text
+                                    x={p.x + p.width / 2}
+                                    y={p.y + p.height / 2 - (p.height > 20 ? 2 : 0)}
+                                    textAnchor="middle"
+                                    dominantBaseline="central"
+                                    fill="#000000"
+                                    fontSize={Math.min(9, Math.max(4, p.height / 3.5))}
+                                    fontWeight="bold"
+                                    fontFamily="sans-serif"
+                                  >
+                                    #{p.pieceNumber}
+                                  </text>
+                                  {p.height > 15 && (
+                                    <text
+                                      x={p.x + p.width / 2}
+                                      y={p.y + p.height / 2 + 5}
+                                      textAnchor="middle"
+                                      dominantBaseline="central"
+                                      fill="#000000"
+                                      fontSize={Math.min(6, Math.max(3, p.height / 5))}
+                                      fontWeight="bold"
+                                      fontFamily="monospace"
+                                    >
+                                      {p.width}×{p.height}
+                                    </text>
+                                  )}
+                                </>
+                              )}
                             </g>
                           );
                         })}
-                      </svg>
-                    </div>
-                  )}
-                </div>
+                    </svg>
+                  </div>
+                ) : (
+                  <div className="flex flex-col items-center justify-center text-center p-8 text-[#64748B]">
+                    <Layers className="w-12 h-12 stroke-[1.5] mb-3 text-[#475569]" />
+                    <p className="font-bold text-white text-sm">Aucun plan de coupe généré</p>
+                    <p className="text-xs text-[#94A3B8] max-w-sm mt-1">
+                      Renseignez vos pièces ou scannez une photo, puis cliquez sur &quot;Générer le plan de découpe optimal&quot;.
+                    </p>
+                  </div>
+                )}
               </div>
 
-              {/* Pieces Breakdown & Export Panel */}
-              <div className="lg:col-span-4 rounded-2xl bg-[#1E293B]/60 border border-[#334155] p-6 flex flex-col justify-between">
-                <div>
-                  <h3 className="text-base font-bold text-white mb-3">Détail des Pièces du Panneau</h3>
-                  <div className="space-y-2 max-h-[380px] overflow-y-auto pr-1">
-                    {result?.sheets[activeSheetIndex]?.pieces.map((p, idx) => {
-                      const color = PIECE_COLORS[(p.pieceNumber - 1) % PIECE_COLORS.length];
-                      return (
-                        <div
-                          key={idx}
-                          className="flex items-center gap-3 p-2.5 rounded-xl bg-[#0F172A] border border-[#334155]"
-                        >
-                          <div
-                            style={{ backgroundColor: color }}
-                            className="w-7 h-7 rounded-lg text-black font-black text-xs flex items-center justify-center shrink-0"
-                          >
-                            {p.pieceNumber}
-                          </div>
-                          <div className="flex-1 truncate">
-                            <p className="text-xs font-bold text-white truncate">{p.name}</p>
-                            <p className="text-[11px] text-[#94A3B8]">
-                              {p.width} × {p.height} cm {p.rotated && '• (Tourné)'}
-                            </p>
-                          </div>
-                        </div>
-                      );
-                    })}
+              {/* Download & Actions Footer */}
+              {result && (
+                <div className="mt-5 pt-4 border-t border-[#334155] flex flex-wrap items-center justify-between gap-3">
+                  <div className="text-xs text-[#94A3B8]">
+                    <span className="font-semibold text-white">Chute panneau actuel : </span>
+                    <span className="font-mono font-bold text-amber-400">{currentSheet?.wasteRate || 0}%</span>
                   </div>
-                </div>
 
-                {/* Export Options */}
-                <div className="mt-6 pt-4 border-t border-[#334155] space-y-2.5">
                   <button
                     onClick={handleDownloadPdf}
-                    className="w-full flex items-center justify-center gap-2 py-3 rounded-xl bg-[#F5A623] hover:bg-[#D97706] text-black font-extrabold text-xs tracking-wide shadow-md transition-all"
+                    className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-[#1E3A5F] hover:bg-[#2A4F82] text-white font-bold text-xs shadow-md transition-all border border-sky-400/30"
                   >
-                    <Download className="w-4 h-4" />
-                    TÉLÉCHARGER LE PLAN PDF COMPLET (A4)
-                  </button>
-                  <button
-                    onClick={() => setStep('capture')}
-                    className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl border border-[#475569] hover:bg-[#334155] text-[#CBD5E1] font-bold text-xs transition-all"
-                  >
-                    <Layers className="w-4 h-4" />
-                    Modifier les cotes & recalculer
+                    <Download className="w-4 h-4 text-sky-400" />
+                    <span>TÉLÉCHARGER LE PLAN PDF COMPLET (A4)</span>
                   </button>
                 </div>
-              </div>
+              )}
             </div>
+
+            {/* Pieces breakdown list on current sheet */}
+            {result && currentSheet && (
+              <div className="rounded-2xl bg-[#1E293B] border border-[#334155] p-5 shadow-lg">
+                <h3 className="text-xs font-bold text-white uppercase tracking-wider mb-3">
+                  Nomenclature du Panneau {activeSheetIndex + 1} ({currentSheet.pieces.length} pièces)
+                </h3>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+                  {currentSheet.pieces.map((p) => (
+                    <div key={p.pieceNumber} className="p-2.5 rounded-xl bg-[#0F172A] border border-[#334155] flex items-center justify-between">
+                      <div className="flex items-center gap-2 truncate">
+                        <span className="font-bold text-amber-400 font-mono">#{p.pieceNumber}</span>
+                        <span className="text-white font-medium truncate">{p.name}</span>
+                      </div>
+                      <span className="font-mono text-[#94A3B8] shrink-0 font-semibold">{p.width} × {p.height} cm</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
-        )}
+        </div>
       </main>
     </div>
   );

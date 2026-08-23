@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { optimizeCutting, Piece, Sheet } from '@/lib/cutting/binpacking';
+import { optimizeCutting, Piece, Sheet, OptimizationOptions } from '@/lib/cutting/binpacking';
 import { z } from 'zod';
 
 const OptimizeSchema = z.object({
@@ -7,8 +7,9 @@ const OptimizeSchema = z.object({
     width: z.number().positive(),
     height: z.number().positive(),
     kerf: z.number().min(0).default(0.3),
-    margin: z.number().min(0).default(0),
+    margin: z.number().min(0).default(1.0),
     grainDirection: z.boolean().default(true),
+    material: z.enum(['mdf', 'aluminium', 'verre', 'contreplaques']).optional(),
   }),
   pieces: z.array(
     z.object({
@@ -17,9 +18,19 @@ const OptimizeSchema = z.object({
       width: z.number().positive(),
       height: z.number().positive(),
       quantity: z.number().int().positive().default(1),
+      material: z.enum(['mdf', 'aluminium', 'verre', 'contreplaques']).optional().nullable(),
       rotatable: z.boolean().optional(),
     })
   ).min(1),
+  options: z.object({
+    kerfWidth: z.number().min(0).max(10).optional(),
+    showLabels: z.boolean().optional(),
+    singleSheetOnly: z.boolean().optional(),
+    considerMaterial: z.boolean().optional(),
+    edgeBanding: z.boolean().optional(),
+    grainDirection: z.boolean().optional(),
+    optimizationPriority: z.enum(['min_waste', 'min_sheets', 'balanced']).optional(),
+  }).optional(),
 });
 
 export async function POST(req: Request) {
@@ -34,8 +45,8 @@ export async function POST(req: Request) {
       );
     }
 
-    const { sheet, pieces } = parsed.data;
-    const result = optimizeCutting(pieces as Piece[], sheet as Sheet);
+    const { sheet, pieces, options } = parsed.data;
+    const result = optimizeCutting(pieces as Piece[], sheet as Sheet, options as Partial<OptimizationOptions>);
 
     return NextResponse.json({
       success: true,
