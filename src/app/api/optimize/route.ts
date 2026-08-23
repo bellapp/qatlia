@@ -15,12 +15,12 @@ const OptimizeSchema = z.object({
     z.object({
       id: z.string().optional(),
       name: z.string().optional(),
-      width: z.number().positive(),
-      height: z.number().positive(),
-      quantity: z.number().int().positive().default(1),
-      material: z.enum(['mdf', 'aluminium', 'verre', 'contreplaques']).optional().nullable(),
+      width: z.coerce.number().positive(),
+      height: z.coerce.number().positive(),
+      quantity: z.coerce.number().int().positive().default(1),
+      material: z.string().optional().nullable(),
       rotatable: z.boolean().optional(),
-    })
+    }).passthrough()
   ).min(1),
   options: z.object({
     kerfWidth: z.number().min(0).max(10).optional(),
@@ -29,8 +29,8 @@ const OptimizeSchema = z.object({
     considerMaterial: z.boolean().optional(),
     edgeBanding: z.boolean().optional(),
     grainDirection: z.boolean().optional(),
-    optimizationPriority: z.enum(['min_waste', 'min_sheets', 'balanced']).optional(),
-  }).optional(),
+    optimizationPriority: z.string().optional(),
+  }).passthrough().optional(),
 });
 
 export async function POST(req: Request) {
@@ -39,6 +39,7 @@ export async function POST(req: Request) {
     const parsed = OptimizeSchema.safeParse(body);
 
     if (!parsed.success) {
+      console.error('Validation Optimize error:', JSON.stringify(parsed.error.format()));
       return NextResponse.json(
         { error: 'INVALID_INPUT', details: parsed.error.format() },
         { status: 400 }
