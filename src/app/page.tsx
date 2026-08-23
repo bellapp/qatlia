@@ -8,8 +8,6 @@ import {
   Layers,
   Sparkles,
   Play,
-  Plus,
-  Trash2,
   RefreshCw,
   Download,
   ZoomIn,
@@ -29,6 +27,7 @@ import {
   MaterialType,
 } from '@/lib/cutting/binpacking';
 import { OptionsPanel } from '@/components/OptionsPanel';
+import { PiecesManager } from '@/components/PiecesManager';
 
 const DEFAULT_SHEET: Sheet = {
   width: 280, // cm
@@ -167,6 +166,38 @@ export default function Dashboard() {
     reader.readAsDataURL(file);
   };
 
+  const handleDownloadDxf = async () => {
+    if (!result) return;
+    try {
+      const res = await fetch('/api/export-dxf', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          projectName: 'QatlIA_CNC_Plan',
+          sheet: {
+            width: sheet.width,
+            height: sheet.height,
+          },
+          placedPieces: result.placedPieces,
+        }),
+      });
+
+      if (res.ok) {
+        const blob = await res.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `qatlia_cnc_${Date.now()}.dxf`;
+        document.body.appendChild(a);
+        a.click();
+        window.URL.revokeObjectURL(url);
+        document.body.removeChild(a);
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
   const handleDownloadPdf = async () => {
     if (!result) return;
     try {
@@ -203,26 +234,6 @@ export default function Dashboard() {
       console.error(err);
       window.print();
     }
-  };
-
-  const handleAddPiece = () => {
-    const newId = `p_${Date.now()}`;
-    setPieces([
-      ...pieces,
-      { id: newId, name: `Pièce ${pieces.length + 1}`, width: 100, height: 50, quantity: 1, material: sheet.material || 'mdf', rotatable: true },
-    ]);
-  };
-
-  const handleRemovePiece = (index: number) => {
-    const copy = [...pieces];
-    copy.splice(index, 1);
-    setPieces(copy);
-  };
-
-  const handleUpdatePiece = (index: number, field: keyof Piece, val: string | number | boolean | null) => {
-    const copy = [...pieces];
-    copy[index] = { ...copy[index], [field]: val };
-    setPieces(copy);
   };
 
   const currentSheet = result?.sheets[activeSheetIndex] || (result ? {
@@ -421,93 +432,23 @@ export default function Dashboard() {
               )}
             </div>
 
-            {/* Pieces Table Input */}
-            <div className="rounded-2xl bg-[#1E293B] border border-[#334155] p-5 shadow-lg">
-              <div className="flex items-center justify-between mb-4">
-                <div>
-                  <h2 className="text-sm font-bold text-white uppercase tracking-wider">
-                    Liste des Pièces à Découper ({pieces.reduce((s, p) => s + (p.quantity || 1), 0)})
-                  </h2>
-                  <p className="text-[11px] text-[#94A3B8]">Dimensions en cm</p>
-                </div>
-                <button
-                  onClick={handleAddPiece}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 text-[#F5A623] text-xs font-bold transition-all border border-amber-500/30"
-                >
-                  <Plus className="w-3.5 h-3.5" />
-                  <span>Ajouter</span>
-                </button>
-              </div>
+            {/* Pieces Table Input (F1, F2, F3, F5) */}
+            <PiecesManager
+              pieces={pieces}
+              onUpdatePieces={setPieces}
+              defaultMaterial={sheet.material || 'mdf'}
+              showMaterialCol={options.considerMaterial}
+              disabled={isOptimizing}
+            />
 
-              <div className="space-y-2 max-h-[340px] overflow-y-auto pr-1">
-                {pieces.map((p, idx) => (
-                  <div key={p.id || idx} className="p-3 rounded-xl bg-[#0F172A] border border-[#334155] flex flex-wrap sm:flex-nowrap items-center gap-2 text-xs">
-                    <span className="font-mono text-[#64748B] w-5 text-center shrink-0">#{idx + 1}</span>
-                    <input
-                      type="text"
-                      placeholder="Nom"
-                      value={p.name}
-                      onChange={(e) => handleUpdatePiece(idx, 'name', e.target.value)}
-                      className="flex-1 min-w-[90px] px-2.5 py-1.5 rounded-lg bg-[#1E293B] border border-[#334155] text-white font-medium outline-none focus:border-amber-400"
-                    />
-                    <div className="flex items-center gap-1 shrink-0">
-                      <input
-                        type="number"
-                        placeholder="Long."
-                        value={p.width}
-                        onChange={(e) => handleUpdatePiece(idx, 'width', parseFloat(e.target.value) || 0)}
-                        className="w-16 px-2 py-1.5 rounded-lg bg-[#1E293B] border border-[#334155] text-white font-mono font-bold text-right outline-none focus:border-amber-400"
-                      />
-                      <span className="text-[#64748B]">×</span>
-                      <input
-                        type="number"
-                        placeholder="Larg."
-                        value={p.height}
-                        onChange={(e) => handleUpdatePiece(idx, 'height', parseFloat(e.target.value) || 0)}
-                        className="w-16 px-2 py-1.5 rounded-lg bg-[#1E293B] border border-[#334155] text-white font-mono font-bold text-right outline-none focus:border-amber-400"
-                      />
-                    </div>
-                    <div className="flex items-center gap-1 shrink-0">
-                      <span className="text-[#64748B] text-[10px]">Qté:</span>
-                      <input
-                        type="number"
-                        min="1"
-                        value={p.quantity}
-                        onChange={(e) => handleUpdatePiece(idx, 'quantity', parseInt(e.target.value, 10) || 1)}
-                        className="w-12 px-1.5 py-1.5 rounded-lg bg-[#1E293B] border border-[#334155] text-white font-mono font-bold text-center outline-none focus:border-amber-400"
-                      />
-                    </div>
-                    {options.considerMaterial && (
-                      <select
-                        value={p.material || sheet.material || 'mdf'}
-                        onChange={(e) => handleUpdatePiece(idx, 'material', e.target.value as MaterialType)}
-                        className="px-1.5 py-1.5 rounded-lg bg-[#1E293B] border border-[#334155] text-white text-[11px] outline-none"
-                      >
-                        <option value="mdf">MDF</option>
-                        <option value="aluminium">Alu</option>
-                        <option value="verre">Verre</option>
-                        <option value="contreplaques">CP</option>
-                      </select>
-                    )}
-                    <button
-                      onClick={() => handleRemovePiece(idx)}
-                      className="p-1.5 rounded-lg hover:bg-rose-500/20 text-[#64748B] hover:text-rose-400 transition-colors shrink-0"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
-                  </div>
-                ))}
-              </div>
-
-              <button
-                onClick={handleRunOptimization}
-                disabled={isOptimizing || pieces.length === 0}
-                className="w-full mt-4 py-3 rounded-xl bg-gradient-to-r from-[#F5A623] to-[#E09015] hover:brightness-110 text-slate-950 font-black text-sm flex items-center justify-center gap-2 shadow-lg shadow-amber-500/20 transition-all disabled:opacity-50"
-              >
-                {isOptimizing ? <RefreshCw className="w-5 h-5 animate-spin" /> : <Play className="w-5 h-5 fill-current" />}
-                <span>GÉNÉRER LE PLAN DE DÉCOUPE OPTIMAL</span>
-              </button>
-            </div>
+            <button
+              onClick={handleRunOptimization}
+              disabled={isOptimizing || pieces.length === 0}
+              className="w-full py-3.5 rounded-xl bg-gradient-to-r from-[#F5A623] to-[#E09015] hover:brightness-110 text-slate-950 font-black text-sm flex items-center justify-center gap-2 shadow-lg shadow-amber-500/20 transition-all disabled:opacity-50 cursor-pointer"
+            >
+              {isOptimizing ? <RefreshCw className="w-5 h-5 animate-spin" /> : <Play className="w-5 h-5 fill-current" />}
+              <span>GÉNÉRER LE PLAN DE DÉCOUPE OPTIMAL</span>
+            </button>
           </div>
 
           {/* RIGHT COLUMN: Interactive 2D Visualizer & Results (7 cols) */}
@@ -722,7 +663,7 @@ export default function Dashboard() {
                 )}
               </div>
 
-              {/* Download & Actions Footer */}
+              {/* Download & Actions Footer (F5: Export Multi-Format) */}
               {result && (
                 <div className="mt-5 pt-4 border-t border-[#334155] flex flex-wrap items-center justify-between gap-3">
                   <div className="text-xs text-[#94A3B8]">
@@ -730,13 +671,24 @@ export default function Dashboard() {
                     <span className="font-mono font-bold text-amber-400">{currentSheet?.wasteRate || 0}%</span>
                   </div>
 
-                  <button
-                    onClick={handleDownloadPdf}
-                    className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-[#1E3A5F] hover:bg-[#2A4F82] text-white font-bold text-xs shadow-md transition-all border border-sky-400/30"
-                  >
-                    <Download className="w-4 h-4 text-sky-400" />
-                    <span>TÉLÉCHARGER LE PLAN PDF COMPLET (A4)</span>
-                  </button>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={handleDownloadDxf}
+                      className="flex items-center gap-1.5 px-3.5 py-2.5 rounded-xl bg-[#0F172A] hover:bg-[#283548] text-slate-200 font-bold text-xs shadow-md transition-all border border-[#334155]"
+                      title="Télécharger le fichier DXF pour machine CNC"
+                    >
+                      <Download className="w-4 h-4 text-emerald-400" />
+                      <span>DXF (CNC)</span>
+                    </button>
+
+                    <button
+                      onClick={handleDownloadPdf}
+                      className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-[#1E3A5F] hover:bg-[#2A4F82] text-white font-bold text-xs shadow-md transition-all border border-sky-400/30"
+                    >
+                      <Download className="w-4 h-4 text-sky-400" />
+                      <span>PLAN PDF COMPLET (A4)</span>
+                    </button>
+                  </div>
                 </div>
               )}
             </div>
