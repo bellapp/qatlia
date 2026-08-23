@@ -198,8 +198,9 @@ export const OptionsPanel: React.FC<OptionsPanelProps> = ({
               onChange={(e) => updateField('optimizationPriority', e.target.value as OptimizationOptions['optimizationPriority'])}
               className="px-3 py-1.5 rounded-lg bg-[#0F172A] border border-[#475569] text-white text-xs outline-none focus:border-amber-400 disabled:opacity-50"
             >
+              <option value="linear_guillotine">Coupe Linéaire Traversante (Recommandé Atelier)</option>
               <option value="min_waste">Minimiser les chutes (%)</option>
-              <option value="min_sheets">Minimiser les panneaux</option>
+              <option value="min_sheets">Minimiser les panneaux bruts</option>
               <option value="balanced">Équilibré (Facilité de coupe)</option>
             </select>
           </div>

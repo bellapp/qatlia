@@ -26,7 +26,7 @@ export interface OptimizationOptions {
   considerMaterial: boolean;
   edgeBanding: boolean;
   grainDirection: boolean;
-  optimizationPriority: 'min_waste' | 'min_sheets' | 'balanced';
+  optimizationPriority: 'min_waste' | 'min_sheets' | 'linear_guillotine' | 'balanced';
   defaultMaterial?: MaterialType;
 }
 
@@ -37,7 +37,7 @@ export const OPTIONS_DEFAULTS: OptimizationOptions = {
   considerMaterial: false,
   edgeBanding: false,
   grainDirection: true,
-  optimizationPriority: 'min_waste',
+  optimizationPriority: 'linear_guillotine',
   defaultMaterial: 'mdf',
 };
 
@@ -69,6 +69,7 @@ export interface PlacedSheet {
   pieces: PlacedPiece[];
   wasteRate: number;
   usedArea: number;
+  linearCutsCount?: number;
 }
 
 export interface MaterialStat {
@@ -87,7 +88,8 @@ export interface OptimizationResult {
   wastePercentage: number;
   totalAreaUsed: number;
   totalAreaAvailable: number;
-  cutLines: Array<{ sheetIndex: number; x1: number; y1: number; x2: number; y2: number; type: 'vertical' | 'horizontal' }>;
+  moneySavedMad: number; // Économie estimée en MAD par rapport à une coupe non-optimisée
+  totalLinearCutMeters: number; // Linéaire total de passe de scie
   sheets: PlacedSheet[];
   materialStats?: MaterialStat[];
 }
@@ -124,9 +126,9 @@ function expandPieces(pieces: Piece[], defaultMaterial: MaterialType): ExpandedP
 }
 
 /**
- * Guillotine Packer Multi-Heuristiques (ShortSideFit + LongSideFit + BestAreaFit + Guillotine Split optimal)
+ * Guillotine Strip Packer : Conçu spécialement pour l'opérateur de scie (Découpes linéaires traversantes de bout en bout)
  */
-class GuillotinePacker {
+class LinearGuillotinePacker {
   private sheetW: number;
   private sheetH: number;
   private kerf: number;
@@ -142,19 +144,12 @@ class GuillotinePacker {
     this.freeRects = [{ x: 0, y: 0, width: sheetW, height: sheetH }];
   }
 
-  public clone(): GuillotinePacker {
-    const copy = new GuillotinePacker(this.sheetW, this.sheetH, this.kerf, this.material);
-    copy.freeRects = this.freeRects.map((r) => ({ ...r }));
-    copy.placed = this.placed.map((p) => ({ ...p }));
-    return copy;
-  }
-
   public tryFit(
     item: ExpandedPiece,
     sheetIndex: number,
     pieceNumber: number,
     grainDirection: boolean,
-    splitRule: 'shorter_axis' | 'longer_axis' | 'guillotine_strip' = 'shorter_axis'
+    cutOrientation: 'horizontal_strip' | 'vertical_strip' = 'horizontal_strip'
   ): PlacedPiece | null {
     const canRotate = item.rotatable && !grainDirection;
 
@@ -165,11 +160,11 @@ class GuillotinePacker {
     for (let i = 0; i < this.freeRects.length; i++) {
       const r = this.freeRects[i];
 
-      // Test sans rotation
+      // 1. Essai sans rotation
       if (r.width >= item.width && r.height >= item.height) {
-        const leftoverW = r.width - item.width;
-        const leftoverH = r.height - item.height;
-        const score = Math.min(leftoverW, leftoverH) * 10000 + Math.max(leftoverW, leftoverH);
+        // En coupe linéaire, on privilégie l'alignement parfait sur la bande
+        const stripWaste = cutOrientation === 'horizontal_strip' ? Math.abs(r.height - item.height) : Math.abs(r.width - item.width);
+        const score = stripWaste * 1000 + (r.x + r.y);
 
         if (score < bestScore) {
           bestScore = score;
@@ -178,12 +173,11 @@ class GuillotinePacker {
         }
       }
 
-      // Test avec rotation (si permise)
+      // 2. Essai avec rotation si permise
       if (canRotate) {
         if (r.width >= item.height && r.height >= item.width) {
-          const leftoverW = r.width - item.height;
-          const leftoverH = r.height - item.width;
-          const score = Math.min(leftoverW, leftoverH) * 10000 + Math.max(leftoverW, leftoverH);
+          const stripWaste = cutOrientation === 'horizontal_strip' ? Math.abs(r.height - item.width) : Math.abs(r.width - item.height);
+          const score = stripWaste * 1000 + (r.x + r.y);
 
           if (score < bestScore) {
             bestScore = score;
@@ -217,13 +211,12 @@ class GuillotinePacker {
 
     this.placed.push(placedPiece);
 
-    // Guillotine Cut
+    // Coupe Guillotine Linéaire Traversante (Passe de scie de bout en bout)
     const rightW = targetRect.width - (placedW + this.kerf);
     const bottomH = targetRect.height - (placedH + this.kerf);
 
-    const splitShorter = splitRule === 'shorter_axis' ? (placedW <= placedH) : (placedW >= placedH);
-
-    if (splitShorter) {
+    if (cutOrientation === 'horizontal_strip') {
+      // Coupe horizontale principale traversante
       if (rightW > 0.05) {
         this.freeRects.push({
           x: targetRect.x + placedW + this.kerf,
@@ -241,20 +234,21 @@ class GuillotinePacker {
         });
       }
     } else {
-      if (rightW > 0.05) {
-        this.freeRects.push({
-          x: targetRect.x + placedW + this.kerf,
-          y: targetRect.y,
-          width: rightW,
-          height: targetRect.height,
-        });
-      }
+      // Coupe verticale principale traversante
       if (bottomH > 0.05) {
         this.freeRects.push({
           x: targetRect.x,
           y: targetRect.y + placedH + this.kerf,
           width: placedW,
           height: bottomH,
+        });
+      }
+      if (rightW > 0.05) {
+        this.freeRects.push({
+          x: targetRect.x + placedW + this.kerf,
+          y: targetRect.y,
+          width: rightW,
+          height: targetRect.height,
         });
       }
     }
@@ -298,7 +292,7 @@ class GuillotinePacker {
 }
 
 /**
- * Optimisation Multi-Pass (Test de plusieurs stratégies de tri & guillotine split pour égaler OptiCoupe)
+ * Moteur d'optimisation QatlIA (Efficacité Scieur + Minimum Chutes)
  */
 export function optimizeCutting(
   pieces: Piece[],
@@ -330,35 +324,35 @@ export function optimizeCutting(
       }, {} as Partial<Record<MaterialType, ExpandedPiece[]>>)
     : { [defaultMat]: expanded };
 
-  // Définition des stratégies de tri
+  // Stratégies de tri pour bandes linéaires de coupe
   const sortStrategies: Array<(a: ExpandedPiece, b: ExpandedPiece) => number> = [
-    // Stratégie 1: Largeur max puis longueur (Strips)
+    // 1. Hauteur commune (Bande de coupe parfaite)
+    (a, b) => {
+      if (b.height !== a.height) return b.height - a.height;
+      return b.width - a.width;
+    },
+    // 2. Longueur commune
+    (a, b) => {
+      if (b.width !== a.width) return b.width - a.width;
+      return b.height - a.height;
+    },
+    // 3. Grande dimension d'abord
     (a, b) => {
       const maxA = Math.max(a.width, a.height);
       const maxB = Math.max(b.width, b.height);
       if (maxB !== maxA) return maxB - maxA;
       return (b.width * b.height) - (a.width * a.height);
     },
-    // Stratégie 2: Surface décroissante (BAF)
-    (a, b) => (b.width * b.height) - (a.width * a.height),
-    // Stratégie 3: Longueur pure (Longest Side First)
-    (a, b) => Math.max(b.width, b.height) - Math.max(a.width, a.height),
-    // Stratégie 4: Rapport d'aspect / Strip alignment
-    (a, b) => {
-      if (b.height !== a.height) return b.height - a.height;
-      return b.width - a.width;
-    }
   ];
 
-  const splitRules: Array<'shorter_axis' | 'longer_axis'> = ['shorter_axis', 'longer_axis'];
+  const orientations: Array<'horizontal_strip' | 'vertical_strip'> = ['horizontal_strip', 'vertical_strip'];
 
   let bestResult: OptimizationResult | null = null;
   let minSheets = Number.POSITIVE_INFINITY;
   let minWaste = Number.POSITIVE_INFINITY;
 
-  // Multi-pass simulation pour trouver la meilleure découpe
   for (const sortFn of sortStrategies) {
-    for (const splitRule of splitRules) {
+    for (const orient of orientations) {
       const allPlaced: PlacedPiece[] = [];
       const unplacedPieces: Piece[] = [];
       const placedSheets: PlacedSheet[] = [];
@@ -368,13 +362,13 @@ export function optimizeCutting(
       for (const [matKey, groupPieces] of Object.entries(materialGroups)) {
         const currentMat = matKey as MaterialType;
         const sortedPieces = [...groupPieces].sort(sortFn);
-        const groupPackers: { packer: GuillotinePacker; sheetIndex: number }[] = [];
+        const groupPackers: { packer: LinearGuillotinePacker; sheetIndex: number }[] = [];
 
         for (const item of sortedPieces) {
           let fitted = false;
 
           for (const { packer, sheetIndex } of groupPackers) {
-            const placed = packer.tryFit(item, sheetIndex, globalPieceIndex, mergedOptions.grainDirection, splitRule);
+            const placed = packer.tryFit(item, sheetIndex, globalPieceIndex, mergedOptions.grainDirection, orient);
             if (placed) {
               allPlaced.push({
                 ...placed,
@@ -393,11 +387,11 @@ export function optimizeCutting(
               continue;
             }
 
-            const newPacker = new GuillotinePacker(effectiveW, effectiveH, kerfCm, currentMat);
+            const newPacker = new LinearGuillotinePacker(effectiveW, effectiveH, kerfCm, currentMat);
             const assignedSheetIdx = globalSheetIndex++;
             groupPackers.push({ packer: newPacker, sheetIndex: assignedSheetIdx });
 
-            const placed = newPacker.tryFit(item, assignedSheetIdx, globalPieceIndex, mergedOptions.grainDirection, splitRule);
+            const placed = newPacker.tryFit(item, assignedSheetIdx, globalPieceIndex, mergedOptions.grainDirection, orient);
             if (placed) {
               allPlaced.push({
                 ...placed,
@@ -434,7 +428,14 @@ export function optimizeCutting(
       const totalUsed = allPlaced.reduce((sum, p) => sum + p.width * p.height, 0);
       const currentWaste = Math.max(0, Math.round(((totalAvailable - totalUsed) / totalAvailable) * 1000) / 10);
 
-      // Si c'est le meilleur résultat trouvé
+      // Calcul du linéaire de passe de coupe pour l'opérateur (en mètres)
+      const linearCutMeters = allPlaced.reduce((sum, p) => sum + (p.width + p.height) / 100, 0) * 1.1;
+
+      // Économie en MAD : calculée sur la base d'un panneau moyen à 450 MAD économisé
+      const baselineSheets = Math.ceil(totalUsed / (sheet.width * sheet.height * 0.65)); // méthode artisanale sans algo (65% rendement)
+      const sheetsSaved = Math.max(0, baselineSheets - currentSheetsUsed);
+      const moneySavedMad = sheetsSaved * 450 + (allPlaced.length * 5); // 450 MAD/panneau + temps de coupe
+
       if (
         bestResult === null ||
         unplacedPieces.length < bestResult.unplacedPieces.length ||
@@ -478,7 +479,8 @@ export function optimizeCutting(
           wastePercentage: currentWaste,
           totalAreaUsed: Math.round(totalUsed * 10) / 10,
           totalAreaAvailable: totalAvailable,
-          cutLines: [],
+          moneySavedMad,
+          totalLinearCutMeters: Math.round(linearCutMeters * 10) / 10,
           sheets: placedSheets,
           materialStats: mergedOptions.considerMaterial ? materialStats : undefined,
         };

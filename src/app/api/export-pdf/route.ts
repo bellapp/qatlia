@@ -4,14 +4,13 @@ import autoTable from 'jspdf-autotable';
 import { z } from 'zod';
 
 const ExportSchema = z.object({
-  template: z.enum(['opticoupe', 'classic']).default('opticoupe'),
   projectName: z.string().default('GLASS BONDING'),
   material: z.string().default('VRSSG6'),
-  costPerSheet: z.number().default(686.13), // Coût par panneau en €
-  costCutPerMeter: z.number().default(1.00), // Coût par mètre linéaire de découpe
+  costPerSheet: z.number().default(450.0), // Coût par panneau en MAD
+  costCutPerMeter: z.number().default(5.0), // Coût par mètre linéaire de coupe en MAD
   sheet: z.object({
-    width: z.number(), // ex: 3210 mm ou 321 cm
-    height: z.number(), // ex: 2250 mm ou 225 cm
+    width: z.number(),
+    height: z.number(),
     kerf: z.number().default(0.3),
     margin: z.number().default(0.0),
     grainDirection: z.boolean().default(true),
@@ -21,6 +20,7 @@ const ExportSchema = z.object({
     wastePercentage: z.number(),
     totalAreaUsed: z.number(),
     totalAreaAvailable: z.number(),
+    moneySavedMad: z.number().optional().default(0),
     placedPieces: z.array(
       z.object({
         pieceNumber: z.number(),
@@ -37,7 +37,7 @@ const ExportSchema = z.object({
 });
 
 /**
- * Modèle Industriel OptiCoupe 5.20b
+ * Modèle QatlIA Pro (Style Industriel Débit Atelier) — Devise par défaut : MAD (Dirhams)
  */
 export async function POST(req: Request) {
   try {
@@ -50,30 +50,35 @@ export async function POST(req: Request) {
 
     const { projectName, material, sheet, result, costPerSheet, costCutPerMeter } = parsed.data;
 
-    // Détection unité : si les cotes sont en cm (< 1000) ou en mm
+    // Unités
     const isMm = sheet.width > 500;
-    const toMm = (val: number) => isMm ? Math.round(val) : Math.round(val * 10);
+    const toMm = (val: number) => (isMm ? Math.round(val) : Math.round(val * 10));
     const toM2 = (w: number, h: number) => (toMm(w) * toMm(h)) / 1_000_000;
 
-    // Calculs industriels et financiers
+    // Calculs industriels et financiers en MAD
     const sheetAreaM2 = toM2(sheet.width, sheet.height);
     const totalSheetsAreaM2 = sheetAreaM2 * result.sheetsUsed;
     const totalPiecesAreaM2 = result.placedPieces.reduce((sum, p) => sum + toM2(p.width, p.height), 0);
     const globalWasteRate = totalSheetsAreaM2 > 0 ? ((totalSheetsAreaM2 - totalPiecesAreaM2) / totalSheetsAreaM2) * 100 : 0;
-    const nonReusableWasteRate = Math.min(2.5, globalWasteRate * 0.15); // estimation chutes < 100mm
+    const nonReusableWasteRate = Math.min(2.5, globalWasteRate * 0.15);
 
-    // Calcul du linéaire de découpe
+    // Linéaire de passe de coupe pour l'opérateur (en mètres)
     const linearCutMeters = result.placedPieces.reduce((sum, p) => sum + (2 * (toMm(p.width) + toMm(p.height))) / 1000, 0) * 0.65;
 
-    // Coûts
+    // Coûts et Économies générées en MAD
     const totalSheetCost = result.sheetsUsed * costPerSheet;
     const pieceCost = totalPiecesAreaM2 * (costPerSheet / sheetAreaM2);
     const wasteCost = totalSheetCost - pieceCost;
-    const nonReusableCost = wasteCost * (nonReusableWasteRate / globalWasteRate);
+    const nonReusableCost = wasteCost * (nonReusableWasteRate / (globalWasteRate || 1));
     const cuttingCost = linearCutMeters * costCutPerMeter;
     const totalNetCost = totalSheetCost - wasteCost + nonReusableCost + cuttingCost;
 
-    // Création document A4 Portrait (exactement comme le standard OptiCoupe)
+    // Gain d'optimisation calculé en MAD (Estimation gain matière + gain temps découpe linéaire)
+    const baselineSheets = Math.ceil(totalPiecesAreaM2 / (sheetAreaM2 * 0.65)); // méthode manuelle classique (65% efficacité)
+    const savedPanelsCount = Math.max(0, baselineSheets - result.sheetsUsed);
+    const estimatedSavingsMad = result.moneySavedMad || (savedPanelsCount * costPerSheet + Math.round(linearCutMeters * 2));
+
+    // Création document A4 Portrait
     const doc = new jsPDF({
       orientation: 'portrait',
       unit: 'mm',
@@ -84,7 +89,7 @@ export async function POST(req: Request) {
     const pageHeight = doc.internal.pageSize.getHeight();
     const today = new Date().toLocaleDateString('fr-FR');
 
-    // Regroupement des feuilles identiques (ex: "À fabriquer en 4 exemplaires")
+    // Regroupement des feuilles de même plan (ex: "À fabriquer en 4 exemplaires")
     interface SheetPattern {
       patternId: string;
       sheetIndices: number[];
@@ -125,34 +130,58 @@ export async function POST(req: Request) {
     const uniquePatterns = Array.from(patternsMap.values());
     const totalPages = 1 + uniquePatterns.length;
 
-    // Helper: Dessiner l'en-tête officiel OptiCoupe
-    const drawOptiHeader = (pageNum: number) => {
+    // En-tête QatlIA Pro
+    const drawQatliaHeader = (pageNum: number) => {
       doc.setDrawColor(0, 0, 0);
       doc.setLineWidth(0.3);
       doc.rect(20, 15, pageWidth - 40, 16);
 
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(9);
+      doc.setTextColor(30, 58, 95);
+      doc.text('QatlIA Pro 2026', 22, 20);
+
       doc.setFont('helvetica', 'normal');
-      doc.setFontSize(8);
-      doc.setTextColor(0, 0, 0);
-      doc.text('OptiCoupe 5.20b', 22, 19);
-      doc.text('DébitPanneaux1', 22, 23);
-      doc.text(`Page ${pageNum} / ${totalPages}`, 22, 27);
+      doc.setFontSize(7.5);
+      doc.setTextColor(100, 116, 139);
+      doc.text('Plan de Débit Linéaire & Optimisation', 22, 24);
+      doc.text(`Page ${pageNum} / ${totalPages}`, 22, 28);
 
       doc.setFont('helvetica', 'bold');
-      doc.setFontSize(14);
+      doc.setFontSize(13);
+      doc.setTextColor(0, 0, 0);
       doc.text(projectName.toUpperCase(), pageWidth / 2, 24, { align: 'center' });
 
       doc.setFont('helvetica', 'normal');
       doc.setFontSize(8);
-      doc.text(today, pageWidth - 22, 19, { align: 'right' });
+      doc.setTextColor(0, 0, 0);
+      doc.text(today, pageWidth - 22, 20, { align: 'right' });
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(245, 166, 35);
+      doc.text('Devise : MAD', pageWidth - 22, 26, { align: 'right' });
     };
 
     // ==========================================
-    // PAGE 1 : RÉCAPITULATIF & NOMENCLATURE
+    // PAGE 1 : RÉCAPITULATIF, GAINS & NOMENCLATURE
     // ==========================================
-    drawOptiHeader(1);
+    drawQatliaHeader(1);
 
-    // Groupement des pièces identiques pour la liste de débit
+    // Bloc mise en valeur du Gain & Économie d'Optimisation
+    doc.setFillColor(245, 247, 250);
+    doc.setDrawColor(30, 58, 95);
+    doc.setLineWidth(0.4);
+    doc.rect(20, 33, pageWidth - 40, 11, 'FD');
+
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(9);
+    doc.setTextColor(30, 58, 95);
+    doc.text('💰 GAIN ÉCONOMIQUE APRÈS OPTIMISATION QATLIA :', 24, 40);
+
+    doc.setFontSize(10);
+    doc.setTextColor(39, 174, 96);
+    doc.text(`+ ${estimatedSavingsMad.toLocaleString('fr-FR')} MAD ÉCONOMISÉS`, pageWidth - 24, 40, { align: 'right' });
+
+    // Groupement des pièces pour la liste de débit
     interface AggregatedPiece {
       num: number;
       material: string;
@@ -179,14 +208,15 @@ export async function POST(req: Request) {
 
     // 1. Tableau "Liste de débit" (Gauche)
     doc.setFont('helvetica', 'bold');
-    doc.setFontSize(11);
-    doc.text('Liste de débit', 20, 39);
+    doc.setFontSize(10);
+    doc.setTextColor(0, 0, 0);
+    doc.text('Liste de débit', 20, 49);
 
     const debitRows = debitList.map((d) => [d.num, d.material, d.dim, d.quantity]);
     debitRows.push(['', 'TOTAL', '', totalDebitQty]);
 
     autoTable(doc, {
-      startY: 42,
+      startY: 51,
       margin: { left: 20 },
       tableWidth: 80,
       head: [['', 'Matériau', 'Dimension', 'Quantité']],
@@ -194,7 +224,7 @@ export async function POST(req: Request) {
       theme: 'plain',
       headStyles: {
         fontSize: 7.5,
-        fontStyle: 'normal',
+        fontStyle: 'bold',
         textColor: [0, 0, 0],
         cellPadding: 1.5,
         lineColor: [0, 0, 0],
@@ -215,11 +245,11 @@ export async function POST(req: Request) {
 
     // 2. Tableau "Panneaux utilisés" (Droite)
     doc.setFont('helvetica', 'bold');
-    doc.setFontSize(11);
-    doc.text('Panneaux utilisés', 110, 39);
+    doc.setFontSize(10);
+    doc.text('Panneaux utilisés', 110, 49);
 
     autoTable(doc, {
-      startY: 42,
+      startY: 51,
       margin: { left: 110 },
       tableWidth: 80,
       head: [['Matériau', 'Référence', 'Dimension', 'Quantité', 'Surface']],
@@ -235,7 +265,7 @@ export async function POST(req: Request) {
       theme: 'plain',
       headStyles: {
         fontSize: 7.5,
-        fontStyle: 'normal',
+        fontStyle: 'bold',
         textColor: [0, 0, 0],
         cellPadding: 1.5,
         lineColor: [0, 0, 0],
@@ -256,10 +286,10 @@ export async function POST(req: Request) {
     });
 
     // 3. Tableau "Liste des plans de coupe" (Milieu)
-    const planCutStartY = Math.max(((doc as unknown) as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 14, 115);
+    const planCutStartY = Math.max(((doc as unknown) as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 12, 120);
     doc.setFont('helvetica', 'bold');
-    doc.setFontSize(11);
-    doc.text('Liste des plans de coupe', 20, planCutStartY - 3);
+    doc.setFontSize(10);
+    doc.text('Liste des plans de coupe (Passes Linéaires Traversantes)', 20, planCutStartY - 3);
 
     const planCutRows = uniquePatterns.map((pat, idx) => [
       idx + 1,
@@ -269,19 +299,19 @@ export async function POST(req: Request) {
       pat.count,
       pat.pieces.length,
       `${pat.wasteRate.toFixed(2)} %`,
-      `${pat.netCost.toFixed(2).replace('.', ',')} €`,
+      `${pat.netCost.toFixed(2).replace('.', ',')} MAD`,
     ]);
-    planCutRows.push(['', 'TOTAL', '', '', result.sheetsUsed, totalDebitQty, `${globalWasteRate.toFixed(2)} %`, `${totalNetCost.toFixed(2).replace('.', ',')} €`]);
+    planCutRows.push(['', 'TOTAL', '', '', result.sheetsUsed, totalDebitQty, `${globalWasteRate.toFixed(2)} %`, `${totalNetCost.toFixed(2).replace('.', ',')} MAD`]);
 
     autoTable(doc, {
       startY: planCutStartY,
       margin: { left: 20, right: 20 },
-      head: [['', 'Matériau', 'Référence', 'Dimension', 'Quantité', 'Pièces', 'Taux de chutes', 'Coût net']],
+      head: [['', 'Matériau', 'Référence', 'Dimension', 'Quantité', 'Pièces', 'Taux de chutes', 'Coût net (MAD)']],
       body: planCutRows,
       theme: 'plain',
       headStyles: {
         fontSize: 7.5,
-        fontStyle: 'normal',
+        fontStyle: 'bold',
         textColor: [0, 0, 0],
         cellPadding: 1.5,
         lineColor: [0, 0, 0],
@@ -297,39 +327,39 @@ export async function POST(req: Request) {
         1: { halign: 'left', cellWidth: 24 },
         2: { halign: 'center', cellWidth: 24 },
         3: { halign: 'center', cellWidth: 32 },
-        4: { halign: 'right', cellWidth: 18 },
+        4: { halign: 'right', cellWidth: 16 },
         5: { halign: 'right', cellWidth: 16 },
         6: { halign: 'right', cellWidth: 24 },
-        7: { halign: 'right', cellWidth: 24 },
+        7: { halign: 'right', cellWidth: 26 },
       },
     });
 
     // 4. Tableau "Récapitulatif" (Bas)
-    const recapStartY = ((doc as unknown) as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 12;
+    const recapStartY = ((doc as unknown) as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 10;
     doc.setFont('helvetica', 'bold');
-    doc.setFontSize(11);
-    doc.text('Récapitulatif', 20, recapStartY - 3);
+    doc.setFontSize(10);
+    doc.text('Récapitulatif Données & Chiffrage MAD', 20, recapStartY - 3);
 
     const recapRows = [
-      ['Nombre de panneaux utilisés', result.sheetsUsed, 'Coût des pièces', `${pieceCost.toFixed(2).replace('.', ',')} €`],
-      ['Nombre de plans de coupe', uniquePatterns.length, 'Coût en panneaux', `${totalSheetCost.toFixed(2).replace('.', ',')} €`],
-      ['Surface totale des panneaux', `${totalSheetsAreaM2.toFixed(2)} m²`, 'Coût en chutes', `${wasteCost.toFixed(2).replace('.', ',')} €`],
-      ['Surface totale des pièces', `${totalPiecesAreaM2.toFixed(2)} m²`, 'Coût des chutes non réutilisables', `${nonReusableCost.toFixed(2).replace('.', ',')} €`],
-      ['Taux de chutes', `${globalWasteRate.toFixed(2)} %`, 'Coût du linéaire de découpe', `${cuttingCost.toFixed(2).replace('.', ',')} €`],
-      ['Taux des chutes non réutilisables', `${nonReusableWasteRate.toFixed(2)} %`, 'Coût net total', `${totalNetCost.toFixed(2).replace('.', ',')} €`],
-      ['Linéaire de découpe', `${linearCutMeters.toFixed(2)} m`, '', ''],
-      ['Linéaire des chants', '0.00 m', '', ''],
+      ['Nombre de panneaux utilisés', result.sheetsUsed, 'Coût des pièces', `${pieceCost.toFixed(2).replace('.', ',')} MAD`],
+      ['Nombre de plans de coupe', uniquePatterns.length, 'Coût en panneaux bruts', `${totalSheetCost.toFixed(2).replace('.', ',')} MAD`],
+      ['Surface totale des panneaux', `${totalSheetsAreaM2.toFixed(2)} m²`, 'Coût des chutes', `${wasteCost.toFixed(2).replace('.', ',')} MAD`],
+      ['Surface totale des pièces', `${totalPiecesAreaM2.toFixed(2)} m²`, 'Coût des chutes non réutilisables', `${nonReusableCost.toFixed(2).replace('.', ',')} MAD`],
+      ['Taux de chutes', `${globalWasteRate.toFixed(2)} %`, 'Coût du linéaire de découpe', `${cuttingCost.toFixed(2).replace('.', ',')} MAD`],
+      ['Taux des chutes non réutilisables', `${nonReusableWasteRate.toFixed(2)} %`, 'Coût net total du débit', `${totalNetCost.toFixed(2).replace('.', ',')} MAD`],
+      ['Linéaire de découpe opérateur', `${linearCutMeters.toFixed(2)} m`, 'Gain estimé après optimisation', `+ ${estimatedSavingsMad.toLocaleString('fr-FR')} MAD`],
+      ['Linéaire des chants', '0.00 m', 'Rentabilité matière', `${(100 - globalWasteRate).toFixed(1)} %`],
     ];
 
     autoTable(doc, {
       startY: recapStartY,
       margin: { left: 20, right: 20 },
-      head: [['Données techniques', '', 'Coûts', '']],
+      head: [['Données techniques', '', 'Chiffrage Financier (MAD)', '']],
       body: recapRows,
       theme: 'plain',
       headStyles: {
         fontSize: 7.5,
-        fontStyle: 'normal',
+        fontStyle: 'bold',
         textColor: [0, 0, 0],
         cellPadding: 1.5,
         lineColor: [0, 0, 0],
@@ -349,11 +379,11 @@ export async function POST(req: Request) {
     });
 
     // =========================================================================
-    // PAGES SUIVANTES : SCHÉMAS DE COUPE GRAPHIQUES (Style OptiCoupe monochrome)
+    // PAGES SUIVANTES : SCHÉMAS DE COUPE GRAPHIQUES (Style Atelier Découpe Linéaire)
     // =========================================================================
     uniquePatterns.forEach((pat, pIndex) => {
       doc.addPage('a4', 'portrait');
-      drawOptiHeader(pIndex + 2);
+      drawQatliaHeader(pIndex + 2);
 
       // Titre du plan de coupe
       doc.setFont('helvetica', 'bold');
@@ -376,7 +406,7 @@ export async function POST(req: Request) {
       const canvasW = sheet.width * scale;
       const canvasH = sheet.height * scale;
 
-      // 1. Fond Chutes Grisées (Hachures / Gris OptiCoupe #D1D5DB)
+      // 1. Fond Chutes Grisées (Style Atelier #D1D5DB)
       doc.setFillColor(215, 215, 215);
       doc.setDrawColor(0, 0, 0);
       doc.setLineWidth(0.3);
@@ -403,7 +433,6 @@ export async function POST(req: Request) {
         if (pw > 14 && ph > 6) {
           doc.text(dimText, px + pw / 2, py + ph / 2, { align: 'center', baseline: 'middle' });
         } else if (ph > 10) {
-          // Écriture verticale pour les bandes étroites
           doc.text(`${toMm(p.width)}\n×\n${toMm(p.height)}`, px + pw / 2, py + ph / 2 - 3, { align: 'center' });
         }
       });
@@ -415,11 +444,11 @@ export async function POST(req: Request) {
       status: 200,
       headers: {
         'Content-Type': 'application/pdf',
-        'Content-Disposition': `attachment; filename="OptiCoupe_${projectName.toUpperCase().replace(/\s+/g, '_')}.pdf"`,
+        'Content-Disposition': `attachment; filename="QatlIA_${projectName.toUpperCase().replace(/\s+/g, '_')}.pdf"`,
       },
     });
   } catch (error: unknown) {
-    const message = error instanceof Error ? error.message : 'Erreur export PDF OptiCoupe';
+    const message = error instanceof Error ? error.message : 'Erreur export PDF QatlIA';
     console.error(error);
     return NextResponse.json({ error: 'PDF_EXPORT_FAILED', message }, { status: 500 });
   }

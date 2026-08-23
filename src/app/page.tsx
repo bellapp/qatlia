@@ -467,36 +467,57 @@ export default function Dashboard() {
 
             {/* Results Summary Bar */}
             {result && (
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                <div className="p-4 rounded-2xl bg-[#1E293B] border border-[#334155] shadow-lg">
-                  <span className="text-[11px] text-[#94A3B8] uppercase font-bold">Feuilles Requises</span>
-                  <p className="text-2xl font-black text-white font-mono mt-1">{result.sheetsUsed}</p>
-                  <span className="text-[10px] text-[#64748B]">{sheet.width} × {sheet.height} cm</span>
+              <>
+                {/* Banner Gain Économique Réalisé (MAD) */}
+                <div className="p-4 rounded-2xl bg-gradient-to-r from-emerald-950/40 via-[#1E293B] to-[#1E293B] border border-emerald-500/30 shadow-lg flex flex-wrap items-center justify-between gap-3">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400 font-bold text-lg">
+                      MAD
+                    </div>
+                    <div>
+                      <span className="text-[11px] font-bold text-emerald-400 uppercase tracking-wider">
+                        Gain Économique Estimé Après Optimisation QatlIA
+                      </span>
+                      <p className="text-xl font-black text-white">
+                        + {result.moneySavedMad?.toLocaleString('fr-FR') || 0} MAD Économisés
+                      </p>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <span className="text-[10px] text-[#94A3B8]">Linéaire de coupe</span>
+                    <p className="text-xs font-mono font-bold text-slate-200">{result.totalLinearCutMeters || 0} m de passes</p>
+                  </div>
                 </div>
-                <div className="p-4 rounded-2xl bg-[#1E293B] border border-[#334155] shadow-lg">
-                  <span className="text-[11px] text-[#94A3B8] uppercase font-bold">Surface Utile</span>
-                  <p className="text-2xl font-black text-emerald-400 font-mono mt-1">
-                    {(100 - result.wastePercentage).toFixed(1)}%
-                  </p>
-                  <span className="text-[10px] text-emerald-500/80">Efficacité de coupe</span>
+
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                  <div className="p-4 rounded-2xl bg-[#1E293B] border border-[#334155] shadow-lg">
+                    <span className="text-[11px] text-[#94A3B8] uppercase font-bold">Feuilles Requises</span>
+                    <p className="text-2xl font-black text-white font-mono mt-1">{result.sheetsUsed}</p>
+                    <span className="text-[10px] text-[#64748B]">{sheet.width} × {sheet.height} cm</span>
+                  </div>
+                  <div className="p-4 rounded-2xl bg-[#1E293B] border border-[#334155] shadow-lg">
+                    <span className="text-[11px] text-[#94A3B8] uppercase font-bold">Surface Utile</span>
+                    <p className="text-2xl font-black text-emerald-400 font-mono mt-1">
+                      {(100 - result.wastePercentage).toFixed(1)}%
+                    </p>
+                    <span className="text-[10px] text-emerald-500/80">Efficacité de coupe</span>
+                  </div>
+                  <div className="p-4 rounded-2xl bg-[#1E293B] border border-[#334155] shadow-lg">
+                    <span className="text-[11px] text-[#94A3B8] uppercase font-bold">Taux de Chute</span>
+                    <p className="text-2xl font-black text-amber-400 font-mono mt-1">
+                      {result.wastePercentage.toFixed(1)}%
+                    </p>
+                    <span className="text-[10px] text-amber-500/80">Pertes résiduelles</span>
+                  </div>
+                  <div className="p-4 rounded-2xl bg-[#1E293B] border border-[#334155] shadow-lg">
+                    <span className="text-[11px] text-[#94A3B8] uppercase font-bold">Coupe Linéaire</span>
+                    <p className="text-2xl font-black text-sky-400 font-mono mt-1">
+                      {result.placedPieces.length} pcs
+                    </p>
+                    <span className="text-[10px] text-sky-400/80">Passes traversantes</span>
+                  </div>
                 </div>
-                <div className="p-4 rounded-2xl bg-[#1E293B] border border-[#334155] shadow-lg">
-                  <span className="text-[11px] text-[#94A3B8] uppercase font-bold">Taux de Chute</span>
-                  <p className="text-2xl font-black text-amber-400 font-mono mt-1">
-                    {result.wastePercentage.toFixed(1)}%
-                  </p>
-                  <span className="text-[10px] text-amber-500/80">Pertes de matière</span>
-                </div>
-                <div className="p-4 rounded-2xl bg-[#1E293B] border border-[#334155] shadow-lg">
-                  <span className="text-[11px] text-[#94A3B8] uppercase font-bold">Pièces Placées</span>
-                  <p className="text-2xl font-black text-sky-400 font-mono mt-1">
-                    {result.placedPieces.length}
-                  </p>
-                  <span className="text-[10px] text-sky-500/80">
-                    {result.unplacedPieces.length > 0 ? `${result.unplacedPieces.length} non placées` : '100% complété'}
-                  </span>
-                </div>
-              </div>
+              </>
             )}
 
             {/* Material breakdown if F12 active */}
@@ -683,10 +704,10 @@ export default function Dashboard() {
 
                     <button
                       onClick={handleDownloadPdf}
-                      className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-[#1E3A5F] hover:bg-[#2A4F82] text-white font-bold text-xs shadow-md transition-all border border-sky-400/30"
+                      className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-[#1E3A5F] to-[#2563EB] hover:brightness-110 text-white font-bold text-xs shadow-md transition-all border border-sky-400/30"
                     >
                       <Download className="w-4 h-4 text-sky-400" />
-                      <span>RAPPORT INDUSTRIEL (STYLE OPTICOUPE)</span>
+                      <span>RAPPORT INDUSTRIEL QATLIA (PDF)</span>
                     </button>
                   </div>
                 </div>
