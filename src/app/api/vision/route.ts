@@ -140,12 +140,12 @@ Règles :
         // @ts-ignore
         if (errText.includes('rate limit') || errText.includes('429')) {
           return NextResponse.json(
-            { error: 'AI_RATE_LIMIT', message: 'Quota ou limite OpenRouter atteinte. Réessayez dans un instant.' },
+            { error: 'AI_RATE_LIMIT', message: 'Service temporairement saturé. Veuillez réessayer dans un instant.' },
             { status: 429 }
           );
         }
         return NextResponse.json(
-          { error: 'AI_SERVICE_ERROR', message: `Erreur API OpenRouter (${res.status}): ${errText}` },
+          { error: 'AI_SERVICE_ERROR', message: `Erreur d'analyse IA (${res.status}). Veuillez réessayer avec une photo plus nette.` },
           { status: 502 }
         );
     }
@@ -180,7 +180,7 @@ Règles :
       pieces,
       confidence: 0.98,
       creditsRemaining: 4,
-      notes: `${pieces.length} pièces extraites avec succès via Gemini 3.7 Flash`,
+      notes: `${pieces.length} pièces extraites avec succès`,
     });
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : 'Erreur inconnue';

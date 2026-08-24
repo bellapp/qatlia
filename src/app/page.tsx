@@ -377,8 +377,8 @@ export default function Dashboard() {
                     Capture Photo & IA Vision
                   </h2>
                 </div>
-                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-sky-500/10 text-sky-400 border border-sky-500/20">
-                  Gemini 3.7 Flash
+                <span className="text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-sky-500/10 text-sky-400 border border-sky-500/20">
+                  Vision IA
                 </span>
               </div>
               <p className="text-xs text-[#94A3B8] mb-4">
@@ -396,7 +396,7 @@ export default function Dashboard() {
                 {isProcessingVision ? (
                   <div className="flex flex-col items-center gap-3">
                     <RefreshCw className="w-8 h-8 text-sky-400 animate-spin" />
-                    <span className="text-xs font-bold text-sky-300">Analyse Gemini 3.7 Flash en cours...</span>
+                    <span className="text-xs font-bold text-sky-300">Analyse de l&apos;image en cours...</span>
                   </div>
                 ) : (
                   <div className="flex flex-col items-center gap-2">
@@ -520,12 +520,12 @@ export default function Dashboard() {
               </>
             )}
 
-            {/* Material breakdown if F12 active */}
+            {/* Material breakdown if active */}
             {result?.materialStats && result.materialStats.length > 0 && (
               <div className="p-4 rounded-2xl bg-[#1E293B] border border-[#334155] shadow-lg">
                 <h3 className="text-xs font-bold text-white uppercase tracking-wider mb-2 flex items-center gap-1.5">
                   <Info className="w-3.5 h-3.5 text-sky-400" />
-                  Répartition Multi-Matériaux (F12)
+                  Répartition Multi-Matériaux
                 </h3>
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-xs">
                   {result.materialStats.map((ms) => (

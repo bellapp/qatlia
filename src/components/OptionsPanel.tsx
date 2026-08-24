@@ -45,10 +45,7 @@ export const OptionsPanel: React.FC<OptionsPanelProps> = ({
           </div>
           <div>
             <h3 className="text-sm font-bold text-white flex items-center gap-2">
-              Panneau d&apos;Options Avancées
-              <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-sky-500/10 text-sky-400 border border-sky-500/20">
-                F10-F12
-              </span>
+              Panneau d&apos;Options de Découpe
             </h3>
             <p className="text-xs text-[#94A3B8]">Kerf, mode 1 feuille, groupement matériaux & priorités</p>
           </div>
