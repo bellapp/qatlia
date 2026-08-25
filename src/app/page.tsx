@@ -4,7 +4,6 @@ import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { createClient } from '@/lib/supabase/client';
 import {
-  Upload,
   Layers,
   Sparkles,
   Play,
@@ -17,6 +16,8 @@ import {
   Zap,
   AlertTriangle,
   Info,
+  Camera,
+  Image as ImageIcon,
 } from 'lucide-react';
 import {
   Sheet,
@@ -399,31 +400,51 @@ export default function Dashboard() {
               </div>
 
               <p className="text-xs text-[#94A3B8] mb-4">
-                Photographiez votre carnet de mesures manuscrites. L&apos;IA extrait automatiquement les cotes et quantités.
+                Photographiez votre carnet de mesures ou importez un fichier depuis votre galerie/ordinateur. L&apos;IA extrait automatiquement les cotes.
               </p>
 
-              <label className="flex flex-col items-center justify-center border-2 border-dashed border-sky-500/40 hover:border-sky-400 rounded-xl p-4 cursor-pointer bg-sky-950/20 hover:bg-sky-900/30 transition-all text-center">
-                <input
-                  type="file"
-                  accept="image/*"
-                  capture="environment"
-                  className="hidden"
-                  onChange={handleImageUpload}
-                  disabled={isProcessingVision}
-                />
-                {isProcessingVision ? (
-                  <div className="flex items-center gap-2 text-sky-400 text-xs font-bold py-2">
-                    <RefreshCw className="w-4 h-4 animate-spin" />
-                    <span>Analyse de l&apos;image en cours...</span>
-                  </div>
-                ) : (
-                  <>
-                    <Upload className="w-6 h-6 text-sky-400 mb-2" />
-                    <span className="text-xs font-bold text-white">Importer ou Scanner une fiche de mesures</span>
-                    <span className="text-[10px] text-[#94A3B8] mt-0.5">JPEG, PNG ou photo directe mobile</span>
-                  </>
-                )}
-              </label>
+              {isProcessingVision ? (
+                <div className="flex flex-col items-center justify-center border-2 border-dashed border-sky-500/40 rounded-xl p-6 bg-sky-950/20 text-center">
+                  <RefreshCw className="w-6 h-6 text-sky-400 animate-spin mb-2" />
+                  <span className="text-xs font-bold text-sky-400">Analyse de l&apos;image en cours par Vision IA...</span>
+                  <span className="text-[10px] text-[#94A3B8] mt-1">Extraction des hauteurs, largeurs et quantités</span>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {/* Bouton 1 : Prendre une photo directe (Caméra Mobile) */}
+                  <label className="flex flex-col items-center justify-center border-2 border-dashed border-sky-500/40 hover:border-sky-400 rounded-xl p-4 cursor-pointer bg-sky-950/20 hover:bg-sky-900/30 transition-all text-center group">
+                    <input
+                      type="file"
+                      accept="image/*"
+                      capture="environment"
+                      className="hidden"
+                      onChange={handleImageUpload}
+                      disabled={isProcessingVision}
+                    />
+                    <div className="w-10 h-10 rounded-xl bg-sky-500/10 border border-sky-500/20 flex items-center justify-center text-sky-400 group-hover:scale-110 transition-transform mb-2">
+                      <Camera className="w-5 h-5" />
+                    </div>
+                    <span className="text-xs font-bold text-white">Prendre une photo</span>
+                    <span className="text-[10px] text-sky-300/80 mt-0.5">Ouvre l&apos;appareil photo</span>
+                  </label>
+
+                  {/* Bouton 2 : Charger depuis Galerie / Fichiers */}
+                  <label className="flex flex-col items-center justify-center border-2 border-dashed border-[#334155] hover:border-amber-400/60 rounded-xl p-4 cursor-pointer bg-[#0F172A] hover:bg-[#1E293B] transition-all text-center group">
+                    <input
+                      type="file"
+                      accept="image/png,image/jpeg,image/webp,image/jpg"
+                      className="hidden"
+                      onChange={handleImageUpload}
+                      disabled={isProcessingVision}
+                    />
+                    <div className="w-10 h-10 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400 group-hover:scale-110 transition-transform mb-2">
+                      <ImageIcon className="w-5 h-5" />
+                    </div>
+                    <span className="text-xs font-bold text-white">Charger une image</span>
+                    <span className="text-[10px] text-[#94A3B8] mt-0.5">Galerie, PDF ou fichier</span>
+                  </label>
+                </div>
+              )}
 
               {visionError && (
                 <div className="mt-3 p-3 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-400 text-xs flex items-center gap-2">
