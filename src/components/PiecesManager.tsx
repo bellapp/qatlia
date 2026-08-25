@@ -60,8 +60,8 @@ export const PiecesManager: React.FC<PiecesManagerProps> = ({
 
     if (!h || !w || h <= 0 || w <= 0) return;
 
-    // Si saisi en mm (> 300), conversion automatique en cm
-    if (h > 300 || w > 300) {
+    // Si saisi en mm (> 500), conversion automatique en cm
+    if (h > 500 || w > 500) {
       h = h / 10;
       w = w / 10;
     }
@@ -91,8 +91,8 @@ export const PiecesManager: React.FC<PiecesManagerProps> = ({
     const updated = pieces.map((p) => {
       if (p.id === id) {
         let finalVal = val;
-        // Si mise à jour dimension et valeur en mm (> 300), conversion en cm
-        if ((field === 'height' || field === 'width') && typeof val === 'number' && val > 300) {
+        // Si mise à jour dimension et valeur en mm (> 500), conversion en cm
+        if ((field === 'height' || field === 'width') && typeof val === 'number' && val > 500) {
           finalVal = val / 10;
         }
         return { ...p, [field]: finalVal };
@@ -397,9 +397,9 @@ export const PiecesManager: React.FC<PiecesManagerProps> = ({
               const isSelected = selectedIds.has(p.id || '');
               const ed = p.edges || {};
 
-              // Affichage normalisé en cm
-              const displayH = p.height > 300 ? p.height / 10 : p.height;
-              const displayW = p.width > 300 ? p.width / 10 : p.width;
+              // Affichage en cm
+              const displayH = p.height > 500 ? p.height / 10 : p.height;
+              const displayW = p.width > 500 ? p.width / 10 : p.width;
 
               return (
                 <div

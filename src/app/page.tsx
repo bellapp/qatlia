@@ -147,8 +147,8 @@ export default function Dashboard() {
           const newPieces: Piece[] = data.pieces.map((p: { name?: string; width?: number | string; height?: number | string; quantity?: number | string; material?: string }, i: number) => {
             let h = Number(p.height) || 10;
             let w = Number(p.width) || 10;
-            // Si l'extraction donne des mm (> 300), convertir en cm
-            if (h > 300 || w > 300) {
+            // Si l'extraction donne des mm manifestes (> 500), convertir en cm
+            if (h > 500 || w > 500) {
               h = h / 10;
               w = w / 10;
             }

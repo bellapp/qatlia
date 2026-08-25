@@ -341,11 +341,12 @@ export function optimizeCutting(
   const effectiveH = Math.max(1, sheetH - marginCm * 2);
 
   // Normaliser toutes les pièces vers le CENTIMÈTRE (cm)
+  // Ne PAS diviser si h ou w sont des cotes valides en cm (comme 230 cm pour un panneau de 278 cm)
   const normalizedPieces = pieces.map((p) => {
     let h = Number(p.height) || 10;
     let w = Number(p.width) || 10;
-    // Si la pièce a été saisie en mm (ex: 2300x1200, 480x1180, 380x418), convertir en cm (230x120, 48x118, 38x41.8)
-    if (h > 200 || w > 200) {
+    // Seulement si manifestement en millimètres (> 500 mm)
+    if (h > 500 || w > 500) {
       h = h / 10;
       w = w / 10;
     }
