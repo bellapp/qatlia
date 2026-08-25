@@ -80,20 +80,19 @@ export async function POST(req: Request) {
     }
 
     const systemPrompt = `Tu es un expert en lecture de fiches de débit pour menuisiers et artisans.
-Tu dois analyser attentivement l'image et extraire les dimensions EXACTES de chaque ligne sous la convention : HAUTEUR (Y) × LARGEUR (X) = QUANTITÉ.
+Tu dois analyser attentivement l'image et extraire les dimensions EXACTES de chaque ligne sous la convention : HAUTEUR (Y) × LARGEUR (X) = QUANTITÉ en CENTIMÈTRES (cm).
 
 Règles impératives :
-1. Extrais les nombres EXACTS sans les multiplier ni les diviser. Si l'image contient "418.00 x 380.00", la hauteur est 418 et la largeur est 380 (ou inversement si orienté).
-2. Ignore les décimales .00 (ex: 1200.00 devient 1200, 418.00 devient 418).
-3. La quantité est le nombre à droite (ex: "418.00 x 380.00   7" -> height: 418, width: 380, quantity: 7).
-4. Retourne STRICTEMENT un objet JSON :
+1. Extrais les cotes en centimètres (cm). Si l'image contient des millimètres (ex: 2300 x 1200 ou 418.00 x 380.00), convertis en centimètres (ex: 230 x 120, 41.8 x 38).
+2. La quantité est le nombre à droite (ex: "418 x 380   7" -> height: 41.8, width: 38, quantity: 7).
+3. Retourne STRICTEMENT un objet JSON :
 {
   "pieces": [
-    { "name": "Pièce 1", "height": 1200, "width": 2300, "quantity": 2 },
-    { "name": "Pièce 2", "height": 1180, "width": 480, "quantity": 1 },
-    { "name": "Pièce 3", "height": 418, "width": 380, "quantity": 7 },
-    { "name": "Pièce 4", "height": 531, "width": 480, "quantity": 4 },
-    { "name": "Pièce 5", "height": 513, "width": 480, "quantity": 2 }
+    { "name": "Pièce 1", "height": 230, "width": 120, "quantity": 2 },
+    { "name": "Pièce 2", "height": 118, "width": 48, "quantity": 1 },
+    { "name": "Pièce 3", "height": 41.8, "width": 38, "quantity": 7 },
+    { "name": "Pièce 4", "height": 53.1, "width": 48, "quantity": 4 },
+    { "name": "Pièce 5", "height": 51.3, "width": 48, "quantity": 2 }
   ]
 }`;
 

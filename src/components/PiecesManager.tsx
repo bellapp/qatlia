@@ -30,7 +30,7 @@ export const PiecesManager: React.FC<PiecesManagerProps> = ({
   const [filterMaterial, setFilterMaterial] = useState<string>('all');
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
-  // Formulaire d'ajout rapide (Unité unique : mm)
+  // Formulaire d'ajout rapide (Unité officielle : cm)
   const [newHeight, setNewHeight] = useState<string>('');
   const [newWidth, setNewWidth] = useState<string>('');
   const [newQty, setNewQty] = useState<string>('1');
@@ -54,18 +54,24 @@ export const PiecesManager: React.FC<PiecesManagerProps> = ({
 
   const handleAddPieceQuick = (e: React.FormEvent) => {
     e.preventDefault();
-    const h = parseFloat(newHeight);
-    const w = parseFloat(newWidth);
+    let h = parseFloat(newHeight);
+    let w = parseFloat(newWidth);
     const q = parseInt(newQty, 10) || 1;
 
     if (!h || !w || h <= 0 || w <= 0) return;
+
+    // Si saisi en mm (> 300), conversion automatique en cm
+    if (h > 300 || w > 300) {
+      h = h / 10;
+      w = w / 10;
+    }
 
     const newId = `p_${Date.now()}`;
     const newPiece: Piece = {
       id: newId,
       name: newReference.trim() || `Pièce ${pieces.length + 1}`,
-      height: h, // Hauteur (Y) en mm
-      width: w, // Largeur (X) en mm
+      height: Math.round(h * 10) / 10, // Hauteur (Y) en cm
+      width: Math.round(w * 10) / 10,  // Largeur (X) en cm
       quantity: q,
       material: defaultMaterial,
       grainDirection: newGrain,
@@ -84,7 +90,12 @@ export const PiecesManager: React.FC<PiecesManagerProps> = ({
   const handleUpdate = (id: string, field: keyof Piece, val: string | number | boolean | EdgeBandingConfig | null) => {
     const updated = pieces.map((p) => {
       if (p.id === id) {
-        return { ...p, [field]: val };
+        let finalVal = val;
+        // Si mise à jour dimension et valeur en mm (> 300), conversion en cm
+        if ((field === 'height' || field === 'width') && typeof val === 'number' && val > 300) {
+          finalVal = val / 10;
+        }
+        return { ...p, [field]: finalVal };
       }
       return p;
     });
@@ -135,7 +146,7 @@ export const PiecesManager: React.FC<PiecesManagerProps> = ({
   };
 
   const handleExportCsv = () => {
-    let csv = 'Numéro,Hauteur (Y mm),Largeur (X mm),Quantité,Matériau,Référence,Sens du fil,Chant Gauche,Chant Droit,Chant Haut,Chant Bas\n';
+    let csv = 'Numéro,Hauteur (Y cm),Largeur (X cm),Quantité,Matériau,Référence,Sens du fil,Chant Gauche,Chant Droit,Chant Haut,Chant Bas\n';
     pieces.forEach((p, idx) => {
       const ed = p.edges || {};
       csv += `${idx + 1},${p.height},${p.width},${p.quantity || 1},"${p.material || defaultMaterial}","${p.name || ''}",${p.grainDirection ? 'OUI' : 'NON'},${ed.left ? '1' : '0'},${ed.right ? '1' : '0'},${ed.top ? '1' : '0'},${ed.bottom ? '1' : '0'}\n`;
@@ -156,9 +167,9 @@ export const PiecesManager: React.FC<PiecesManagerProps> = ({
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#334155] pb-4">
         <div>
           <h2 className="text-sm font-black text-white uppercase tracking-wider flex items-center gap-2">
-            Liste de Débit ({pieces.reduce((s, p) => s + (p.quantity || 1), 0)} pièces au total)
+            Nomenclature des Pièces ({pieces.reduce((s, p) => s + (p.quantity || 1), 0)} au total)
           </h2>
-          <p className="text-[11px] text-[#94A3B8]">Norme industrielle d&apos;atelier : Hauteur (Y) × Largeur (X) en millimètres (mm)</p>
+          <p className="text-[11px] text-[#94A3B8]">Unités : Hauteur (Y) × Largeur (X) en centimètres (cm)</p>
         </div>
 
         <div className="flex items-center gap-2">
@@ -175,42 +186,42 @@ export const PiecesManager: React.FC<PiecesManagerProps> = ({
         </div>
       </div>
 
-      {/* Formulaire de Saisie Industrielle (100% mm) */}
+      {/* Formulaire de Saisie en Centimètres (cm) */}
       <form onSubmit={handleAddPieceQuick} className="p-4 rounded-xl bg-[#0F172A] border border-[#334155] space-y-3">
         <div className="flex items-center justify-between">
           <span className="text-xs font-bold text-amber-400 uppercase tracking-wider flex items-center gap-1.5">
-            <Plus className="w-3.5 h-3.5" /> Saisie d&apos;une nouvelle pièce (en mm)
+            <Plus className="w-3.5 h-3.5" /> Saisie d&apos;une nouvelle pièce (en cm)
           </span>
-          <span className="text-[10px] text-amber-300/80 font-mono">Unité standard : mm</span>
+          <span className="text-[10px] text-amber-300/90 font-mono font-bold">Unité : cm</span>
         </div>
 
         <div className="grid grid-cols-2 sm:grid-cols-12 gap-2 text-xs">
-          {/* Hauteur Y */}
+          {/* Hauteur Y (cm) */}
           <div className="sm:col-span-3">
             <label className="block text-[10px] font-bold text-[#94A3B8] uppercase mb-1">
-              Hauteur (Y en mm) *
+              Hauteur (Y en cm) *
             </label>
             <input
               type="number"
-              step="1"
+              step="0.1"
               required
-              placeholder="ex: 2300"
+              placeholder="ex: 230"
               value={newHeight}
               onChange={(e) => setNewHeight(e.target.value)}
               className="w-full px-2.5 py-1.5 rounded-lg bg-[#1E293B] border border-[#475569] text-white font-mono font-bold outline-none focus:border-amber-400 text-right"
             />
           </div>
 
-          {/* Largeur X */}
+          {/* Largeur X (cm) */}
           <div className="sm:col-span-3">
             <label className="block text-[10px] font-bold text-[#94A3B8] uppercase mb-1">
-              Largeur (X en mm) *
+              Largeur (X en cm) *
             </label>
             <input
               type="number"
-              step="1"
+              step="0.1"
               required
-              placeholder="ex: 1200"
+              placeholder="ex: 120"
               value={newWidth}
               onChange={(e) => setNewWidth(e.target.value)}
               className="w-full px-2.5 py-1.5 rounded-lg bg-[#1E293B] border border-[#475569] text-white font-mono font-bold outline-none focus:border-amber-400 text-right"
@@ -316,7 +327,7 @@ export const PiecesManager: React.FC<PiecesManagerProps> = ({
           <Search className="w-4 h-4 text-[#64748B] absolute left-3 top-2.5" />
           <input
             type="text"
-            placeholder="Rechercher (ex: 2300, Côté, 480)..."
+            placeholder="Rechercher (ex: 230, Côté, 48)..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="w-full pl-9 pr-3 py-2 rounded-xl bg-[#0F172A] border border-[#334155] text-white placeholder-[#64748B] outline-none focus:border-amber-400"
@@ -364,17 +375,17 @@ export const PiecesManager: React.FC<PiecesManagerProps> = ({
         </div>
       )}
 
-        {/* Tableau Type OptiCoupe : N° | Hauteur (mm) | Largeur (mm) | Qté | Référence | Chants | Act. */}
-        <div className="border border-[#334155] rounded-xl overflow-hidden bg-[#0F172A]">
-          <div className="grid grid-cols-12 bg-[#1E293B] px-3 py-2.5 text-[11px] font-black text-slate-300 uppercase tracking-wider border-b border-[#334155]">
-            <div className="col-span-1 text-center">N°</div>
-            <div className="col-span-2 text-right pr-2">Hauteur (Y)</div>
-            <div className="col-span-2 text-right pr-2">Largeur (X)</div>
-            <div className="col-span-2 text-center">Quantité</div>
-            <div className="col-span-2 pl-2">Référence</div>
-            <div className="col-span-2 text-center">Chants (G D H B)</div>
-            <div className="col-span-1 text-center">Act.</div>
-          </div>
+      {/* Tableau Type OptiCoupe : N° | Hauteur (cm) | Largeur (cm) | Qté | Référence | Chants | Act. */}
+      <div className="border border-[#334155] rounded-xl overflow-hidden bg-[#0F172A]">
+        <div className="grid grid-cols-12 bg-[#1E293B] px-3 py-2.5 text-[11px] font-black text-slate-300 uppercase tracking-wider border-b border-[#334155]">
+          <div className="col-span-1 text-center">N°</div>
+          <div className="col-span-2 text-right pr-2">Hauteur (Y cm)</div>
+          <div className="col-span-2 text-right pr-2">Largeur (X cm)</div>
+          <div className="col-span-2 text-center">Quantité</div>
+          <div className="col-span-2 pl-2">Référence</div>
+          <div className="col-span-2 text-center">Chants (G D H B)</div>
+          <div className="col-span-1 text-center">Act.</div>
+        </div>
 
         <div className="divide-y divide-[#1E293B] max-h-[380px] overflow-y-auto">
           {filteredPieces.length === 0 ? (
@@ -385,6 +396,10 @@ export const PiecesManager: React.FC<PiecesManagerProps> = ({
             filteredPieces.map((p, idx) => {
               const isSelected = selectedIds.has(p.id || '');
               const ed = p.edges || {};
+
+              // Affichage normalisé en cm
+              const displayH = p.height > 300 ? p.height / 10 : p.height;
+              const displayW = p.width > 300 ? p.width / 10 : p.width;
 
               return (
                 <div
@@ -408,29 +423,29 @@ export const PiecesManager: React.FC<PiecesManagerProps> = ({
                     <span className="font-mono text-[#94A3B8] font-bold text-[11px]">#{idx + 1}</span>
                   </div>
 
-                  {/* Hauteur Y (en mm) */}
+                  {/* Hauteur Y (en cm) */}
                   <div className="col-span-2 text-right pr-1">
                     <input
                       type="number"
-                      step="1"
-                      value={p.height}
+                      step="0.1"
+                      value={displayH}
                       onChange={(e) => handleUpdate(p.id || '', 'height', parseFloat(e.target.value) || 0)}
                       className="w-full px-2 py-1.5 rounded-lg bg-[#1E293B] border border-[#334155] hover:border-[#475569] focus:border-amber-400 text-white font-mono font-bold text-right text-xs outline-none"
                     />
                   </div>
 
-                  {/* Largeur X (en mm) */}
+                  {/* Largeur X (en cm) */}
                   <div className="col-span-2 text-right pr-1">
                     <input
                       type="number"
-                      step="1"
-                      value={p.width}
+                      step="0.1"
+                      value={displayW}
                       onChange={(e) => handleUpdate(p.id || '', 'width', parseFloat(e.target.value) || 0)}
                       className="w-full px-2 py-1.5 rounded-lg bg-[#1E293B] border border-[#334155] hover:border-[#475569] focus:border-amber-400 text-white font-mono font-bold text-right text-xs outline-none"
                     />
                   </div>
 
-                  {/* Quantité : Largeur augmentée pour affichage parfait */}
+                  {/* Quantité */}
                   <div className="col-span-2 text-center px-2">
                     <input
                       type="number"

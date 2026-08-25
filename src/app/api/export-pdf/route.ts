@@ -137,7 +137,7 @@ export async function POST(req: Request) {
     const aggMap = new Map<string, AggregatedPiece>();
     let pNum = 1;
     for (const p of result.placedPieces) {
-      const key = `${toMm(p.width)} × ${toMm(p.height)}`;
+      const key = `${p.height.toFixed(1)} × ${p.width.toFixed(1)} cm`;
       if (aggMap.has(key)) {
         aggMap.get(key)!.quantity += 1;
       } else {
@@ -219,7 +219,7 @@ export async function POST(req: Request) {
       startY: 45,
       margin: { left: 14 },
       tableWidth: 88,
-      head: [['', 'Matériau', 'Dimension (mm)', 'Quantité']],
+      head: [['', 'Matériau', 'Dimension (cm)', 'Quantité']],
       body: debitRows,
       theme: 'plain',
       headStyles: {
@@ -253,12 +253,12 @@ export async function POST(req: Request) {
       startY: 45,
       margin: { left: 108 },
       tableWidth: 88,
-      head: [['Matériau', 'Référence', 'Dimension (mm)', 'Quantité', 'Surface']],
+      head: [['Matériau', 'Référence', 'Dimension (cm)', 'Quantité', 'Surface']],
       body: [
         [
           material.toUpperCase(),
           'Stock Brut',
-          `${toMm(sheet.width)} × ${toMm(sheet.height)}`,
+          `${sheet.height.toFixed(1)} × ${sheet.width.toFixed(1)} cm`,
           result.sheetsUsed,
           `${totalSheetsAreaM2.toFixed(2)} m²`,
         ],
@@ -297,7 +297,7 @@ export async function POST(req: Request) {
       idx + 1,
       material.toUpperCase(),
       'Stock',
-      `${toMm(sheet.width)} × ${toMm(sheet.height)}`,
+      `${sheet.height.toFixed(1)} × ${sheet.width.toFixed(1)} cm`,
       pat.count,
       pat.pieces.length,
       `${pat.wasteRate.toFixed(2)} %`,
@@ -412,7 +412,7 @@ export async function POST(req: Request) {
       doc.setLineWidth(0.5);
       doc.rect(drawX, drawY, canvasW, canvasH, 'FD');
 
-      // 2. Dessin des Chutes (Fond Gris #C8CCD1 avec Bordures Noires Nettes - Exactement comme OptiCoupe)
+      // 2. Dessin des Chutes (Fond Gris #C8CCD1 avec Bordures Noires Nettes)
       pat.offcuts.forEach((off) => {
         const ox = drawX + off.x * scale;
         const oy = drawY + off.y * scale;
@@ -425,12 +425,12 @@ export async function POST(req: Request) {
         doc.setLineWidth(0.4);
         doc.rect(ox, oy, ow, oh, 'FD');
 
-        // Cotation explicite Hauteur x Largeur au centre de la chute
+        // Cotation explicite Hauteur x Largeur en cm au centre de la chute
         if (ow > 12 && oh > 5) {
           doc.setFont('helvetica', 'normal');
           doc.setFontSize(Math.min(7.0, Math.max(4.0, Math.min(ow, oh) / 4.5)));
           doc.setTextColor(30, 41, 59);
-          doc.text(`${toMm(off.height)}.00 × ${toMm(off.width)}.00`, ox + ow / 2, oy + oh / 2, {
+          doc.text(`${off.height.toFixed(1)} × ${off.width.toFixed(1)} cm`, ox + ow / 2, oy + oh / 2, {
             align: 'center',
             baseline: 'middle',
           });
@@ -449,7 +449,7 @@ export async function POST(req: Request) {
         doc.setLineWidth(0.4);
         doc.rect(px, py, pw, ph, 'FD');
 
-        const dimText = `${toMm(p.height)}.00 × ${toMm(p.width)}.00`;
+        const dimText = `${p.height.toFixed(1)} × ${p.width.toFixed(1)} cm`;
         doc.setFont('helvetica', 'normal');
         doc.setFontSize(Math.min(7.5, Math.max(4.2, Math.min(pw, ph) / 4)));
         doc.setTextColor(0, 0, 0);
@@ -457,7 +457,7 @@ export async function POST(req: Request) {
         if (pw > 14 && ph > 6) {
           doc.text(dimText, px + pw / 2, py + ph / 2, { align: 'center', baseline: 'middle' });
         } else if (ph > 9) {
-          doc.text(`${toMm(p.height)}.00\n×\n${toMm(p.width)}.00`, px + pw / 2, py + ph / 2 - 2, { align: 'center' });
+          doc.text(`${p.height.toFixed(1)}\n×\n${p.width.toFixed(1)}`, px + pw / 2, py + ph / 2 - 2, { align: 'center' });
         }
       });
     });
