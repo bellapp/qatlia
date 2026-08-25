@@ -651,8 +651,8 @@ export default function Dashboard() {
                       {result.offcuts && result.offcuts
                         .filter((o) => o.sheetIndex === activeSheetIndex)
                         .map((off, oIdx) => {
-                          const dispW = Math.round(off.width);
                           const dispH = Math.round(off.height);
+                          const dispW = Math.round(off.width);
 
                           return (
                             <g key={`off_${oIdx}`}>
@@ -662,22 +662,22 @@ export default function Dashboard() {
                                 width={off.width}
                                 height={off.height}
                                 fill="#1E293B"
-                                stroke="#334155"
-                                strokeWidth={1}
-                                opacity="0.9"
+                                stroke="#0F172A"
+                                strokeWidth={1.5}
+                                opacity="0.95"
                               />
-                              {off.width >= 120 && off.height >= 80 && (
+                              {off.width >= 100 && off.height >= 70 && (
                                 <text
                                   x={off.x + off.width / 2}
                                   y={off.y + off.height / 2}
                                   textAnchor="middle"
                                   dominantBaseline="central"
                                   fill="#94A3B8"
-                                  fontSize={Math.min(55, Math.max(20, Math.min(off.width, off.height) / 10))}
-                                  fontStyle="italic"
+                                  fontSize={Math.min(50, Math.max(16, Math.min(off.width, off.height) / 10))}
+                                  fontStyle="normal"
                                   fontFamily="sans-serif"
                                 >
-                                  {dispW} × {dispH}
+                                  {dispH}.00 × {dispW}.00
                                 </text>
                               )}
                             </g>
@@ -723,21 +723,21 @@ export default function Dashboard() {
                                   >
                                     #{p.pieceNumber} {p.name && minSide >= 300 ? `• ${p.name}` : ''}
                                   </text>
-                                  {/* Cotes en millimètres bien calibrées */}
-                                  {p.height >= 120 && p.width >= 120 && (
-                                    <text
-                                      x={p.x + p.width / 2}
-                                      y={p.y + p.height / 2 + (p.height >= 250 ? 32 : 0)}
-                                      textAnchor="middle"
-                                      dominantBaseline="central"
-                                      fill="#000000"
-                                      fontSize={Math.min(42, Math.max(16, minSide / 15))}
-                                      fontWeight="bold"
-                                      fontFamily="monospace"
-                                    >
-                                      {dispW} × {dispH}
-                                    </text>
-                                  )}
+                                    {/* Cotes en millimètres bien calibrées : Hauteur x Largeur */}
+                                    {p.height >= 120 && p.width >= 120 && (
+                                      <text
+                                        x={p.x + p.width / 2}
+                                        y={p.y + p.height / 2 + (p.height >= 250 ? 32 : 0)}
+                                        textAnchor="middle"
+                                        dominantBaseline="central"
+                                        fill="#000000"
+                                        fontSize={Math.min(42, Math.max(16, minSide / 15))}
+                                        fontWeight="bold"
+                                        fontFamily="monospace"
+                                      >
+                                        {dispH}.00 × {dispW}.00
+                                      </text>
+                                    )}
                                 </>
                               )}
                             </g>

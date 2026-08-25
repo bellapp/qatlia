@@ -406,13 +406,38 @@ export async function POST(req: Request) {
       const canvasW = sheet.width * scale;
       const canvasH = sheet.height * scale;
 
-      // 1. Fond Panneau Brut Chutes Grisées
-      doc.setFillColor(210, 210, 210);
+      // 1. Fond Panneau Brut (Blanc avec Contour Noir Épais)
+      doc.setFillColor(255, 255, 255);
       doc.setDrawColor(0, 0, 0);
-      doc.setLineWidth(0.4);
+      doc.setLineWidth(0.5);
       doc.rect(drawX, drawY, canvasW, canvasH, 'FD');
 
-      // 2. Dessin des pièces utiles (Fond Blanc Pur)
+      // 2. Dessin des Chutes (Fond Gris #C8CCD1 avec Bordures Noires Nettes - Exactement comme OptiCoupe)
+      pat.offcuts.forEach((off) => {
+        const ox = drawX + off.x * scale;
+        const oy = drawY + off.y * scale;
+        const ow = off.width * scale;
+        const oh = off.height * scale;
+
+        // Rectangle de chute avec fond gris et contour noir bien marqué
+        doc.setFillColor(200, 204, 209);
+        doc.setDrawColor(0, 0, 0);
+        doc.setLineWidth(0.4);
+        doc.rect(ox, oy, ow, oh, 'FD');
+
+        // Cotation explicite Hauteur x Largeur au centre de la chute
+        if (ow > 12 && oh > 5) {
+          doc.setFont('helvetica', 'normal');
+          doc.setFontSize(Math.min(7.0, Math.max(4.0, Math.min(ow, oh) / 4.5)));
+          doc.setTextColor(30, 41, 59);
+          doc.text(`${toMm(off.height)}.00 × ${toMm(off.width)}.00`, ox + ow / 2, oy + oh / 2, {
+            align: 'center',
+            baseline: 'middle',
+          });
+        }
+      });
+
+      // 3. Dessin des pièces utiles (Fond Blanc Pur + Bordure Noire Épaisse 0.4mm)
       pat.pieces.forEach((p) => {
         const px = drawX + p.x * scale;
         const py = drawY + p.y * scale;
@@ -421,37 +446,18 @@ export async function POST(req: Request) {
 
         doc.setFillColor(255, 255, 255);
         doc.setDrawColor(0, 0, 0);
-        doc.setLineWidth(0.35);
+        doc.setLineWidth(0.4);
         doc.rect(px, py, pw, ph, 'FD');
 
-        const dimText = `${toMm(p.width)} × ${toMm(p.height)}`;
+        const dimText = `${toMm(p.height)}.00 × ${toMm(p.width)}.00`;
         doc.setFont('helvetica', 'normal');
-        doc.setFontSize(Math.min(7.5, Math.max(4.2, ph / 4)));
+        doc.setFontSize(Math.min(7.5, Math.max(4.2, Math.min(pw, ph) / 4)));
         doc.setTextColor(0, 0, 0);
 
-        if (pw > 16 && ph > 6) {
+        if (pw > 14 && ph > 6) {
           doc.text(dimText, px + pw / 2, py + ph / 2, { align: 'center', baseline: 'middle' });
         } else if (ph > 9) {
-          doc.text(`${toMm(p.width)}\n×\n${toMm(p.height)}`, px + pw / 2, py + ph / 2 - 2, { align: 'center' });
-        }
-      });
-
-      // 3. Cotation explicite des Chutes Réutilisables / Résiduelles
-      pat.offcuts.forEach((off) => {
-        const ox = drawX + off.x * scale;
-        const oy = drawY + off.y * scale;
-        const ow = off.width * scale;
-        const oh = off.height * scale;
-
-        // Si la chute est assez grande pour afficher sa cote (ex: > 14mm à l'écran)
-        if (ow > 14 && oh > 6) {
-          doc.setFont('helvetica', 'italic');
-          doc.setFontSize(Math.min(7.0, Math.max(4.0, oh / 4.5)));
-          doc.setTextColor(60, 60, 60);
-          doc.text(`${toMm(off.width)} × ${toMm(off.height)}`, ox + ow / 2, oy + oh / 2, {
-            align: 'center',
-            baseline: 'middle',
-          });
+          doc.text(`${toMm(p.height)}.00\n×\n${toMm(p.width)}.00`, px + pw / 2, py + ph / 2 - 2, { align: 'center' });
         }
       });
     });
