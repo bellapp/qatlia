@@ -145,13 +145,8 @@ export default function Dashboard() {
           setPreviewImage(base64);
           // Normalisation universelle : Tout est stocké en millimètres (mm)
           const newPieces: Piece[] = data.pieces.map((p: { name?: string; width?: number | string; height?: number | string; quantity?: number | string; material?: string }, i: number) => {
-            let h = Number(p.height) || 100;
-            let w = Number(p.width) || 100;
-            // Si l'utilisateur ou l'IA a scanné des cotes en cm (ex: 230 x 120), convertir en mm (2300 x 1200)
-            if (h < 500 && w < 500) {
-              h = Math.round(h * 10);
-              w = Math.round(w * 10);
-            }
+            const h = Number(p.height) || 100;
+            const w = Number(p.width) || 100;
             return {
               id: `ext_${Date.now()}_${i}`,
               name: p.name || `Pièce ${i + 1}`,

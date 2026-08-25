@@ -364,17 +364,17 @@ export const PiecesManager: React.FC<PiecesManagerProps> = ({
         </div>
       )}
 
-      {/* Tableau Type OptiCoupe : N° | Hauteur (mm) | Largeur (mm) | Qté | Référence | Chants | Act. */}
-      <div className="border border-[#334155] rounded-xl overflow-hidden bg-[#0F172A]">
-        <div className="grid grid-cols-12 bg-[#1E293B] px-3 py-2.5 text-[11px] font-black text-slate-300 uppercase tracking-wider border-b border-[#334155]">
-          <div className="col-span-1 text-center">N°</div>
-          <div className="col-span-2 text-right pr-2">Hauteur (Y mm)</div>
-          <div className="col-span-2 text-right pr-2">Largeur (X mm)</div>
-          <div className="col-span-2 text-center">Quantité</div>
-          <div className="col-span-2 pl-2">Référence</div>
-          <div className="col-span-2 text-center">Chants (G D H B)</div>
-          <div className="col-span-1 text-center">Act.</div>
-        </div>
+        {/* Tableau Type OptiCoupe : N° | Hauteur (mm) | Largeur (mm) | Qté | Référence | Chants | Act. */}
+        <div className="border border-[#334155] rounded-xl overflow-hidden bg-[#0F172A]">
+          <div className="grid grid-cols-12 bg-[#1E293B] px-3 py-2.5 text-[11px] font-black text-slate-300 uppercase tracking-wider border-b border-[#334155]">
+            <div className="col-span-1 text-center">N°</div>
+            <div className="col-span-2 text-right pr-2">Hauteur (Y)</div>
+            <div className="col-span-2 text-right pr-2">Largeur (X)</div>
+            <div className="col-span-2 text-center">Quantité</div>
+            <div className="col-span-2 pl-2">Référence</div>
+            <div className="col-span-2 text-center">Chants (G D H B)</div>
+            <div className="col-span-1 text-center">Act.</div>
+          </div>
 
         <div className="divide-y divide-[#1E293B] max-h-[380px] overflow-y-auto">
           {filteredPieces.length === 0 ? (
