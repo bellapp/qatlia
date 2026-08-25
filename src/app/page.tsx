@@ -143,15 +143,24 @@ export default function Dashboard() {
         const data = await res.json();
         if (data.success && Array.isArray(data.pieces) && data.pieces.length > 0) {
           setPreviewImage(base64);
-          const newPieces: Piece[] = data.pieces.map((p: { name?: string; width: number | string; height: number | string; quantity?: number | string; material?: string }, i: number) => ({
-            id: `ext_${Date.now()}_${i}`,
-            name: p.name || `Pièce ${i + 1}`,
-            width: Number(p.width),
-            height: Number(p.height),
-            quantity: Number(p.quantity) || 1,
-            material: (p.material as MaterialType) || (sheet.material || 'mdf'),
-            rotatable: true,
-          }));
+          // Normalisation intelligente : si les dimensions sont > 500, elles sont en mm et converties en cm pour cohérence avec le panneau
+          const newPieces: Piece[] = data.pieces.map((p: { name?: string; width?: number | string; height?: number | string; quantity?: number | string; material?: string }, i: number) => {
+            let h = Number(p.height) || 10;
+            let w = Number(p.width) || 10;
+            if (h > 500 || w > 500) {
+              h = h / 10;
+              w = w / 10;
+            }
+            return {
+              id: `ext_${Date.now()}_${i}`,
+              name: p.name || `Pièce ${i + 1}`,
+              height: h,
+              width: w,
+              quantity: Number(p.quantity) || 1,
+              material: (p.material as MaterialType) || (sheet.material || 'mdf'),
+              rotatable: true,
+            };
+          });
           setPieces(newPieces);
         } else {
           setVisionError(data.message || 'Aucune mesure détectée dans l\'image.');
@@ -645,43 +654,54 @@ export default function Dashboard() {
                       {/* Dessin des Chutes Réutilisables / Offcuts */}
                       {result.offcuts && result.offcuts
                         .filter((o) => o.sheetIndex === activeSheetIndex)
-                        .map((off, oIdx) => (
-                          <g key={`off_${oIdx}`}>
-                            <rect
-                              x={off.x}
-                              y={off.y}
-                              width={off.width}
-                              height={off.height}
-                              fill="#334155"
-                              stroke="#1E293B"
-                              strokeWidth={0.3}
-                              opacity="0.6"
-                            />
-                            {off.width > 20 && off.height > 10 && (
-                              <text
-                                x={off.x + off.width / 2}
-                                y={off.y + off.height / 2}
-                                textAnchor="middle"
-                                dominantBaseline="central"
-                                fill="#94A3B8"
-                                fontSize={Math.min(7, Math.max(3.5, off.height / 4))}
-                                fontStyle="italic"
-                                fontFamily="monospace"
-                              >
-                                {off.width}×{off.height}
-                              </text>
-                            )}
-                          </g>
-                        ))}
+                        .map((off, oIdx) => {
+                          const isMm = sheet.width > 500;
+                          const dispW = isMm ? Math.round(off.width) : Math.round(off.width * 10);
+                          const dispH = isMm ? Math.round(off.height) : Math.round(off.height * 10);
+
+                          return (
+                            <g key={`off_${oIdx}`}>
+                              <rect
+                                x={off.x}
+                                y={off.y}
+                                width={off.width}
+                                height={off.height}
+                                fill="#243248"
+                                stroke="#0F172A"
+                                strokeWidth={0.4}
+                                opacity="0.85"
+                              />
+                              {off.width >= 15 && off.height >= 12 && (
+                                <text
+                                  x={off.x + off.width / 2}
+                                  y={off.y + off.height / 2}
+                                  textAnchor="middle"
+                                  dominantBaseline="central"
+                                  fill="#94A3B8"
+                                  fontSize={Math.min(10, Math.max(5, Math.min(off.width, off.height) / 3.5))}
+                                  fontStyle="italic"
+                                  fontWeight="bold"
+                                  fontFamily="sans-serif"
+                                >
+                                  {dispW}×{dispH}
+                                </text>
+                              )}
+                            </g>
+                          );
+                        })}
 
                       {/* Placed Pieces on this sheet */}
                       {result.placedPieces
                         .filter((p) => p.sheetIndex === activeSheetIndex)
                         .map((p) => {
                           const colors = [
-                            '#38BDF8', '#F5A623', '#34D399', '#F87171', '#A78BFA', '#FBBF24', '#2DD4BF', '#818CF8'
+                            '#F59E0B', '#38BDF8', '#10B981', '#EC4899', '#8B5CF6', '#F97316', '#14B8A6', '#6366F1'
                           ];
                           const color = colors[(p.pieceNumber - 1) % colors.length];
+                          const isMm = sheet.width > 500;
+                          const dispW = isMm ? Math.round(p.width) : Math.round(p.width * 10);
+                          const dispH = isMm ? Math.round(p.height) : Math.round(p.height * 10);
+                          const minSide = Math.min(p.width, p.height);
 
                           return (
                             <g key={`${p.sheetIndex}_${p.pieceNumber}`}>
@@ -692,36 +712,37 @@ export default function Dashboard() {
                                 height={p.height}
                                 fill={color}
                                 stroke="#0F172A"
-                                strokeWidth={Math.max(0.2, options.kerfWidth / 10)}
+                                strokeWidth={Math.max(0.4, options.kerfWidth / 5)}
                                 rx={0.5}
-                                opacity="0.9"
                               />
                               {options.showLabels && (
                                 <>
+                                  {/* Numéro de pièce */}
                                   <text
                                     x={p.x + p.width / 2}
-                                    y={p.y + p.height / 2 - (p.height > 20 ? 2 : 0)}
+                                    y={p.y + p.height / 2 - (p.height >= 25 ? 5 : 0)}
                                     textAnchor="middle"
                                     dominantBaseline="central"
                                     fill="#000000"
-                                    fontSize={Math.min(9, Math.max(4, p.height / 3.5))}
-                                    fontWeight="bold"
+                                    fontSize={Math.min(14, Math.max(6, minSide / 4))}
+                                    fontWeight="900"
                                     fontFamily="sans-serif"
                                   >
-                                    #{p.pieceNumber}
+                                    #{p.pieceNumber} {p.name && minSide >= 30 ? `• ${p.name}` : ''}
                                   </text>
-                                  {p.height > 15 && (
+                                  {/* Cotes en millimètres */}
+                                  {p.height >= 14 && p.width >= 14 && (
                                     <text
                                       x={p.x + p.width / 2}
-                                      y={p.y + p.height / 2 + 5}
+                                      y={p.y + p.height / 2 + (p.height >= 25 ? 6 : 0)}
                                       textAnchor="middle"
                                       dominantBaseline="central"
                                       fill="#000000"
-                                      fontSize={Math.min(6, Math.max(3, p.height / 5))}
+                                      fontSize={Math.min(11, Math.max(5, minSide / 5.5))}
                                       fontWeight="bold"
                                       fontFamily="monospace"
                                     >
-                                      {p.width}×{p.height}
+                                      {dispW} × {dispH}
                                     </text>
                                   )}
                                 </>

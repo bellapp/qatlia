@@ -54,11 +54,17 @@ export const PiecesManager: React.FC<PiecesManagerProps> = ({
 
   const handleAddPieceQuick = (e: React.FormEvent) => {
     e.preventDefault();
-    const h = parseFloat(newHeight);
-    const w = parseFloat(newWidth);
+    let h = parseFloat(newHeight);
+    let w = parseFloat(newWidth);
     const q = parseInt(newQty, 10) || 1;
 
     if (!h || !w || h <= 0 || w <= 0) return;
+
+    // Conversion automatique mm -> cm si la valeur saisie est > 500
+    if (h > 500 || w > 500) {
+      h = h / 10;
+      w = w / 10;
+    }
 
     const newId = `p_${Date.now()}`;
     const newPiece: Piece = {
