@@ -16,7 +16,7 @@ interface PiecesManagerProps {
   pieces: Piece[];
   onUpdatePieces: (pieces: Piece[]) => void;
   defaultMaterial: MaterialType;
-  showMaterialCol: boolean;
+  showMaterialCol?: boolean;
   disabled?: boolean;
 }
 
@@ -30,7 +30,7 @@ export const PiecesManager: React.FC<PiecesManagerProps> = ({
   const [filterMaterial, setFilterMaterial] = useState<string>('all');
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
-  // Formulaire d'ajout rapide inspiré d'OptiCoupe
+  // Formulaire d'ajout rapide (Unité unique : mm)
   const [newHeight, setNewHeight] = useState<string>('');
   const [newWidth, setNewWidth] = useState<string>('');
   const [newQty, setNewQty] = useState<string>('1');
@@ -54,24 +54,18 @@ export const PiecesManager: React.FC<PiecesManagerProps> = ({
 
   const handleAddPieceQuick = (e: React.FormEvent) => {
     e.preventDefault();
-    let h = parseFloat(newHeight);
-    let w = parseFloat(newWidth);
+    const h = parseFloat(newHeight);
+    const w = parseFloat(newWidth);
     const q = parseInt(newQty, 10) || 1;
 
     if (!h || !w || h <= 0 || w <= 0) return;
-
-    // Conversion automatique mm -> cm si la valeur saisie est > 500
-    if (h > 500 || w > 500) {
-      h = h / 10;
-      w = w / 10;
-    }
 
     const newId = `p_${Date.now()}`;
     const newPiece: Piece = {
       id: newId,
       name: newReference.trim() || `Pièce ${pieces.length + 1}`,
-      height: h, // Hauteur (Y)
-      width: w, // Largeur (X)
+      height: h, // Hauteur (Y) en mm
+      width: w, // Largeur (X) en mm
       quantity: q,
       material: defaultMaterial,
       grainDirection: newGrain,
@@ -141,7 +135,7 @@ export const PiecesManager: React.FC<PiecesManagerProps> = ({
   };
 
   const handleExportCsv = () => {
-    let csv = 'Numéro,Hauteur (Y),Largeur (X),Quantité,Matériau,Référence,Sens du fil,Chant Gauche,Chant Droit,Chant Haut,Chant Bas\n';
+    let csv = 'Numéro,Hauteur (Y mm),Largeur (X mm),Quantité,Matériau,Référence,Sens du fil,Chant Gauche,Chant Droit,Chant Haut,Chant Bas\n';
     pieces.forEach((p, idx) => {
       const ed = p.edges || {};
       csv += `${idx + 1},${p.height},${p.width},${p.quantity || 1},"${p.material || defaultMaterial}","${p.name || ''}",${p.grainDirection ? 'OUI' : 'NON'},${ed.left ? '1' : '0'},${ed.right ? '1' : '0'},${ed.top ? '1' : '0'},${ed.bottom ? '1' : '0'}\n`;
@@ -162,9 +156,9 @@ export const PiecesManager: React.FC<PiecesManagerProps> = ({
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#334155] pb-4">
         <div>
           <h2 className="text-sm font-black text-white uppercase tracking-wider flex items-center gap-2">
-            Édition de la Liste de Débit ({pieces.reduce((s, p) => s + (p.quantity || 1), 0)} pièces au total)
+            Liste de Débit ({pieces.reduce((s, p) => s + (p.quantity || 1), 0)} pièces au total)
           </h2>
-          <p className="text-[11px] text-[#94A3B8]">Norme industrielle : Hauteur (Y) × Largeur (X) • Chants & Veinage</p>
+          <p className="text-[11px] text-[#94A3B8]">Norme industrielle d&apos;atelier : Hauteur (Y) × Largeur (X) en millimètres (mm)</p>
         </div>
 
         <div className="flex items-center gap-2">
@@ -181,26 +175,26 @@ export const PiecesManager: React.FC<PiecesManagerProps> = ({
         </div>
       </div>
 
-      {/* Formulaire de Saisie Industrielle Rapide (Hauteur / Largeur / Quantité / Chants) */}
+      {/* Formulaire de Saisie Industrielle (100% mm) */}
       <form onSubmit={handleAddPieceQuick} className="p-4 rounded-xl bg-[#0F172A] border border-[#334155] space-y-3">
         <div className="flex items-center justify-between">
           <span className="text-xs font-bold text-amber-400 uppercase tracking-wider flex items-center gap-1.5">
-            <Plus className="w-3.5 h-3.5" /> Saisie d&apos;une nouvelle pièce
+            <Plus className="w-3.5 h-3.5" /> Saisie d&apos;une nouvelle pièce (en mm)
           </span>
-          <span className="text-[10px] text-[#64748B]">Dimensions en cm (ou mm)</span>
+          <span className="text-[10px] text-amber-300/80 font-mono">Unité standard : mm</span>
         </div>
 
         <div className="grid grid-cols-2 sm:grid-cols-12 gap-2 text-xs">
           {/* Hauteur Y */}
           <div className="sm:col-span-3">
             <label className="block text-[10px] font-bold text-[#94A3B8] uppercase mb-1">
-              Hauteur (Y) *
+              Hauteur (Y en mm) *
             </label>
             <input
               type="number"
-              step="0.1"
+              step="1"
               required
-              placeholder="ex: 230"
+              placeholder="ex: 2300"
               value={newHeight}
               onChange={(e) => setNewHeight(e.target.value)}
               className="w-full px-2.5 py-1.5 rounded-lg bg-[#1E293B] border border-[#475569] text-white font-mono font-bold outline-none focus:border-amber-400 text-right"
@@ -210,13 +204,13 @@ export const PiecesManager: React.FC<PiecesManagerProps> = ({
           {/* Largeur X */}
           <div className="sm:col-span-3">
             <label className="block text-[10px] font-bold text-[#94A3B8] uppercase mb-1">
-              Largeur (X) *
+              Largeur (X en mm) *
             </label>
             <input
               type="number"
-              step="0.1"
+              step="1"
               required
-              placeholder="ex: 120"
+              placeholder="ex: 1200"
               value={newWidth}
               onChange={(e) => setNewWidth(e.target.value)}
               className="w-full px-2.5 py-1.5 rounded-lg bg-[#1E293B] border border-[#475569] text-white font-mono font-bold outline-none focus:border-amber-400 text-right"
@@ -254,7 +248,6 @@ export const PiecesManager: React.FC<PiecesManagerProps> = ({
 
         {/* Options de chants & Matériau */}
         <div className="flex flex-wrap items-center justify-between gap-3 pt-2 border-t border-[#1E293B] text-[11px]">
-          {/* Chants 4 côtés */}
           <div className="flex items-center gap-3">
             <span className="font-bold text-[#94A3B8]">Chants :</span>
             <label className="flex items-center gap-1 text-slate-300 cursor-pointer">
@@ -309,7 +302,7 @@ export const PiecesManager: React.FC<PiecesManagerProps> = ({
             <button
               type="submit"
               disabled={disabled}
-              className="px-4 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs transition-all shadow"
+              className="px-4 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs transition-all shadow cursor-pointer"
             >
               + Ajouter la pièce
             </button>
@@ -323,7 +316,7 @@ export const PiecesManager: React.FC<PiecesManagerProps> = ({
           <Search className="w-4 h-4 text-[#64748B] absolute left-3 top-2.5" />
           <input
             type="text"
-            placeholder="Rechercher (ex: 230, Côté, 48)..."
+            placeholder="Rechercher (ex: 2300, Côté, 480)..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="w-full pl-9 pr-3 py-2 rounded-xl bg-[#0F172A] border border-[#334155] text-white placeholder-[#64748B] outline-none focus:border-amber-400"
@@ -371,19 +364,19 @@ export const PiecesManager: React.FC<PiecesManagerProps> = ({
         </div>
       )}
 
-      {/* Tableau Type OptiCoupe : Numéro | Hauteur | Largeur | Quantité | Matériau | Référence | Chants */}
+      {/* Tableau Type OptiCoupe : N° | Hauteur (mm) | Largeur (mm) | Qté | Référence | Chants | Act. */}
       <div className="border border-[#334155] rounded-xl overflow-hidden bg-[#0F172A]">
-        <div className="grid grid-cols-12 bg-[#1E293B] px-3 py-2 text-[11px] font-black text-slate-300 uppercase tracking-wider border-b border-[#334155]">
+        <div className="grid grid-cols-12 bg-[#1E293B] px-3 py-2.5 text-[11px] font-black text-slate-300 uppercase tracking-wider border-b border-[#334155]">
           <div className="col-span-1 text-center">N°</div>
-          <div className="col-span-2 text-right">Hauteur (Y)</div>
-          <div className="col-span-2 text-right">Largeur (X)</div>
-          <div className="col-span-1 text-center">Qté</div>
-          <div className="col-span-3 pl-2">Référence</div>
+          <div className="col-span-2 text-right pr-2">Hauteur (Y mm)</div>
+          <div className="col-span-2 text-right pr-2">Largeur (X mm)</div>
+          <div className="col-span-2 text-center">Quantité</div>
+          <div className="col-span-2 pl-2">Référence</div>
           <div className="col-span-2 text-center">Chants (G D H B)</div>
           <div className="col-span-1 text-center">Act.</div>
         </div>
 
-        <div className="divide-y divide-[#1E293B] max-h-[360px] overflow-y-auto">
+        <div className="divide-y divide-[#1E293B] max-h-[380px] overflow-y-auto">
           {filteredPieces.length === 0 ? (
             <div className="p-8 text-center text-[#64748B] text-xs">
               Aucune pièce dans la liste de débit.
@@ -400,7 +393,7 @@ export const PiecesManager: React.FC<PiecesManagerProps> = ({
                     isSelected ? 'bg-amber-500/10' : 'hover:bg-[#1E293B]/60'
                   }`}
                 >
-                  <div className="col-span-1 flex items-center justify-center gap-1">
+                  <div className="col-span-1 flex items-center justify-center gap-1.5">
                     <button
                       type="button"
                       onClick={() => handleToggleSelect(p.id || '')}
@@ -415,55 +408,55 @@ export const PiecesManager: React.FC<PiecesManagerProps> = ({
                     <span className="font-mono text-[#94A3B8] font-bold text-[11px]">#{idx + 1}</span>
                   </div>
 
-                  {/* Hauteur Y */}
+                  {/* Hauteur Y (en mm) */}
                   <div className="col-span-2 text-right pr-1">
                     <input
                       type="number"
-                      step="0.1"
+                      step="1"
                       value={p.height}
                       onChange={(e) => handleUpdate(p.id || '', 'height', parseFloat(e.target.value) || 0)}
-                      className="w-full px-1.5 py-1 rounded bg-[#1E293B] border border-transparent hover:border-[#475569] focus:border-amber-400 text-white font-mono font-bold text-right text-xs outline-none"
+                      className="w-full px-2 py-1.5 rounded-lg bg-[#1E293B] border border-[#334155] hover:border-[#475569] focus:border-amber-400 text-white font-mono font-bold text-right text-xs outline-none"
                     />
                   </div>
 
-                  {/* Largeur X */}
+                  {/* Largeur X (en mm) */}
                   <div className="col-span-2 text-right pr-1">
                     <input
                       type="number"
-                      step="0.1"
+                      step="1"
                       value={p.width}
                       onChange={(e) => handleUpdate(p.id || '', 'width', parseFloat(e.target.value) || 0)}
-                      className="w-full px-1.5 py-1 rounded bg-[#1E293B] border border-transparent hover:border-[#475569] focus:border-amber-400 text-white font-mono font-bold text-right text-xs outline-none"
+                      className="w-full px-2 py-1.5 rounded-lg bg-[#1E293B] border border-[#334155] hover:border-[#475569] focus:border-amber-400 text-white font-mono font-bold text-right text-xs outline-none"
                     />
                   </div>
 
-                  {/* Quantité */}
-                  <div className="col-span-1 text-center px-1">
+                  {/* Quantité : Largeur augmentée pour affichage parfait */}
+                  <div className="col-span-2 text-center px-2">
                     <input
                       type="number"
                       min="1"
                       value={p.quantity}
                       onChange={(e) => handleUpdate(p.id || '', 'quantity', parseInt(e.target.value, 10) || 1)}
-                      className="w-full px-1 py-1 rounded bg-[#1E293B] border border-transparent hover:border-[#475569] focus:border-amber-400 text-white font-mono font-bold text-center text-xs outline-none"
+                      className="w-full max-w-[65px] mx-auto px-2 py-1.5 rounded-lg bg-[#1E293B] border border-[#334155] hover:border-[#475569] focus:border-amber-400 text-white font-mono font-bold text-center text-xs outline-none"
                     />
                   </div>
 
                   {/* Référence / Nom */}
-                  <div className="col-span-3 pl-2">
+                  <div className="col-span-2 pl-2">
                     <input
                       type="text"
                       value={p.name}
                       onChange={(e) => handleUpdate(p.id || '', 'name', e.target.value)}
-                      className="w-full px-2 py-1 rounded bg-[#1E293B] border border-transparent hover:border-[#475569] focus:border-amber-400 text-white font-medium text-xs outline-none"
+                      className="w-full px-2 py-1.5 rounded-lg bg-[#1E293B] border border-[#334155] hover:border-[#475569] focus:border-amber-400 text-white font-medium text-xs outline-none"
                     />
                   </div>
 
                   {/* Chants G D H B */}
-                  <div className="col-span-2 flex items-center justify-center gap-1.5 font-mono text-[10px]">
+                  <div className="col-span-2 flex items-center justify-center gap-1 font-mono text-[10px]">
                     <button
                       type="button"
                       onClick={() => handleToggleEdge(p.id || '', 'left')}
-                      className={`px-1 py-0.5 rounded font-bold ${ed.left ? 'bg-amber-500 text-slate-950' : 'bg-[#1E293B] text-[#64748B]'}`}
+                      className={`w-5 h-5 rounded font-bold flex items-center justify-center ${ed.left ? 'bg-amber-500 text-slate-950' : 'bg-[#1E293B] text-[#64748B] border border-[#334155]'}`}
                       title="Chant Gauche"
                     >
                       G
@@ -471,7 +464,7 @@ export const PiecesManager: React.FC<PiecesManagerProps> = ({
                     <button
                       type="button"
                       onClick={() => handleToggleEdge(p.id || '', 'right')}
-                      className={`px-1 py-0.5 rounded font-bold ${ed.right ? 'bg-amber-500 text-slate-950' : 'bg-[#1E293B] text-[#64748B]'}`}
+                      className={`w-5 h-5 rounded font-bold flex items-center justify-center ${ed.right ? 'bg-amber-500 text-slate-950' : 'bg-[#1E293B] text-[#64748B] border border-[#334155]'}`}
                       title="Chant Droit"
                     >
                       D
@@ -479,7 +472,7 @@ export const PiecesManager: React.FC<PiecesManagerProps> = ({
                     <button
                       type="button"
                       onClick={() => handleToggleEdge(p.id || '', 'top')}
-                      className={`px-1 py-0.5 rounded font-bold ${ed.top ? 'bg-amber-500 text-slate-950' : 'bg-[#1E293B] text-[#64748B]'}`}
+                      className={`w-5 h-5 rounded font-bold flex items-center justify-center ${ed.top ? 'bg-amber-500 text-slate-950' : 'bg-[#1E293B] text-[#64748B] border border-[#334155]'}`}
                       title="Chant Haut"
                     >
                       H
@@ -487,7 +480,7 @@ export const PiecesManager: React.FC<PiecesManagerProps> = ({
                     <button
                       type="button"
                       onClick={() => handleToggleEdge(p.id || '', 'bottom')}
-                      className={`px-1 py-0.5 rounded font-bold ${ed.bottom ? 'bg-amber-500 text-slate-950' : 'bg-[#1E293B] text-[#64748B]'}`}
+                      className={`w-5 h-5 rounded font-bold flex items-center justify-center ${ed.bottom ? 'bg-amber-500 text-slate-950' : 'bg-[#1E293B] text-[#64748B] border border-[#334155]'}`}
                       title="Chant Bas"
                     >
                       B
@@ -499,7 +492,7 @@ export const PiecesManager: React.FC<PiecesManagerProps> = ({
                     <button
                       type="button"
                       onClick={() => handleRemove(p.id || '')}
-                      className="p-1 rounded hover:bg-rose-500/20 text-[#64748B] hover:text-rose-400 transition-colors"
+                      className="p-1.5 rounded hover:bg-rose-500/20 text-[#64748B] hover:text-rose-400 transition-colors cursor-pointer"
                       title="Supprimer"
                     >
                       <Trash2 className="w-3.5 h-3.5" />

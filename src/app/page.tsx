@@ -30,20 +30,20 @@ import { OptionsPanel } from '@/components/OptionsPanel';
 import { PiecesManager } from '@/components/PiecesManager';
 
 const DEFAULT_SHEET: Sheet = {
-  height: 278, // Hauteur panneau brut vertical (cm)
-  width: 208, // Largeur panneau brut horizontal (cm)
-  kerf: 0.3, // cm = 3mm
-  margin: 1.0, // cm
+  height: 2780, // Hauteur panneau brut vertical en mm
+  width: 2080, // Largeur panneau brut horizontal en mm
+  kerf: 3, // mm
+  margin: 10, // mm
   grainDirection: false,
   material: 'mdf',
 };
 
 const INITIAL_PIECES: Piece[] = [
-  { id: '1', name: 'Panneau Latéral G', height: 230, width: 120, quantity: 2, material: 'mdf', rotatable: true },
-  { id: '2', name: 'Panneau Latéral D', height: 118, width: 48, quantity: 1, material: 'mdf', rotatable: true },
-  { id: '3', name: 'Étagère Mobile', height: 41.8, width: 38, quantity: 7, material: 'mdf', rotatable: true },
-  { id: '4', name: 'Séparation Centrale', height: 53.1, width: 48, quantity: 4, material: 'mdf', rotatable: true },
-  { id: '5', name: 'Socle Bas', height: 51.3, width: 48, quantity: 2, material: 'mdf', rotatable: true },
+  { id: '1', name: 'Pièce 1', height: 2300, width: 1200, quantity: 2, material: 'mdf', rotatable: true },
+  { id: '2', name: 'Pièce 2', height: 1180, width: 480, quantity: 1, material: 'mdf', rotatable: true },
+  { id: '3', name: 'Pièce 3', height: 418, width: 380, quantity: 7, material: 'mdf', rotatable: true },
+  { id: '4', name: 'Pièce 4', height: 531, width: 480, quantity: 4, material: 'mdf', rotatable: true },
+  { id: '5', name: 'Pièce 5', height: 513, width: 480, quantity: 2, material: 'mdf', rotatable: true },
 ];
 
 export default function Dashboard() {
@@ -143,13 +143,14 @@ export default function Dashboard() {
         const data = await res.json();
         if (data.success && Array.isArray(data.pieces) && data.pieces.length > 0) {
           setPreviewImage(base64);
-          // Normalisation intelligente : si les dimensions sont > 500, elles sont en mm et converties en cm pour cohérence avec le panneau
+          // Normalisation universelle : Tout est stocké en millimètres (mm)
           const newPieces: Piece[] = data.pieces.map((p: { name?: string; width?: number | string; height?: number | string; quantity?: number | string; material?: string }, i: number) => {
-            let h = Number(p.height) || 10;
-            let w = Number(p.width) || 10;
-            if (h > 500 || w > 500) {
-              h = h / 10;
-              w = w / 10;
+            let h = Number(p.height) || 100;
+            let w = Number(p.width) || 100;
+            // Si l'utilisateur ou l'IA a scanné des cotes en cm (ex: 230 x 120), convertir en mm (2300 x 1200)
+            if (h < 500 && w < 500) {
+              h = Math.round(h * 10);
+              w = Math.round(w * 10);
             }
             return {
               id: `ext_${Date.now()}_${i}`,
@@ -336,28 +337,28 @@ export default function Dashboard() {
                     Dimensions du Panneau Brut
                   </h2>
                 </div>
-                <span className="text-xs text-[#94A3B8] font-mono">cm</span>
+                <span className="text-xs text-amber-400 font-mono font-bold">Unité : mm</span>
               </div>
 
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 text-xs">
                 <div>
-                  <label htmlFor="sheetHeightInput" className="block text-[#94A3B8] font-medium mb-1">Hauteur (Y) [Vertical]</label>
+                  <label htmlFor="sheetHeightInput" className="block text-[#94A3B8] font-medium mb-1">Hauteur (Y mm)</label>
                   <input
                     id="sheetHeightInput"
                     type="number"
                     value={sheet.height}
                     onChange={(e) => setSheet({ ...sheet, height: parseFloat(e.target.value) || 0 })}
-                    className="w-full px-3 py-2 rounded-xl bg-[#0F172A] border border-[#334155] text-white font-mono font-bold focus:border-amber-400 outline-none"
+                    className="w-full px-3 py-2 rounded-xl bg-[#0F172A] border border-[#334155] text-white font-mono font-bold focus:border-amber-400 outline-none text-right"
                   />
                 </div>
                 <div>
-                  <label htmlFor="sheetWidthInput" className="block text-[#94A3B8] font-medium mb-1">Largeur (X) [Horizontal]</label>
+                  <label htmlFor="sheetWidthInput" className="block text-[#94A3B8] font-medium mb-1">Largeur (X mm)</label>
                   <input
                     id="sheetWidthInput"
                     type="number"
                     value={sheet.width}
                     onChange={(e) => setSheet({ ...sheet, width: parseFloat(e.target.value) || 0 })}
-                    className="w-full px-3 py-2 rounded-xl bg-[#0F172A] border border-[#334155] text-white font-mono font-bold focus:border-amber-400 outline-none"
+                    className="w-full px-3 py-2 rounded-xl bg-[#0F172A] border border-[#334155] text-white font-mono font-bold focus:border-amber-400 outline-none text-right"
                   />
                 </div>
                 <div>
@@ -655,9 +656,8 @@ export default function Dashboard() {
                       {result.offcuts && result.offcuts
                         .filter((o) => o.sheetIndex === activeSheetIndex)
                         .map((off, oIdx) => {
-                          const isMm = sheet.width > 500;
-                          const dispW = isMm ? Math.round(off.width) : Math.round(off.width * 10);
-                          const dispH = isMm ? Math.round(off.height) : Math.round(off.height * 10);
+                          const dispW = Math.round(off.width);
+                          const dispH = Math.round(off.height);
 
                           return (
                             <g key={`off_${oIdx}`}>
@@ -666,24 +666,23 @@ export default function Dashboard() {
                                 y={off.y}
                                 width={off.width}
                                 height={off.height}
-                                fill="#243248"
-                                stroke="#0F172A"
-                                strokeWidth={0.4}
-                                opacity="0.85"
+                                fill="#1E293B"
+                                stroke="#334155"
+                                strokeWidth={1}
+                                opacity="0.9"
                               />
-                              {off.width >= 15 && off.height >= 12 && (
+                              {off.width >= 120 && off.height >= 80 && (
                                 <text
                                   x={off.x + off.width / 2}
                                   y={off.y + off.height / 2}
                                   textAnchor="middle"
                                   dominantBaseline="central"
                                   fill="#94A3B8"
-                                  fontSize={Math.min(10, Math.max(5, Math.min(off.width, off.height) / 3.5))}
+                                  fontSize={Math.min(55, Math.max(20, Math.min(off.width, off.height) / 10))}
                                   fontStyle="italic"
-                                  fontWeight="bold"
                                   fontFamily="sans-serif"
                                 >
-                                  {dispW}×{dispH}
+                                  {dispW} × {dispH}
                                 </text>
                               )}
                             </g>
@@ -698,9 +697,8 @@ export default function Dashboard() {
                             '#F59E0B', '#38BDF8', '#10B981', '#EC4899', '#8B5CF6', '#F97316', '#14B8A6', '#6366F1'
                           ];
                           const color = colors[(p.pieceNumber - 1) % colors.length];
-                          const isMm = sheet.width > 500;
-                          const dispW = isMm ? Math.round(p.width) : Math.round(p.width * 10);
-                          const dispH = isMm ? Math.round(p.height) : Math.round(p.height * 10);
+                          const dispW = Math.round(p.width);
+                          const dispH = Math.round(p.height);
                           const minSide = Math.min(p.width, p.height);
 
                           return (
@@ -712,33 +710,33 @@ export default function Dashboard() {
                                 height={p.height}
                                 fill={color}
                                 stroke="#0F172A"
-                                strokeWidth={Math.max(0.4, options.kerfWidth / 5)}
-                                rx={0.5}
+                                strokeWidth={Math.max(1, options.kerfWidth)}
+                                rx={2}
                               />
                               {options.showLabels && (
                                 <>
-                                  {/* Numéro de pièce */}
+                                  {/* Numéro de pièce discret et proportionné */}
                                   <text
                                     x={p.x + p.width / 2}
-                                    y={p.y + p.height / 2 - (p.height >= 25 ? 5 : 0)}
+                                    y={p.y + p.height / 2 - (p.height >= 250 ? 30 : 0)}
                                     textAnchor="middle"
                                     dominantBaseline="central"
                                     fill="#000000"
-                                    fontSize={Math.min(14, Math.max(6, minSide / 4))}
-                                    fontWeight="900"
+                                    fontSize={Math.min(50, Math.max(18, minSide / 12))}
+                                    fontWeight="bold"
                                     fontFamily="sans-serif"
                                   >
-                                    #{p.pieceNumber} {p.name && minSide >= 30 ? `• ${p.name}` : ''}
+                                    #{p.pieceNumber} {p.name && minSide >= 300 ? `• ${p.name}` : ''}
                                   </text>
-                                  {/* Cotes en millimètres */}
-                                  {p.height >= 14 && p.width >= 14 && (
+                                  {/* Cotes en millimètres bien calibrées */}
+                                  {p.height >= 120 && p.width >= 120 && (
                                     <text
                                       x={p.x + p.width / 2}
-                                      y={p.y + p.height / 2 + (p.height >= 25 ? 6 : 0)}
+                                      y={p.y + p.height / 2 + (p.height >= 250 ? 32 : 0)}
                                       textAnchor="middle"
                                       dominantBaseline="central"
                                       fill="#000000"
-                                      fontSize={Math.min(11, Math.max(5, minSide / 5.5))}
+                                      fontSize={Math.min(42, Math.max(16, minSide / 15))}
                                       fontWeight="bold"
                                       fontFamily="monospace"
                                     >
@@ -793,25 +791,25 @@ export default function Dashboard() {
               )}
             </div>
 
-            {/* Pieces breakdown list on current sheet */}
-            {result && currentSheet && (
-              <div className="rounded-2xl bg-[#1E293B] border border-[#334155] p-5 shadow-lg">
-                <h3 className="text-xs font-bold text-white uppercase tracking-wider mb-3">
-                  Nomenclature du Panneau {activeSheetIndex + 1} ({currentSheet.pieces.length} pièces)
-                </h3>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
-                  {currentSheet.pieces.map((p) => (
-                    <div key={p.pieceNumber} className="p-2.5 rounded-xl bg-[#0F172A] border border-[#334155] flex items-center justify-between">
-                      <div className="flex items-center gap-2 truncate">
-                        <span className="font-bold text-amber-400 font-mono">#{p.pieceNumber}</span>
-                        <span className="text-white font-medium truncate">{p.name}</span>
+                  {/* Nomenclature du Panneau */}
+                  {currentSheet && (
+                    <div className="rounded-2xl bg-[#1E293B] border border-[#334155] p-5 shadow-lg">
+                      <h3 className="text-xs font-bold text-white uppercase tracking-wider mb-3">
+                        Nomenclature du Panneau {activeSheetIndex + 1} ({currentSheet.pieces.length} pièces)
+                      </h3>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+                        {currentSheet.pieces.map((p) => (
+                          <div key={p.pieceNumber} className="p-2.5 rounded-xl bg-[#0F172A] border border-[#334155] flex items-center justify-between">
+                            <div className="flex items-center gap-2 truncate">
+                              <span className="font-bold text-amber-400 font-mono">#{p.pieceNumber}</span>
+                              <span className="text-white font-medium truncate">{p.name}</span>
+                            </div>
+                            <span className="font-mono text-[#94A3B8] shrink-0 font-semibold">{Math.round(p.height)} × {Math.round(p.width)} mm</span>
+                          </div>
+                        ))}
                       </div>
-                      <span className="font-mono text-[#94A3B8] shrink-0 font-semibold">{p.width} × {p.height} cm</span>
                     </div>
-                  ))}
-                </div>
-              </div>
-            )}
+                  )}
           </div>
         </div>
       </main>
