@@ -10,7 +10,7 @@ import {
   CheckSquare,
   Square,
 } from 'lucide-react';
-import { Piece, MaterialType } from '@/lib/cutting/binpacking';
+import { Piece, MaterialType, EdgeBandingConfig } from '@/lib/cutting/binpacking';
 
 interface PiecesManagerProps {
   pieces: Piece[];
@@ -24,18 +24,26 @@ export const PiecesManager: React.FC<PiecesManagerProps> = ({
   pieces,
   onUpdatePieces,
   defaultMaterial,
-  showMaterialCol,
   disabled = false,
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [filterMaterial, setFilterMaterial] = useState<string>('all');
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
-  // F3: Moteur de recherche + F2: Filtrage multi-critères
+  // Formulaire d'ajout rapide inspiré d'OptiCoupe
+  const [newHeight, setNewHeight] = useState<string>('');
+  const [newWidth, setNewWidth] = useState<string>('');
+  const [newQty, setNewQty] = useState<string>('1');
+  const [newReference, setNewReference] = useState<string>('');
+  const [newGrain, setNewGrain] = useState<boolean>(false);
+  const [newEdges, setNewEdges] = useState<EdgeBandingConfig>({ left: false, right: false, top: false, bottom: false });
+
+  // Moteur de recherche et filtrage
   const filteredPieces = pieces.filter((p) => {
     const matchesSearch =
       searchQuery === '' ||
       (p.name && p.name.toLowerCase().includes(searchQuery.toLowerCase())) ||
+      `${p.height}x${p.width}`.includes(searchQuery) ||
       `${p.width}x${p.height}`.includes(searchQuery);
 
     const mat = p.material || defaultMaterial;
@@ -44,26 +52,56 @@ export const PiecesManager: React.FC<PiecesManagerProps> = ({
     return matchesSearch && matchesMaterial;
   });
 
-  const handleAddPiece = () => {
+  const handleAddPieceQuick = (e: React.FormEvent) => {
+    e.preventDefault();
+    const h = parseFloat(newHeight);
+    const w = parseFloat(newWidth);
+    const q = parseInt(newQty, 10) || 1;
+
+    if (!h || !w || h <= 0 || w <= 0) return;
+
     const newId = `p_${Date.now()}`;
-    onUpdatePieces([
-      ...pieces,
-      {
-        id: newId,
-        name: `Pièce ${pieces.length + 1}`,
-        width: 100,
-        height: 50,
-        quantity: 1,
-        material: defaultMaterial,
-        rotatable: true,
-      },
-    ]);
+    const newPiece: Piece = {
+      id: newId,
+      name: newReference.trim() || `Pièce ${pieces.length + 1}`,
+      height: h, // Hauteur (Y)
+      width: w, // Largeur (X)
+      quantity: q,
+      material: defaultMaterial,
+      grainDirection: newGrain,
+      edges: { ...newEdges },
+      rotatable: !newGrain,
+    };
+
+    onUpdatePieces([...pieces, newPiece]);
+    setNewHeight('');
+    setNewWidth('');
+    setNewReference('');
+    setNewQty('1');
+    setNewEdges({ left: false, right: false, top: false, bottom: false });
   };
 
-  const handleUpdate = (id: string, field: keyof Piece, val: string | number | boolean | null) => {
+  const handleUpdate = (id: string, field: keyof Piece, val: string | number | boolean | EdgeBandingConfig | null) => {
     const updated = pieces.map((p) => {
       if (p.id === id) {
         return { ...p, [field]: val };
+      }
+      return p;
+    });
+    onUpdatePieces(updated);
+  };
+
+  const handleToggleEdge = (id: string, side: 'left' | 'right' | 'top' | 'bottom') => {
+    const updated = pieces.map((p) => {
+      if (p.id === id) {
+        const currentEdges = p.edges || {};
+        return {
+          ...p,
+          edges: {
+            ...currentEdges,
+            [side]: !currentEdges[side],
+          },
+        };
       }
       return p;
     });
@@ -96,31 +134,31 @@ export const PiecesManager: React.FC<PiecesManagerProps> = ({
     setSelectedIds(new Set());
   };
 
-  // F5: Export CSV
   const handleExportCsv = () => {
-    let csv = 'Nom,Longueur (cm),Largeur (cm),Quantite,Materiau,Rotatif\n';
-    for (const p of pieces) {
-      csv += `"${p.name || ''}",${p.width},${p.height},${p.quantity || 1},"${p.material || defaultMaterial}",${p.rotatable !== false ? 'OUI' : 'NON'}\n`;
-    }
+    let csv = 'Numéro,Hauteur (Y),Largeur (X),Quantité,Matériau,Référence,Sens du fil,Chant Gauche,Chant Droit,Chant Haut,Chant Bas\n';
+    pieces.forEach((p, idx) => {
+      const ed = p.edges || {};
+      csv += `${idx + 1},${p.height},${p.width},${p.quantity || 1},"${p.material || defaultMaterial}","${p.name || ''}",${p.grainDirection ? 'OUI' : 'NON'},${ed.left ? '1' : '0'},${ed.right ? '1' : '0'},${ed.top ? '1' : '0'},${ed.bottom ? '1' : '0'}\n`;
+    });
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.setAttribute('href', url);
-    link.setAttribute('download', `qatlia_pieces_${Date.now()}.csv`);
+    link.setAttribute('download', `qatlia_debit_${Date.now()}.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
   };
 
   return (
-    <div className="rounded-2xl bg-[#1E293B] border border-[#334155] p-5 shadow-lg space-y-4">
+    <div className="rounded-2xl bg-[#1E293B] border border-[#334155] p-5 shadow-lg space-y-5">
       {/* Header & Actions */}
-      <div className="flex flex-wrap items-center justify-between gap-3">
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#334155] pb-4">
         <div>
-          <h2 className="text-sm font-bold text-white uppercase tracking-wider flex items-center gap-2">
-            Nomenclature des Pièces ({pieces.reduce((s, p) => s + (p.quantity || 1), 0)} total)
+          <h2 className="text-sm font-black text-white uppercase tracking-wider flex items-center gap-2">
+            Édition de la Liste de Débit ({pieces.reduce((s, p) => s + (p.quantity || 1), 0)} pièces au total)
           </h2>
-          <p className="text-[11px] text-[#94A3B8]">Édition en ligne, recherche et export CSV</p>
+          <p className="text-[11px] text-[#94A3B8]">Norme industrielle : Hauteur (Y) × Largeur (X) • Chants & Veinage</p>
         </div>
 
         <div className="flex items-center gap-2">
@@ -129,31 +167,157 @@ export const PiecesManager: React.FC<PiecesManagerProps> = ({
             onClick={handleExportCsv}
             disabled={pieces.length === 0}
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#0F172A] hover:bg-[#283548] text-slate-300 text-xs font-semibold border border-[#334155] transition-all disabled:opacity-40"
-            title="Exporter la liste au format CSV"
+            title="Exporter la liste de débit CSV"
           >
             <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-400" />
-            <span>CSV</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={handleAddPiece}
-            disabled={disabled}
-            className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 text-[#F5A623] text-xs font-bold transition-all border border-amber-500/30 disabled:opacity-50"
-          >
-            <Plus className="w-4 h-4" />
-            <span>Ajouter</span>
+            <span>Export CSV</span>
           </button>
         </div>
       </div>
 
-      {/* Search Bar & Filter Controls & Select All */}
+      {/* Formulaire de Saisie Industrielle Rapide (Hauteur / Largeur / Quantité / Chants) */}
+      <form onSubmit={handleAddPieceQuick} className="p-4 rounded-xl bg-[#0F172A] border border-[#334155] space-y-3">
+        <div className="flex items-center justify-between">
+          <span className="text-xs font-bold text-amber-400 uppercase tracking-wider flex items-center gap-1.5">
+            <Plus className="w-3.5 h-3.5" /> Saisie d&apos;une nouvelle pièce
+          </span>
+          <span className="text-[10px] text-[#64748B]">Dimensions en cm (ou mm)</span>
+        </div>
+
+        <div className="grid grid-cols-2 sm:grid-cols-12 gap-2 text-xs">
+          {/* Hauteur Y */}
+          <div className="sm:col-span-3">
+            <label className="block text-[10px] font-bold text-[#94A3B8] uppercase mb-1">
+              Hauteur (Y) *
+            </label>
+            <input
+              type="number"
+              step="0.1"
+              required
+              placeholder="ex: 230"
+              value={newHeight}
+              onChange={(e) => setNewHeight(e.target.value)}
+              className="w-full px-2.5 py-1.5 rounded-lg bg-[#1E293B] border border-[#475569] text-white font-mono font-bold outline-none focus:border-amber-400 text-right"
+            />
+          </div>
+
+          {/* Largeur X */}
+          <div className="sm:col-span-3">
+            <label className="block text-[10px] font-bold text-[#94A3B8] uppercase mb-1">
+              Largeur (X) *
+            </label>
+            <input
+              type="number"
+              step="0.1"
+              required
+              placeholder="ex: 120"
+              value={newWidth}
+              onChange={(e) => setNewWidth(e.target.value)}
+              className="w-full px-2.5 py-1.5 rounded-lg bg-[#1E293B] border border-[#475569] text-white font-mono font-bold outline-none focus:border-amber-400 text-right"
+            />
+          </div>
+
+          {/* Quantité */}
+          <div className="sm:col-span-2">
+            <label className="block text-[10px] font-bold text-[#94A3B8] uppercase mb-1">
+              Quantité
+            </label>
+            <input
+              type="number"
+              min="1"
+              value={newQty}
+              onChange={(e) => setNewQty(e.target.value)}
+              className="w-full px-2 py-1.5 rounded-lg bg-[#1E293B] border border-[#475569] text-white font-mono font-bold text-center outline-none focus:border-amber-400"
+            />
+          </div>
+
+          {/* Référence / Nom */}
+          <div className="sm:col-span-4">
+            <label className="block text-[10px] font-bold text-[#94A3B8] uppercase mb-1">
+              Référence / Nom
+            </label>
+            <input
+              type="text"
+              placeholder="ex: Côté G / Étagère"
+              value={newReference}
+              onChange={(e) => setNewReference(e.target.value)}
+              className="w-full px-2.5 py-1.5 rounded-lg bg-[#1E293B] border border-[#475569] text-white font-medium outline-none focus:border-amber-400"
+            />
+          </div>
+        </div>
+
+        {/* Options de chants & Matériau */}
+        <div className="flex flex-wrap items-center justify-between gap-3 pt-2 border-t border-[#1E293B] text-[11px]">
+          {/* Chants 4 côtés */}
+          <div className="flex items-center gap-3">
+            <span className="font-bold text-[#94A3B8]">Chants :</span>
+            <label className="flex items-center gap-1 text-slate-300 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={newEdges.left}
+                onChange={(e) => setNewEdges({ ...newEdges, left: e.target.checked })}
+                className="rounded text-amber-500 bg-[#1E293B]"
+              />
+              <span>G</span>
+            </label>
+            <label className="flex items-center gap-1 text-slate-300 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={newEdges.right}
+                onChange={(e) => setNewEdges({ ...newEdges, right: e.target.checked })}
+                className="rounded text-amber-500 bg-[#1E293B]"
+              />
+              <span>D</span>
+            </label>
+            <label className="flex items-center gap-1 text-slate-300 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={newEdges.top}
+                onChange={(e) => setNewEdges({ ...newEdges, top: e.target.checked })}
+                className="rounded text-amber-500 bg-[#1E293B]"
+              />
+              <span>H</span>
+            </label>
+            <label className="flex items-center gap-1 text-slate-300 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={newEdges.bottom}
+                onChange={(e) => setNewEdges({ ...newEdges, bottom: e.target.checked })}
+                className="rounded text-amber-500 bg-[#1E293B]"
+              />
+              <span>B</span>
+            </label>
+          </div>
+
+          <div className="flex items-center gap-3">
+            <label className="flex items-center gap-1.5 text-slate-300 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={newGrain}
+                onChange={(e) => setNewGrain(e.target.checked)}
+                className="rounded text-amber-500 bg-[#1E293B]"
+              />
+              <span>Sens du fil fixe</span>
+            </label>
+
+            <button
+              type="submit"
+              disabled={disabled}
+              className="px-4 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs transition-all shadow"
+            >
+              + Ajouter la pièce
+            </button>
+          </div>
+        </div>
+      </form>
+
+      {/* Barre de recherche & Filtres */}
       <div className="grid grid-cols-1 sm:grid-cols-12 gap-2 text-xs items-center">
         <div className="sm:col-span-7 relative">
           <Search className="w-4 h-4 text-[#64748B] absolute left-3 top-2.5" />
           <input
             type="text"
-            placeholder="Rechercher par nom ou dimension (ex: 200, Etagère)..."
+            placeholder="Rechercher (ex: 230, Côté, 48)..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="w-full pl-9 pr-3 py-2 rounded-xl bg-[#0F172A] border border-[#334155] text-white placeholder-[#64748B] outline-none focus:border-amber-400"
@@ -168,7 +332,7 @@ export const PiecesManager: React.FC<PiecesManagerProps> = ({
             className="w-full px-2.5 py-2 rounded-xl bg-[#0F172A] border border-[#334155] text-slate-200 text-xs outline-none focus:border-amber-400"
           >
             <option value="all">Tous matériaux</option>
-            <option value="mdf">MDF</option>
+            <option value="mdf">MDF / Bois</option>
             <option value="aluminium">Aluminium</option>
             <option value="verre">Verre</option>
             <option value="contreplaques">Contreplaqué</option>
@@ -186,7 +350,7 @@ export const PiecesManager: React.FC<PiecesManagerProps> = ({
         </div>
       </div>
 
-      {/* Batch Actions */}
+      {/* Batch delete */}
       {selectedIds.size > 0 && (
         <div className="p-2.5 rounded-xl bg-rose-500/10 border border-rose-500/30 flex items-center justify-between text-xs text-rose-300">
           <span>{selectedIds.size} pièce(s) sélectionnée(s)</span>
@@ -201,97 +365,145 @@ export const PiecesManager: React.FC<PiecesManagerProps> = ({
         </div>
       )}
 
-      {/* Table List */}
-      <div className="space-y-2 max-h-[380px] overflow-y-auto pr-1">
-        {filteredPieces.length === 0 ? (
-          <div className="p-8 rounded-xl bg-[#0F172A] border border-[#334155] text-center text-[#64748B] text-xs">
-            Aucune pièce ne correspond à votre recherche.
-          </div>
-        ) : (
-          filteredPieces.map((p, idx) => {
-            const isSelected = selectedIds.has(p.id || '');
-            return (
-              <div
-                key={p.id || idx}
-                className={`p-3 rounded-xl border transition-all flex flex-wrap sm:flex-nowrap items-center gap-2 text-xs ${
-                  isSelected ? 'bg-amber-500/5 border-amber-500/40' : 'bg-[#0F172A] border-[#334155]'
-                }`}
-              >
-                <button
-                  type="button"
-                  onClick={() => handleToggleSelect(p.id || '')}
-                  className="text-[#64748B] hover:text-amber-400 shrink-0"
+      {/* Tableau Type OptiCoupe : Numéro | Hauteur | Largeur | Quantité | Matériau | Référence | Chants */}
+      <div className="border border-[#334155] rounded-xl overflow-hidden bg-[#0F172A]">
+        <div className="grid grid-cols-12 bg-[#1E293B] px-3 py-2 text-[11px] font-black text-slate-300 uppercase tracking-wider border-b border-[#334155]">
+          <div className="col-span-1 text-center">N°</div>
+          <div className="col-span-2 text-right">Hauteur (Y)</div>
+          <div className="col-span-2 text-right">Largeur (X)</div>
+          <div className="col-span-1 text-center">Qté</div>
+          <div className="col-span-3 pl-2">Référence</div>
+          <div className="col-span-2 text-center">Chants (G D H B)</div>
+          <div className="col-span-1 text-center">Act.</div>
+        </div>
+
+        <div className="divide-y divide-[#1E293B] max-h-[360px] overflow-y-auto">
+          {filteredPieces.length === 0 ? (
+            <div className="p-8 text-center text-[#64748B] text-xs">
+              Aucune pièce dans la liste de débit.
+            </div>
+          ) : (
+            filteredPieces.map((p, idx) => {
+              const isSelected = selectedIds.has(p.id || '');
+              const ed = p.edges || {};
+
+              return (
+                <div
+                  key={p.id || idx}
+                  className={`grid grid-cols-12 items-center px-3 py-2 text-xs transition-colors ${
+                    isSelected ? 'bg-amber-500/10' : 'hover:bg-[#1E293B]/60'
+                  }`}
                 >
-                  {isSelected ? (
-                    <CheckSquare className="w-4 h-4 text-amber-400" />
-                  ) : (
-                    <Square className="w-4 h-4" />
-                  )}
-                </button>
+                  <div className="col-span-1 flex items-center justify-center gap-1">
+                    <button
+                      type="button"
+                      onClick={() => handleToggleSelect(p.id || '')}
+                      className="text-[#64748B] hover:text-amber-400"
+                    >
+                      {isSelected ? (
+                        <CheckSquare className="w-3.5 h-3.5 text-amber-400" />
+                      ) : (
+                        <Square className="w-3.5 h-3.5" />
+                      )}
+                    </button>
+                    <span className="font-mono text-[#94A3B8] font-bold text-[11px]">#{idx + 1}</span>
+                  </div>
 
-                <span className="font-mono text-[#64748B] w-5 text-center shrink-0">#{idx + 1}</span>
+                  {/* Hauteur Y */}
+                  <div className="col-span-2 text-right pr-1">
+                    <input
+                      type="number"
+                      step="0.1"
+                      value={p.height}
+                      onChange={(e) => handleUpdate(p.id || '', 'height', parseFloat(e.target.value) || 0)}
+                      className="w-full px-1.5 py-1 rounded bg-[#1E293B] border border-transparent hover:border-[#475569] focus:border-amber-400 text-white font-mono font-bold text-right text-xs outline-none"
+                    />
+                  </div>
 
-                <input
-                  type="text"
-                  placeholder="Nom de la pièce"
-                  value={p.name}
-                  onChange={(e) => handleUpdate(p.id || '', 'name', e.target.value)}
-                  className="flex-1 min-w-[100px] px-2.5 py-1.5 rounded-lg bg-[#1E293B] border border-[#334155] text-white font-medium outline-none focus:border-amber-400"
-                />
+                  {/* Largeur X */}
+                  <div className="col-span-2 text-right pr-1">
+                    <input
+                      type="number"
+                      step="0.1"
+                      value={p.width}
+                      onChange={(e) => handleUpdate(p.id || '', 'width', parseFloat(e.target.value) || 0)}
+                      className="w-full px-1.5 py-1 rounded bg-[#1E293B] border border-transparent hover:border-[#475569] focus:border-amber-400 text-white font-mono font-bold text-right text-xs outline-none"
+                    />
+                  </div>
 
-                <div className="flex items-center gap-1 shrink-0">
-                  <input
-                    type="number"
-                    placeholder="Long."
-                    value={p.width}
-                    onChange={(e) => handleUpdate(p.id || '', 'width', parseFloat(e.target.value) || 0)}
-                    className="w-16 px-2 py-1.5 rounded-lg bg-[#1E293B] border border-[#334155] text-white font-mono font-bold text-right outline-none focus:border-amber-400"
-                  />
-                  <span className="text-[#64748B]">×</span>
-                  <input
-                    type="number"
-                    placeholder="Larg."
-                    value={p.height}
-                    onChange={(e) => handleUpdate(p.id || '', 'height', parseFloat(e.target.value) || 0)}
-                    className="w-16 px-2 py-1.5 rounded-lg bg-[#1E293B] border border-[#334155] text-white font-mono font-bold text-right outline-none focus:border-amber-400"
-                  />
+                  {/* Quantité */}
+                  <div className="col-span-1 text-center px-1">
+                    <input
+                      type="number"
+                      min="1"
+                      value={p.quantity}
+                      onChange={(e) => handleUpdate(p.id || '', 'quantity', parseInt(e.target.value, 10) || 1)}
+                      className="w-full px-1 py-1 rounded bg-[#1E293B] border border-transparent hover:border-[#475569] focus:border-amber-400 text-white font-mono font-bold text-center text-xs outline-none"
+                    />
+                  </div>
+
+                  {/* Référence / Nom */}
+                  <div className="col-span-3 pl-2">
+                    <input
+                      type="text"
+                      value={p.name}
+                      onChange={(e) => handleUpdate(p.id || '', 'name', e.target.value)}
+                      className="w-full px-2 py-1 rounded bg-[#1E293B] border border-transparent hover:border-[#475569] focus:border-amber-400 text-white font-medium text-xs outline-none"
+                    />
+                  </div>
+
+                  {/* Chants G D H B */}
+                  <div className="col-span-2 flex items-center justify-center gap-1.5 font-mono text-[10px]">
+                    <button
+                      type="button"
+                      onClick={() => handleToggleEdge(p.id || '', 'left')}
+                      className={`px-1 py-0.5 rounded font-bold ${ed.left ? 'bg-amber-500 text-slate-950' : 'bg-[#1E293B] text-[#64748B]'}`}
+                      title="Chant Gauche"
+                    >
+                      G
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleToggleEdge(p.id || '', 'right')}
+                      className={`px-1 py-0.5 rounded font-bold ${ed.right ? 'bg-amber-500 text-slate-950' : 'bg-[#1E293B] text-[#64748B]'}`}
+                      title="Chant Droit"
+                    >
+                      D
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleToggleEdge(p.id || '', 'top')}
+                      className={`px-1 py-0.5 rounded font-bold ${ed.top ? 'bg-amber-500 text-slate-950' : 'bg-[#1E293B] text-[#64748B]'}`}
+                      title="Chant Haut"
+                    >
+                      H
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleToggleEdge(p.id || '', 'bottom')}
+                      className={`px-1 py-0.5 rounded font-bold ${ed.bottom ? 'bg-amber-500 text-slate-950' : 'bg-[#1E293B] text-[#64748B]'}`}
+                      title="Chant Bas"
+                    >
+                      B
+                    </button>
+                  </div>
+
+                  {/* Action */}
+                  <div className="col-span-1 text-center">
+                    <button
+                      type="button"
+                      onClick={() => handleRemove(p.id || '')}
+                      className="p-1 rounded hover:bg-rose-500/20 text-[#64748B] hover:text-rose-400 transition-colors"
+                      title="Supprimer"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
                 </div>
-
-                <div className="flex items-center gap-1 shrink-0">
-                  <span className="text-[#64748B] text-[10px]">Qté:</span>
-                  <input
-                    type="number"
-                    min="1"
-                    value={p.quantity}
-                    onChange={(e) => handleUpdate(p.id || '', 'quantity', parseInt(e.target.value, 10) || 1)}
-                    className="w-12 px-1.5 py-1.5 rounded-lg bg-[#1E293B] border border-[#334155] text-white font-mono font-bold text-center outline-none focus:border-amber-400"
-                  />
-                </div>
-
-                {showMaterialCol && (
-                  <select
-                    value={p.material || defaultMaterial}
-                    onChange={(e) => handleUpdate(p.id || '', 'material', e.target.value as MaterialType)}
-                    className="px-2 py-1.5 rounded-lg bg-[#1E293B] border border-[#334155] text-white text-[11px] outline-none"
-                  >
-                    <option value="mdf">MDF</option>
-                    <option value="aluminium">Alu</option>
-                    <option value="verre">Verre</option>
-                    <option value="contreplaques">CP</option>
-                  </select>
-                )}
-
-                <button
-                  type="button"
-                  onClick={() => handleRemove(p.id || '')}
-                  className="p-1.5 rounded-lg hover:bg-rose-500/20 text-[#64748B] hover:text-rose-400 transition-colors shrink-0 ml-auto sm:ml-0"
-                >
-                  <Trash2 className="w-4 h-4" />
-                </button>
-              </div>
-            );
-          })
-        )}
+              );
+            })
+          )}
+        </div>
       </div>
     </div>
   );

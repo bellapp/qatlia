@@ -79,19 +79,18 @@ export async function POST(req: Request) {
       });
     }
 
-    const systemPrompt = `Tu es un expert en lecture de fiches de débit et de listes de mesures manuscrites pour menuisiers et artisans.
-Tu dois analyser l'image et extraire les dimensions et quantités de chaque pièce.
-Retourne STRICTEMENT un objet JSON sans aucun texte avant ou après.
-Format attendu :
+    const systemPrompt = `Tu es un expert en lecture de fiches de débit pour menuisiers et artisans.
+Tu dois analyser l'image et extraire les dimensions sous la convention industrielle : HAUTEUR (Y) × LARGEUR (X).
+Retourne STRICTEMENT un objet JSON :
 {
   "pieces": [
-    { "name": "Côté", "width": 200, "height": 60, "quantity": 2 }
+    { "name": "Côté G", "height": 230, "width": 120, "quantity": 2 }
   ]
 }
 Règles :
-- Largeur (width) et Hauteur/Longueur (height) en centimètres (nombres décimaux ou entiers).
+- Hauteur (height / Y) et Largeur (width / X) en centimètres ou millimètres.
 - Quantité (quantity) en entier (1 par défaut).
-- Nom descriptif ou "Pièce N".`;
+- Nom ou Référence de la pièce.`;
 
     const userPrompt = `Extrais la liste des pièces de cette image sous format JSON {"pieces": [...]}.`;
 
@@ -167,10 +166,10 @@ Règles :
 
     // Normalisation des pièces
     const rawPieces = parsedJson.pieces || [];
-    const pieces = rawPieces.map((p: { name?: string; width: number | string; height: number | string; quantity?: number | string }, i: number) => ({
+    const pieces = rawPieces.map((p: { name?: string; height?: number | string; width?: number | string; quantity?: number | string }, i: number) => ({
       name: p.name ? String(p.name).trim() : `Pièce ${i + 1}`,
-      width: Math.abs(parseFloat(String(p.width))) || 10,
-      height: Math.abs(parseFloat(String(p.height))) || 10,
+      height: Math.abs(parseFloat(String(p.height || 10))),
+      width: Math.abs(parseFloat(String(p.width || 10))),
       quantity: Math.max(1, parseInt(String(p.quantity || 1), 10) || 1),
     }));
 

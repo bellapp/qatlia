@@ -1,32 +1,44 @@
-export type MaterialType = 'mdf' | 'aluminium' | 'verre' | 'contreplaques';
+export type MaterialType = 'mdf' | 'aluminium' | 'verre' | 'contreplaques' | 'melamine' | 'chene';
+
+export interface EdgeBandingConfig {
+  left?: boolean;
+  right?: boolean;
+  top?: boolean;
+  bottom?: boolean;
+  thickness?: number; // en mm (ex: 0.8mm ou 2mm)
+  material?: string;
+}
 
 export interface Piece {
   id?: string;
-  name?: string;
-  width: number; // en cm ou mm
-  height: number;
+  name?: string; // Nom ou Référence
+  height: number; // Hauteur (Y / vertical) en cm ou mm
+  width: number; // Largeur (X / horizontal) en cm ou mm
   quantity: number;
   material?: MaterialType | null;
+  grainDirection?: boolean; // Sens du fil spécifique à la pièce
+  edges?: EdgeBandingConfig; // Chants: Gauche, Droit, Haut, Bas
+  preCut?: { height?: number; width?: number }; // Pré-débit
   rotatable?: boolean;
 }
 
 export interface Sheet {
-  width: number; // ex: 278 cm ou 2780 mm
-  height: number; // ex: 208 cm ou 2080 mm
-  kerf: number;
-  margin?: number;
-  grainDirection?: boolean;
+  height: number; // Hauteur panneau brut vertical (ex: 278 cm ou 2780 mm)
+  width: number; // Largeur panneau brut horizontal (ex: 208 cm ou 2080 mm)
+  kerf: number; // Épaisseur trait de scie (cm ou mm)
+  margin?: number; // Marge / Pré-éboutage (cm)
+  grainDirection?: boolean; // Sens du fil global
   material?: MaterialType;
 }
 
 export interface OptimizationOptions {
-  kerfWidth: number; // mm
+  kerfWidth: number; // mm (défaut: 3)
   showLabels: boolean;
   singleSheetOnly: boolean;
   considerMaterial: boolean;
   edgeBanding: boolean;
   grainDirection: boolean;
-  optimizationPriority: 'min_waste' | 'min_sheets' | 'linear_guillotine' | 'balanced';
+  optimizationPriority: 'linear_guillotine' | 'min_waste' | 'min_sheets' | 'balanced';
   defaultMaterial?: MaterialType;
 }
 
@@ -36,7 +48,7 @@ export const OPTIONS_DEFAULTS: OptimizationOptions = {
   singleSheetOnly: false,
   considerMaterial: false,
   edgeBanding: false,
-  grainDirection: false,
+  grainDirection: false, // Rotation libre par défaut pour maximiser le rendement
   optimizationPriority: 'linear_guillotine',
   defaultMaterial: 'mdf',
 };
@@ -44,8 +56,8 @@ export const OPTIONS_DEFAULTS: OptimizationOptions = {
 export interface Rect {
   x: number;
   y: number;
-  width: number;
-  height: number;
+  width: number; // Largeur (X)
+  height: number; // Hauteur (Y)
 }
 
 export interface PlacedPiece {
@@ -55,10 +67,13 @@ export interface PlacedPiece {
   material?: MaterialType;
   x: number;
   y: number;
-  width: number;
-  height: number;
+  width: number; // Largeur effective placée
+  height: number; // Hauteur effective placée
+  originalHeight: number;
+  originalWidth: number;
   rotated: boolean;
   pieceNumber: number;
+  edges?: EdgeBandingConfig;
 }
 
 export interface OffcutWaste {
@@ -68,14 +83,14 @@ export interface OffcutWaste {
   height: number;
   sheetIndex: number;
   areaM2: number;
-  isReusable: boolean; // chutes exploitables (ex: > 30x30 cm)
+  isReusable: boolean;
 }
 
 export interface PlacedSheet {
   index: number;
   material: MaterialType;
-  width: number;
-  height: number;
+  width: number; // Largeur panneau
+  height: number; // Hauteur panneau (vertical)
   pieces: PlacedPiece[];
   offcuts: OffcutWaste[];
   wasteRate: number;
@@ -109,13 +124,15 @@ interface ExpandedPiece {
   piece: Piece;
   id: string;
   name: string;
-  width: number;
   height: number;
+  width: number;
   material: MaterialType;
+  grainDirection: boolean;
   rotatable: boolean;
+  edges?: EdgeBandingConfig;
 }
 
-function expandPieces(pieces: Piece[], defaultMaterial: MaterialType): ExpandedPiece[] {
+function expandPieces(pieces: Piece[], defaultMaterial: MaterialType, globalGrain: boolean): ExpandedPiece[] {
   const result: ExpandedPiece[] = [];
   let index = 1;
   for (const p of pieces) {
@@ -125,10 +142,12 @@ function expandPieces(pieces: Piece[], defaultMaterial: MaterialType): ExpandedP
         piece: p,
         id: p.id || `p_${index}`,
         name: p.name || `Pièce ${index}`,
-        width: Number(p.width),
         height: Number(p.height),
+        width: Number(p.width),
         material: p.material || defaultMaterial,
-        rotatable: p.rotatable !== false,
+        grainDirection: p.grainDirection !== undefined ? p.grainDirection : globalGrain,
+        rotatable: p.rotatable !== false && !(p.grainDirection ?? globalGrain),
+        edges: p.edges,
       });
       index++;
     }
@@ -137,11 +156,12 @@ function expandPieces(pieces: Piece[], defaultMaterial: MaterialType): ExpandedP
 }
 
 /**
- * Guillotine Strip Packer avec découpage en bandes/colonnes continues et calcul exact des chutes résiduelles
+ * Guillotine Strip Packer Vertical (Colonnes Industrielles OptiCoupe)
+ * Le panneau est orienté VERTICALEMENT (Hauteur Y en hauteur, Largeur X en largeur)
  */
-class IndustrialGuillotinePacker {
-  private sheetW: number;
-  private sheetH: number;
+class VerticalStripGuillotinePacker {
+  private sheetW: number; // Largeur horizontale (ex: 208 cm)
+  private sheetH: number; // Hauteur verticale (ex: 278 cm)
   private kerf: number;
   private material: MaterialType;
   public freeRects: Rect[] = [];
@@ -159,10 +179,9 @@ class IndustrialGuillotinePacker {
     item: ExpandedPiece,
     sheetIndex: number,
     pieceNumber: number,
-    grainDirection: boolean,
-    cutAxis: 'vertical_strips' | 'horizontal_strips' = 'vertical_strips'
+    grainLocked: boolean
   ): PlacedPiece | null {
-    const canRotate = item.rotatable && !grainDirection;
+    const canRotate = item.rotatable && !grainLocked;
 
     let bestRectIndex = -1;
     let bestRotated = false;
@@ -171,13 +190,16 @@ class IndustrialGuillotinePacker {
     for (let i = 0; i < this.freeRects.length; i++) {
       const r = this.freeRects[i];
 
+      // Format standard : Hauteur Y = item.height, Largeur X = item.width
       const fitsNormal = r.width >= item.width && r.height >= item.height;
+      // Format tourné : Hauteur Y = item.width, Largeur X = item.height
       const fitsRotated = canRotate && r.width >= item.height && r.height >= item.width;
 
       if (fitsNormal) {
-        // En découpe industrielle (bandes verticales), aligner sur la dimension de bande
-        const stripWaste = cutAxis === 'vertical_strips' ? (r.width - item.width) : (r.height - item.height);
-        const score = stripWaste * 1000 + (r.x + r.y);
+        // Favoriser les colonnes de même largeur X pour créer des bandes de coupe verticales
+        const columnWidthWaste = r.width - item.width;
+        const heightWaste = r.height - item.height;
+        const score = columnWidthWaste * 2000 + heightWaste + (r.x * 50 + r.y);
 
         if (score < bestScore) {
           bestScore = score;
@@ -187,8 +209,9 @@ class IndustrialGuillotinePacker {
       }
 
       if (fitsRotated) {
-        const stripWaste = cutAxis === 'vertical_strips' ? (r.width - item.height) : (r.height - item.width);
-        const score = stripWaste * 1000 + (r.x + r.y);
+        const columnWidthWaste = r.width - item.height;
+        const heightWaste = r.height - item.width;
+        const score = columnWidthWaste * 2000 + heightWaste + (r.x * 50 + r.y);
 
         if (score < bestScore) {
           bestScore = score;
@@ -215,52 +238,37 @@ class IndustrialGuillotinePacker {
       y: targetRect.y,
       width: placedW,
       height: placedH,
+      originalHeight: item.height,
+      originalWidth: item.width,
       rotated: bestRotated,
       pieceNumber,
+      edges: item.edges,
     };
 
     this.placed.push(placedPiece);
 
-    // Découpe Guillotine Industrielle (Bandes continues traversantes)
+    // Découpe Guillotine en Colonnes Verticales (Passe traversante de haut en bas)
     const rightW = targetRect.width - (placedW + this.kerf);
     const bottomH = targetRect.height - (placedH + this.kerf);
 
-    if (cutAxis === 'vertical_strips') {
-      // 1ère coupe de passe traversante verticale : crée la bande de colonne
-      if (bottomH > 0.05) {
-        this.freeRects.push({
-          x: targetRect.x,
-          y: targetRect.y + placedH + this.kerf,
-          width: placedW,
-          height: bottomH,
-        });
-      }
-      if (rightW > 0.05) {
-        this.freeRects.push({
-          x: targetRect.x + placedW + this.kerf,
-          y: targetRect.y,
-          width: rightW,
-          height: targetRect.height,
-        });
-      }
-    } else {
-      // 1ère coupe de passe traversante horizontale
-      if (rightW > 0.05) {
-        this.freeRects.push({
-          x: targetRect.x + placedW + this.kerf,
-          y: targetRect.y,
-          width: rightW,
-          height: placedH,
-        });
-      }
-      if (bottomH > 0.05) {
-        this.freeRects.push({
-          x: targetRect.x,
-          y: targetRect.y + placedH + this.kerf,
-          width: targetRect.width,
-          height: bottomH,
-        });
-      }
+    // Règle 1: Découpe en sous-colonne verticale (le reste en hauteur reste dans la colonne)
+    if (bottomH > 0.05) {
+      this.freeRects.push({
+        x: targetRect.x,
+        y: targetRect.y + placedH + this.kerf,
+        width: placedW,
+        height: bottomH,
+      });
+    }
+
+    // Règle 2: La colonne suivante à droite traverse toute la hauteur disponible
+    if (rightW > 0.05) {
+      this.freeRects.push({
+        x: targetRect.x + placedW + this.kerf,
+        y: targetRect.y,
+        width: rightW,
+        height: targetRect.height,
+      });
     }
 
     this.mergeFreeRectangles();
@@ -273,18 +281,8 @@ class IndustrialGuillotinePacker {
         const r1 = this.freeRects[i];
         const r2 = this.freeRects[j];
 
-        if (Math.abs(r1.y - r2.y) < 0.01 && Math.abs(r1.height - r2.height) < 0.01) {
-          if (Math.abs(r1.x + r1.width + this.kerf - r2.x) < 0.01) {
-            r1.width += r2.width + this.kerf;
-            this.freeRects.splice(j, 1);
-            j--;
-          } else if (Math.abs(r2.x + r2.width + this.kerf - r1.x) < 0.01) {
-            r1.x = r2.x;
-            r1.width += r2.width + this.kerf;
-            this.freeRects.splice(j, 1);
-            j--;
-          }
-        } else if (Math.abs(r1.x - r2.x) < 0.01 && Math.abs(r1.width - r2.width) < 0.01) {
+        // Fusion verticale dans la même colonne (même X et même Largeur)
+        if (Math.abs(r1.x - r2.x) < 0.01 && Math.abs(r1.width - r2.width) < 0.01) {
           if (Math.abs(r1.y + r1.height + this.kerf - r2.y) < 0.01) {
             r1.height += r2.height + this.kerf;
             this.freeRects.splice(j, 1);
@@ -292,6 +290,19 @@ class IndustrialGuillotinePacker {
           } else if (Math.abs(r2.y + r2.height + this.kerf - r1.y) < 0.01) {
             r1.y = r2.y;
             r1.height += r2.height + this.kerf;
+            this.freeRects.splice(j, 1);
+            j--;
+          }
+        }
+        // Fusion horizontale (même Y et même Hauteur)
+        else if (Math.abs(r1.y - r2.y) < 0.01 && Math.abs(r1.height - r2.height) < 0.01) {
+          if (Math.abs(r1.x + r1.width + this.kerf - r2.x) < 0.01) {
+            r1.width += r2.width + this.kerf;
+            this.freeRects.splice(j, 1);
+            j--;
+          } else if (Math.abs(r2.x + r2.width + this.kerf - r1.x) < 0.01) {
+            r1.x = r2.x;
+            r1.width += r2.width + this.kerf;
             this.freeRects.splice(j, 1);
             j--;
           }
@@ -320,10 +331,12 @@ export function optimizeCutting(
   const margin = sheet.margin || 0;
   const defaultMat: MaterialType = mergedOptions.defaultMaterial || sheet.material || 'mdf';
 
+  // Orientation standard : sheet.width = horizontal (X), sheet.height = vertical (Y)
+  // Si sheet.width > sheet.height, on ajuste pour que le panneau soit représenté dans sa hauteur de travail
   const effectiveW = Math.max(10, sheet.width - margin * 2);
   const effectiveH = Math.max(10, sheet.height - margin * 2);
 
-  const expanded = expandPieces(pieces, defaultMat);
+  const expanded = expandPieces(pieces, defaultMat, mergedOptions.grainDirection);
 
   const materialGroups: Partial<Record<MaterialType, ExpandedPiece[]>> = mergedOptions.considerMaterial
     ? expanded.reduce((acc, p) => {
@@ -334,27 +347,22 @@ export function optimizeCutting(
       }, {} as Partial<Record<MaterialType, ExpandedPiece[]>>)
     : { [defaultMat]: expanded };
 
-  // Stratégies de tri pour alignement en colonnes / bandes de coupe identiques
+  // Stratégies de tri pour regrouper les largeurs identiques en colonnes
   const sortStrategies: Array<(a: ExpandedPiece, b: ExpandedPiece) => number> = [
-    // 1. Tri par largeur commune, puis par longueur décroissante (colonnes parfaites)
+    // 1. Priorité aux grandes largeurs pour fixer les colonnes maîtresses (1200mm, 480mm, 380mm...)
     (a, b) => {
-      const wA = Math.min(a.width, a.height);
-      const wB = Math.min(b.width, b.height);
-      if (Math.abs(wB - wA) > 0.5) return wB - wA;
-      return (b.width * b.height) - (a.width * a.height);
+      const minA = Math.min(a.width, a.height);
+      const minB = Math.min(b.width, b.height);
+      const maxA = Math.max(a.width, a.height);
+      const maxB = Math.max(b.width, b.height);
+      if (Math.abs(minB - minA) > 0.5) return minB - minA;
+      return maxB - maxA;
     },
     // 2. Surface pure décroissante
     (a, b) => (b.width * b.height) - (a.width * a.height),
-    // 3. Plus grande dimension en premier
-    (a, b) => {
-      const maxA = Math.max(a.width, a.height);
-      const maxB = Math.max(b.width, b.height);
-      if (maxB !== maxA) return maxB - maxA;
-      return (b.width * b.height) - (a.width * a.height);
-    },
+    // 3. Hauteur pure décroissante
+    (a, b) => Math.max(b.width, b.height) - Math.max(a.width, a.height),
   ];
-
-  const cutAxes: Array<'vertical_strips' | 'horizontal_strips'> = ['vertical_strips', 'horizontal_strips'];
 
   let bestResult: OptimizationResult | null = null;
   let minUnplaced = Number.POSITIVE_INFINITY;
@@ -362,167 +370,164 @@ export function optimizeCutting(
   let minWaste = Number.POSITIVE_INFINITY;
 
   for (const sortFn of sortStrategies) {
-    for (const cutAxis of cutAxes) {
-      const allPlaced: PlacedPiece[] = [];
-      const unplacedPieces: Piece[] = [];
-      const placedSheets: PlacedSheet[] = [];
-      const allOffcuts: OffcutWaste[] = [];
-      let globalPieceIndex = 1;
-      let globalSheetIndex = 0;
+    const allPlaced: PlacedPiece[] = [];
+    const unplacedPieces: Piece[] = [];
+    const placedSheets: PlacedSheet[] = [];
+    const allOffcuts: OffcutWaste[] = [];
+    let globalPieceIndex = 1;
+    let globalSheetIndex = 0;
 
-      for (const [matKey, groupPieces] of Object.entries(materialGroups)) {
-        const currentMat = matKey as MaterialType;
-        const sortedPieces = [...groupPieces].sort(sortFn);
-        const groupPackers: { packer: IndustrialGuillotinePacker; sheetIndex: number }[] = [];
+    for (const [matKey, groupPieces] of Object.entries(materialGroups)) {
+      const currentMat = matKey as MaterialType;
+      const sortedPieces = [...groupPieces].sort(sortFn);
+      const groupPackers: { packer: VerticalStripGuillotinePacker; sheetIndex: number }[] = [];
 
-        for (const item of sortedPieces) {
-          let fitted = false;
+      for (const item of sortedPieces) {
+        let fitted = false;
 
-          for (const { packer, sheetIndex } of groupPackers) {
-            const placed = packer.tryFit(item, sheetIndex, globalPieceIndex, mergedOptions.grainDirection, cutAxis);
-            if (placed) {
-              allPlaced.push({
-                ...placed,
-                x: placed.x + margin,
-                y: placed.y + margin,
-              });
-              globalPieceIndex++;
-              fitted = true;
-              break;
-            }
-          }
-
-          if (!fitted) {
-            if (mergedOptions.singleSheetOnly && groupPackers.length >= 1) {
-              unplacedPieces.push(item.piece);
-              continue;
-            }
-
-            const newPacker = new IndustrialGuillotinePacker(effectiveW, effectiveH, kerfCm, currentMat);
-            const assignedSheetIdx = globalSheetIndex++;
-
-            const placed = newPacker.tryFit(item, assignedSheetIdx, globalPieceIndex, mergedOptions.grainDirection, cutAxis);
-            if (placed) {
-              groupPackers.push({ packer: newPacker, sheetIndex: assignedSheetIdx });
-              allPlaced.push({
-                ...placed,
-                x: placed.x + margin,
-                y: placed.y + margin,
-              });
-              globalPieceIndex++;
-            } else {
-              unplacedPieces.push(item.piece);
-            }
+        for (const { packer, sheetIndex } of groupPackers) {
+          const placed = packer.tryFit(item, sheetIndex, globalPieceIndex, mergedOptions.grainDirection);
+          if (placed) {
+            allPlaced.push({
+              ...placed,
+              x: placed.x + margin,
+              y: placed.y + margin,
+            });
+            globalPieceIndex++;
+            fitted = true;
+            break;
           }
         }
 
-        for (const { sheetIndex, packer } of groupPackers) {
-          const sheetPieces = allPlaced.filter((p) => p.sheetIndex === sheetIndex);
-          if (sheetPieces.length === 0) continue;
+        if (!fitted) {
+          if (mergedOptions.singleSheetOnly && groupPackers.length >= 1) {
+            unplacedPieces.push(item.piece);
+            continue;
+          }
 
-          // Calcul des chutes résiduelles réelles (offcuts)
-          const sheetOffcuts: OffcutWaste[] = packer.freeRects
-            .filter((r) => r.width >= 5 && r.height >= 5) // ignorer poussière < 5cm
-            .map((r) => {
-              const area = (r.width * r.height) / 10000;
-              return {
-                x: r.x + margin,
-                y: r.y + margin,
-                width: Math.round(r.width * 10) / 10,
-                height: Math.round(r.height * 10) / 10,
-                sheetIndex,
-                areaM2: Math.round(area * 1000) / 1000,
-                isReusable: r.width >= 30 && r.height >= 30, // chute réutilisable si > 30x30 cm
-              };
+          const newPacker = new VerticalStripGuillotinePacker(effectiveW, effectiveH, kerfCm, currentMat);
+          const assignedSheetIdx = globalSheetIndex++;
+
+          const placed = newPacker.tryFit(item, assignedSheetIdx, globalPieceIndex, mergedOptions.grainDirection);
+          if (placed) {
+            groupPackers.push({ packer: newPacker, sheetIndex: assignedSheetIdx });
+            allPlaced.push({
+              ...placed,
+              x: placed.x + margin,
+              y: placed.y + margin,
             });
-
-          allOffcuts.push(...sheetOffcuts);
-
-          const usedArea = sheetPieces.reduce((sum, p) => sum + p.width * p.height, 0);
-          const totalArea = sheet.width * sheet.height;
-          const wasteRate = Math.max(0, Math.round(((totalArea - usedArea) / totalArea) * 1000) / 10);
-
-          placedSheets.push({
-            index: sheetIndex,
-            material: currentMat,
-            width: sheet.width,
-            height: sheet.height,
-            pieces: sheetPieces,
-            offcuts: sheetOffcuts,
-            wasteRate,
-            usedArea,
-          });
+            globalPieceIndex++;
+          } else {
+            unplacedPieces.push(item.piece);
+          }
         }
       }
 
-      placedSheets.forEach((s, idx) => {
-        const oldIdx = s.index;
-        s.index = idx;
-        allPlaced.filter((p) => p.sheetIndex === oldIdx).forEach((p) => (p.sheetIndex = idx));
-        allOffcuts.filter((o) => o.sheetIndex === oldIdx).forEach((o) => (o.sheetIndex = idx));
+      for (const { sheetIndex, packer } of groupPackers) {
+        const sheetPieces = allPlaced.filter((p) => p.sheetIndex === sheetIndex);
+        if (sheetPieces.length === 0) continue;
+
+        const sheetOffcuts: OffcutWaste[] = packer.freeRects
+          .filter((r) => r.width >= 5 && r.height >= 5)
+          .map((r) => {
+            const area = (r.width * r.height) / 10000;
+            return {
+              x: r.x + margin,
+              y: r.y + margin,
+              width: Math.round(r.width * 10) / 10,
+              height: Math.round(r.height * 10) / 10,
+              sheetIndex,
+              areaM2: Math.round(area * 1000) / 1000,
+              isReusable: r.width >= 30 && r.height >= 30,
+            };
+          });
+
+        allOffcuts.push(...sheetOffcuts);
+
+        const usedArea = sheetPieces.reduce((sum, p) => sum + p.width * p.height, 0);
+        const totalArea = sheet.width * sheet.height;
+        const wasteRate = Math.max(0, Math.round(((totalArea - usedArea) / totalArea) * 1000) / 10);
+
+        placedSheets.push({
+          index: sheetIndex,
+          material: currentMat,
+          width: sheet.width,
+          height: sheet.height,
+          pieces: sheetPieces,
+          offcuts: sheetOffcuts,
+          wasteRate,
+          usedArea,
+        });
+      }
+    }
+
+    placedSheets.forEach((s, idx) => {
+      const oldIdx = s.index;
+      s.index = idx;
+      allPlaced.filter((p) => p.sheetIndex === oldIdx).forEach((p) => (p.sheetIndex = idx));
+      allOffcuts.filter((o) => o.sheetIndex === oldIdx).forEach((o) => (o.sheetIndex = idx));
+    });
+
+    const currentSheetsUsed = placedSheets.length;
+    const totalAvailable = sheet.width * sheet.height * currentSheetsUsed;
+    const totalUsed = allPlaced.reduce((sum, p) => sum + p.width * p.height, 0);
+    const currentWaste = totalAvailable > 0 ? Math.max(0, Math.round(((totalAvailable - totalUsed) / totalAvailable) * 1000) / 10) : 0;
+
+    const linearCutMeters = allPlaced.reduce((sum, p) => sum + (p.width + p.height) / 100, 0) * 1.1;
+    const baselineSheets = Math.ceil(totalUsed / (sheet.width * sheet.height * 0.65 || 1));
+    const sheetsSaved = Math.max(0, baselineSheets - currentSheetsUsed);
+    const moneySavedMad = sheetsSaved * 450 + (allPlaced.length * 5);
+
+    if (
+      bestResult === null ||
+      unplacedPieces.length < minUnplaced ||
+      (unplacedPieces.length === minUnplaced && currentSheetsUsed < minSheets) ||
+      (unplacedPieces.length === minUnplaced && currentSheetsUsed === minSheets && currentWaste < minWaste)
+    ) {
+      minUnplaced = unplacedPieces.length;
+      minSheets = currentSheetsUsed;
+      minWaste = currentWaste;
+
+      let singleSheetWarning: string | undefined;
+      if (mergedOptions.singleSheetOnly && unplacedPieces.length > 0) {
+        singleSheetWarning = `Mode "1 feuille" activé — ${unplacedPieces.length} pièce${
+          unplacedPieces.length > 1 ? 's' : ''
+        } n'ont pas pu être placées.`;
+      }
+
+      const materialStats: MaterialStat[] = Object.entries(materialGroups).map(([matKey]) => {
+        const mat = matKey as MaterialType;
+        const matSheets = placedSheets.filter((s) => s.material === mat);
+        const matPieces = allPlaced.filter((p) => p.material === mat);
+        const matUsedArea = matPieces.reduce((sum, p) => sum + p.width * p.height, 0);
+        const matTotalArea = matSheets.length * sheet.width * sheet.height;
+        const matWaste = matTotalArea > 0
+          ? Math.max(0, Math.round(((matTotalArea - matUsedArea) / matTotalArea) * 1000) / 10)
+          : 0;
+
+        return {
+          material: mat,
+          sheetsUsed: matSheets.length,
+          wasteRate: matWaste,
+          usedArea: Math.round((matUsedArea / 10000) * 100) / 100,
+          totalPieces: matPieces.length,
+        };
       });
 
-      const currentSheetsUsed = placedSheets.length;
-      const totalAvailable = sheet.width * sheet.height * currentSheetsUsed;
-      const totalUsed = allPlaced.reduce((sum, p) => sum + p.width * p.height, 0);
-      const currentWaste = totalAvailable > 0 ? Math.max(0, Math.round(((totalAvailable - totalUsed) / totalAvailable) * 1000) / 10) : 0;
-
-      const linearCutMeters = allPlaced.reduce((sum, p) => sum + (p.width + p.height) / 100, 0) * 1.1;
-      const baselineSheets = Math.ceil(totalUsed / (sheet.width * sheet.height * 0.65 || 1));
-      const sheetsSaved = Math.max(0, baselineSheets - currentSheetsUsed);
-      const moneySavedMad = sheetsSaved * 450 + (allPlaced.length * 5);
-
-      if (
-        bestResult === null ||
-        unplacedPieces.length < minUnplaced ||
-        (unplacedPieces.length === minUnplaced && currentSheetsUsed < minSheets) ||
-        (unplacedPieces.length === minUnplaced && currentSheetsUsed === minSheets && currentWaste < minWaste)
-      ) {
-        minUnplaced = unplacedPieces.length;
-        minSheets = currentSheetsUsed;
-        minWaste = currentWaste;
-
-        let singleSheetWarning: string | undefined;
-        if (mergedOptions.singleSheetOnly && unplacedPieces.length > 0) {
-          singleSheetWarning = `Mode "1 feuille" activé — ${unplacedPieces.length} pièce${
-            unplacedPieces.length > 1 ? 's' : ''
-          } n'ont pas pu être placées.`;
-        }
-
-        const materialStats: MaterialStat[] = Object.entries(materialGroups).map(([matKey]) => {
-          const mat = matKey as MaterialType;
-          const matSheets = placedSheets.filter((s) => s.material === mat);
-          const matPieces = allPlaced.filter((p) => p.material === mat);
-          const matUsedArea = matPieces.reduce((sum, p) => sum + p.width * p.height, 0);
-          const matTotalArea = matSheets.length * sheet.width * sheet.height;
-          const matWaste = matTotalArea > 0
-            ? Math.max(0, Math.round(((matTotalArea - matUsedArea) / matTotalArea) * 1000) / 10)
-            : 0;
-
-          return {
-            material: mat,
-            sheetsUsed: matSheets.length,
-            wasteRate: matWaste,
-            usedArea: Math.round((matUsedArea / 10000) * 100) / 100,
-            totalPieces: matPieces.length,
-          };
-        });
-
-        bestResult = {
-          sheetsUsed: currentSheetsUsed,
-          placedPieces: allPlaced,
-          unplacedPieces,
-          offcuts: allOffcuts,
-          singleSheetWarning,
-          wastePercentage: currentWaste,
-          totalAreaUsed: Math.round(totalUsed * 10) / 10,
-          totalAreaAvailable: totalAvailable,
-          moneySavedMad,
-          totalLinearCutMeters: Math.round(linearCutMeters * 10) / 10,
-          sheets: placedSheets,
-          materialStats: mergedOptions.considerMaterial ? materialStats : undefined,
-        };
-      }
+      bestResult = {
+        sheetsUsed: currentSheetsUsed,
+        placedPieces: allPlaced,
+        unplacedPieces,
+        offcuts: allOffcuts,
+        singleSheetWarning,
+        wastePercentage: currentWaste,
+        totalAreaUsed: Math.round(totalUsed * 10) / 10,
+        totalAreaAvailable: totalAvailable,
+        moneySavedMad,
+        totalLinearCutMeters: Math.round(linearCutMeters * 10) / 10,
+        sheets: placedSheets,
+        materialStats: mergedOptions.considerMaterial ? materialStats : undefined,
+      };
     }
   }
 

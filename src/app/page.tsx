@@ -30,8 +30,8 @@ import { OptionsPanel } from '@/components/OptionsPanel';
 import { PiecesManager } from '@/components/PiecesManager';
 
 const DEFAULT_SHEET: Sheet = {
-  width: 280, // cm
-  height: 207, // cm
+  height: 278, // Hauteur panneau brut vertical (cm)
+  width: 208, // Largeur panneau brut horizontal (cm)
   kerf: 0.3, // cm = 3mm
   margin: 1.0, // cm
   grainDirection: false,
@@ -39,11 +39,11 @@ const DEFAULT_SHEET: Sheet = {
 };
 
 const INITIAL_PIECES: Piece[] = [
-  { id: '1', name: 'Panneau Latéral G', width: 200, height: 58, quantity: 2, material: 'mdf', rotatable: false },
-  { id: '2', name: 'Panneau Latéral D', width: 200, height: 58, quantity: 2, material: 'mdf', rotatable: false },
-  { id: '3', name: 'Dessus / Dessous', width: 116.4, height: 58, quantity: 2, material: 'mdf', rotatable: false },
-  { id: '4', name: 'Étagère Mobile', width: 116.4, height: 55, quantity: 4, material: 'mdf', rotatable: false },
-  { id: '5', name: 'Séparation Centrale', width: 190, height: 55, quantity: 1, material: 'mdf', rotatable: false },
+  { id: '1', name: 'Panneau Latéral G', height: 230, width: 120, quantity: 2, material: 'mdf', rotatable: true },
+  { id: '2', name: 'Panneau Latéral D', height: 118, width: 48, quantity: 1, material: 'mdf', rotatable: true },
+  { id: '3', name: 'Étagère Mobile', height: 41.8, width: 38, quantity: 7, material: 'mdf', rotatable: true },
+  { id: '4', name: 'Séparation Centrale', height: 53.1, width: 48, quantity: 4, material: 'mdf', rotatable: true },
+  { id: '5', name: 'Socle Bas', height: 51.3, width: 48, quantity: 2, material: 'mdf', rotatable: true },
 ];
 
 export default function Dashboard() {
@@ -332,22 +332,22 @@ export default function Dashboard() {
 
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 text-xs">
                 <div>
-                  <label htmlFor="sheetWidthInput" className="block text-[#94A3B8] font-medium mb-1">Longueur (X)</label>
-                  <input
-                    id="sheetWidthInput"
-                    type="number"
-                    value={sheet.width}
-                    onChange={(e) => setSheet({ ...sheet, width: parseFloat(e.target.value) || 0 })}
-                    className="w-full px-3 py-2 rounded-xl bg-[#0F172A] border border-[#334155] text-white font-mono font-bold focus:border-amber-400 outline-none"
-                  />
-                </div>
-                <div>
-                  <label htmlFor="sheetHeightInput" className="block text-[#94A3B8] font-medium mb-1">Largeur (Y)</label>
+                  <label htmlFor="sheetHeightInput" className="block text-[#94A3B8] font-medium mb-1">Hauteur (Y) [Vertical]</label>
                   <input
                     id="sheetHeightInput"
                     type="number"
                     value={sheet.height}
                     onChange={(e) => setSheet({ ...sheet, height: parseFloat(e.target.value) || 0 })}
+                    className="w-full px-3 py-2 rounded-xl bg-[#0F172A] border border-[#334155] text-white font-mono font-bold focus:border-amber-400 outline-none"
+                  />
+                </div>
+                <div>
+                  <label htmlFor="sheetWidthInput" className="block text-[#94A3B8] font-medium mb-1">Largeur (X) [Horizontal]</label>
+                  <input
+                    id="sheetWidthInput"
+                    type="number"
+                    value={sheet.width}
+                    onChange={(e) => setSheet({ ...sheet, width: parseFloat(e.target.value) || 0 })}
                     className="w-full px-3 py-2 rounded-xl bg-[#0F172A] border border-[#334155] text-white font-mono font-bold focus:border-amber-400 outline-none"
                   />
                 </div>
@@ -432,7 +432,7 @@ export default function Dashboard() {
               )}
             </div>
 
-            {/* Pieces Table Input (F1, F2, F3, F5) */}
+            {/* Pieces Table Input (Norme Industrielle Hauteur Y × Largeur X) */}
             <PiecesManager
               pieces={pieces}
               onUpdatePieces={setPieces}
@@ -637,9 +637,9 @@ export default function Dashboard() {
                   >
                     <svg
                       viewBox={`0 0 ${sheet.width} ${sheet.height}`}
-                      className="w-full max-w-[680px] aspect-[278/208] bg-slate-900 rounded-lg shadow-2xl border-2 border-slate-600"
+                      className="w-full max-w-[480px] max-h-[600px] aspect-[208/278] bg-slate-900 rounded-lg shadow-2xl border-2 border-slate-600"
                     >
-                      {/* Panneau Brut Background */}
+                      {/* Panneau Brut Background (Orientation Verticale Réelle d'Atelier) */}
                       <rect x="0" y="0" width={sheet.width} height={sheet.height} fill="#1E293B" stroke="#475569" strokeWidth="0.5" />
 
                       {/* Dessin des Chutes Réutilisables / Offcuts */}
