@@ -34,7 +34,7 @@ const DEFAULT_SHEET: Sheet = {
   height: 207, // cm
   kerf: 0.3, // cm = 3mm
   margin: 1.0, // cm
-  grainDirection: true,
+  grainDirection: false,
   material: 'mdf',
 };
 
@@ -454,15 +454,41 @@ export default function Dashboard() {
           {/* RIGHT COLUMN: Interactive 2D Visualizer & Results (7 cols) */}
           <div className="lg:col-span-7 space-y-6">
             
-            {/* Warning Single Sheet (F11) */}
-            {result?.singleSheetWarning && (
-              <div className="p-4 rounded-2xl bg-amber-500/10 border border-amber-500/30 flex items-start gap-3">
-                <AlertTriangle className="w-5 h-5 text-[#F5A623] shrink-0 mt-0.5" />
-                <div className="text-xs">
-                  <p className="font-bold text-white mb-1">Avertissement Mode &quot;1 Feuille&quot;</p>
-                  <p className="text-amber-200/90 leading-relaxed">{result.singleSheetWarning}</p>
-                </div>
-              </div>
+            {result && (
+              <>
+                {/* Unplaced Pieces Warning */}
+                {result.unplacedPieces && result.unplacedPieces.length > 0 && (
+                  <div className="p-4 rounded-2xl bg-rose-500/10 border border-rose-500/30 flex items-start gap-3">
+                    <AlertTriangle className="w-5 h-5 text-rose-400 shrink-0 mt-0.5" />
+                    <div className="text-xs">
+                      <p className="font-bold text-rose-300 mb-1">
+                        {result.unplacedPieces.length} Pièce(s) non placée(s)
+                      </p>
+                      <p className="text-rose-200/90 leading-relaxed mb-2">
+                        Certaines pièces dépassent la surface restante ou les dimensions du panneau.
+                      </p>
+                      <div className="flex flex-wrap gap-1.5">
+                        {result.unplacedPieces.map((up, idx) => (
+                          <span key={idx} className="px-2 py-0.5 rounded bg-rose-950/60 text-rose-300 border border-rose-800/50 font-mono text-[11px]">
+                            {up.name || `Pièce ${idx + 1}`} ({up.width}×{up.height} cm)
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Warning Single Sheet */}
+                {result.singleSheetWarning && !result.unplacedPieces?.length && (
+                  <div className="p-4 rounded-2xl bg-amber-500/10 border border-amber-500/30 flex items-start gap-3">
+                    <AlertTriangle className="w-5 h-5 text-[#F5A623] shrink-0 mt-0.5" />
+                    <div className="text-xs">
+                      <p className="font-bold text-white mb-1">Avertissement Mode &quot;1 Feuille&quot;</p>
+                      <p className="text-amber-200/90 leading-relaxed">{result.singleSheetWarning}</p>
+                    </div>
+                  </div>
+                )}
+              </>
             )}
 
             {/* Results Summary Bar */}

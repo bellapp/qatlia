@@ -165,8 +165,8 @@ export const OptionsPanel: React.FC<OptionsPanelProps> = ({
           {/* 6. Orientation du fil (Grain Direction) */}
           <div className="flex items-center justify-between py-1">
             <div>
-              <span className="font-semibold text-white">Tenir compte de l&apos;orientation du fil</span>
-              <p className="text-[11px] text-[#94A3B8]">Interdit la rotation 90° pour préserver le veinage</p>
+              <span className="font-semibold text-white">Verrouiller l&apos;orientation du fil</span>
+              <p className="text-[11px] text-[#94A3B8]">Interdit la rotation 90° (uniquement pour bois à veinage strict)</p>
             </div>
             <label className="relative inline-flex items-center cursor-pointer">
               <input
