@@ -1,0 +1,93 @@
+[
+  {
+    "id": "run_01_somfy_notes_mdf",
+    "timestamp": "2026-08-23T14:30:00Z",
+    "title": "Carnet Somfy My Notes (Débit Meuble / Cuisine MDF)",
+    "description": "Scan de fiche manuscrite avec 21 pièces et quantités variables",
+    "input": {
+      "sheet": {
+        "width": 280,
+        "height": 207,
+        "kerf": 0.3,
+        "margin": 1.0,
+        "grainDirection": true,
+        "material": "mdf"
+      },
+      "options": {
+        "kerfWidth": 3,
+        "showLabels": true,
+        "singleSheetOnly": false,
+        "considerMaterial": false,
+        "edgeBanding": false,
+        "grainDirection": true,
+        "optimizationPriority": "linear_guillotine"
+      },
+      "pieces": [
+        { "id": "ext_0", "name": "Pièce 1", "width": 237, "height": 56, "quantity": 1, "material": "mdf", "rotatable": true },
+        { "id": "ext_1", "name": "Pièce 2", "width": 237, "height": 32, "quantity": 1, "material": "mdf", "rotatable": true },
+        { "id": "ext_2", "name": "Pièce 3", "width": 52, "height": 30, "quantity": 16, "material": "mdf", "rotatable": true },
+        { "id": "ext_3", "name": "Pièce 4", "width": 90, "height": 55, "quantity": 1, "material": "mdf", "rotatable": true },
+        { "id": "ext_4", "name": "Pièce 5", "width": 45, "height": 55, "quantity": 1, "material": "mdf", "rotatable": true },
+        { "id": "ext_5", "name": "Pièce 6", "width": 165, "height": 55, "quantity": 1, "material": "mdf", "rotatable": true },
+        { "id": "ext_6", "name": "Pièce 7", "width": 88, "height": 88, "quantity": 1, "material": "mdf", "rotatable": true },
+        { "id": "ext_7", "name": "Pièce 8", "width": 50.4, "height": 58.8, "quantity": 5, "material": "mdf", "rotatable": true },
+        { "id": "ext_8", "name": "Pièce 9", "width": 47.5, "height": 58.8, "quantity": 5, "material": "mdf", "rotatable": true },
+        { "id": "ext_9", "name": "Pièce 10", "width": 61.4, "height": 58.8, "quantity": 2, "material": "mdf", "rotatable": true },
+        { "id": "ext_10", "name": "Pièce 11", "width": 40, "height": 90, "quantity": 6, "material": "mdf", "rotatable": true },
+        { "id": "ext_11", "name": "Pièce 12", "width": 35, "height": 20, "quantity": 24, "material": "mdf", "rotatable": true },
+        { "id": "ext_12", "name": "Pièce 13", "width": 45, "height": 16, "quantity": 24, "material": "mdf", "rotatable": true },
+        { "id": "ext_13", "name": "Pièce 14", "width": 31.2, "height": 14, "quantity": 24, "material": "mdf", "rotatable": true },
+        { "id": "ext_14", "name": "Pièce 15", "width": 61, "height": 12, "quantity": 2, "material": "mdf", "rotatable": true },
+        { "id": "ext_15", "name": "Pièce 16", "width": 45, "height": 10, "quantity": 4, "material": "mdf", "rotatable": true },
+        { "id": "ext_16", "name": "Pièce 17", "width": 56, "height": 8, "quantity": 4, "material": "mdf", "rotatable": true },
+        { "id": "ext_17", "name": "Pièce 18", "width": 72, "height": 20, "quantity": 4, "material": "mdf", "rotatable": true },
+        { "id": "ext_18", "name": "Pièce 19", "width": 45, "height": 14, "quantity": 4, "material": "mdf", "rotatable": true },
+        { "id": "ext_19", "name": "Pièce 20", "width": 67.9, "height": 12, "quantity": 4, "material": "mdf", "rotatable": true },
+        { "id": "ext_20", "name": "Pièce 21", "width": 72.5, "height": 49.5, "quantity": 1, "material": "mdf", "rotatable": true }
+      ]
+    }
+  },
+  {
+    "id": "run_02_glass_bonding_6mm",
+    "timestamp": "2026-08-23T15:00:00Z",
+    "title": "GLASS BONDING — Débit Industriel Verre 6mm (VRSSG6)",
+    "description": "Cas d'étude industriel 52 pièces verrières sur plaques jumbo 3210x2250 mm",
+    "input": {
+      "sheet": {
+        "width": 321.0,
+        "height": 225.0,
+        "kerf": 0.3,
+        "margin": 0.0,
+        "grainDirection": false,
+        "material": "verre"
+      },
+      "options": {
+        "kerfWidth": 3,
+        "showLabels": true,
+        "singleSheetOnly": false,
+        "considerMaterial": false,
+        "edgeBanding": false,
+        "grainDirection": false,
+        "optimizationPriority": "linear_guillotine"
+      },
+      "pieces": [
+        { "id": "p1", "name": "Panneau VRSSG6 1", "width": 193.5, "height": 69.0, "quantity": 1, "material": "verre", "rotatable": true },
+        { "id": "p2", "name": "Panneau VRSSG6 2", "width": 198.5, "height": 64.0, "quantity": 1, "material": "verre", "rotatable": true },
+        { "id": "p3", "name": "Panneau VRSSG6 3", "width": 139.5, "height": 63.0, "quantity": 1, "material": "verre", "rotatable": true },
+        { "id": "p4", "name": "Panneau VRSSG6 4", "width": 199.4, "height": 62.0, "quantity": 1, "material": "verre", "rotatable": true },
+        { "id": "p5", "name": "Panneau VRSSG6 5", "width": 198.4, "height": 64.5, "quantity": 1, "material": "verre", "rotatable": true },
+        { "id": "p6", "name": "Panneau VRSSG6 6", "width": 198.0, "height": 61.5, "quantity": 1, "material": "verre", "rotatable": true },
+        { "id": "p7", "name": "Panneau VRSSG6 7", "width": 194.3, "height": 62.5, "quantity": 1, "material": "verre", "rotatable": true },
+        { "id": "p8", "name": "Panneau VRSSG6 8", "width": 198.5, "height": 62.5, "quantity": 1, "material": "verre", "rotatable": true },
+        { "id": "p9", "name": "Panneau VRSSG6 9", "width": 56.7, "height": 100.7, "quantity": 2, "material": "verre", "rotatable": true },
+        { "id": "p10", "name": "Panneau VRSSG6 10", "width": 71.0, "height": 100.7, "quantity": 2, "material": "verre", "rotatable": true },
+        { "id": "p11", "name": "Panneau VRSSG6 11", "width": 56.5, "height": 100.7, "quantity": 2, "material": "verre", "rotatable": true },
+        { "id": "p12", "name": "Panneau VRSSG6 12", "width": 71.0, "height": 100.7, "quantity": 2, "material": "verre", "rotatable": true },
+        { "id": "p13", "name": "Panneau VRSSG6 13", "width": 70.5, "height": 100.7, "quantity": 2, "material": "verre", "rotatable": true },
+        { "id": "p14", "name": "Panneau VRSSG6 14", "width": 70.7, "height": 100.7, "quantity": 2, "material": "verre", "rotatable": true },
+        { "id": "p15", "name": "Panneau VRSSG6 15", "width": 69.5, "height": 100.7, "quantity": 16, "material": "verre", "rotatable": true },
+        { "id": "p16", "name": "Panneau VRSSG6 16", "width": 89.7, "height": 100.7, "quantity": 16, "material": "verre", "rotatable": true }
+      ]
+    }
+  }
+]
