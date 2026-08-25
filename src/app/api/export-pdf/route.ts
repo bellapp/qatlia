@@ -4,8 +4,8 @@ import autoTable from 'jspdf-autotable';
 import { z } from 'zod';
 
 const ExportSchema = z.object({
-  projectName: z.string().default('GLASS BONDING'),
-  material: z.string().default('VRSSG6'),
+  projectName: z.string().default('PROJET DÉBIT'),
+  material: z.string().default('MDF'),
   costPerSheet: z.number().default(450.0),
   costCutPerMeter: z.number().default(5.0),
   sheet: z.object({
@@ -13,7 +13,7 @@ const ExportSchema = z.object({
     height: z.number(),
     kerf: z.number().default(0.3),
     margin: z.number().default(0.0),
-    grainDirection: z.boolean().default(true),
+    grainDirection: z.boolean().default(false),
   }),
   result: z.object({
     sheetsUsed: z.number(),
@@ -21,6 +21,17 @@ const ExportSchema = z.object({
     totalAreaUsed: z.number(),
     totalAreaAvailable: z.number(),
     moneySavedMad: z.number().optional().default(0),
+    offcuts: z.array(
+      z.object({
+        sheetIndex: z.number(),
+        width: z.number(),
+        height: z.number(),
+        x: z.number(),
+        y: z.number(),
+        areaM2: z.number(),
+        isReusable: z.boolean(),
+      })
+    ).optional().default([]),
     placedPieces: z.array(
       z.object({
         pieceNumber: z.number(),
@@ -37,7 +48,7 @@ const ExportSchema = z.object({
 });
 
 /**
- * Modèle QatlIA Pro (Style Industriel Débit Atelier)
+ * Modèle QatlIA Pro (Débit Industriel avec Cotation Précise des Chutes & Colonnes Traversantes)
  */
 export async function POST(req: Request) {
   try {
@@ -50,22 +61,19 @@ export async function POST(req: Request) {
 
     const { projectName, material, sheet, result, costPerSheet, costCutPerMeter } = parsed.data;
 
-    // Détection unité
+    // Conversion d'affichage en mm si dimension > 500, sinon conversion en mm pour uniformité industrielle
     const isMm = sheet.width > 500;
     const toMm = (val: number) => (isMm ? Math.round(val) : Math.round(val * 10));
     const toM2 = (w: number, h: number) => (toMm(w) * toMm(h)) / 1_000_000;
 
-    // Calculs industriels et financiers en MAD
     const sheetAreaM2 = toM2(sheet.width, sheet.height);
     const totalSheetsAreaM2 = sheetAreaM2 * result.sheetsUsed;
     const totalPiecesAreaM2 = result.placedPieces.reduce((sum, p) => sum + toM2(p.width, p.height), 0);
     const globalWasteRate = totalSheetsAreaM2 > 0 ? ((totalSheetsAreaM2 - totalPiecesAreaM2) / totalSheetsAreaM2) * 100 : 0;
     const nonReusableWasteRate = Math.min(2.5, globalWasteRate * 0.15);
 
-    // Linéaire de passe de coupe pour l'opérateur (en mètres)
     const linearCutMeters = result.placedPieces.reduce((sum, p) => sum + (2 * (toMm(p.width) + toMm(p.height))) / 1000, 0) * 0.65;
 
-    // Coûts et Économies générées en MAD
     const totalSheetCost = result.sheetsUsed * costPerSheet;
     const pieceCost = totalPiecesAreaM2 * (costPerSheet / sheetAreaM2);
     const wasteCost = totalSheetCost - pieceCost;
@@ -73,17 +81,16 @@ export async function POST(req: Request) {
     const cuttingCost = linearCutMeters * costCutPerMeter;
     const totalNetCost = totalSheetCost - wasteCost + nonReusableCost + cuttingCost;
 
-    // Gain d'optimisation calculé en MAD
     const baselineSheets = Math.ceil(totalPiecesAreaM2 / (sheetAreaM2 * 0.65));
     const savedPanelsCount = Math.max(0, baselineSheets - result.sheetsUsed);
     const estimatedSavingsMad = result.moneySavedMad || (savedPanelsCount * costPerSheet + Math.round(linearCutMeters * 2));
 
-    // Regroupement des feuilles de même plan
     interface SheetPattern {
       patternId: string;
       sheetIndices: number[];
       count: number;
       pieces: typeof result.placedPieces;
+      offcuts: typeof result.offcuts;
       wasteRate: number;
       netCost: number;
     }
@@ -91,6 +98,8 @@ export async function POST(req: Request) {
     const patternsMap = new Map<string, SheetPattern>();
     for (let s = 0; s < result.sheetsUsed; s++) {
       const sPieces = result.placedPieces.filter((p) => p.sheetIndex === s);
+      const sOffcuts = result.offcuts ? result.offcuts.filter((o) => o.sheetIndex === s) : [];
+
       const signature = sPieces
         .map((p) => `${toMm(p.width)}x${toMm(p.height)}@${Math.round(p.x)}_${Math.round(p.y)}`)
         .sort()
@@ -110,6 +119,7 @@ export async function POST(req: Request) {
           sheetIndices: [s],
           count: 1,
           pieces: sPieces,
+          offcuts: sOffcuts,
           wasteRate: sWaste,
           netCost: sNetCost,
         });
@@ -118,7 +128,6 @@ export async function POST(req: Request) {
 
     const uniquePatterns = Array.from(patternsMap.values());
 
-    // Groupement des pièces pour la liste de débit
     interface AggregatedPiece {
       num: number;
       material: string;
@@ -143,7 +152,6 @@ export async function POST(req: Request) {
     const debitList = Array.from(aggMap.values());
     const totalDebitQty = debitList.reduce((s, p) => s + p.quantity, 0);
 
-    // Initialisation jsPDF
     const doc = new jsPDF({
       orientation: 'portrait',
       unit: 'mm',
@@ -152,7 +160,6 @@ export async function POST(req: Request) {
 
     const today = new Date().toLocaleDateString('fr-FR');
 
-    // En-tête Header
     const drawQatliaHeader = (pageNum: number, totalPgs: number, orientation: 'portrait' | 'landscape') => {
       const pW = orientation === 'landscape' ? 297 : 210;
       doc.setDrawColor(0, 0, 0);
@@ -184,12 +191,8 @@ export async function POST(req: Request) {
       doc.text('Devise : MAD', pW - 16, 21, { align: 'right' });
     };
 
-    // ==========================================
-    // PAGE 1 : RÉCAPITULATIF & NOMENCLATURE
-    // ==========================================
+    // PAGE 1
     const pW1 = 210;
-
-    // Bloc Gain Économique
     doc.setFillColor(245, 247, 250);
     doc.setDrawColor(30, 58, 95);
     doc.setLineWidth(0.4);
@@ -204,7 +207,6 @@ export async function POST(req: Request) {
     doc.setTextColor(39, 174, 96);
     doc.text(`+ ${estimatedSavingsMad.toLocaleString('fr-FR')} MAD ÉCONOMISÉS`, pW1 - 18, 34.5, { align: 'right' });
 
-    // 1. Tableau "Liste de débit" (Gauche)
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(9.5);
     doc.setTextColor(0, 0, 0);
@@ -217,7 +219,7 @@ export async function POST(req: Request) {
       startY: 45,
       margin: { left: 14 },
       tableWidth: 88,
-      head: [['', 'Matériau', 'Dimension', 'Quantité']],
+      head: [['', 'Matériau', 'Dimension (mm)', 'Quantité']],
       body: debitRows,
       theme: 'plain',
       headStyles: {
@@ -243,7 +245,6 @@ export async function POST(req: Request) {
 
     const debitFinalY = ((doc as unknown) as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY;
 
-    // 2. Tableau "Panneaux utilisés" (Droite)
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(9.5);
     doc.text('Panneaux utilisés', 108, 43);
@@ -252,11 +253,11 @@ export async function POST(req: Request) {
       startY: 45,
       margin: { left: 108 },
       tableWidth: 88,
-      head: [['Matériau', 'Référence', 'Dimension', 'Quantité', 'Surface']],
+      head: [['Matériau', 'Référence', 'Dimension (mm)', 'Quantité', 'Surface']],
       body: [
         [
           material.toUpperCase(),
-          '312/225',
+          'Stock Brut',
           `${toMm(sheet.width)} × ${toMm(sheet.height)}`,
           result.sheetsUsed,
           `${totalSheetsAreaM2.toFixed(2)} m²`,
@@ -287,7 +288,6 @@ export async function POST(req: Request) {
 
     const panelsFinalY = ((doc as unknown) as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY;
 
-    // 3. Tableau "Liste des plans de coupe"
     const planCutStartY = Math.max(debitFinalY, panelsFinalY) + 8;
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(9.5);
@@ -296,7 +296,7 @@ export async function POST(req: Request) {
     const planCutRows = uniquePatterns.map((pat, idx) => [
       idx + 1,
       material.toUpperCase(),
-      '312/225',
+      'Stock',
       `${toMm(sheet.width)} × ${toMm(sheet.height)}`,
       pat.count,
       pat.pieces.length,
@@ -308,7 +308,7 @@ export async function POST(req: Request) {
     autoTable(doc, {
       startY: planCutStartY,
       margin: { left: 14, right: 14 },
-      head: [['', 'Matériau', 'Référence', 'Dimension', 'Quantité', 'Pièces', 'Taux de chutes', 'Coût net (MAD)']],
+      head: [['', 'Matériau', 'Référence', 'Dimension (mm)', 'Quantité', 'Pièces', 'Taux de chutes', 'Coût net (MAD)']],
       body: planCutRows,
       theme: 'plain',
       headStyles: {
@@ -338,7 +338,6 @@ export async function POST(req: Request) {
 
     const plansFinalY = ((doc as unknown) as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY;
 
-    // 4. Tableau "Récapitulatif"
     const recapStartY = plansFinalY + 8;
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(9.5);
@@ -382,15 +381,12 @@ export async function POST(req: Request) {
       },
     });
 
-    // =========================================================================
-    // PAGES SUIVANTES : SCHÉMAS DE COUPE GRAPHIQUES EN A4 PAYSAGE (Landscape)
-    // =========================================================================
+    // PAGES SCHÉMAS GRAPHIQUES (A4 Paysage)
     uniquePatterns.forEach((pat, pIndex) => {
       doc.addPage('a4', 'landscape');
       const pW = 297;
       const pH = 210;
 
-      // Titre du plan de coupe
       doc.setFont('helvetica', 'bold');
       doc.setFontSize(9);
       doc.setTextColor(0, 0, 0);
@@ -401,7 +397,6 @@ export async function POST(req: Request) {
         32
       );
 
-      // Zone de tracé
       const drawX = 14;
       const drawY = 36;
       const maxDrawW = pW - 28;
@@ -411,13 +406,13 @@ export async function POST(req: Request) {
       const canvasW = sheet.width * scale;
       const canvasH = sheet.height * scale;
 
-      // 1. Fond Chutes Grisées
-      doc.setFillColor(215, 215, 215);
+      // 1. Fond Panneau Brut Chutes Grisées
+      doc.setFillColor(210, 210, 210);
       doc.setDrawColor(0, 0, 0);
-      doc.setLineWidth(0.3);
+      doc.setLineWidth(0.4);
       doc.rect(drawX, drawY, canvasW, canvasH, 'FD');
 
-      // 2. Tracé des Pièces
+      // 2. Dessin des pièces utiles (Fond Blanc Pur)
       pat.pieces.forEach((p) => {
         const px = drawX + p.x * scale;
         const py = drawY + p.y * scale;
@@ -429,7 +424,6 @@ export async function POST(req: Request) {
         doc.setLineWidth(0.35);
         doc.rect(px, py, pw, ph, 'FD');
 
-        // Cotation centrée dans la pièce
         const dimText = `${toMm(p.width)} × ${toMm(p.height)}`;
         doc.setFont('helvetica', 'normal');
         doc.setFontSize(Math.min(7.5, Math.max(4.2, ph / 4)));
@@ -441,9 +435,27 @@ export async function POST(req: Request) {
           doc.text(`${toMm(p.width)}\n×\n${toMm(p.height)}`, px + pw / 2, py + ph / 2 - 2, { align: 'center' });
         }
       });
+
+      // 3. Cotation explicite des Chutes Réutilisables / Résiduelles
+      pat.offcuts.forEach((off) => {
+        const ox = drawX + off.x * scale;
+        const oy = drawY + off.y * scale;
+        const ow = off.width * scale;
+        const oh = off.height * scale;
+
+        // Si la chute est assez grande pour afficher sa cote (ex: > 14mm à l'écran)
+        if (ow > 14 && oh > 6) {
+          doc.setFont('helvetica', 'italic');
+          doc.setFontSize(Math.min(7.0, Math.max(4.0, oh / 4.5)));
+          doc.setTextColor(60, 60, 60);
+          doc.text(`${toMm(off.width)} × ${toMm(off.height)}`, ox + ow / 2, oy + oh / 2, {
+            align: 'center',
+            baseline: 'middle',
+          });
+        }
+      });
     });
 
-    // Dessiner tous les en-têtes avec la pagination totale exacte
     const totalPgs = doc.getNumberOfPages();
     for (let i = 1; i <= totalPgs; i++) {
       doc.setPage(i);

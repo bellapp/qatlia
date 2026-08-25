@@ -11,8 +11,8 @@ export interface Piece {
 }
 
 export interface Sheet {
-  width: number;
-  height: number;
+  width: number; // ex: 278 cm ou 2780 mm
+  height: number; // ex: 208 cm ou 2080 mm
   kerf: number;
   margin?: number;
   grainDirection?: boolean;
@@ -36,7 +36,7 @@ export const OPTIONS_DEFAULTS: OptimizationOptions = {
   singleSheetOnly: false,
   considerMaterial: false,
   edgeBanding: false,
-  grainDirection: false, // Par défaut rotation permise sauf si bois massif avec sens de fil forcé
+  grainDirection: false,
   optimizationPriority: 'linear_guillotine',
   defaultMaterial: 'mdf',
 };
@@ -61,15 +61,25 @@ export interface PlacedPiece {
   pieceNumber: number;
 }
 
+export interface OffcutWaste {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  sheetIndex: number;
+  areaM2: number;
+  isReusable: boolean; // chutes exploitables (ex: > 30x30 cm)
+}
+
 export interface PlacedSheet {
   index: number;
   material: MaterialType;
   width: number;
   height: number;
   pieces: PlacedPiece[];
+  offcuts: OffcutWaste[];
   wasteRate: number;
   usedArea: number;
-  linearCutsCount?: number;
 }
 
 export interface MaterialStat {
@@ -84,6 +94,7 @@ export interface OptimizationResult {
   sheetsUsed: number;
   placedPieces: PlacedPiece[];
   unplacedPieces: Piece[];
+  offcuts: OffcutWaste[];
   singleSheetWarning?: string;
   wastePercentage: number;
   totalAreaUsed: number;
@@ -126,9 +137,9 @@ function expandPieces(pieces: Piece[], defaultMaterial: MaterialType): ExpandedP
 }
 
 /**
- * Guillotine Packer Multi-Heuristiques avec support intelligent de rotation et découpe linéaire
+ * Guillotine Strip Packer avec découpage en bandes/colonnes continues et calcul exact des chutes résiduelles
  */
-class LinearGuillotinePacker {
+class IndustrialGuillotinePacker {
   private sheetW: number;
   private sheetH: number;
   private kerf: number;
@@ -149,10 +160,9 @@ class LinearGuillotinePacker {
     sheetIndex: number,
     pieceNumber: number,
     grainDirection: boolean,
-    cutOrientation: 'horizontal_strip' | 'vertical_strip' = 'horizontal_strip'
+    cutAxis: 'vertical_strips' | 'horizontal_strips' = 'vertical_strips'
   ): PlacedPiece | null {
-    // Si la pièce rentre uniquement tournée, elle DOIT pivoter pour ne jamais être zappée
-    const canRotateExplicitly = item.rotatable && !grainDirection;
+    const canRotate = item.rotatable && !grainDirection;
 
     let bestRectIndex = -1;
     let bestRotated = false;
@@ -162,11 +172,11 @@ class LinearGuillotinePacker {
       const r = this.freeRects[i];
 
       const fitsNormal = r.width >= item.width && r.height >= item.height;
-      const fitsRotated = r.width >= item.height && r.height >= item.width;
+      const fitsRotated = canRotate && r.width >= item.height && r.height >= item.width;
 
-      // 1. Essai sans rotation
       if (fitsNormal) {
-        const stripWaste = cutOrientation === 'horizontal_strip' ? Math.abs(r.height - item.height) : Math.abs(r.width - item.width);
+        // En découpe industrielle (bandes verticales), aligner sur la dimension de bande
+        const stripWaste = cutAxis === 'vertical_strips' ? (r.width - item.width) : (r.height - item.height);
         const score = stripWaste * 1000 + (r.x + r.y);
 
         if (score < bestScore) {
@@ -176,13 +186,9 @@ class LinearGuillotinePacker {
         }
       }
 
-      // 2. Essai avec rotation :
-      // - Si la rotation est autorisée
-      // - OU si la pièce NE RENTRE PAS du tout dans le rectangle en orientation normale (sauvetage obligatoire)
-      if (fitsRotated && (canRotateExplicitly || (!fitsNormal && item.rotatable))) {
-        const stripWaste = cutOrientation === 'horizontal_strip' ? Math.abs(r.height - item.width) : Math.abs(r.width - item.height);
-        // Bonus si c'est la seule façon de faire rentrer la pièce
-        const score = stripWaste * 1000 + (r.x + r.y) + (fitsNormal ? 50 : 0);
+      if (fitsRotated) {
+        const stripWaste = cutAxis === 'vertical_strips' ? (r.width - item.height) : (r.height - item.width);
+        const score = stripWaste * 1000 + (r.x + r.y);
 
         if (score < bestScore) {
           bestScore = score;
@@ -215,28 +221,12 @@ class LinearGuillotinePacker {
 
     this.placed.push(placedPiece);
 
-    // Guillotine Cut
+    // Découpe Guillotine Industrielle (Bandes continues traversantes)
     const rightW = targetRect.width - (placedW + this.kerf);
     const bottomH = targetRect.height - (placedH + this.kerf);
 
-    if (cutOrientation === 'horizontal_strip') {
-      if (rightW > 0.05) {
-        this.freeRects.push({
-          x: targetRect.x + placedW + this.kerf,
-          y: targetRect.y,
-          width: rightW,
-          height: placedH,
-        });
-      }
-      if (bottomH > 0.05) {
-        this.freeRects.push({
-          x: targetRect.x,
-          y: targetRect.y + placedH + this.kerf,
-          width: targetRect.width,
-          height: bottomH,
-        });
-      }
-    } else {
+    if (cutAxis === 'vertical_strips') {
+      // 1ère coupe de passe traversante verticale : crée la bande de colonne
       if (bottomH > 0.05) {
         this.freeRects.push({
           x: targetRect.x,
@@ -251,6 +241,24 @@ class LinearGuillotinePacker {
           y: targetRect.y,
           width: rightW,
           height: targetRect.height,
+        });
+      }
+    } else {
+      // 1ère coupe de passe traversante horizontale
+      if (rightW > 0.05) {
+        this.freeRects.push({
+          x: targetRect.x + placedW + this.kerf,
+          y: targetRect.y,
+          width: rightW,
+          height: placedH,
+        });
+      }
+      if (bottomH > 0.05) {
+        this.freeRects.push({
+          x: targetRect.x,
+          y: targetRect.y + placedH + this.kerf,
+          width: targetRect.width,
+          height: bottomH,
         });
       }
     }
@@ -326,25 +334,27 @@ export function optimizeCutting(
       }, {} as Partial<Record<MaterialType, ExpandedPiece[]>>)
     : { [defaultMat]: expanded };
 
-  // Stratégies de tri (Les grandes pièces structurantes passent TOUJOURS en premier pour fixer le plan)
+  // Stratégies de tri pour alignement en colonnes / bandes de coupe identiques
   const sortStrategies: Array<(a: ExpandedPiece, b: ExpandedPiece) => number> = [
-    // 1. Surface pure décroissante (évite d'abandonner les grandes pièces à la fin)
+    // 1. Tri par largeur commune, puis par longueur décroissante (colonnes parfaites)
+    (a, b) => {
+      const wA = Math.min(a.width, a.height);
+      const wB = Math.min(b.width, b.height);
+      if (Math.abs(wB - wA) > 0.5) return wB - wA;
+      return (b.width * b.height) - (a.width * a.height);
+    },
+    // 2. Surface pure décroissante
     (a, b) => (b.width * b.height) - (a.width * a.height),
-    // 2. Plus grande dimension d'abord
+    // 3. Plus grande dimension en premier
     (a, b) => {
       const maxA = Math.max(a.width, a.height);
       const maxB = Math.max(b.width, b.height);
       if (maxB !== maxA) return maxB - maxA;
       return (b.width * b.height) - (a.width * a.height);
     },
-    // 3. Hauteur commune
-    (a, b) => {
-      if (b.height !== a.height) return b.height - a.height;
-      return b.width - a.width;
-    },
   ];
 
-  const orientations: Array<'horizontal_strip' | 'vertical_strip'> = ['horizontal_strip', 'vertical_strip'];
+  const cutAxes: Array<'vertical_strips' | 'horizontal_strips'> = ['vertical_strips', 'horizontal_strips'];
 
   let bestResult: OptimizationResult | null = null;
   let minUnplaced = Number.POSITIVE_INFINITY;
@@ -352,23 +362,24 @@ export function optimizeCutting(
   let minWaste = Number.POSITIVE_INFINITY;
 
   for (const sortFn of sortStrategies) {
-    for (const orient of orientations) {
+    for (const cutAxis of cutAxes) {
       const allPlaced: PlacedPiece[] = [];
       const unplacedPieces: Piece[] = [];
       const placedSheets: PlacedSheet[] = [];
+      const allOffcuts: OffcutWaste[] = [];
       let globalPieceIndex = 1;
       let globalSheetIndex = 0;
 
       for (const [matKey, groupPieces] of Object.entries(materialGroups)) {
         const currentMat = matKey as MaterialType;
         const sortedPieces = [...groupPieces].sort(sortFn);
-        const groupPackers: { packer: LinearGuillotinePacker; sheetIndex: number }[] = [];
+        const groupPackers: { packer: IndustrialGuillotinePacker; sheetIndex: number }[] = [];
 
         for (const item of sortedPieces) {
           let fitted = false;
 
           for (const { packer, sheetIndex } of groupPackers) {
-            const placed = packer.tryFit(item, sheetIndex, globalPieceIndex, mergedOptions.grainDirection, orient);
+            const placed = packer.tryFit(item, sheetIndex, globalPieceIndex, mergedOptions.grainDirection, cutAxis);
             if (placed) {
               allPlaced.push({
                 ...placed,
@@ -387,10 +398,10 @@ export function optimizeCutting(
               continue;
             }
 
-            const newPacker = new LinearGuillotinePacker(effectiveW, effectiveH, kerfCm, currentMat);
+            const newPacker = new IndustrialGuillotinePacker(effectiveW, effectiveH, kerfCm, currentMat);
             const assignedSheetIdx = globalSheetIndex++;
 
-            const placed = newPacker.tryFit(item, assignedSheetIdx, globalPieceIndex, mergedOptions.grainDirection, orient);
+            const placed = newPacker.tryFit(item, assignedSheetIdx, globalPieceIndex, mergedOptions.grainDirection, cutAxis);
             if (placed) {
               groupPackers.push({ packer: newPacker, sheetIndex: assignedSheetIdx });
               allPlaced.push({
@@ -400,15 +411,32 @@ export function optimizeCutting(
               });
               globalPieceIndex++;
             } else {
-              // Si la pièce dépasse physiquement la taille brute du panneau même seule
               unplacedPieces.push(item.piece);
             }
           }
         }
 
-        for (const { sheetIndex } of groupPackers) {
+        for (const { sheetIndex, packer } of groupPackers) {
           const sheetPieces = allPlaced.filter((p) => p.sheetIndex === sheetIndex);
-          if (sheetPieces.length === 0) continue; // NE JAMAIS créer de panneau vide
+          if (sheetPieces.length === 0) continue;
+
+          // Calcul des chutes résiduelles réelles (offcuts)
+          const sheetOffcuts: OffcutWaste[] = packer.freeRects
+            .filter((r) => r.width >= 5 && r.height >= 5) // ignorer poussière < 5cm
+            .map((r) => {
+              const area = (r.width * r.height) / 10000;
+              return {
+                x: r.x + margin,
+                y: r.y + margin,
+                width: Math.round(r.width * 10) / 10,
+                height: Math.round(r.height * 10) / 10,
+                sheetIndex,
+                areaM2: Math.round(area * 1000) / 1000,
+                isReusable: r.width >= 30 && r.height >= 30, // chute réutilisable si > 30x30 cm
+              };
+            });
+
+          allOffcuts.push(...sheetOffcuts);
 
           const usedArea = sheetPieces.reduce((sum, p) => sum + p.width * p.height, 0);
           const totalArea = sheet.width * sheet.height;
@@ -420,17 +448,18 @@ export function optimizeCutting(
             width: sheet.width,
             height: sheet.height,
             pieces: sheetPieces,
+            offcuts: sheetOffcuts,
             wasteRate,
             usedArea,
           });
         }
       }
 
-      // Re-indexer les feuilles pour qu'elles soient continues (0, 1, 2...)
       placedSheets.forEach((s, idx) => {
         const oldIdx = s.index;
         s.index = idx;
         allPlaced.filter((p) => p.sheetIndex === oldIdx).forEach((p) => (p.sheetIndex = idx));
+        allOffcuts.filter((o) => o.sheetIndex === oldIdx).forEach((o) => (o.sheetIndex = idx));
       });
 
       const currentSheetsUsed = placedSheets.length;
@@ -443,10 +472,6 @@ export function optimizeCutting(
       const sheetsSaved = Math.max(0, baselineSheets - currentSheetsUsed);
       const moneySavedMad = sheetsSaved * 450 + (allPlaced.length * 5);
 
-      // Critère de sélection :
-      // 1. Zéro pièce non placée en priorité absolue
-      // 2. Minimum de feuilles
-      // 3. Minimum de chutes
       if (
         bestResult === null ||
         unplacedPieces.length < minUnplaced ||
@@ -462,8 +487,6 @@ export function optimizeCutting(
           singleSheetWarning = `Mode "1 feuille" activé — ${unplacedPieces.length} pièce${
             unplacedPieces.length > 1 ? 's' : ''
           } n'ont pas pu être placées.`;
-        } else if (unplacedPieces.length > 0) {
-          singleSheetWarning = `Attention : ${unplacedPieces.length} pièce(s) dépassent les dimensions du panneau brut (${sheet.width} × ${sheet.height} cm).`;
         }
 
         const materialStats: MaterialStat[] = Object.entries(materialGroups).map(([matKey]) => {
@@ -489,6 +512,7 @@ export function optimizeCutting(
           sheetsUsed: currentSheetsUsed,
           placedPieces: allPlaced,
           unplacedPieces,
+          offcuts: allOffcuts,
           singleSheetWarning,
           wastePercentage: currentWaste,
           totalAreaUsed: Math.round(totalUsed * 10) / 10,

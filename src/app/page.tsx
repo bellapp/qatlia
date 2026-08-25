@@ -637,10 +637,42 @@ export default function Dashboard() {
                   >
                     <svg
                       viewBox={`0 0 ${sheet.width} ${sheet.height}`}
-                      className="w-full max-w-[620px] aspect-[280/207] bg-slate-900 rounded-lg shadow-2xl border-2 border-slate-600"
+                      className="w-full max-w-[680px] aspect-[278/208] bg-slate-900 rounded-lg shadow-2xl border-2 border-slate-600"
                     >
                       {/* Panneau Brut Background */}
                       <rect x="0" y="0" width={sheet.width} height={sheet.height} fill="#1E293B" stroke="#475569" strokeWidth="0.5" />
+
+                      {/* Dessin des Chutes Réutilisables / Offcuts */}
+                      {result.offcuts && result.offcuts
+                        .filter((o) => o.sheetIndex === activeSheetIndex)
+                        .map((off, oIdx) => (
+                          <g key={`off_${oIdx}`}>
+                            <rect
+                              x={off.x}
+                              y={off.y}
+                              width={off.width}
+                              height={off.height}
+                              fill="#334155"
+                              stroke="#1E293B"
+                              strokeWidth={0.3}
+                              opacity="0.6"
+                            />
+                            {off.width > 20 && off.height > 10 && (
+                              <text
+                                x={off.x + off.width / 2}
+                                y={off.y + off.height / 2}
+                                textAnchor="middle"
+                                dominantBaseline="central"
+                                fill="#94A3B8"
+                                fontSize={Math.min(7, Math.max(3.5, off.height / 4))}
+                                fontStyle="italic"
+                                fontFamily="monospace"
+                              >
+                                {off.width}×{off.height}
+                              </text>
+                            )}
+                          </g>
+                        ))}
 
                       {/* Placed Pieces on this sheet */}
                       {result.placedPieces
