@@ -323,20 +323,39 @@ export function optimizeCutting(
   const mergedOptions: OptimizationOptions = {
     ...OPTIONS_DEFAULTS,
     ...options,
-    kerfWidth: options.kerfWidth !== undefined ? Math.max(0, Math.min(10, options.kerfWidth)) : (sheet.kerf ? sheet.kerf * 10 : 3),
+    kerfWidth: options.kerfWidth !== undefined ? Math.max(0, Math.min(10, options.kerfWidth)) : (sheet.kerf ? sheet.kerf : 3),
     grainDirection: options.grainDirection !== undefined ? options.grainDirection : (sheet.grainDirection ?? false),
   };
 
-  const kerfCm = mergedOptions.kerfWidth / 10;
-  const margin = sheet.margin || 0;
+  // Normalisation intelligente automatique des unités (cm vs mm)
+  // Si le panneau ou une pièce est en cm (ex: 280x207 au lieu de 2800x2070), on convertit tout en mm
+  const isSheetInCm = sheet.width < 500 && sheet.height < 500;
+  const sheetW = isSheetInCm ? sheet.width * 10 : sheet.width;
+  const sheetH = isSheetInCm ? sheet.height * 10 : sheet.height;
+  const kerfMm = mergedOptions.kerfWidth; // toujours en mm
+  const marginMm = sheet.margin !== undefined ? (isSheetInCm ? sheet.margin * 10 : sheet.margin) : 0;
   const defaultMat: MaterialType = mergedOptions.defaultMaterial || sheet.material || 'mdf';
 
-  // Orientation standard : sheet.width = horizontal (X), sheet.height = vertical (Y)
-  // Si sheet.width > sheet.height, on ajuste pour que le panneau soit représenté dans sa hauteur de travail
-  const effectiveW = Math.max(10, sheet.width - margin * 2);
-  const effectiveH = Math.max(10, sheet.height - margin * 2);
+  const effectiveW = Math.max(10, sheetW - marginMm * 2);
+  const effectiveH = Math.max(10, sheetH - marginMm * 2);
 
-  const expanded = expandPieces(pieces, defaultMat, mergedOptions.grainDirection);
+  // Normaliser les pièces en mm
+  const normalizedPieces = pieces.map((p) => {
+    let h = Number(p.height) || 10;
+    let w = Number(p.width) || 10;
+    // Si la pièce est exprimée en cm (ex: 230x120 au lieu de 2300x1200 alors que le panneau est en mm)
+    if (h < 500 && w < 500 && (sheetW > 500 || sheetH > 500)) {
+      h = h * 10;
+      w = w * 10;
+    }
+    return {
+      ...p,
+      height: h,
+      width: w,
+    };
+  });
+
+  const expanded = expandPieces(normalizedPieces, defaultMat, mergedOptions.grainDirection);
 
   const materialGroups: Partial<Record<MaterialType, ExpandedPiece[]>> = mergedOptions.considerMaterial
     ? expanded.reduce((acc, p) => {
@@ -390,22 +409,22 @@ export function optimizeCutting(
           if (placed) {
             allPlaced.push({
               ...placed,
-              x: placed.x + margin,
-              y: placed.y + margin,
+              x: placed.x + marginMm,
+              y: placed.y + marginMm,
             });
             globalPieceIndex++;
             fitted = true;
             break;
           }
-        }
+          }
 
-        if (!fitted) {
+          if (!fitted) {
           if (mergedOptions.singleSheetOnly && groupPackers.length >= 1) {
             unplacedPieces.push(item.piece);
             continue;
           }
 
-          const newPacker = new VerticalStripGuillotinePacker(effectiveW, effectiveH, kerfCm, currentMat);
+          const newPacker = new VerticalStripGuillotinePacker(effectiveW, effectiveH, kerfMm, currentMat);
           const assignedSheetIdx = globalSheetIndex++;
 
           const placed = newPacker.tryFit(item, assignedSheetIdx, globalPieceIndex, mergedOptions.grainDirection);
@@ -413,70 +432,70 @@ export function optimizeCutting(
             groupPackers.push({ packer: newPacker, sheetIndex: assignedSheetIdx });
             allPlaced.push({
               ...placed,
-              x: placed.x + margin,
-              y: placed.y + margin,
+              x: placed.x + marginMm,
+              y: placed.y + marginMm,
             });
             globalPieceIndex++;
           } else {
             unplacedPieces.push(item.piece);
           }
-        }
-      }
+          }
+          }
 
-      for (const { sheetIndex, packer } of groupPackers) {
-        const sheetPieces = allPlaced.filter((p) => p.sheetIndex === sheetIndex);
-        if (sheetPieces.length === 0) continue;
+          for (const { sheetIndex, packer } of groupPackers) {
+          const sheetPieces = allPlaced.filter((p) => p.sheetIndex === sheetIndex);
+          if (sheetPieces.length === 0) continue;
 
-        const sheetOffcuts: OffcutWaste[] = packer.freeRects
+          const sheetOffcuts: OffcutWaste[] = packer.freeRects
           .filter((r) => r.width >= 5 && r.height >= 5)
           .map((r) => {
-            const area = (r.width * r.height) / 10000;
+            const area = (r.width * r.height) / 1000000;
             return {
-              x: r.x + margin,
-              y: r.y + margin,
+              x: r.x + marginMm,
+              y: r.y + marginMm,
               width: Math.round(r.width * 10) / 10,
               height: Math.round(r.height * 10) / 10,
               sheetIndex,
               areaM2: Math.round(area * 1000) / 1000,
-              isReusable: r.width >= 30 && r.height >= 30,
+              isReusable: r.width >= 300 && r.height >= 300,
             };
           });
 
-        allOffcuts.push(...sheetOffcuts);
+          allOffcuts.push(...sheetOffcuts);
 
-        const usedArea = sheetPieces.reduce((sum, p) => sum + p.width * p.height, 0);
-        const totalArea = sheet.width * sheet.height;
-        const wasteRate = Math.max(0, Math.round(((totalArea - usedArea) / totalArea) * 1000) / 10);
+          const usedArea = sheetPieces.reduce((sum, p) => sum + p.width * p.height, 0);
+          const totalArea = sheetW * sheetH;
+          const wasteRate = Math.max(0, Math.round(((totalArea - usedArea) / totalArea) * 1000) / 10);
 
-        placedSheets.push({
+          placedSheets.push({
           index: sheetIndex,
           material: currentMat,
-          width: sheet.width,
-          height: sheet.height,
+          width: sheetW,
+          height: sheetH,
           pieces: sheetPieces,
           offcuts: sheetOffcuts,
           wasteRate,
           usedArea,
-        });
-      }
-    }
+          });
+          }
+          }
 
-    placedSheets.forEach((s, idx) => {
-      const oldIdx = s.index;
-      s.index = idx;
-      allPlaced.filter((p) => p.sheetIndex === oldIdx).forEach((p) => (p.sheetIndex = idx));
-      allOffcuts.filter((o) => o.sheetIndex === oldIdx).forEach((o) => (o.sheetIndex = idx));
-    });
+          placedSheets.forEach((s, idx) => {
+          const oldIdx = s.index;
+          s.index = idx;
+          allPlaced.filter((p) => p.sheetIndex === oldIdx).forEach((p) => (p.sheetIndex = idx));
+          allOffcuts.filter((o) => o.sheetIndex === oldIdx).forEach((o) => (o.sheetIndex = idx));
+          });
 
-    const currentSheetsUsed = placedSheets.length;
-    const totalAvailable = sheet.width * sheet.height * currentSheetsUsed;
-    const totalUsed = allPlaced.reduce((sum, p) => sum + p.width * p.height, 0);
-    const currentWaste = totalAvailable > 0 ? Math.max(0, Math.round(((totalAvailable - totalUsed) / totalAvailable) * 1000) / 10) : 0;
+          const currentSheetsUsed = placedSheets.length;
+          const totalAvailable = sheetW * sheetH * currentSheetsUsed;
+          const totalUsed = allPlaced.reduce((sum, p) => sum + p.width * p.height, 0);
+          const currentWaste = totalAvailable > 0 ? Math.max(0, Math.round(((totalAvailable - totalUsed) / totalAvailable) * 1000) / 10) : 0;
 
-    const linearCutMeters = allPlaced.reduce((sum, p) => sum + (p.width + p.height) / 100, 0) * 1.1;
-    const baselineSheets = Math.ceil(totalUsed / (sheet.width * sheet.height * 0.65 || 1));
-    const sheetsSaved = Math.max(0, baselineSheets - currentSheetsUsed);
-    const moneySavedMad = sheetsSaved * 450 + (allPlaced.length * 5);
+          const linearCutMeters = allPlaced.reduce((sum, p) => sum + (p.width + p.height) / 1000, 0) * 1.1;
+          const baselineSheets = Math.ceil(totalUsed / (sheetW * sheetH * 0.65 || 1));
+          const sheetsSaved = Math.max(0, baselineSheets - currentSheetsUsed);
+          const moneySavedMad = sheetsSaved * 450 + (allPlaced.length * 5);
 
     if (
       bestResult === null ||

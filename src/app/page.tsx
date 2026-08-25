@@ -247,6 +247,7 @@ export default function Dashboard() {
     width: sheet.width,
     height: sheet.height,
     pieces: result.placedPieces.filter((p) => p.sheetIndex === activeSheetIndex),
+    offcuts: result.offcuts.filter((o) => o.sheetIndex === activeSheetIndex),
     wasteRate: result.wastePercentage,
     usedArea: result.totalAreaUsed,
   } : null);
@@ -524,7 +525,7 @@ export default function Dashboard() {
                   <div className="p-4 rounded-2xl bg-[#1E293B] border border-[#334155] shadow-lg">
                     <span className="text-[11px] text-[#94A3B8] uppercase font-bold">Feuilles Requises</span>
                     <p className="text-2xl font-black text-white font-mono mt-1">{result.sheetsUsed}</p>
-                    <span className="text-[10px] text-[#64748B]">{sheet.width} × {sheet.height} cm</span>
+                    <span className="text-[10px] text-amber-400 font-mono font-bold">{Math.round(sheet.height > 500 ? sheet.height : sheet.height * 10)} × {Math.round(sheet.width > 500 ? sheet.width : sheet.width * 10)} mm</span>
                   </div>
                   <div className="p-4 rounded-2xl bg-[#1E293B] border border-[#334155] shadow-lg">
                     <span className="text-[11px] text-[#94A3B8] uppercase font-bold">Surface Utile</span>
@@ -800,6 +801,31 @@ export default function Dashboard() {
                               <span className="text-white font-medium truncate">{p.name}</span>
                             </div>
                             <span className="font-mono text-[#94A3B8] shrink-0 font-semibold">{Math.round(p.height)} × {Math.round(p.width)} mm</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Chutes du Panneau Actuel */}
+                  {currentSheet && currentSheet.offcuts && currentSheet.offcuts.length > 0 && (
+                    <div className="rounded-2xl bg-[#1E293B] border border-[#334155] p-5 shadow-lg">
+                      <h3 className="text-xs font-bold text-white uppercase tracking-wider mb-3 flex items-center gap-2">
+                        <span className="w-2.5 h-2.5 rounded bg-slate-500"></span>
+                        Chutes du Panneau {activeSheetIndex + 1} ({currentSheet.offcuts.length})
+                      </h3>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+                        {currentSheet.offcuts.map((off, idx) => (
+                          <div key={idx} className="p-2.5 rounded-xl bg-[#0F172A] border border-[#334155] flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                              <span className="text-[#94A3B8] font-bold font-mono">Chute {idx + 1}</span>
+                              {off.isReusable && (
+                                <span className="text-[9px] px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-400 font-bold border border-emerald-500/30">
+                                  Réutilisable
+                                </span>
+                              )}
+                            </div>
+                            <span className="font-mono text-amber-400 font-bold">{Math.round(off.height)} × {Math.round(off.width)} mm</span>
                           </div>
                         ))}
                       </div>
