@@ -29,6 +29,7 @@ import {
 } from '@/lib/cutting/binpacking';
 import { OptionsPanel } from '@/components/OptionsPanel';
 import { PiecesManager } from '@/components/PiecesManager';
+import { AuthModal } from '@/components/AuthModal';
 
 const DEFAULT_SHEET: Sheet = {
   height: 278, // Hauteur panneau brut vertical en cm
@@ -60,6 +61,8 @@ export default function Dashboard() {
   const [userEmail, setUserEmail] = useState<string | null>(null);
   const [visionError, setVisionError] = useState<string | null>(null);
   const [previewImage, setPreviewImage] = useState<string | null>(null);
+  const [isAuthModalOpen, setIsAuthModalOpen] = useState<boolean>(false);
+  const [isDownloadingPdf, setIsDownloadingPdf] = useState<boolean>(false);
 
   // Sync Supabase User & Credits
   useEffect(() => {
@@ -213,7 +216,40 @@ export default function Dashboard() {
 
   const handleDownloadPdf = async () => {
     if (!result) return;
+
+    // 1. Vérifier si l'utilisateur est connecté
+    const supabase = createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+
+    if (!user) {
+      // Ouvrir la modale d'inscription / connexion avec Google ou Email (+ 5 crédits offerts)
+      setIsAuthModalOpen(true);
+      return;
+    }
+
+    // 2. Vérifier et déduire 1 crédit
+    setIsDownloadingPdf(true);
     try {
+      const consumeRes = await fetch('/api/credits/consume', {
+        method: 'POST',
+      });
+      const consumeData = await consumeRes.json();
+
+      if (!consumeRes.ok) {
+        if (consumeRes.status === 402 || consumeData.error === 'INSUFFICIENT_CREDITS') {
+          // Solde épuisé : Redirection vers la page d'achat de crédits Stripe
+          alert('Votre solde de crédits est épuisé (0 crédit restant). Rechargez vos crédits pour télécharger le rapport PDF complet.');
+          window.location.href = '/credits';
+          return;
+        } else if (consumeRes.status === 401) {
+          setIsAuthModalOpen(true);
+          return;
+        }
+      } else if (consumeData.creditsRemaining !== undefined) {
+        setUserCredits(consumeData.creditsRemaining);
+      }
+
+      // 3. Télécharger le PDF
       const res = await fetch('/api/export-pdf', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -245,6 +281,8 @@ export default function Dashboard() {
     } catch (err) {
       console.error('Erreur téléchargement PDF:', err);
       window.print();
+    } finally {
+      setIsDownloadingPdf(false);
     }
   };
 
@@ -777,10 +815,15 @@ export default function Dashboard() {
 
                     <button
                       onClick={handleDownloadPdf}
-                      className="flex items-center gap-2 px-4 py-2 rounded-xl bg-gradient-to-r from-blue-600 to-sky-600 hover:from-blue-500 hover:to-sky-500 text-white font-black text-xs tracking-wide shadow-lg shadow-sky-500/20 transition-all cursor-pointer"
+                      disabled={isDownloadingPdf}
+                      className="flex items-center gap-2 px-4 py-2 rounded-xl bg-gradient-to-r from-blue-600 to-sky-600 hover:from-blue-500 hover:to-sky-500 text-white font-black text-xs tracking-wide shadow-lg shadow-sky-500/20 transition-all cursor-pointer disabled:opacity-50"
                     >
-                      <Download className="w-3.5 h-3.5" />
-                      <span>RAPPORT INDUSTRIEL QATLIA (PDF)</span>
+                      {isDownloadingPdf ? (
+                        <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                      ) : (
+                        <Download className="w-3.5 h-3.5" />
+                      )}
+                      <span>{isDownloadingPdf ? 'GÉNÉRATION DU PDF...' : 'RAPPORT INDUSTRIEL QATLIA (PDF)'}</span>
                     </button>
                   </div>
                 </div>
@@ -834,6 +877,26 @@ export default function Dashboard() {
           </div>
         </div>
       </main>
+
+      {/* Modale d'Authentification Intelligente (Google OAuth / Email) lors du téléchargement */}
+      <AuthModal
+        isOpen={isAuthModalOpen}
+        onClose={() => setIsAuthModalOpen(false)}
+        onSuccess={() => {
+          setIsAuthModalOpen(false);
+          // Recharger le profil utilisateur et déclencher le téléchargement
+          const supabase = createClient();
+          supabase.auth.getUser().then(({ data: { user } }) => {
+            if (user) {
+              setUserEmail(user.email || null);
+              supabase.from('profiles').select('credits').eq('id', user.id).single().then(({ data }) => {
+                if (data) setUserCredits(data.credits);
+              });
+              handleDownloadPdf();
+            }
+          });
+        }}
+      />
     </div>
   );
 }

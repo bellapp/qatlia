@@ -1,35 +1,35 @@
 'use client';
 
-import React, { useState, useEffect, Suspense } from 'react';
+import React, { useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
-import { Sparkles, ArrowRight, Lock, Mail, User } from 'lucide-react';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { Sparkles, ArrowRight, Lock, Mail, User, X, Gift } from 'lucide-react';
 
-function AuthForm() {
-  const [isLogin, setIsLogin] = useState(true);
+interface AuthModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  onSuccess: () => void;
+  initialMode?: 'login' | 'signup';
+  title?: string;
+  subtitle?: string;
+}
+
+export const AuthModal: React.FC<AuthModalProps> = ({
+  isOpen,
+  onClose,
+  onSuccess,
+  initialMode = 'signup',
+  title = 'Connectez-vous pour télécharger votre plan PDF',
+  subtitle = '🎁 5 crédits gratuits offerts immédiatement à la création de votre compte !',
+}) => {
+  const [isLogin, setIsLogin] = useState(initialMode === 'login');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [fullName, setFullName] = useState('');
   const [loading, setLoading] = useState(false);
   const [oauthLoading, setOauthLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
-  const [successMsg, setSuccessMsg] = useState<string | null>(null);
-  
-  const router = useRouter();
-  const searchParams = useSearchParams();
-  const redirectTo = searchParams?.get('redirect') || '/';
 
-  useEffect(() => {
-    // Si l'utilisateur est déjà connecté, le rediriger directement
-    async function checkUser() {
-      const supabase = createClient();
-      const { data: { user } } = await supabase.auth.getUser();
-      if (user) {
-        router.push(redirectTo);
-      }
-    }
-    checkUser();
-  }, [redirectTo, router]);
+  if (!isOpen) return null;
 
   const handleOAuthGoogle = async () => {
     setOauthLoading(true);
@@ -40,12 +40,12 @@ function AuthForm() {
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
-          redirectTo: `${origin}/auth/callback?redirect=${encodeURIComponent(redirectTo)}`,
+          redirectTo: `${origin}/auth/callback`,
         },
       });
       if (error) throw error;
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'Erreur lors de la connexion avec Google';
+      const msg = err instanceof Error ? err.message : 'Erreur lors de la connexion Google';
       setErrorMsg(msg);
       setOauthLoading(false);
     }
@@ -55,7 +55,6 @@ function AuthForm() {
     e.preventDefault();
     setLoading(true);
     setErrorMsg(null);
-    setSuccessMsg(null);
 
     const supabase = createClient();
 
@@ -66,10 +65,8 @@ function AuthForm() {
           password,
         });
         if (error) throw error;
-        router.push(redirectTo);
-        router.refresh();
       } else {
-        const { data, error } = await supabase.auth.signUp({
+        const { error } = await supabase.auth.signUp({
           email,
           password,
           options: {
@@ -77,16 +74,10 @@ function AuthForm() {
           },
         });
         if (error) throw error;
-
-        // Si confirmation par email non obligatoire
-        if (data.session) {
-          router.push(redirectTo);
-          router.refresh();
-        } else {
-          setSuccessMsg('Compte créé avec succès ! Vous pouvez maintenant vous connecter.');
-          setIsLogin(true);
-        }
       }
+
+      onSuccess();
+      onClose();
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Une erreur est survenue';
       setErrorMsg(msg);
@@ -96,33 +87,33 @@ function AuthForm() {
   };
 
   return (
-    <div className="min-h-screen bg-[#0F172A] text-[#E2E8F0] font-sans antialiased flex items-center justify-center p-6">
-      <div className="max-w-md w-full p-8 rounded-3xl bg-[#1E293B]/90 border border-[#334155] shadow-2xl backdrop-blur-md space-y-6">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
+      <div className="relative w-full max-w-md p-6 sm:p-8 rounded-3xl bg-[#1E293B] border border-[#334155] shadow-2xl space-y-5">
         
+        {/* Close button */}
+        <button
+          onClick={onClose}
+          className="absolute right-4 top-4 p-2 text-[#94A3B8] hover:text-white rounded-full hover:bg-[#0F172A] transition-colors"
+        >
+          <X className="w-5 h-5" />
+        </button>
+
         {/* Header */}
-        <div className="text-center space-y-2">
+        <div className="text-center space-y-2 pt-2">
           <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-tr from-[#F5A623] to-[#D97706] text-slate-950 font-black text-xl mx-auto shadow-lg shadow-amber-500/20 border border-amber-400/40">
             Q
           </div>
-          <h1 className="text-2xl font-black text-white">
-            {isLogin ? 'Connexion à QatlIA' : 'Créer un compte Artisan'}
-          </h1>
-          <p className="text-xs text-[#94A3B8]">
-            {isLogin
-              ? 'Connectez-vous pour télécharger vos plans PDF et gérer vos crédits'
-              : '🎁 5 crédits offerts immédiatement à l\'inscription pour vos débits'}
-          </p>
+          <h2 className="text-xl font-black text-white">{title}</h2>
+          <div className="flex items-center justify-center gap-1.5 p-2 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-300 text-xs font-semibold">
+            <Gift className="w-4 h-4 text-amber-400 shrink-0" />
+            <span>{subtitle}</span>
+          </div>
         </div>
 
-        {/* Notifications */}
+        {/* Error message */}
         {errorMsg && (
           <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-400 text-xs font-semibold text-center">
             {errorMsg}
-          </div>
-        )}
-        {successMsg && (
-          <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xs font-semibold text-center">
-            {successMsg}
           </div>
         )}
 
@@ -162,11 +153,11 @@ function AuthForm() {
           </span>
         </div>
 
-        {/* Email Form */}
-        <form onSubmit={handleAuth} className="space-y-4">
+        {/* Email & Password Form */}
+        <form onSubmit={handleAuth} className="space-y-3.5">
           {!isLogin && (
             <div>
-              <label className="text-xs font-bold text-[#94A3B8]">Nom complet / Atelier</label>
+              <label className="text-xs font-bold text-[#94A3B8]">Nom ou Nom d&apos;Atelier</label>
               <div className="relative mt-1">
                 <User className="w-4 h-4 text-[#64748B] absolute left-3 top-3" />
                 <input
@@ -174,7 +165,7 @@ function AuthForm() {
                   required
                   value={fullName}
                   onChange={(e) => setFullName(e.target.value)}
-                  placeholder="Ex: Menuiserie Atlas"
+                  placeholder="Ex: Menuiserie Moderne"
                   className="w-full bg-[#0F172A] border border-[#334155] rounded-xl pl-9 pr-3 py-2.5 text-xs text-white placeholder-[#64748B] focus:border-amber-400 outline-none"
                 />
               </div>
@@ -221,7 +212,7 @@ function AuthForm() {
               <Sparkles className="w-4 h-4 animate-spin" />
             ) : (
               <>
-                {isLogin ? 'Se connecter' : 'Créer mon compte (5 crédits offerts)'}
+                {isLogin ? 'Se connecter & Télécharger' : 'Créer mon compte & Recevoir 5 crédits'}
                 <ArrowRight className="w-4 h-4" />
               </>
             )}
@@ -234,7 +225,6 @@ function AuthForm() {
             onClick={() => {
               setIsLogin(!isLogin);
               setErrorMsg(null);
-              setSuccessMsg(null);
             }}
             className="text-xs text-amber-400 hover:text-amber-300 font-bold cursor-pointer"
           >
@@ -246,12 +236,4 @@ function AuthForm() {
       </div>
     </div>
   );
-}
-
-export default function LoginPage() {
-  return (
-    <Suspense fallback={<div className="min-h-screen bg-[#0F172A] flex items-center justify-center text-white">Chargement...</div>}>
-      <AuthForm />
-    </Suspense>
-  );
-}
+};
