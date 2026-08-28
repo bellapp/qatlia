@@ -308,18 +308,18 @@ export const PiecesManager: React.FC<PiecesManagerProps> = ({
             return (
               <div
                 key={p.id || idx}
-                className={`p-2.5 rounded-xl border transition-all flex items-center justify-between gap-2.5 ${
+                className={`p-2.5 rounded-xl border transition-all flex flex-wrap items-center gap-2 ${
                   isSelected
                     ? 'bg-amber-500/10 border-amber-500/30 shadow-sm'
                     : 'bg-slate-900/40 hover:bg-slate-900/80 border-slate-800/70 hover:border-slate-700/80'
                 }`}
               >
-                {/* Select & Num */}
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 shrink-0">
                   <button
                     type="button"
                     onClick={() => handleToggleSelect(p.id || '')}
                     className="text-slate-600 hover:text-amber-400 transition-colors cursor-pointer"
+                    aria-label="Sélectionner"
                   >
                     {isSelected ? (
                       <CheckSquare className="w-4 h-4 text-amber-400" />
@@ -330,8 +330,7 @@ export const PiecesManager: React.FC<PiecesManagerProps> = ({
                   <span className="font-mono text-slate-400 font-bold text-xs w-6">#{idx + 1}</span>
                 </div>
 
-                {/* Nom */}
-                <div className="flex-1 min-w-[90px]">
+                <div className="flex-1 min-w-[100px]">
                   <input
                     type="text"
                     value={p.name}
@@ -341,39 +340,40 @@ export const PiecesManager: React.FC<PiecesManagerProps> = ({
                   />
                 </div>
 
-                {/* Dimensions H x L */}
-                <div className="flex items-center gap-1 font-mono text-xs">
+                <div className="flex items-center gap-1 font-mono text-xs shrink-0">
                   <input
                     type="number"
                     step="0.1"
-                    value={p.height}
+                    value={Number(p.height.toFixed(1))}
                     onChange={(e) => handleUpdate(p.id || '', 'height', parseFloat(e.target.value) || 0)}
-                    className="w-14 px-1.5 py-0.5 rounded-lg bg-slate-950/80 border border-slate-800 focus:border-amber-500/50 text-slate-100 font-bold text-right outline-none"
+                    className="w-16 px-1.5 py-1 rounded-lg bg-slate-950 border border-slate-800 focus:border-amber-500/50 text-slate-100 font-bold text-right outline-none"
+                    aria-label="Hauteur cm"
                   />
                   <span className="text-slate-600">×</span>
                   <input
                     type="number"
                     step="0.1"
-                    value={p.width}
+                    value={Number(p.width.toFixed(1))}
                     onChange={(e) => handleUpdate(p.id || '', 'width', parseFloat(e.target.value) || 0)}
-                    className="w-14 px-1.5 py-0.5 rounded-lg bg-slate-950/80 border border-slate-800 focus:border-amber-500/50 text-slate-100 font-bold text-right outline-none"
+                    className="w-16 px-1.5 py-1 rounded-lg bg-slate-950 border border-slate-800 focus:border-amber-500/50 text-slate-100 font-bold text-right outline-none"
+                    aria-label="Largeur cm"
                   />
                   <span className="text-slate-500 text-[10px] pl-0.5">cm</span>
                 </div>
 
-                {/* Quantité */}
-                <div className="w-12">
+                <div className="flex items-center gap-1 shrink-0">
+                  <span className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">Qté</span>
                   <input
                     type="number"
                     min="1"
-                    value={p.quantity}
+                    value={p.quantity || 1}
                     onChange={(e) => handleUpdate(p.id || '', 'quantity', parseInt(e.target.value, 10) || 1)}
-                    className="w-full px-1 py-0.5 rounded-lg bg-slate-950/80 border border-slate-800 focus:border-amber-500/50 text-amber-400 font-mono font-bold text-center text-xs outline-none"
+                    className="w-14 px-1.5 py-1 rounded-lg bg-slate-950 border border-amber-500/40 focus:border-amber-400 text-amber-400 font-mono font-black text-center text-sm outline-none"
+                    aria-label="Quantité"
                   />
                 </div>
 
-                {/* Chants rapides */}
-                <div className="hidden sm:flex items-center gap-0.5 font-mono text-[9px]">
+                <div className="flex items-center gap-0.5 font-mono text-[9px] shrink-0">
                   {(['left', 'right', 'top', 'bottom'] as const).map((side) => {
                     const label = side === 'left' ? 'G' : side === 'right' ? 'D' : side === 'top' ? 'H' : 'B';
                     return (
@@ -381,7 +381,7 @@ export const PiecesManager: React.FC<PiecesManagerProps> = ({
                         key={side}
                         type="button"
                         onClick={() => handleToggleEdge(p.id || '', side)}
-                        className={`w-4 h-4 rounded font-bold transition-colors ${
+                        className={`w-5 h-5 rounded font-bold transition-colors ${
                           ed[side] ? 'bg-amber-400 text-slate-950' : 'bg-slate-800/60 text-slate-500 hover:text-slate-300'
                         }`}
                       >
@@ -391,11 +391,11 @@ export const PiecesManager: React.FC<PiecesManagerProps> = ({
                   })}
                 </div>
 
-                {/* Delete */}
                 <button
                   type="button"
                   onClick={() => handleRemove(p.id || '')}
-                  className="p-1 rounded-lg text-slate-600 hover:text-rose-400 hover:bg-rose-500/10 transition-colors"
+                  className="p-1 rounded-lg text-slate-600 hover:text-rose-400 hover:bg-rose-500/10 transition-colors shrink-0 ml-auto"
+                  aria-label="Supprimer"
                 >
                   <Trash2 className="w-3.5 h-3.5" />
                 </button>
