@@ -1,12 +1,11 @@
 'use client';
 
-import React, { useState } from 'react';
+import React from 'react';
 import { OptimizationOptions } from '@/lib/cutting/binpacking';
-import { Settings, ChevronDown, ChevronUp } from 'lucide-react';
 
 interface OptionsPanelProps {
   options: OptimizationOptions;
-  onChange: (options: OptimizationOptions) => void;
+  onChange: (newOptions: OptimizationOptions) => void;
   disabled?: boolean;
 }
 
@@ -15,194 +14,110 @@ export const OptionsPanel: React.FC<OptionsPanelProps> = ({
   onChange,
   disabled = false,
 }) => {
-  const [isOpen, setIsOpen] = useState(true);
-
-  const updateField = <K extends keyof OptimizationOptions>(key: K, value: OptimizationOptions[K]) => {
+  const updateField = <K extends keyof OptimizationOptions>(
+    field: K,
+    value: OptimizationOptions[K]
+  ) => {
     onChange({
       ...options,
-      [key]: value,
+      [field]: value,
     });
   };
 
-  const handleKerfChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const raw = parseFloat(e.target.value);
-    const clamped = isNaN(raw) ? 0 : Math.max(0, Math.min(10, raw));
-    updateField('kerfWidth', clamped);
-  };
-
   return (
-    <div className="rounded-2xl bg-[#1E293B] border border-[#334155] shadow-lg overflow-hidden transition-all">
-      {/* Header Collapsible */}
-      <button
-        type="button"
-        onClick={() => setIsOpen(!isOpen)}
-        className="w-full px-5 py-4 flex items-center justify-between bg-[#1E293B] hover:bg-[#283548] transition-colors text-left"
-        aria-expanded={isOpen}
-      >
-        <div className="flex items-center gap-2.5">
-          <div className="w-8 h-8 rounded-lg bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-[#F5A623]">
-            <Settings className="w-4 h-4" />
+    <div className="space-y-4 text-xs">
+      {/* Kerf & Priorité */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <div className="p-3 rounded-xl bg-slate-900/60 border border-slate-800/80">
+          <div className="flex items-center justify-between mb-1.5">
+            <span className="text-[11px] font-medium text-slate-300">Trait de scie (Kerf)</span>
+            <span className="text-[10px] font-mono font-semibold text-amber-400 bg-amber-400/10 px-1.5 py-0.5 rounded">mm</span>
           </div>
-          <div>
-            <h3 className="text-sm font-bold text-white flex items-center gap-2">
-              Panneau d&apos;Options de Découpe
-            </h3>
-            <p className="text-xs text-[#94A3B8]">Kerf, mode 1 feuille, groupement matériaux & priorités</p>
-          </div>
-        </div>
-        <div className="text-[#94A3B8]">
-          {isOpen ? <ChevronUp className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />}
-        </div>
-      </button>
-
-      {/* Content Form */}
-      {isOpen && (
-        <div className="p-5 pt-2 border-t border-[#334155] space-y-4 text-xs">
-          {/* 1. Largeur de coupe / Kerf (F10) */}
-          <div className="flex items-center justify-between py-1.5">
-            <div>
-              <label htmlFor="kerfInput" className="font-semibold text-white flex items-center gap-1.5 cursor-pointer">
-                Largeur de coupe / lame (Kerf)
-              </label>
-              <p className="text-[11px] text-[#94A3B8]">Épaisseur de matière retirée par le trait de scie</p>
-            </div>
-            <div className="flex items-center gap-2">
-              <input
-                id="kerfInput"
-                type="number"
-                min="0"
-                max="10"
-                step="0.5"
-                disabled={disabled}
-                value={options.kerfWidth}
-                onChange={handleKerfChange}
-                className="w-20 px-2.5 py-1.5 rounded-lg bg-[#0F172A] border border-[#475569] focus:border-amber-400 text-right font-mono font-bold text-white outline-none disabled:opacity-50"
-              />
-              <span className="text-xs font-bold text-amber-400">mm</span>
-            </div>
-          </div>
-
-          <hr className="border-[#334155]" />
-
-          {/* 2. Étiquettes sur les panneaux */}
-          <div className="flex items-center justify-between py-1">
-            <div>
-              <span className="font-semibold text-white">Étiquette sur les panneaux</span>
-              <p className="text-[11px] text-[#94A3B8]">Affiche les numéros et dimensions sur chaque pièce</p>
-            </div>
-            <label className="relative inline-flex items-center cursor-pointer">
-              <input
-                type="checkbox"
-                disabled={disabled}
-                checked={options.showLabels}
-                onChange={(e) => updateField('showLabels', e.target.checked)}
-                className="sr-only peer"
-              />
-              <div className="w-11 h-6 bg-[#334155] peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[#F5A623]"></div>
-            </label>
-          </div>
-
-          {/* 3. N'utiliser qu'un panneau (F11 - Mode 1 feuille) */}
-          <div className="flex items-center justify-between py-1">
-            <div>
-              <span className="font-semibold text-white flex items-center gap-1.5">
-                N&apos;utiliser qu&apos;un panneau du stock
-                <span className="text-[9px] font-bold px-1.5 py-0.2 rounded bg-amber-500/20 text-amber-300">Mode 1 Feuille</span>
-              </span>
-              <p className="text-[11px] text-[#94A3B8]">Limite stricte à 1 panneau, alerte sur les pièces restantes</p>
-            </div>
-            <label className="relative inline-flex items-center cursor-pointer">
-              <input
-                type="checkbox"
-                disabled={disabled}
-                checked={options.singleSheetOnly}
-                onChange={(e) => updateField('singleSheetOnly', e.target.checked)}
-                className="sr-only peer"
-              />
-              <div className="w-11 h-6 bg-[#334155] peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[#F5A623]"></div>
-            </label>
-          </div>
-
-          {/* 4. Tenir compte du matériau (F12 - Groupement Matériaux) */}
-          <div className="flex items-center justify-between py-1">
-            <div>
-              <span className="font-semibold text-white flex items-center gap-1.5">
-                Tenir compte du matériau
-                <span className="text-[9px] font-bold px-1.5 py-0.2 rounded bg-emerald-500/20 text-emerald-300">Multi-Matériaux</span>
-              </span>
-              <p className="text-[11px] text-[#94A3B8]">Isole les panneaux MDF, Aluminium et Verre</p>
-            </div>
-            <label className="relative inline-flex items-center cursor-pointer">
-              <input
-                type="checkbox"
-                disabled={disabled}
-                checked={options.considerMaterial}
-                onChange={(e) => updateField('considerMaterial', e.target.checked)}
-                className="sr-only peer"
-              />
-              <div className="w-11 h-6 bg-[#334155] peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[#F5A623]"></div>
-            </label>
-          </div>
-
-          {/* 5. Chants / Edge Banding */}
-          <div className="flex items-center justify-between py-1">
-            <div>
-              <span className="font-semibold text-white">Chants (Edge Banding)</span>
-              <p className="text-[11px] text-[#94A3B8]">Prend en compte la surépaisseur des bandes de chant</p>
-            </div>
-            <label className="relative inline-flex items-center cursor-pointer">
-              <input
-                type="checkbox"
-                disabled={disabled}
-                checked={options.edgeBanding}
-                onChange={(e) => updateField('edgeBanding', e.target.checked)}
-                className="sr-only peer"
-              />
-              <div className="w-11 h-6 bg-[#334155] peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[#F5A623]"></div>
-            </label>
-          </div>
-
-          {/* 6. Orientation du fil (Grain Direction) */}
-          <div className="flex items-center justify-between py-1">
-            <div>
-              <span className="font-semibold text-white">Verrouiller l&apos;orientation du fil</span>
-              <p className="text-[11px] text-[#94A3B8]">Interdit la rotation 90° (uniquement pour bois à veinage strict)</p>
-            </div>
-            <label className="relative inline-flex items-center cursor-pointer">
-              <input
-                type="checkbox"
-                disabled={disabled}
-                checked={options.grainDirection}
-                onChange={(e) => updateField('grainDirection', e.target.checked)}
-                className="sr-only peer"
-              />
-              <div className="w-11 h-6 bg-[#334155] peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[#F5A623]"></div>
-            </label>
-          </div>
-
-          <hr className="border-[#334155]" />
-
-          {/* 7. Priorité d'optimisation */}
-          <div className="flex items-center justify-between py-1">
-            <div>
-              <label htmlFor="prioSelect" className="font-semibold text-white">Priorité d&apos;optimisation</label>
-              <p className="text-[11px] text-[#94A3B8]">Heuristique de découpe préférentielle</p>
-            </div>
-            <select
-              id="prioSelect"
+          <div className="flex items-center gap-2">
+            <input
+              type="range"
+              min="0"
+              max="10"
+              step="0.5"
               disabled={disabled}
-              value={options.optimizationPriority}
-              onChange={(e) => updateField('optimizationPriority', e.target.value as OptimizationOptions['optimizationPriority'])}
-              className="px-3 py-1.5 rounded-lg bg-[#0F172A] border border-[#475569] text-white text-xs outline-none focus:border-amber-400 disabled:opacity-50"
-            >
-              <option value="linear_guillotine">Coupe Linéaire Traversante (Recommandé Atelier)</option>
-              <option value="min_waste">Minimiser les chutes (%)</option>
-              <option value="min_sheets">Minimiser les panneaux bruts</option>
-              <option value="balanced">Équilibré (Facilité de coupe)</option>
-            </select>
+              value={options.kerfWidth}
+              onChange={(e) => updateField('kerfWidth', parseFloat(e.target.value) || 0)}
+              className="w-full accent-amber-500 cursor-pointer h-1.5 bg-slate-800 rounded-lg"
+            />
+            <span className="font-mono font-bold text-slate-100 w-8 text-right text-xs">
+              {options.kerfWidth}
+            </span>
           </div>
         </div>
-      )}
+
+        <div className="p-3 rounded-xl bg-slate-900/60 border border-slate-800/80">
+          <span className="text-[11px] font-medium text-slate-300 block mb-1.5">Priorité d&apos;optimisation</span>
+          <select
+            disabled={disabled}
+            value={options.optimizationPriority}
+            onChange={(e) => updateField('optimizationPriority', e.target.value as OptimizationOptions['optimizationPriority'])}
+            className="w-full px-2.5 py-1.5 rounded-lg bg-slate-950 border border-slate-800 text-slate-200 text-xs outline-none focus:border-amber-500/50"
+          >
+            <option value="linear_guillotine">Coupe Linéaire (Atelier)</option>
+            <option value="min_waste">Minimiser les chutes (%)</option>
+            <option value="min_sheets">Minimiser les panneaux</option>
+            <option value="balanced">Équilibré</option>
+          </select>
+        </div>
+      </div>
+
+      {/* Toggles */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
+        {/* Toggle 1: Étiquettes */}
+        <label className="flex items-center justify-between p-2.5 rounded-xl bg-slate-900/40 border border-slate-800/60 hover:border-slate-700/60 cursor-pointer transition-colors">
+          <span className="text-slate-300 text-[11px]">Étiquettes sur les pièces</span>
+          <input
+            type="checkbox"
+            disabled={disabled}
+            checked={options.showLabels}
+            onChange={(e) => updateField('showLabels', e.target.checked)}
+            className="w-4 h-4 rounded text-amber-500 bg-slate-950 border-slate-700 focus:ring-0 focus:ring-offset-0"
+          />
+        </label>
+
+        {/* Toggle 2: Mode 1 Feuille */}
+        <label className="flex items-center justify-between p-2.5 rounded-xl bg-slate-900/40 border border-slate-800/60 hover:border-slate-700/60 cursor-pointer transition-colors">
+          <div className="flex items-center gap-1">
+            <span className="text-slate-300 text-[11px]">Mode 1 Feuille Unique</span>
+          </div>
+          <input
+            type="checkbox"
+            disabled={disabled}
+            checked={options.singleSheetOnly}
+            onChange={(e) => updateField('singleSheetOnly', e.target.checked)}
+            className="w-4 h-4 rounded text-amber-500 bg-slate-950 border-slate-700 focus:ring-0 focus:ring-offset-0"
+          />
+        </label>
+
+        {/* Toggle 3: Multi-Matériaux */}
+        <label className="flex items-center justify-between p-2.5 rounded-xl bg-slate-900/40 border border-slate-800/60 hover:border-slate-700/60 cursor-pointer transition-colors">
+          <span className="text-slate-300 text-[11px]">Répartition Multi-Matériaux</span>
+          <input
+            type="checkbox"
+            disabled={disabled}
+            checked={options.considerMaterial}
+            onChange={(e) => updateField('considerMaterial', e.target.checked)}
+            className="w-4 h-4 rounded text-amber-500 bg-slate-950 border-slate-700 focus:ring-0 focus:ring-offset-0"
+          />
+        </label>
+
+        {/* Toggle 4: Sens du fil */}
+        <label className="flex items-center justify-between p-2.5 rounded-xl bg-slate-900/40 border border-slate-800/60 hover:border-slate-700/60 cursor-pointer transition-colors">
+          <span className="text-slate-300 text-[11px]">Bloquer le sens du fil</span>
+          <input
+            type="checkbox"
+            disabled={disabled}
+            checked={options.grainDirection}
+            onChange={(e) => updateField('grainDirection', e.target.checked)}
+            className="w-4 h-4 rounded text-amber-500 bg-slate-950 border-slate-700 focus:ring-0 focus:ring-offset-0"
+          />
+        </label>
+      </div>
     </div>
   );
 };
