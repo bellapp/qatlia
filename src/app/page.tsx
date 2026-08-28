@@ -18,6 +18,7 @@ import {
   Info,
   Camera,
   Image as ImageIcon,
+  History,
 } from 'lucide-react';
 import {
   Sheet,
@@ -64,7 +65,7 @@ export default function Dashboard() {
   const [isAuthModalOpen, setIsAuthModalOpen] = useState<boolean>(false);
   const [isDownloadingPdf, setIsDownloadingPdf] = useState<boolean>(false);
 
-  // Sync Supabase User & Credits
+  // Sync Supabase User & Credits + Restore saved project from history if present
   useEffect(() => {
     async function loadUser() {
       try {
@@ -86,6 +87,22 @@ export default function Dashboard() {
       }
     }
     loadUser();
+
+    // Vérifier si un projet a été chargé depuis la page Historique
+    if (typeof window !== 'undefined') {
+      const savedProj = sessionStorage.getItem('qatlia_saved_project');
+      if (savedProj) {
+        try {
+          const parsed = JSON.parse(savedProj);
+          if (parsed.sheet) setSheet(parsed.sheet);
+          if (Array.isArray(parsed.pieces)) setPieces(parsed.pieces);
+          if (parsed.options) setOptions((prev) => ({ ...prev, ...parsed.options }));
+          sessionStorage.removeItem('qatlia_saved_project');
+        } catch (e) {
+          console.error('Erreur restauration projet:', e);
+        }
+      }
+    }
   }, []);
 
   // Sync options.kerfWidth and options.grainDirection with sheet
@@ -266,6 +283,19 @@ export default function Dashboard() {
       });
 
       if (res.ok) {
+        // Sauvegarder automatiquement le projet dans l'historique de l'utilisateur
+        fetch('/api/projects', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            name: `Débit ${sheet.material?.toUpperCase() || 'MDF'} (${pieces.length} pièces)`,
+            sheet,
+            pieces,
+            options,
+            result,
+          }),
+        }).catch((err) => console.error('Erreur auto-save projet:', err));
+
         const blob = await res.blob();
         const url = window.URL.createObjectURL(blob);
         const a = document.createElement('a');
@@ -331,6 +361,15 @@ export default function Dashboard() {
           </div>
 
           <div className="flex items-center gap-3">
+            <Link
+              href="/history"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#1E293B] hover:bg-[#283548] border border-[#334155] text-xs font-bold text-slate-200 transition-all"
+              title="Historique de mes débits"
+            >
+              <History className="w-3.5 h-3.5 text-amber-400" />
+              <span className="hidden sm:inline">Historique</span>
+            </Link>
+
             <Link
               href="/credits"
               className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-[#1E293B] hover:bg-[#283548] border border-[#334155] transition-all"
