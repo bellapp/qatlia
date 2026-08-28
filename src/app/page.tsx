@@ -239,24 +239,20 @@ export default function Dashboard() {
 
     setIsDownloadingPdf(true);
     try {
-      const consumeRes = await fetch('/api/credits/consume', {
-        method: 'POST',
-      });
-      const consumeData = await consumeRes.json();
-
-      if (!consumeRes.ok) {
-        if (consumeRes.status === 402 || consumeData.error === 'INSUFFICIENT_CREDITS') {
-          alert('Solde de crédits épuisé. Rechargez vos crédits pour continuer à exporter.');
-          window.location.href = '/credits';
-          return;
-        } else if (consumeRes.status === 401) {
-          setIsAuthModalOpen(true);
-          return;
+      // 1. Déduire 1 crédit si configuré
+      try {
+        const consumeRes = await fetch('/api/credits/consume', {
+          method: 'POST',
+        });
+        const consumeData = await consumeRes.json();
+        if (consumeData.creditsRemaining !== undefined) {
+          setUserCredits(consumeData.creditsRemaining);
         }
-      } else if (consumeData.creditsRemaining !== undefined) {
-        setUserCredits(consumeData.creditsRemaining);
+      } catch (e) {
+        console.warn('Crédit consume warning:', e);
       }
 
+      // 2. Générer le PDF
       const res = await fetch('/api/export-pdf', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },

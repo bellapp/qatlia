@@ -18,22 +18,30 @@ export async function POST() {
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
     const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
-    // Si Supabase est configuré en production
     if (supabaseUrl && serviceRoleKey && !supabaseUrl.includes('placeholder')) {
       const supabaseAdmin = createAdminClient(supabaseUrl, serviceRoleKey);
 
+      // Assurer que le profil existe
+      await supabaseAdmin.from('profiles').upsert(
+        {
+          id: user.id,
+          email: user.email || 'artisan@qatlia.ma',
+          full_name: user.user_metadata?.full_name || 'Artisan QatlIA',
+          credits: 5,
+        },
+        { onConflict: 'id' }
+      );
+
       // Récupérer le solde actuel
-      const { data: profile, error: profileErr } = await supabaseAdmin
+      const { data: profile } = await supabaseAdmin
         .from('profiles')
         .select('credits')
         .eq('id', user.id)
         .single();
 
-      if (profileErr || !profile) {
-        return NextResponse.json({ error: 'PROFILE_NOT_FOUND', message: 'Profil utilisateur introuvable.' }, { status: 404 });
-      }
+      const currentCredits = profile?.credits ?? 5;
 
-      if (profile.credits <= 0) {
+      if (currentCredits <= 0) {
         return NextResponse.json(
           {
             error: 'INSUFFICIENT_CREDITS',
@@ -45,20 +53,10 @@ export async function POST() {
       }
 
       // Déduire 1 crédit
-      const { data: newCredits, error: deductErr } = await supabaseAdmin.rpc('deduct_credit', {
-        p_user_id: user.id,
-        p_amount: 1,
-      });
+      const updated = Math.max(0, currentCredits - 1);
+      await supabaseAdmin.from('profiles').update({ credits: updated }).eq('id', user.id);
 
-      if (deductErr) {
-        console.error('Erreur deduct_credit RPC:', deductErr);
-        // Fallback update direct
-        const updated = Math.max(0, profile.credits - 1);
-        await supabaseAdmin.from('profiles').update({ credits: updated }).eq('id', user.id);
-        return NextResponse.json({ success: true, creditsRemaining: updated });
-      }
-
-      return NextResponse.json({ success: true, creditsRemaining: newCredits });
+      return NextResponse.json({ success: true, creditsRemaining: updated });
     }
 
     // Mode Démo / Hors ligne

@@ -28,6 +28,7 @@ interface ProjectHistoryItem {
     pieces?: Array<{ name: string; height: number; width: number; quantity: number }>;
     sheet?: { width: number; height: number; material: string };
     options?: Record<string, unknown>;
+    result?: { sheetsUsed?: number; wastePercentage?: number };
   };
   cut_results?: Array<{
     id: string;
@@ -201,68 +202,71 @@ export default function HistoryPage() {
             </Link>
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {projects.map((proj) => {
-              const latestResult = proj.cut_results?.[0];
-              const pieceCount = proj.options_json?.pieces?.reduce((s, p) => s + (p.quantity || 1), 0) || 0;
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {projects.map((proj) => {
+                const optJson = proj.options_json || {};
+                const res = optJson.result as { sheetsUsed?: number; wastePercentage?: number } | undefined;
+                const pieceCount = optJson.pieces?.reduce((s: number, p: { quantity?: number }) => s + (p.quantity || 1), 0) || 0;
+                const wasteRate = res?.wastePercentage !== undefined ? res.wastePercentage : 0;
+                const sheetsUsed = res?.sheetsUsed !== undefined ? res.sheetsUsed : 1;
 
-              return (
-                <div
-                  key={proj.id}
-                  className="p-5 rounded-2xl bg-[#1E293B] border border-[#334155] hover:border-amber-400/50 transition-all shadow-lg flex flex-col justify-between gap-4"
-                >
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between gap-2">
-                      <span className="text-[11px] font-mono text-[#94A3B8] flex items-center gap-1">
-                        <Calendar className="w-3.5 h-3.5" />
-                        {new Date(proj.created_at).toLocaleDateString('fr-FR', {
-                          day: 'numeric',
-                          month: 'short',
-                          year: 'numeric',
-                          hour: '2-digit',
-                          minute: '2-digit',
-                        })}
-                      </span>
-                      {getMaterialBadge(proj.material)}
-                    </div>
-
-                    <h3 className="text-base font-black text-white truncate">{proj.name}</h3>
-
-                    <div className="grid grid-cols-3 gap-2 pt-2 border-t border-[#334155]/60 text-xs font-mono">
-                      <div className="p-2 rounded-lg bg-[#0F172A]">
-                        <span className="text-[10px] text-[#94A3B8] block">Panneau</span>
-                        <span className="font-bold text-white">{proj.sheet_height} × {proj.sheet_width} cm</span>
-                      </div>
-                      <div className="p-2 rounded-lg bg-[#0F172A]">
-                        <span className="text-[10px] text-[#94A3B8] block">Pièces</span>
-                        <span className="font-bold text-amber-400">{pieceCount} pcs</span>
-                      </div>
-                      <div className="p-2 rounded-lg bg-[#0F172A]">
-                        <span className="text-[10px] text-[#94A3B8] block">Chute</span>
-                        <span className="font-bold text-emerald-400">
-                          {latestResult?.waste_percentage ? `${latestResult.waste_percentage}%` : 'N/A'}
+                return (
+                  <div
+                    key={proj.id}
+                    className="p-5 rounded-2xl bg-[#1E293B] border border-[#334155] hover:border-amber-400/50 transition-all shadow-lg flex flex-col justify-between gap-4"
+                  >
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="text-[11px] font-mono text-[#94A3B8] flex items-center gap-1">
+                          <Calendar className="w-3.5 h-3.5" />
+                          {new Date(proj.created_at).toLocaleDateString('fr-FR', {
+                            day: 'numeric',
+                            month: 'short',
+                            year: 'numeric',
+                            hour: '2-digit',
+                            minute: '2-digit',
+                          })}
                         </span>
+                        {getMaterialBadge(proj.material)}
+                      </div>
+
+                      <h3 className="text-base font-black text-white truncate">{proj.name}</h3>
+
+                      <div className="grid grid-cols-3 gap-2 pt-2 border-t border-[#334155]/60 text-xs font-mono">
+                        <div className="p-2 rounded-lg bg-[#0F172A]">
+                          <span className="text-[10px] text-[#94A3B8] block">Panneau</span>
+                          <span className="font-bold text-white">{proj.sheet_height} × {proj.sheet_width} cm</span>
+                        </div>
+                        <div className="p-2 rounded-lg bg-[#0F172A]">
+                          <span className="text-[10px] text-[#94A3B8] block">Pièces</span>
+                          <span className="font-bold text-amber-400">{pieceCount} pcs</span>
+                        </div>
+                        <div className="p-2 rounded-lg bg-[#0F172A]">
+                          <span className="text-[10px] text-[#94A3B8] block">Chute</span>
+                          <span className="font-bold text-emerald-400">
+                            {wasteRate > 0 ? `${wasteRate}%` : 'Optimal'}
+                          </span>
+                        </div>
                       </div>
                     </div>
-                  </div>
 
-                  <div className="flex items-center justify-between gap-2 pt-2">
-                    <span className="text-[11px] font-mono font-bold text-slate-300">
-                      {latestResult?.sheets_used || 1} feuille(s) requise(s)
-                    </span>
+                    <div className="flex items-center justify-between gap-2 pt-2">
+                      <span className="text-[11px] font-mono font-bold text-slate-300">
+                        {sheetsUsed} feuille(s) requise(s)
+                      </span>
 
-                    <button
-                      onClick={() => handleLoadProject(proj)}
-                      className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-black text-xs transition-all shadow-md cursor-pointer"
-                    >
-                      <span>Ouvrir le projet</span>
-                      <ArrowRight className="w-3.5 h-3.5" />
-                    </button>
+                      <button
+                        onClick={() => handleLoadProject(proj)}
+                        className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-black text-xs transition-all shadow-md cursor-pointer"
+                      >
+                        <span>Ouvrir le projet</span>
+                        <ArrowRight className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
                   </div>
-                </div>
-              );
-            })}
-          </div>
+                );
+              })}
+            </div>
         )}
       </main>
     </div>

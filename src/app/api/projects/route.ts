@@ -31,15 +31,7 @@ export async function GET() {
           status,
           options_json,
           created_at,
-          updated_at,
-          cut_results (
-            id,
-            sheets_used,
-            waste_percentage,
-            total_area_used,
-            layout_data,
-            created_at
-          )
+          updated_at
         `)
         .eq('user_id', user.id)
         .order('created_at', { ascending: false });
@@ -49,7 +41,8 @@ export async function GET() {
         return NextResponse.json({ error: 'DB_ERROR', message: error.message }, { status: 500 });
       }
 
-      return NextResponse.json({ success: true, projects });
+      // Si cut_results n'est pas encore joint ou échoue, renvoyer les projets
+      return NextResponse.json({ success: true, projects: projects || [] });
     }
 
     // Fallback mode démo
@@ -79,6 +72,17 @@ export async function POST(request: Request) {
     if (supabaseUrl && serviceRoleKey && !supabaseUrl.includes('placeholder')) {
       const supabaseAdmin = createAdminClient(supabaseUrl, serviceRoleKey);
 
+      // Assurer que le profil existe pour éviter violation de clé étrangère
+      await supabaseAdmin.from('profiles').upsert(
+        {
+          id: user.id,
+          email: user.email || 'artisan@qatlia.ma',
+          full_name: user.user_metadata?.full_name || 'Artisan QatlIA',
+          credits: 5,
+        },
+        { onConflict: 'id' }
+      );
+
       // 1. Créer le projet
       const { data: project, error: projErr } = await supabaseAdmin
         .from('projects')
@@ -91,7 +95,7 @@ export async function POST(request: Request) {
           kerf: sheet.kerf || 0.3,
           grain_direction: sheet.grainDirection ?? false,
           status: 'optimized',
-          options_json: { options, pieces, sheet },
+          options_json: { options, pieces, sheet, result },
         })
         .select()
         .single();
@@ -101,7 +105,7 @@ export async function POST(request: Request) {
         return NextResponse.json({ error: 'PROJECT_INSERT_FAILED', message: projErr?.message }, { status: 500 });
       }
 
-      // 2. Insérer le résultat de découpe
+      // 2. Insérer le résultat de découpe (optionnel)
       if (result) {
         await supabaseAdmin.from('cut_results').insert({
           project_id: project.id,
