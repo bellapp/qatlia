@@ -79,8 +79,7 @@ export default function HistoryPage() {
       } = await supabase.auth.getUser();
       if (user) {
         setUserEmail(user.email || null);
-        const { data: profile } = await supabase.from('profiles').select('credits').eq('id', user.id).single();
-        if (profile) setUserCredits(profile.credits);
+        try { const { data: p } = await supabase.from('profiles').select('credits').eq('id', user.id).single(); if (p) setUserCredits(p.credits); } catch {/* noop */}
 
         const res = await fetch('/api/projects');
         const data = await res.json();

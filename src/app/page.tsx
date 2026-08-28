@@ -78,13 +78,15 @@ export default function Dashboard() {
         const { data: { user } } = await supabase.auth.getUser();
         if (user) {
           setUserEmail(user.email || null);
-          const { data: profile } = await supabase
-            .from('profiles')
-            .select('credits')
-            .eq('id', user.id)
-            .single();
-          if (profile) {
-            setUserCredits(profile.credits);
+          try {
+            const { data: profile } = await supabase
+              .from('profiles')
+              .select('credits')
+              .eq('id', user.id)
+              .single();
+            if (profile) setUserCredits(profile.credits);
+          } catch {
+            /* table profiles pas encore créée — crédits en local */
           }
         }
       } catch (err) {
@@ -911,9 +913,6 @@ export default function Dashboard() {
           supabase.auth.getUser().then(({ data: { user } }) => {
             if (user) {
               setUserEmail(user.email || null);
-              supabase.from('profiles').select('credits').eq('id', user.id).single().then(({ data }) => {
-                if (data) setUserCredits(data.credits);
-              });
               handleDownloadPdf();
             }
           });

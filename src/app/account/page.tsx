@@ -40,8 +40,7 @@ export default function AccountPage() {
         return;
       }
       setEmail(user.email || null);
-      const { data: profile } = await supabase.from('profiles').select('credits').eq('id', user.id).single();
-      if (profile) setCredits(profile.credits);
+      try { const { data: p } = await supabase.from('profiles').select('credits').eq('id', user.id).single(); if (p) setCredits(p.credits); } catch {/* noop */}
 
       try {
         const res = await fetch('/api/credits/history');

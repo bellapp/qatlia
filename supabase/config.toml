@@ -1,0 +1,4 @@
+# Supabase project config for QatlIA
+project_id = "awssldjsyxdgopapnkxi"
+[db]
+pooler.port = 5432
