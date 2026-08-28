@@ -34,6 +34,7 @@ import {
 import { OptionsPanel } from '@/components/OptionsPanel';
 import { PiecesManager } from '@/components/PiecesManager';
 import { AuthModal } from '@/components/AuthModal';
+import { writeLocalHistoryItem, type LocalHistoryItem } from '@/lib/history';
 
 const DEFAULT_SHEET: Sheet = {
   height: 278,
@@ -116,6 +117,47 @@ export default function Dashboard() {
     }));
   };
 
+  const persistProject = async (
+    nextResult: OptimizationResult,
+    source: 'optimize' | 'pdf'
+  ) => {
+    const payload = {
+      name: `Débit ${(sheet.material || 'MDF').toUpperCase()} — ${pieces.reduce((s, p) => s + (p.quantity || 1), 0)} pcs`,
+      sheet,
+      pieces,
+      options,
+      result: nextResult,
+    };
+
+    writeLocalHistoryItem({
+      id: `${source}_${Date.now()}`,
+      name: payload.name,
+      material: sheet.material || 'mdf',
+      sheet_width: sheet.width,
+      sheet_height: sheet.height,
+      kerf: sheet.kerf,
+      grain_direction: !!sheet.grainDirection,
+      status: 'optimized',
+      created_at: new Date().toISOString(),
+      options_json: payload as unknown as LocalHistoryItem['options_json'],
+    });
+
+    try {
+      const supabase = createClient();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (!user) return;
+      await fetch('/api/projects', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+    } catch (err) {
+      console.error('Erreur auto-save projet:', err);
+    }
+  };
+
   const handleRunOptimization = async () => {
     setIsOptimizing(true);
     try {
@@ -132,6 +174,7 @@ export default function Dashboard() {
       if (data.success && data.result) {
         setResult(data.result);
         setActiveSheetIndex(0);
+        void persistProject(data.result, 'optimize');
       }
     } catch (err) {
       console.error('Erreur optimisation:', err);
@@ -269,17 +312,7 @@ export default function Dashboard() {
       });
 
       if (res.ok) {
-        fetch('/api/projects', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            name: `Débit ${sheet.material?.toUpperCase() || 'MDF'} (${pieces.length} pièces)`,
-            sheet,
-            pieces,
-            options,
-            result,
-          }),
-        }).catch((err) => console.error('Erreur auto-save projet:', err));
+        await persistProject(result, 'pdf');
 
         const blob = await res.blob();
         const url = window.URL.createObjectURL(blob);

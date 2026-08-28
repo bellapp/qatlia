@@ -32,6 +32,8 @@ CREATE TABLE IF NOT EXISTS public.projects (
   updated_at    TIMESTAMPTZ DEFAULT NOW()
 );
 
+ALTER TABLE public.projects ADD COLUMN IF NOT EXISTS options_json JSONB;
+
 -- 4. Table pieces
 CREATE TABLE IF NOT EXISTS public.pieces (
   id            UUID DEFAULT uuid_generate_v4() PRIMARY KEY,

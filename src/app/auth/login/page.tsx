@@ -1,32 +1,44 @@
 'use client';
 
 import React, { useState, useEffect, Suspense } from 'react';
+import Link from 'next/link';
 import { createClient } from '@/lib/supabase/client';
-import { Sparkles, ArrowRight, Lock, Mail, User } from 'lucide-react';
+import { ArrowRight, Lock, Mail, User, Eye, EyeOff, Gift, ShieldCheck, Scissors } from 'lucide-react';
 import { useRouter, useSearchParams } from 'next/navigation';
+
+function GoogleMark() {
+  return (
+    <svg className="w-4 h-4" viewBox="0 0 24 24" aria-hidden>
+      <path fill="#EA4335" d="M12 5c1.6 0 3 .6 4.1 1.7l3.1-3.1C17.3 1.8 14.8 1 12 1 7.4 1 3.5 3.6 1.6 7.4l3.7 2.9C6.2 7.4 8.9 5 12 5z" />
+      <path fill="#4285F4" d="M23.5 12.3c0-.8-.1-1.6-.2-2.3H12v4.5h6.5c-.3 1.5-1.1 2.8-2.4 3.7l3.7 2.9c2.2-2 3.7-5 3.7-8.8z" />
+      <path fill="#FBBC05" d="M5.3 14.7c-.2-.7-.4-1.4-.4-2.2s.2-1.5.4-2.2L1.6 7.4C.6 9.4 0 11.6 0 14.5s.6 5.1 1.6 7.1l3.7-2.9z" />
+      <path fill="#34A853" d="M12 23c3.2 0 6-1.1 8-3l-3.7-2.9c-1.1.7-2.5 1.2-4.3 1.2-3.1 0-5.8-2.4-6.7-5.3L1.6 16c1.9 3.8 5.8 7 10.4 7z" />
+    </svg>
+  );
+}
 
 function AuthForm() {
   const [isLogin, setIsLogin] = useState(true);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [fullName, setFullName] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [oauthLoading, setOauthLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
-  
+
   const router = useRouter();
   const searchParams = useSearchParams();
   const redirectTo = searchParams?.get('redirect') || '/';
 
   useEffect(() => {
-    // Si l'utilisateur est déjà connecté, le rediriger directement
     async function checkUser() {
       const supabase = createClient();
-      const { data: { user } } = await supabase.auth.getUser();
-      if (user) {
-        router.push(redirectTo);
-      }
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (user) router.push(redirectTo);
     }
     checkUser();
   }, [redirectTo, router]);
@@ -39,14 +51,11 @@ function AuthForm() {
       const origin = typeof window !== 'undefined' ? window.location.origin : 'https://qatlia.vercel.app';
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
-        options: {
-          redirectTo: `${origin}/auth/callback?redirect=${encodeURIComponent(redirectTo)}`,
-        },
+        options: { redirectTo: `${origin}/auth/callback?redirect=${encodeURIComponent(redirectTo)}` },
       });
       if (error) throw error;
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'Erreur lors de la connexion avec Google';
-      setErrorMsg(msg);
+      setErrorMsg(err instanceof Error ? err.message : 'Erreur lors de la connexion avec Google');
       setOauthLoading(false);
     }
   };
@@ -56,15 +65,11 @@ function AuthForm() {
     setLoading(true);
     setErrorMsg(null);
     setSuccessMsg(null);
-
     const supabase = createClient();
 
     try {
       if (isLogin) {
-        const { error } = await supabase.auth.signInWithPassword({
-          email,
-          password,
-        });
+        const { error } = await supabase.auth.signInWithPassword({ email, password });
         if (error) throw error;
         router.push(redirectTo);
         router.refresh();
@@ -72,163 +77,162 @@ function AuthForm() {
         const { data, error } = await supabase.auth.signUp({
           email,
           password,
-          options: {
-            data: { full_name: fullName },
-          },
+          options: { data: { full_name: fullName } },
         });
         if (error) throw error;
-
-        // Si confirmation par email non obligatoire
         if (data.session) {
           router.push(redirectTo);
           router.refresh();
         } else {
-          setSuccessMsg('Compte créé avec succès ! Vous pouvez maintenant vous connecter.');
+          setSuccessMsg('Compte créé. Vérifiez votre email, puis reconnectez-vous.');
           setIsLogin(true);
         }
       }
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'Une erreur est survenue';
-      setErrorMsg(msg);
+      setErrorMsg(err instanceof Error ? err.message : 'Une erreur est survenue');
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="min-h-screen bg-[#0F172A] text-[#E2E8F0] font-sans antialiased flex items-center justify-center p-6">
-      <div className="max-w-md w-full p-8 rounded-3xl bg-[#1E293B]/90 border border-[#334155] shadow-2xl backdrop-blur-md space-y-6">
-        
-        {/* Header */}
-        <div className="text-center space-y-2">
-          <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-tr from-[#F5A623] to-[#D97706] text-slate-950 font-black text-xl mx-auto shadow-lg shadow-amber-500/20 border border-amber-400/40">
-            Q
+    <div className="min-h-screen bg-[#070C18] text-slate-100 font-sans antialiased grid lg:grid-cols-2">
+      <aside className="hidden lg:flex flex-col justify-between p-12 border-r border-slate-800/80 bg-[radial-gradient(1200px_circle_at_0%_0%,rgba(245,166,35,0.12),transparent_45%)]">
+        <Link href="/" className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-amber-500 to-amber-400 text-slate-950 font-black text-lg flex items-center justify-center">Q</div>
+          <div>
+            <p className="font-extrabold tracking-tight">QatlIA</p>
+            <p className="text-[11px] text-slate-400">Atelier de calepinage</p>
           </div>
-          <h1 className="text-2xl font-black text-white">
-            {isLogin ? 'Connexion à QatlIA' : 'Créer un compte Artisan'}
-          </h1>
-          <p className="text-xs text-[#94A3B8]">
-            {isLogin
-              ? 'Connectez-vous pour télécharger vos plans PDF et gérer vos crédits'
-              : '🎁 5 crédits offerts immédiatement à l\'inscription pour vos débits'}
-          </p>
+        </Link>
+
+        <div className="space-y-8 max-w-md">
+          <div>
+            <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-amber-400/80">Compte artisan</p>
+            <h2 className="text-4xl font-black leading-tight mt-2">Vos plans de coupe, synchronisés.</h2>
+            <p className="text-slate-400 mt-3 text-sm leading-relaxed">
+              Historique des débits, crédits Vision IA, export PDF industriel. Un compte, tous vos ateliers.
+            </p>
+          </div>
+          <ul className="space-y-3 text-sm">
+            {[
+              { icon: Gift, label: '5 crédits offerts à l’inscription' },
+              { icon: Scissors, label: 'Historique de chaque plan généré' },
+              { icon: ShieldCheck, label: 'Connexion Google ou email sécurisée' },
+            ].map((item) => (
+              <li key={item.label} className="flex items-center gap-3 text-slate-300">
+                <span className="w-8 h-8 rounded-lg bg-slate-900 border border-slate-800 flex items-center justify-center text-amber-400">
+                  <item.icon className="w-4 h-4" />
+                </span>
+                {item.label}
+              </li>
+            ))}
+          </ul>
         </div>
+        <p className="text-[11px] text-slate-600">QatlIA Pro · Maroc · MAD</p>
+      </aside>
 
-        {/* Notifications */}
-        {errorMsg && (
-          <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-400 text-xs font-semibold text-center">
-            {errorMsg}
+      <main className="flex items-center justify-center p-6 sm:p-10">
+        <div className="w-full max-w-[420px] space-y-6">
+          <div className="lg:hidden flex items-center gap-3">
+            <div className="w-9 h-9 rounded-xl bg-amber-500 text-slate-950 font-black flex items-center justify-center">Q</div>
+            <span className="font-extrabold">QatlIA</span>
           </div>
-        )}
-        {successMsg && (
-          <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xs font-semibold text-center">
-            {successMsg}
+
+          <div>
+            <h1 className="text-2xl font-black text-white">{isLogin ? 'Connexion' : 'Créer un compte'}</h1>
+            <p className="text-sm text-slate-400 mt-1">
+              {isLogin ? 'Retrouvez vos débits et crédits.' : '5 crédits offerts pour lancer vos premiers scans.'}
+            </p>
           </div>
-        )}
 
-        {/* Google OAuth Button */}
-        <button
-          type="button"
-          onClick={handleOAuthGoogle}
-          disabled={oauthLoading || loading}
-          className="w-full py-3 px-4 rounded-xl bg-[#0F172A] hover:bg-[#283548] border border-[#334155] hover:border-[#475569] text-white font-bold text-xs transition-all flex items-center justify-center gap-3 shadow-md disabled:opacity-50 cursor-pointer"
-        >
-          <svg className="w-4 h-4" viewBox="0 0 24 24">
-            <path
-              fill="#EA4335"
-              d="M12 5c1.6 0 3 .6 4.1 1.7l3.1-3.1C17.3 1.8 14.8 1 12 1 7.4 1 3.5 3.6 1.6 7.4l3.7 2.9C6.2 7.4 8.9 5 12 5z"
-            />
-            <path
-              fill="#4285F4"
-              d="M23.5 12.3c0-.8-.1-1.6-.2-2.3H12v4.5h6.5c-.3 1.5-1.1 2.8-2.4 3.7l3.7 2.9c2.2-2 3.7-5 3.7-8.8z"
-            />
-            <path
-              fill="#FBBC05"
-              d="M5.3 14.7c-.2-.7-.4-1.4-.4-2.2s.2-1.5.4-2.2L1.6 7.4C.6 9.4 0 11.6 0 14.5s.6 5.1 1.6 7.1l3.7-2.9z"
-            />
-            <path
-              fill="#34A853"
-              d="M12 23c3.2 0 6-1.1 8-3l-3.7-2.9c-1.1.7-2.5 1.2-4.3 1.2-3.1 0-5.8-2.4-6.7-5.3L1.6 16c1.9 3.8 5.8 7 10.4 7z"
-            />
-          </svg>
-          <span>{oauthLoading ? 'Redirection Google...' : 'Continuer avec Google (Gmail)'}</span>
-        </button>
-
-        {/* Divider */}
-        <div className="relative flex items-center justify-center">
-          <div className="border-t border-[#334155] w-full"></div>
-          <span className="bg-[#1E293B] px-3 text-[11px] font-bold text-[#64748B] uppercase tracking-wider relative">
-            ou par email
-          </span>
-        </div>
-
-        {/* Email Form */}
-        <form onSubmit={handleAuth} className="space-y-4">
-          {!isLogin && (
-            <div>
-              <label className="text-xs font-bold text-[#94A3B8]">Nom complet / Atelier</label>
-              <div className="relative mt-1">
-                <User className="w-4 h-4 text-[#64748B] absolute left-3 top-3" />
-                <input
-                  type="text"
-                  required
-                  value={fullName}
-                  onChange={(e) => setFullName(e.target.value)}
-                  placeholder="Ex: Menuiserie Atlas"
-                  className="w-full bg-[#0F172A] border border-[#334155] rounded-xl pl-9 pr-3 py-2.5 text-xs text-white placeholder-[#64748B] focus:border-amber-400 outline-none"
-                />
-              </div>
-            </div>
+          {errorMsg && (
+            <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-300 text-xs font-medium">{errorMsg}</div>
+          )}
+          {successMsg && (
+            <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 text-xs font-medium">{successMsg}</div>
           )}
 
-          <div>
-            <label className="text-xs font-bold text-[#94A3B8]">Adresse Email</label>
-            <div className="relative mt-1">
-              <Mail className="w-4 h-4 text-[#64748B] absolute left-3 top-3" />
-              <input
-                type="email"
-                required
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="artisan@atelier.ma"
-                className="w-full bg-[#0F172A] border border-[#334155] rounded-xl pl-9 pr-3 py-2.5 text-xs text-white placeholder-[#64748B] focus:border-amber-400 outline-none"
-              />
-            </div>
-          </div>
-
-          <div>
-            <label className="text-xs font-bold text-[#94A3B8]">Mot de passe</label>
-            <div className="relative mt-1">
-              <Lock className="w-4 h-4 text-[#64748B] absolute left-3 top-3" />
-              <input
-                type="password"
-                required
-                minLength={6}
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="••••••••"
-                className="w-full bg-[#0F172A] border border-[#334155] rounded-xl pl-9 pr-3 py-2.5 text-xs text-white placeholder-[#64748B] focus:border-amber-400 outline-none"
-              />
-            </div>
-          </div>
-
           <button
-            type="submit"
-            disabled={loading || oauthLoading}
-            className="w-full py-3.5 rounded-xl bg-gradient-to-r from-[#F5A623] to-[#D97706] hover:from-[#D97706] hover:to-[#B45309] text-slate-950 font-black text-xs uppercase tracking-wider transition-all flex items-center justify-center gap-2 shadow-lg shadow-amber-500/20 disabled:opacity-50 cursor-pointer"
+            type="button"
+            onClick={handleOAuthGoogle}
+            disabled={oauthLoading || loading}
+            className="w-full py-3 px-4 rounded-xl bg-white hover:bg-slate-100 text-slate-900 font-semibold text-sm flex items-center justify-center gap-3 disabled:opacity-50"
           >
-            {loading ? (
-              <Sparkles className="w-4 h-4 animate-spin" />
-            ) : (
-              <>
-                {isLogin ? 'Se connecter' : 'Créer mon compte (5 crédits offerts)'}
-                <ArrowRight className="w-4 h-4" />
-              </>
-            )}
+            <GoogleMark />
+            {oauthLoading ? 'Redirection Google…' : 'Continuer avec Google'}
           </button>
-        </form>
 
-        <div className="text-center pt-2 border-t border-[#334155]/60">
+          <div className="relative flex items-center">
+            <div className="border-t border-slate-800 w-full" />
+            <span className="px-3 text-[11px] font-semibold uppercase tracking-wider text-slate-500 bg-[#070C18]">ou email</span>
+          </div>
+
+          <form onSubmit={handleAuth} className="space-y-3.5">
+            {!isLogin && (
+              <label className="block">
+                <span className="text-[11px] font-semibold text-slate-400">Nom d’atelier</span>
+                <div className="relative mt-1">
+                  <User className="w-4 h-4 text-slate-500 absolute left-3 top-3" />
+                  <input
+                    type="text"
+                    required
+                    value={fullName}
+                    onChange={(e) => setFullName(e.target.value)}
+                    placeholder="Menuiserie Atlas"
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl pl-9 pr-3 py-2.5 text-sm text-white placeholder-slate-600 focus:border-amber-500/50 outline-none"
+                  />
+                </div>
+              </label>
+            )}
+            <label className="block">
+              <span className="text-[11px] font-semibold text-slate-400">Email</span>
+              <div className="relative mt-1">
+                <Mail className="w-4 h-4 text-slate-500 absolute left-3 top-3" />
+                <input
+                  type="email"
+                  required
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="artisan@atelier.ma"
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl pl-9 pr-3 py-2.5 text-sm text-white placeholder-slate-600 focus:border-amber-500/50 outline-none"
+                />
+              </div>
+            </label>
+            <label className="block">
+              <span className="text-[11px] font-semibold text-slate-400">Mot de passe</span>
+              <div className="relative mt-1">
+                <Lock className="w-4 h-4 text-slate-500 absolute left-3 top-3" />
+                <input
+                  type={showPassword ? 'text' : 'password'}
+                  required
+                  minLength={6}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="••••••••"
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl pl-9 pr-10 py-2.5 text-sm text-white placeholder-slate-600 focus:border-amber-500/50 outline-none"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3 top-2.5 text-slate-500 hover:text-slate-300"
+                  aria-label={showPassword ? 'Masquer' : 'Afficher'}
+                >
+                  {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
+              </div>
+            </label>
+
+            <button
+              type="submit"
+              disabled={loading || oauthLoading}
+              className="w-full py-3.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-sm flex items-center justify-center gap-2 disabled:opacity-50"
+            >
+              {isLogin ? 'Se connecter' : 'Créer le compte'}
+              <ArrowRight className="w-4 h-4" />
+            </button>
+          </form>
+
           <button
             type="button"
             onClick={() => {
@@ -236,21 +240,25 @@ function AuthForm() {
               setErrorMsg(null);
               setSuccessMsg(null);
             }}
-            className="text-xs text-amber-400 hover:text-amber-300 font-bold cursor-pointer"
+            className="w-full text-center text-sm text-amber-400 hover:text-amber-300 font-semibold"
           >
-            {isLogin
-              ? 'Pas encore de compte ? Créer un compte gratuit (+ 5 crédits)'
-              : 'Déjà un compte ? Se connecter'}
+            {isLogin ? 'Pas de compte ? Créer un compte (+ 5 crédits)' : 'Déjà un compte ? Se connecter'}
           </button>
+
+          <p className="text-center text-[11px] text-slate-600">
+            <Link href="/" className="hover:text-slate-400">
+              Retour à l’atelier
+            </Link>
+          </p>
         </div>
-      </div>
+      </main>
     </div>
   );
 }
 
 export default function LoginPage() {
   return (
-    <Suspense fallback={<div className="min-h-screen bg-[#0F172A] flex items-center justify-center text-white">Chargement...</div>}>
+    <Suspense fallback={<div className="min-h-screen bg-[#070C18] flex items-center justify-center text-slate-400 text-sm">Chargement…</div>}>
       <AuthForm />
     </Suspense>
   );
