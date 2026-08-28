@@ -15,6 +15,7 @@ import {
   CloudOff,
 } from 'lucide-react';
 import { readLocalHistory, type LocalHistoryItem } from '@/lib/history';
+import { AccountMenu } from '@/components/AccountMenu';
 
 interface ProjectHistoryItem {
   id: string;
@@ -86,11 +87,17 @@ export default function HistoryPage() {
         if (data.success && Array.isArray(data.projects)) {
           setProjects(mergeHistory(data.projects, local));
           if (data.projects.length === 0 && local.length > 0) {
-            setSyncNote('Affichage des débits enregistrés sur cet appareil. La sync cloud se fera au prochain export.');
+            setSyncNote('Plans enregistrés sur cet appareil. La sync cloud se fera dès que la base atelier sera prête.');
           }
         } else {
           setProjects(mergeHistory([], local));
-          setSyncNote(data.message || 'Historique cloud indisponible — affichage local.');
+          const raw = String(data.message || '');
+          const missingTable = /schema cache|could not find the table|public\.projects/i.test(raw);
+          setSyncNote(
+            missingTable
+              ? 'Historique cloud pas encore activé — vos débits de cet appareil s’affichent ci-dessous.'
+              : 'Historique cloud indisponible — affichage local.'
+          );
         }
       } else {
         setUserEmail(null);
@@ -156,10 +163,7 @@ export default function HistoryPage() {
               <span className="font-mono font-bold">{userCredits}</span>
             </Link>
             {userEmail ? (
-              <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-900 border border-slate-800">
-                <div className="w-2 h-2 rounded-full bg-emerald-400" />
-                <span className="text-xs text-slate-300 truncate max-w-[140px]">{userEmail}</span>
-              </div>
+              <AccountMenu email={userEmail} />
             ) : (
               <Link href="/auth/login?redirect=/history" className="px-3.5 py-1.5 rounded-xl bg-white text-slate-950 font-bold text-xs">
                 Connexion

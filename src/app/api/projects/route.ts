@@ -42,8 +42,12 @@ export async function GET() {
       .order('created_at', { ascending: false });
 
     if (error) {
+      const missing = /schema cache|could not find the table|public\.projects/i.test(error.message || '');
       console.error('Erreur récupération projets:', error);
-      return NextResponse.json({ error: 'DB_ERROR', message: error.message }, { status: 500 });
+      if (missing) {
+        return NextResponse.json({ success: true, projects: [], note: 'cloud_not_ready' });
+      }
+      return NextResponse.json({ error: 'DB_ERROR', message: 'Historique cloud indisponible' }, { status: 500 });
     }
 
     return NextResponse.json({ success: true, projects: projects || [] });

@@ -34,6 +34,7 @@ import {
 import { OptionsPanel } from '@/components/OptionsPanel';
 import { PiecesManager } from '@/components/PiecesManager';
 import { AuthModal } from '@/components/AuthModal';
+import { AccountMenu } from '@/components/AccountMenu';
 import { writeLocalHistoryItem, type LocalHistoryItem } from '@/lib/history';
 
 const DEFAULT_SHEET: Sheet = {
@@ -290,6 +291,24 @@ export default function Dashboard() {
         const consumeData = await consumeRes.json();
         if (consumeData.creditsRemaining !== undefined) {
           setUserCredits(consumeData.creditsRemaining);
+          try {
+            const key = 'qatlia_credit_tx_v1';
+            const prev = JSON.parse(localStorage.getItem(key) || '[]');
+            const next = [
+              {
+                id: `tx_${Date.now()}`,
+                type: 'usage',
+                amount: -1,
+                balance_after: consumeData.creditsRemaining,
+                description: 'Export rapport PDF',
+                created_at: new Date().toISOString(),
+              },
+              ...(Array.isArray(prev) ? prev : []),
+            ].slice(0, 50);
+            localStorage.setItem(key, JSON.stringify(next));
+          } catch {
+            /* ignore */
+          }
         }
       } catch (e) {
         console.warn('Crédit consume warning:', e);
@@ -381,10 +400,7 @@ export default function Dashboard() {
             </Link>
 
             {userEmail ? (
-              <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-900/80 border border-slate-800">
-                <div className="w-2 h-2 rounded-full bg-emerald-400"></div>
-                <span className="text-xs text-slate-300 font-medium truncate max-w-[110px]">{userEmail}</span>
-              </div>
+              <AccountMenu email={userEmail} />
             ) : (
               <Link
                 href="/auth/login"

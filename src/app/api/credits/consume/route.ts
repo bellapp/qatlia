@@ -55,6 +55,13 @@ export async function POST() {
       // Déduire 1 crédit
       const updated = Math.max(0, currentCredits - 1);
       await supabaseAdmin.from('profiles').update({ credits: updated }).eq('id', user.id);
+      await supabaseAdmin.from('credit_transactions').insert({
+        user_id: user.id,
+        type: 'usage',
+        amount: -1,
+        balance_after: updated,
+        description: 'Export rapport PDF',
+      });
 
       return NextResponse.json({ success: true, creditsRemaining: updated });
     }
