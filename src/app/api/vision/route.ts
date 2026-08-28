@@ -102,9 +102,9 @@ Règles impératives :
       ? 'https://openrouter.ai/api/v1/chat/completions'
       : 'https://api.openai.com/v1/chat/completions';
 
-    // Modèle Vision demandé : x-ai/grok-4.6 (OpenRouter)
+    // Modèle Vision officiel : Google Gemini 3.7 Flash
     const model = isUsingOpenRouter
-      ? (process.env.OPENROUTER_MODEL || 'x-ai/grok-4.6')
+      ? (process.env.OPENROUTER_MODEL || 'google/gemini-3.7-flash')
       : 'gpt-4o-mini';
 
     const res = await fetch(endpoint, {
