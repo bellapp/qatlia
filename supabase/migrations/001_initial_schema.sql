@@ -1,5 +1,7 @@
 -- Extension UUID
-CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+CREATE EXTENSION IF NOT EXISTS "uuid-ossp" SCHEMA extensions;
+CREATE EXTENSION IF NOT EXISTS "uuid-ossp" SCHEMA public;
+SET search_path TO public, extensions;
 
 -- ============================================================
 -- Table profiles (gérée par Supabase Auth, extended ici)
