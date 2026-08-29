@@ -39,13 +39,13 @@ export default function LandingPage() {
           </div>
 
           <h1 className="text-4xl sm:text-5xl lg:text-6xl font-black tracking-tight text-white leading-[1.05]">
-            Calepinez vos panneaux
+            Optimisez vos panneaux
             <br />
             <span className="text-brand-400">en quelques secondes</span>
           </h1>
 
           <p className="mt-6 text-base sm:text-lg text-slate-400 max-w-2xl mx-auto leading-relaxed">
-            Économisez jusqu&apos;à <strong className="text-white">530 MAD par chantier</strong>. Scannez vos fiches de débit,
+            Réduisez vos chutes jusqu&apos;à <strong className="text-white">75%</strong>. Scannez vos fiches de débit,
             optimisez le placement, exportez votre plan en PDF industriel.
           </p>
 
@@ -76,8 +76,8 @@ export default function LandingPage() {
       <section className="max-w-5xl mx-auto px-6 sm:px-10 pb-20">
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
           {[
-            { value: '530', unit: 'MAD', label: 'Économie moyenne par chantier' },
-            { value: '75', unit: '%', label: 'Surface utile optimisée' },
+            { value: '75', unit: '%', label: 'Moins de chutes sur vos panneaux' },
+            { value: '90', unit: '%', label: 'Surface utile optimisée en moyenne' },
             { value: '2', unit: 'min', label: 'Pour générer un plan complet' },
             { value: '5', unit: 'crédits', label: 'Offerts à l&apos;inscription' },
           ].map((stat) => (
@@ -120,8 +120,8 @@ export default function LandingPage() {
             },
             {
               icon: TrendingUp,
-              title: 'Optimisation MAD',
-              desc: 'Visualisez le gain économique en dirhams. Matière économisée = argent gagné.',
+              title: 'Réduction des chutes',
+              desc: 'Visualisez le taux de chute et la surface utile. Moins de perte = plus de rentabilité.',
               color: 'text-purple-400 bg-purple-500/10 border-purple-500/20',
             },
           ].map((feat) => (
