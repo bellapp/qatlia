@@ -35,6 +35,7 @@ import { OptionsPanel } from '@/components/OptionsPanel';
 import { PiecesManager } from '@/components/PiecesManager';
 import { AuthModal } from '@/components/AuthModal';
 import { AccountMenu } from '@/components/AccountMenu';
+import { QatlIALogo } from '@/components/QatlIALogo';
 import { writeLocalHistoryItem, type LocalHistoryItem } from '@/lib/history';
 
 const DEFAULT_SHEET: Sheet = {
@@ -366,36 +367,41 @@ export default function Dashboard() {
   return (
     <div className="min-h-screen bg-studio-canvas text-slate-100 font-sans antialiased selection:bg-brand-500 selection:text-black">
       {/* Top Navbar Studio */}
-      <header className="sticky top-0 z-40 bg-studio-canvas/90 backdrop-blur-xl border-b border-studio-border/80 px-4 sm:px-8 py-3">
-        <div className="max-w-7xl mx-auto flex items-center justify-between">
+      <header className="sticky top-0 z-40 border-b border-studio-border/70 bg-studio-canvas/70 backdrop-blur-2xl backdrop-saturate-150">
+        <div className="absolute inset-0 -z-10 bg-gradient-to-b from-brand-500/[0.04] to-transparent pointer-events-none" />
+        <div className="max-w-7xl mx-auto flex items-center justify-between px-4 sm:px-8 h-16">
           <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-brand-500 to-brand-400 flex items-center justify-center text-slate-950 font-black text-lg shadow-md shadow-brand-500/20">
-              Q
+            <div className="text-brand-400">
+              <QatlIALogo size="md" />
             </div>
-            <div>
+            <div className="leading-tight">
               <div className="flex items-center gap-2">
-                <span className="font-extrabold text-base tracking-tight text-white">QatlIA</span>
-                <span className="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded bg-brand-400/10 text-brand-400 border border-brand-400/20">
+                <span className="font-display font-extrabold text-[17px] tracking-tight text-white">QatlIA</span>
+                <span className="text-[9px] font-mono font-bold px-1.5 py-0.5 rounded-md bg-brand-500/10 text-brand-400 border border-brand-500/20 tracking-wide">
                   PRO
                 </span>
               </div>
-              <p className="text-[11px] text-slate-400 hidden sm:block">Atelier de Découpe & Calepinage Industriel</p>
+              <p className="text-[11px] text-slate-400 hidden sm:block -mt-0.5">Atelier de découpe &amp; calepinage</p>
             </div>
           </div>
 
-          <div className="flex items-center gap-2.5">
+          <div className="flex items-center gap-2">
             <Link
               href="/history"
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-studio-panel/80 hover:bg-slate-800 text-slate-300 text-xs font-medium border border-studio-border transition-colors"
+              className="group relative flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-medium text-slate-300 hover:text-white hover:bg-studio-panel transition-all"
             >
-              <History className="w-3.5 h-3.5 text-brand-400" />
+              <History className="w-4 h-4 text-slate-400 group-hover:text-brand-400 transition-colors" />
               <span className="hidden sm:inline">Historique</span>
             </Link>
 
             <Link
               href="/credits"
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-brand-500/10 hover:bg-brand-500/20 text-brand-400 border border-brand-500/30 text-xs font-semibold transition-colors"
+              className="group relative flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-brand-500/10 border border-brand-500/25 text-brand-400 hover:bg-brand-500/15 hover:border-brand-500/40 text-xs font-semibold transition-all"
             >
+              <span className="relative flex h-2 w-2">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-brand-400 opacity-60" />
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-brand-400" />
+              </span>
               <Zap className="w-3.5 h-3.5 fill-brand-400 text-brand-400" />
               <span className="font-mono font-bold">{userCredits}</span>
               <span className="text-[10px] opacity-80 hidden sm:inline">crédits</span>
@@ -406,7 +412,7 @@ export default function Dashboard() {
             ) : (
               <Link
                 href="/auth/login"
-                className="px-3.5 py-1.5 rounded-xl bg-slate-100 hover:bg-white text-slate-950 font-bold text-xs transition-colors shadow-sm"
+                className="px-4 py-2 rounded-xl bg-white hover:bg-slate-100 text-slate-950 font-bold text-xs transition-all shadow-sm hover:shadow-md"
               >
                 Connexion
               </Link>

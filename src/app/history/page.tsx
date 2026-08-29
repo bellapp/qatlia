@@ -4,7 +4,6 @@ import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { createClient } from '@/lib/supabase/client';
 import {
-  History,
   Layers,
   Calendar,
   ArrowRight,
@@ -16,6 +15,7 @@ import {
 } from 'lucide-react';
 import { readLocalHistory, type LocalHistoryItem } from '@/lib/history';
 import { AccountMenu } from '@/components/AccountMenu';
+import { QatlIALogo } from '@/components/QatlIALogo';
 
 interface ProjectHistoryItem {
   id: string;
@@ -137,26 +137,28 @@ export default function HistoryPage() {
 
   return (
     <div className="min-h-screen bg-studio-canvas text-slate-100 font-sans antialiased selection:bg-brand-500 selection:text-black pb-16">
-      <header className="sticky top-0 z-40 bg-studio-canvas/90 backdrop-blur-xl border-b border-studio-border/80 px-4 sm:px-8 py-3">
-        <div className="max-w-6xl mx-auto flex items-center justify-between">
+      <header className="sticky top-0 z-40 border-b border-studio-border/70 bg-studio-canvas/70 backdrop-blur-2xl backdrop-saturate-150">
+        <div className="max-w-6xl mx-auto flex items-center justify-between px-4 sm:px-8 h-16">
           <div className="flex items-center gap-3">
             <Link
               href="/"
-              className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-studio-panel hover:bg-slate-800 text-slate-300 text-xs font-semibold border border-studio-border transition-all"
+              className="flex items-center gap-2 px-3 py-2 rounded-xl bg-studio-panel hover:bg-studio-field text-slate-300 text-xs font-semibold border border-studio-border transition-all"
             >
               <ArrowLeft className="w-4 h-4" />
               <span>Atelier</span>
             </Link>
             <div className="flex items-center gap-2">
-              <History className="w-5 h-5 text-brand-400" />
-              <h1 className="font-extrabold text-base text-white tracking-tight">Historique</h1>
+              <div className="text-brand-400">
+                <QatlIALogo size="sm" />
+              </div>
+              <h1 className="font-display font-extrabold text-base text-white tracking-tight">Historique</h1>
             </div>
           </div>
 
-          <div className="flex items-center gap-2.5">
+          <div className="flex items-center gap-2">
             <Link
               href="/credits"
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-brand-500/10 border border-brand-500/30 text-brand-400 text-xs font-semibold"
+              className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-brand-500/10 border border-brand-500/25 text-brand-400 hover:bg-brand-500/15 text-xs font-semibold transition-all"
             >
               <Zap className="w-3.5 h-3.5 fill-brand-400 text-brand-400" />
               <span className="font-mono font-bold">{userCredits}</span>
@@ -164,7 +166,7 @@ export default function HistoryPage() {
             {userEmail ? (
               <AccountMenu email={userEmail} />
             ) : (
-              <Link href="/auth/login?redirect=/history" className="px-3.5 py-1.5 rounded-xl bg-white text-slate-950 font-bold text-xs">
+              <Link href="/auth/login?redirect=/history" className="px-4 py-2 rounded-xl bg-white text-slate-950 font-bold text-xs hover:bg-slate-100 transition-all">
                 Connexion
               </Link>
             )}

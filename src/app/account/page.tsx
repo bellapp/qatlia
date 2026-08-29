@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { ArrowLeft, KeyRound, LogOut, Receipt, Shield, Zap } from 'lucide-react';
 import { AccountMenu } from '@/components/AccountMenu';
+import { QatlIALogo } from '@/components/QatlIALogo';
 
 interface Tx {
   id: string;
@@ -93,14 +94,19 @@ export default function AccountPage() {
 
   return (
     <div className="min-h-screen bg-studio-canvas text-slate-100 font-sans antialiased">
-      <header className="sticky top-0 z-40 bg-studio-canvas/90 backdrop-blur-xl border-b border-studio-border/80 px-4 sm:px-8 py-3">
-        <div className="max-w-4xl mx-auto flex items-center justify-between">
-          <Link href="/" className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-studio-panel border border-studio-border text-xs font-semibold text-slate-300">
+      <header className="sticky top-0 z-40 border-b border-studio-border/70 bg-studio-canvas/70 backdrop-blur-2xl backdrop-saturate-150">
+        <div className="max-w-4xl mx-auto flex items-center justify-between px-4 sm:px-8 h-16">
+          <div className="flex items-center gap-3">
+            <Link href="/" className="flex items-center gap-2 px-3 py-2 rounded-xl bg-studio-panel border border-studio-border text-xs font-semibold text-slate-300 hover:bg-studio-field transition-all">
             <ArrowLeft className="w-4 h-4" />
-            Atelier
-          </Link>
-          <div className="flex items-center gap-2.5">
-            <Link href="/credits" className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-brand-500/10 border border-brand-500/30 text-brand-400 text-xs font-semibold">
+              Atelier
+            </Link>
+            <div className="text-brand-400">
+              <QatlIALogo size="sm" />
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <Link href="/credits" className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-brand-500/10 border border-brand-500/25 text-brand-400 hover:bg-brand-500/15 text-xs font-semibold transition-all">
               <Zap className="w-3.5 h-3.5 fill-brand-400 text-brand-400" />
               <span className="font-mono font-bold">{credits}</span>
             </Link>
