@@ -36,6 +36,7 @@ import { AccountMenu } from '@/components/AccountMenu';
 import { QatlIALogo } from '@/components/QatlIALogo';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { OnboardingTour } from '@/components/OnboardingTour';
+import { LocaleSwitcher } from '@/components/LocaleProvider';
 import { writeLocalHistoryItem, type LocalHistoryItem } from '@/lib/history';
 
 const DEFAULT_SHEET: Sheet = {
@@ -443,6 +444,7 @@ export default function Dashboard() {
               <span className="hidden sm:inline">Historique</span>
             </Link>
 
+            <LocaleSwitcher />
             <OnboardingTour />
             <ThemeToggle />
             <Link

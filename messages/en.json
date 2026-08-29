@@ -1,0 +1,44 @@
+{
+  "app": {
+    "title": "QatlIA Pro — Cutting Optimization",
+    "description": "2D optimizer for woodworkers",
+    "tryFree": "Try for free",
+    "login": "Sign in",
+    "logout": "Sign out",
+    "account": "My account",
+    "history": "History",
+    "credits": "Credits",
+    "darkMode": "Dark mode",
+    "lightMode": "Light mode"
+  },
+  "landing": {
+    "heroTitle": "Optimize your panels",
+    "heroHighlight": "in seconds",
+    "heroSubtitle": "Reduce waste by up to 75%. Scan your cut lists, optimize placement, export your plan.",
+    "stats": {
+      "waste": "Less waste",
+      "surface": "Surface utilization",
+      "time": "To generate a plan",
+      "credits": "Free at signup"
+    },
+    "cta": "Try QatlIA now"
+  },
+  "atelier": {
+    "quickActions": "Quick Actions",
+    "takePhoto": "Take a photo",
+    "loadImage": "Load an image",
+    "visionBadge": "AI Vision",
+    "stockPanel": "Stock panel",
+    "height": "Height",
+    "width": "Width",
+    "pieces": "Pieces to cut",
+    "addPiece": "Add a piece",
+    "optimize": "Optimize",
+    "advancedOptions": "Advanced cut settings",
+    "results": "Results",
+    "sheets": "Sheets",
+    "wasteRate": "Waste",
+    "exportPdf": "Export PDF report",
+    "noResults": "Add your pieces and launch optimization"
+  }
+}

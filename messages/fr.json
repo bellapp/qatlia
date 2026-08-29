@@ -1,0 +1,44 @@
+{
+  "app": {
+    "title": "QatlIA Pro — Optimisation de Découpe",
+    "description": "Optimiseur 2D pour menuisiers",
+    "tryFree": "Essayer gratuitement",
+    "login": "Connexion",
+    "logout": "Déconnexion",
+    "account": "Mon compte",
+    "history": "Historique",
+    "credits": "Crédits",
+    "darkMode": "Mode sombre",
+    "lightMode": "Mode clair"
+  },
+  "landing": {
+    "heroTitle": "Optimisez vos panneaux",
+    "heroHighlight": "en quelques secondes",
+    "heroSubtitle": "Réduisez vos chutes jusqu'à 75%. Scannez vos fiches de débit, optimisez le placement, exportez votre plan.",
+    "stats": {
+      "waste": "Moins de chutes",
+      "surface": "Surface utile optimisée",
+      "time": "Pour générer un plan",
+      "credits": "Offerts à l'inscription"
+    },
+    "cta": "Essayer QatlIA maintenant"
+  },
+  "atelier": {
+    "quickActions": "Actions rapides",
+    "takePhoto": "Prendre une photo",
+    "loadImage": "Charger une image",
+    "visionBadge": "Vision IA",
+    "stockPanel": "Panneau brut",
+    "height": "Hauteur",
+    "width": "Largeur",
+    "pieces": "Pièces à découper",
+    "addPiece": "Ajouter une pièce",
+    "optimize": "Optimiser",
+    "advancedOptions": "Réglages de coupe avancés",
+    "results": "Résultats",
+    "sheets": "Feuilles",
+    "wasteRate": "Chute",
+    "exportPdf": "Exporter le rapport PDF",
+    "noResults": "Ajoutez vos pièces et lancez l'optimisation"
+  }
+}

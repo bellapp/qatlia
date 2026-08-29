@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { ArrowRight, Scissors, Camera, TrendingUp, FileText } from 'lucide-react';
 import { QatlIALogo } from '@/components/QatlIALogo';
 import { ThemeToggle } from '@/components/ThemeToggle';
+import { LocaleSwitcher } from '@/components/LocaleProvider';
 
 export default function LandingPage() {
   return (
@@ -20,6 +21,7 @@ export default function LandingPage() {
             <Link href="/auth/login" className="text-sm font-medium text-slate-600 dark:text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-slate-900 dark:text-white transition-colors">
               Connexion
             </Link>
+            <LocaleSwitcher />
             <ThemeToggle />
             <Link
               href="/atelier"
