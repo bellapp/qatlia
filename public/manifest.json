@@ -1,0 +1,17 @@
+{
+  "name": "QatlIA Pro — Optimisation de Découpe",
+  "short_name": "QatlIA",
+  "description": "Solution professionnelle d'optimisation de découpe de panneaux pour menuisiers et artisans. Moteur 2D Guillotine, OCR Vision IA, exports PDF & DXF CNC.",
+  "start_url": "/atelier",
+  "display": "standalone",
+  "background_color": "#060B14",
+  "theme_color": "#F5A623",
+  "orientation": "any",
+  "icons": [
+    { "src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "/icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ],
+  "categories": ["productivity", "utilities", "business"],
+  "lang": "fr",
+  "dir": "ltr"
+}

@@ -240,6 +240,35 @@ export default function Dashboard() {
     reader.readAsDataURL(file);
   };
 
+  const handleDownloadPng = async () => {
+    const svg = document.querySelector('svg');
+    if (!svg) return;
+    const clone = svg.cloneNode(true) as SVGSVGElement;
+    const serializer = new XMLSerializer();
+    const svgStr = serializer.serializeToString(clone);
+    const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d')!;
+    const img = new Image();
+    const blob = new Blob([svgStr], { type: 'image/svg+xml;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    img.onload = () => {
+      canvas.width = img.width * 2;
+      canvas.height = img.height * 2;
+      ctx.fillStyle = '#060B14';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+      canvas.toBlob((b) => {
+        if (!b) return;
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(b);
+        a.download = `qatlia_plan_${Date.now()}.png`;
+        document.body.appendChild(a); a.click(); document.body.removeChild(a);
+      }, 'image/png');
+      URL.revokeObjectURL(url);
+    };
+    img.src = url;
+  };
+
   const handleDownloadDxf = async () => {
     if (!result) return;
     try {
@@ -766,9 +795,13 @@ export default function Dashboard() {
 
                 {/* Export Actions */}
                 <div className="flex items-center gap-2.5">
+                  <button onClick={handleDownloadPng} className="flex-1 py-3 rounded-xl bg-studio-panel/60 border border-studio-border hover:border-studio-border-hover text-slate-700 dark:text-slate-300 font-bold text-xs flex items-center justify-center gap-2 transition-all">
+                    <FileCode2 className="w-4 h-4 text-purple-400" />
+                    PNG
+                  </button>
                   <button onClick={handleDownloadDxf} className="flex-1 py-3 rounded-xl bg-studio-panel/60 border border-studio-border hover:border-studio-border-hover text-slate-700 dark:text-slate-300 font-bold text-xs flex items-center justify-center gap-2 transition-all">
                     <FileCode2 className="w-4 h-4 text-sky-400" />
-                    Télécharger DXF (CNC)
+                    DXF (CNC)
                   </button>
                   <button onClick={handleDownloadPdf} disabled={isDownloadingPdf} className="flex-[2] py-3 rounded-xl bg-brand-500 hover:bg-brand-400 text-slate-950 font-black text-xs flex items-center justify-center gap-2 shadow-lg shadow-brand-500/20 transition-all disabled:opacity-40">
                     {isDownloadingPdf ? <RefreshCw className="w-4 h-4 animate-spin" /> : <FileText className="w-4 h-4" />}
