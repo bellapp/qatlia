@@ -428,112 +428,121 @@ export default function Dashboard() {
           {/* LEFT COLUMN: Controls & Input Studio (5 cols) */}
           <div className="lg:col-span-5 space-y-4">
             
-            {/* Quick Actions Header: Camera & Import */}
-            <div className="grid grid-cols-2 gap-2.5">
-              <label className="flex items-center gap-3 p-3 rounded-2xl bg-gradient-to-br from-slate-900 to-slate-900/60 border border-studio-border hover:border-sky-500/50 cursor-pointer group transition-all">
-                <input
-                  type="file"
-                  accept="image/*"
-                  capture="environment"
-                  className="hidden"
-                  onChange={handleImageUpload}
-                  disabled={isProcessingVision}
-                />
-                <div className="w-9 h-9 rounded-xl bg-sky-500/10 border border-sky-500/20 flex items-center justify-center text-sky-400 group-hover:scale-105 transition-transform shrink-0">
-                  <Camera className="w-4 h-4" />
+            {/* Quick Actions: Hero Cards */}
+            <div className="grid grid-cols-2 gap-3">
+              {/* Take Photo Card */}
+              <label className="group relative flex flex-col gap-3 p-4 rounded-2xl bg-studio-panel/60 border border-studio-border hover:border-sky-500/40 hover:bg-studio-panel/80 cursor-pointer transition-all duration-200 overflow-hidden">
+                <input type="file" accept="image/*" capture="environment" className="hidden" onChange={handleImageUpload} disabled={isProcessingVision} />
+                <div className="absolute inset-0 bg-gradient-to-br from-sky-500/[0.06] to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+                <div className="relative flex items-center gap-3">
+                  <span className="shrink-0 w-10 h-10 rounded-xl bg-sky-500/10 border border-sky-500/20 flex items-center justify-center group-hover:scale-105 group-hover:bg-sky-500/15 transition-all">
+                    <Camera className="w-5 h-5 text-sky-400" />
+                  </span>
+                  <div>
+                    <p className="text-sm font-bold text-slate-200 group-hover:text-white transition-colors">Appareil photo</p>
+                    <p className="text-[11px] text-slate-500 leading-tight">Scanner une fiche de débit papier</p>
+                  </div>
                 </div>
-                <div className="overflow-hidden">
-                  <span className="text-xs font-bold text-slate-200 block truncate">Prendre photo</span>
-                  <span className="text-[10px] text-slate-500 block truncate">Scan manuscrit IA</span>
-                </div>
+                <span className="self-start px-2 py-0.5 rounded-md bg-sky-500/10 text-sky-400 text-[10px] font-bold font-mono border border-sky-500/20">📷 Scan IA</span>
               </label>
 
-              <label className="flex items-center gap-3 p-3 rounded-2xl bg-gradient-to-br from-slate-900 to-slate-900/60 border border-studio-border hover:border-brand-500/50 cursor-pointer group transition-all">
-                <input
-                  type="file"
-                  accept="image/*"
-                  className="hidden"
-                  onChange={handleImageUpload}
-                  disabled={isProcessingVision}
-                />
-                <div className="w-9 h-9 rounded-xl bg-brand-500/10 border border-brand-500/20 flex items-center justify-center text-brand-400 group-hover:scale-105 transition-transform shrink-0">
-                  <ImageIcon className="w-4 h-4" />
+              {/* Upload File Card */}
+              <label className="group relative flex flex-col gap-3 p-4 rounded-2xl bg-studio-panel/60 border border-studio-border hover:border-brand-500/40 hover:bg-studio-panel/80 cursor-pointer transition-all duration-200 overflow-hidden">
+                <input type="file" accept="image/*" className="hidden" onChange={handleImageUpload} disabled={isProcessingVision} />
+                <div className="absolute inset-0 bg-gradient-to-br from-brand-500/[0.06] to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+                <div className="relative flex items-center gap-3">
+                  <span className="shrink-0 w-10 h-10 rounded-xl bg-brand-500/10 border border-brand-500/20 flex items-center justify-center group-hover:scale-105 group-hover:bg-brand-500/15 transition-all">
+                    <ImageIcon className="w-5 h-5 text-brand-400" />
+                  </span>
+                  <div>
+                    <p className="text-sm font-bold text-slate-200 group-hover:text-white transition-colors">Importer un fichier</p>
+                    <p className="text-[11px] text-slate-500 leading-tight">Photo, scan ou capture d&apos;écran</p>
+                  </div>
                 </div>
-                <div className="overflow-hidden">
-                  <span className="text-xs font-bold text-slate-200 block truncate">Importer image</span>
-                  <span className="text-[10px] text-slate-500 block truncate">Galerie / Fichier</span>
-                </div>
+                <span className="self-start px-2 py-0.5 rounded-md bg-brand-500/10 text-brand-400 text-[10px] font-bold font-mono border border-brand-500/20">JPG PNG WebP</span>
               </label>
+            </div>
+
+            {/* Vision IA Badge — flottant entre les deux cartes */}
+            <div className="flex items-center justify-center -mt-1">
+              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-gradient-to-r from-sky-500/10 via-brand-500/10 to-sky-500/10 border border-brand-500/20 text-[11px] font-semibold text-brand-400">
+                <span className="w-1.5 h-1.5 rounded-full bg-brand-400 animate-pulse" />
+                Vision IA · Extraction automatique
+              </span>
             </div>
 
             {/* Preview scan if present */}
             {previewImage && (
-              <div className="flex items-center gap-3 p-2.5 rounded-2xl bg-studio-panel/60 border border-studio-border">
+              <div className="flex items-center gap-3 p-3 rounded-2xl bg-emerald-500/10 border border-emerald-500/20">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={previewImage} alt="Scan preview" className="w-10 h-10 object-cover rounded-lg border border-studio-border-hover" />
+                <img src={previewImage} alt="Scan preview" className="w-12 h-12 object-cover rounded-xl border border-emerald-500/30 shadow-sm" />
                 <div className="text-xs">
-                  <span className="text-emerald-400 font-bold block">Fiche manuscrite analysée</span>
-                  <span className="text-[10px] text-slate-400">{pieces.length} cotes chargées</span>
+                  <span className="text-emerald-400 font-bold block">Fiche analysée</span>
+                  <span className="text-[11px] text-emerald-300/70 font-mono">{pieces.length} cotes extraites</span>
                 </div>
               </div>
             )}
 
             {/* Processing Banner */}
             {isProcessingVision && (
-              <div className="p-3.5 rounded-2xl bg-sky-500/10 border border-sky-500/30 flex items-center gap-3 text-sky-300 text-xs font-medium animate-pulse">
+              <div className="flex items-center gap-3 p-3.5 rounded-2xl bg-sky-500/10 border border-sky-500/20 animate-pulse">
                 <RefreshCw className="w-4 h-4 animate-spin text-sky-400 shrink-0" />
-                <span>Analyse intelligente des mesures en cours...</span>
+                <div className="text-xs">
+                  <span className="text-sky-300 font-bold block">Analyse en cours…</span>
+                  <span className="text-[11px] text-sky-400/60">Extraction des dimensions et quantités</span>
+                </div>
               </div>
             )}
 
             {visionError && (
-              <div className="p-3 rounded-2xl bg-rose-500/10 border border-rose-500/30 text-rose-400 text-xs flex items-center gap-2">
-                <AlertTriangle className="w-4 h-4 shrink-0" />
-                <span>{visionError}</span>
+              <div className="flex items-center gap-3 p-3 rounded-2xl bg-rose-500/10 border border-rose-500/20">
+                <AlertTriangle className="w-4 h-4 text-rose-400 shrink-0" />
+                <span className="text-xs text-rose-300 font-medium">{visionError}</span>
               </div>
             )}
 
-            {/* Stock Panel Dimensions (Compact Card) */}
-            <div className="p-4 rounded-2xl bg-studio-panel/60 border border-studio-border/90 shadow-sm space-y-3">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <Layers className="w-4 h-4 text-brand-400" />
-                  <h2 className="text-xs font-bold uppercase tracking-wider text-slate-300">
-                    Panneau Brut en Stock
-                  </h2>
+            {/* Stock Panel Card */}
+            <div className="overflow-hidden rounded-2xl bg-studio-panel/60 border border-studio-border/90">
+              <div className="flex items-center justify-between px-4 py-3.5 border-b border-studio-border/80">
+                <div className="flex items-center gap-2.5">
+                  <span className="w-8 h-8 rounded-lg bg-brand-500/10 border border-brand-500/20 flex items-center justify-center">
+                    <Layers className="w-4 h-4 text-brand-400" />
+                  </span>
+                  <div>
+                    <h2 className="text-xs font-bold text-white tracking-wide">Panneau brut en stock</h2>
+                    <p className="text-[10px] text-slate-500">Dimensions du matériau à optimiser</p>
+                  </div>
                 </div>
-                <span className="text-[10px] font-mono text-slate-400 bg-studio-field px-2 py-0.5 rounded-md border border-studio-border">
-                  Unité : cm
-                </span>
+                <span className="text-[10px] font-mono font-semibold text-brand-400 bg-brand-500/10 px-2 py-0.5 rounded-md border border-brand-500/20">cm</span>
               </div>
 
-              <div className="grid grid-cols-3 gap-2.5 text-xs">
-                <div>
-                  <label className="block text-[10px] text-slate-400 mb-1">Hauteur (Y)</label>
+              <div className="p-4 grid grid-cols-3 gap-3">
+                <div className="space-y-1">
+                  <label className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">Hauteur (Y)</label>
                   <input
                     type="number"
                     step="0.1"
                     value={sheet.height}
                     onChange={(e) => setSheet({ ...sheet, height: parseFloat(e.target.value) || 0 })}
-                    className="w-full px-2.5 py-1.5 rounded-xl bg-studio-field border border-studio-border text-slate-100 font-mono font-bold text-right outline-none focus:border-brand-500/50"
+                    className="w-full px-3 py-2 rounded-xl bg-studio-field border border-studio-border text-slate-100 font-mono font-bold text-right outline-none focus:border-brand-500/50 focus:ring-1 focus:ring-brand-500/20 transition-all"
                   />
                 </div>
-                <div>
-                  <label className="block text-[10px] text-slate-400 mb-1">Largeur (X)</label>
+                <div className="space-y-1">
+                  <label className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">Largeur (X)</label>
                   <input
                     type="number"
                     step="0.1"
                     value={sheet.width}
                     onChange={(e) => setSheet({ ...sheet, width: parseFloat(e.target.value) || 0 })}
-                    className="w-full px-2.5 py-1.5 rounded-xl bg-studio-field border border-studio-border text-slate-100 font-mono font-bold text-right outline-none focus:border-brand-500/50"
+                    className="w-full px-3 py-2 rounded-xl bg-studio-field border border-studio-border text-slate-100 font-mono font-bold text-right outline-none focus:border-brand-500/50 focus:ring-1 focus:ring-brand-500/20 transition-all"
                   />
                 </div>
-                <div>
-                  <label className="block text-[10px] text-slate-400 mb-1">Matériau</label>
+                <div className="space-y-1">
+                  <label className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">Matériau</label>
                   <select
                     value={sheet.material || 'mdf'}
                     onChange={(e) => setSheet({ ...sheet, material: e.target.value as MaterialType })}
-                    className="w-full px-2 py-1.5 rounded-xl bg-studio-field border border-studio-border text-slate-200 text-xs outline-none focus:border-brand-500/50"
+                    className="w-full px-3 py-2 rounded-xl bg-studio-field border border-studio-border text-slate-200 text-xs outline-none focus:border-brand-500/50 focus:ring-1 focus:ring-brand-500/20 transition-all"
                   >
                     <option value="mdf">MDF / Bois</option>
                     <option value="aluminium">Aluminium</option>
