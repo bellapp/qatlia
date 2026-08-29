@@ -35,6 +35,7 @@ import { EmptyState } from '@/components/EmptyState';
 import { AccountMenu } from '@/components/AccountMenu';
 import { QatlIALogo } from '@/components/QatlIALogo';
 import { ThemeToggle } from '@/components/ThemeToggle';
+import { OnboardingTour } from '@/components/OnboardingTour';
 import { writeLocalHistoryItem, type LocalHistoryItem } from '@/lib/history';
 
 const DEFAULT_SHEET: Sheet = {
@@ -240,6 +241,26 @@ export default function Dashboard() {
     reader.readAsDataURL(file);
   };
 
+  const handleDownloadJson = () => {
+    if (!result) return;
+    const json = JSON.stringify({
+      sheetsUsed: result.sheetsUsed,
+      wastePercentage: result.wastePercentage,
+      totalCostMad: result.totalCostMad,
+      sheets: result.sheets.map(s => ({
+        index: s.index, material: s.material,
+        width: s.width, height: s.height,
+        pieces: s.pieces.map(p => ({ name: p.name, height: p.height, width: p.width, rotated: p.rotated, x: p.x, y: p.y })),
+        offcuts: s.offcuts.map(o => ({ height: o.height, width: o.width, x: o.x, y: o.y }))
+      }))
+    }, null, 2);
+    const blob = new Blob([json], { type: 'application/json;charset=utf-8' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `qatlia_plan_${Date.now()}.json`;
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  };
+
   const handleDownloadPng = async () => {
     const svg = document.querySelector('svg');
     if (!svg) return;
@@ -422,6 +443,7 @@ export default function Dashboard() {
               <span className="hidden sm:inline">Historique</span>
             </Link>
 
+            <OnboardingTour />
             <ThemeToggle />
             <Link
               href="/credits"
@@ -794,16 +816,20 @@ export default function Dashboard() {
                 </div>
 
                 {/* Export Actions */}
-                <div className="flex items-center gap-2.5">
-                  <button onClick={handleDownloadPng} className="flex-1 py-3 rounded-xl bg-studio-panel/60 border border-studio-border hover:border-studio-border-hover text-slate-700 dark:text-slate-300 font-bold text-xs flex items-center justify-center gap-2 transition-all">
-                    <FileCode2 className="w-4 h-4 text-purple-400" />
+                <div className="grid grid-cols-4 gap-1.5">
+                  <button onClick={handleDownloadJson} className="py-2.5 rounded-xl bg-studio-panel/60 border border-studio-border hover:border-studio-border-hover text-slate-700 dark:text-slate-300 font-bold text-[10px] flex items-center justify-center gap-1.5 transition-all">
+                    <FileCode2 className="w-3.5 h-3.5 text-emerald-400" />
+                    JSON
+                  </button>
+                  <button onClick={handleDownloadPng} className="py-2.5 rounded-xl bg-studio-panel/60 border border-studio-border hover:border-studio-border-hover text-slate-700 dark:text-slate-300 font-bold text-[10px] flex items-center justify-center gap-1.5 transition-all">
+                    <FileCode2 className="w-3.5 h-3.5 text-purple-400" />
                     PNG
                   </button>
-                  <button onClick={handleDownloadDxf} className="flex-1 py-3 rounded-xl bg-studio-panel/60 border border-studio-border hover:border-studio-border-hover text-slate-700 dark:text-slate-300 font-bold text-xs flex items-center justify-center gap-2 transition-all">
-                    <FileCode2 className="w-4 h-4 text-sky-400" />
-                    DXF (CNC)
+                  <button onClick={handleDownloadDxf} className="py-2.5 rounded-xl bg-studio-panel/60 border border-studio-border hover:border-studio-border-hover text-slate-700 dark:text-slate-300 font-bold text-[10px] flex items-center justify-center gap-1.5 transition-all">
+                    <FileCode2 className="w-3.5 h-3.5 text-sky-400" />
+                    DXF
                   </button>
-                  <button onClick={handleDownloadPdf} disabled={isDownloadingPdf} className="flex-[2] py-3 rounded-xl bg-brand-500 hover:bg-brand-400 text-slate-950 font-black text-xs flex items-center justify-center gap-2 shadow-lg shadow-brand-500/20 transition-all disabled:opacity-40">
+                  <button onClick={handleDownloadPdf} disabled={isDownloadingPdf} className="col-span-4 mt-1 py-3 rounded-xl bg-brand-500 hover:bg-brand-400 text-slate-950 font-black text-xs flex items-center justify-center gap-2 shadow-lg shadow-brand-500/20 transition-all disabled:opacity-40">
                     {isDownloadingPdf ? <RefreshCw className="w-4 h-4 animate-spin" /> : <FileText className="w-4 h-4" />}
                     {isDownloadingPdf ? 'Génération…' : 'Exporter le rapport PDF'}
                   </button>
