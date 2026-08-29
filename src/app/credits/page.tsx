@@ -66,7 +66,7 @@ export default function CreditsPage() {
   };
 
   return (
-    <div className="min-h-screen bg-[#0F172A] text-[#E2E8F0] font-sans antialiased p-6 md:p-10">
+    <div className="min-h-screen bg-studio-panel text-[#E2E8F0] font-sans antialiased p-6 md:p-10">
       <div className="max-w-5xl mx-auto space-y-8">
         {/* Top bar */}
         <div className="flex items-center justify-between">
@@ -77,7 +77,7 @@ export default function CreditsPage() {
             <ArrowLeft className="w-4 h-4" />
             Retour au Dashboard
           </Link>
-          <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-300 text-xs font-bold">
+          <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-brand-500/10 border border-brand-500/30 text-brand-400 text-xs font-bold">
             <Zap className="w-3.5 h-3.5 text-[#F5A623]" />
             <span>Solde actuel : 5 Crédits</span>
           </div>
@@ -85,7 +85,7 @@ export default function CreditsPage() {
 
         {/* Title */}
         <div className="text-center space-y-2">
-          <span className="text-xs font-black uppercase tracking-widest text-[#F5A623] bg-amber-500/10 px-3 py-1 rounded-full border border-amber-500/20">
+          <span className="text-xs font-black uppercase tracking-widest text-[#F5A623] bg-brand-500/10 px-3 py-1 rounded-full border border-brand-500/20">
             Recharge de Crédits
           </span>
           <h1 className="text-3xl md:text-4xl font-black text-white">
@@ -104,7 +104,7 @@ export default function CreditsPage() {
               className={`rounded-2xl p-6 flex flex-col justify-between transition-all relative ${
                 p.highlight
                   ? 'bg-gradient-to-b from-[#1E3A5F] to-[#0F172A] border-2 border-[#F5A623] shadow-xl shadow-orange-500/10'
-                  : 'bg-[#1E293B]/60 border border-[#334155]'
+                  : 'bg-studio-panel/60 border border-[#334155]'
               }`}
             >
               {p.highlight && (
@@ -164,7 +164,7 @@ export default function CreditsPage() {
         </div>
 
         {/* Payment Methods Banner */}
-        <div className="p-4 rounded-2xl bg-[#1E293B]/40 border border-[#334155] flex flex-wrap items-center justify-between text-xs text-[#94A3B8] gap-4">
+        <div className="p-4 rounded-2xl bg-studio-panel/40 border border-[#334155] flex flex-wrap items-center justify-between text-xs text-[#94A3B8] gap-4">
           <div className="flex items-center gap-2">
             <ShieldCheck className="w-4 h-4 text-sky-400" />
             <span>Paiement sécurisé par <strong>Stripe</strong> (Cartes bancaires Visa / Mastercard) et CMI / CashPlus</span>

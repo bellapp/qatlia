@@ -96,10 +96,10 @@ function AuthForm() {
   };
 
   return (
-    <div className="min-h-screen bg-[#070C18] text-slate-100 font-sans antialiased grid lg:grid-cols-2">
-      <aside className="hidden lg:flex flex-col justify-between p-12 border-r border-slate-800/80 bg-[radial-gradient(1200px_circle_at_0%_0%,rgba(245,166,35,0.12),transparent_45%)]">
+    <div className="min-h-screen bg-studio-canvas text-slate-100 font-sans antialiased grid lg:grid-cols-2">
+      <aside className="hidden lg:flex flex-col justify-between p-12 border-r border-studio-border/80 bg-[radial-gradient(1200px_circle_at_0%_0%,rgba(245,166,35,0.12),transparent_45%)]">
         <Link href="/" className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-amber-500 to-amber-400 text-slate-950 font-black text-lg flex items-center justify-center">Q</div>
+          <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-brand-500 to-brand-400 text-slate-950 font-black text-lg flex items-center justify-center">Q</div>
           <div>
             <p className="font-extrabold tracking-tight">QatlIA</p>
             <p className="text-[11px] text-slate-400">Atelier de calepinage</p>
@@ -108,7 +108,7 @@ function AuthForm() {
 
         <div className="space-y-8 max-w-md">
           <div>
-            <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-amber-400/80">Compte artisan</p>
+            <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-brand-400/80">Compte artisan</p>
             <h2 className="text-4xl font-black leading-tight mt-2">Vos plans de coupe, synchronisés.</h2>
             <p className="text-slate-400 mt-3 text-sm leading-relaxed">
               Historique des débits, crédits Vision IA, export PDF industriel. Un compte, tous vos ateliers.
@@ -121,7 +121,7 @@ function AuthForm() {
               { icon: ShieldCheck, label: 'Connexion Google ou email sécurisée' },
             ].map((item) => (
               <li key={item.label} className="flex items-center gap-3 text-slate-300">
-                <span className="w-8 h-8 rounded-lg bg-slate-900 border border-slate-800 flex items-center justify-center text-amber-400">
+                <span className="w-8 h-8 rounded-lg bg-studio-panel border border-studio-border flex items-center justify-center text-brand-400">
                   <item.icon className="w-4 h-4" />
                 </span>
                 {item.label}
@@ -135,7 +135,7 @@ function AuthForm() {
       <main className="flex items-center justify-center p-6 sm:p-10">
         <div className="w-full max-w-[420px] space-y-6">
           <div className="lg:hidden flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl bg-amber-500 text-slate-950 font-black flex items-center justify-center">Q</div>
+            <div className="w-9 h-9 rounded-xl bg-brand-500 text-slate-950 font-black flex items-center justify-center">Q</div>
             <span className="font-extrabold">QatlIA</span>
           </div>
 
@@ -164,8 +164,8 @@ function AuthForm() {
           </button>
 
           <div className="relative flex items-center">
-            <div className="border-t border-slate-800 w-full" />
-            <span className="px-3 text-[11px] font-semibold uppercase tracking-wider text-slate-500 bg-[#070C18]">ou email</span>
+            <div className="border-t border-studio-border w-full" />
+            <span className="px-3 text-[11px] font-semibold uppercase tracking-wider text-slate-500 bg-studio-canvas">ou email</span>
           </div>
 
           <form onSubmit={handleAuth} className="space-y-3.5">
@@ -180,7 +180,7 @@ function AuthForm() {
                     value={fullName}
                     onChange={(e) => setFullName(e.target.value)}
                     placeholder="Menuiserie Atlas"
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl pl-9 pr-3 py-2.5 text-sm text-white placeholder-slate-600 focus:border-amber-500/50 outline-none"
+                    className="w-full bg-studio-field border border-studio-border rounded-xl pl-9 pr-3 py-2.5 text-sm text-white placeholder-slate-600 focus:border-brand-500/50 outline-none"
                   />
                 </div>
               </label>
@@ -195,7 +195,7 @@ function AuthForm() {
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="artisan@atelier.ma"
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl pl-9 pr-3 py-2.5 text-sm text-white placeholder-slate-600 focus:border-amber-500/50 outline-none"
+                  className="w-full bg-studio-field border border-studio-border rounded-xl pl-9 pr-3 py-2.5 text-sm text-white placeholder-slate-600 focus:border-brand-500/50 outline-none"
                 />
               </div>
             </label>
@@ -210,7 +210,7 @@ function AuthForm() {
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="••••••••"
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl pl-9 pr-10 py-2.5 text-sm text-white placeholder-slate-600 focus:border-amber-500/50 outline-none"
+                  className="w-full bg-studio-field border border-studio-border rounded-xl pl-9 pr-10 py-2.5 text-sm text-white placeholder-slate-600 focus:border-brand-500/50 outline-none"
                 />
                 <button
                   type="button"
@@ -226,7 +226,7 @@ function AuthForm() {
             <button
               type="submit"
               disabled={loading || oauthLoading}
-              className="w-full py-3.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-sm flex items-center justify-center gap-2 disabled:opacity-50"
+              className="w-full py-3.5 rounded-xl bg-brand-500 hover:bg-brand-400 text-slate-950 font-black text-sm flex items-center justify-center gap-2 disabled:opacity-50"
             >
               {isLogin ? 'Se connecter' : 'Créer le compte'}
               <ArrowRight className="w-4 h-4" />
@@ -240,7 +240,7 @@ function AuthForm() {
               setErrorMsg(null);
               setSuccessMsg(null);
             }}
-            className="w-full text-center text-sm text-amber-400 hover:text-amber-300 font-semibold"
+            className="w-full text-center text-sm text-brand-400 hover:text-brand-400 font-semibold"
           >
             {isLogin ? 'Pas de compte ? Créer un compte (+ 5 crédits)' : 'Déjà un compte ? Se connecter'}
           </button>
@@ -258,7 +258,7 @@ function AuthForm() {
 
 export default function LoginPage() {
   return (
-    <Suspense fallback={<div className="min-h-screen bg-[#070C18] flex items-center justify-center text-slate-400 text-sm">Chargement…</div>}>
+    <Suspense fallback={<div className="min-h-screen bg-studio-canvas flex items-center justify-center text-slate-400 text-sm">Chargement…</div>}>
       <AuthForm />
     </Suspense>
   );

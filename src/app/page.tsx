@@ -364,18 +364,18 @@ export default function Dashboard() {
   } : null);
 
   return (
-    <div className="min-h-screen bg-[#070C18] text-slate-100 font-sans antialiased selection:bg-amber-500 selection:text-black">
+    <div className="min-h-screen bg-studio-canvas text-slate-100 font-sans antialiased selection:bg-brand-500 selection:text-black">
       {/* Top Navbar Studio */}
-      <header className="sticky top-0 z-40 bg-[#070C18]/90 backdrop-blur-xl border-b border-slate-800/80 px-4 sm:px-8 py-3">
+      <header className="sticky top-0 z-40 bg-studio-canvas/90 backdrop-blur-xl border-b border-studio-border/80 px-4 sm:px-8 py-3">
         <div className="max-w-7xl mx-auto flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-amber-500 to-amber-400 flex items-center justify-center text-slate-950 font-black text-lg shadow-md shadow-amber-500/20">
+            <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-brand-500 to-brand-400 flex items-center justify-center text-slate-950 font-black text-lg shadow-md shadow-brand-500/20">
               Q
             </div>
             <div>
               <div className="flex items-center gap-2">
                 <span className="font-extrabold text-base tracking-tight text-white">QatlIA</span>
-                <span className="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded bg-amber-400/10 text-amber-400 border border-amber-400/20">
+                <span className="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded bg-brand-400/10 text-brand-400 border border-brand-400/20">
                   PRO
                 </span>
               </div>
@@ -386,17 +386,17 @@ export default function Dashboard() {
           <div className="flex items-center gap-2.5">
             <Link
               href="/history"
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-900/80 hover:bg-slate-800 text-slate-300 text-xs font-medium border border-slate-800 transition-colors"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-studio-panel/80 hover:bg-slate-800 text-slate-300 text-xs font-medium border border-studio-border transition-colors"
             >
-              <History className="w-3.5 h-3.5 text-amber-400" />
+              <History className="w-3.5 h-3.5 text-brand-400" />
               <span className="hidden sm:inline">Historique</span>
             </Link>
 
             <Link
               href="/credits"
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border border-amber-500/30 text-xs font-semibold transition-colors"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-brand-500/10 hover:bg-brand-500/20 text-brand-400 border border-brand-500/30 text-xs font-semibold transition-colors"
             >
-              <Zap className="w-3.5 h-3.5 fill-amber-400 text-amber-400" />
+              <Zap className="w-3.5 h-3.5 fill-brand-400 text-brand-400" />
               <span className="font-mono font-bold">{userCredits}</span>
               <span className="text-[10px] opacity-80 hidden sm:inline">crédits</span>
             </Link>
@@ -424,7 +424,7 @@ export default function Dashboard() {
             
             {/* Quick Actions Header: Camera & Import */}
             <div className="grid grid-cols-2 gap-2.5">
-              <label className="flex items-center gap-3 p-3 rounded-2xl bg-gradient-to-br from-slate-900 to-slate-900/60 border border-slate-800 hover:border-sky-500/50 cursor-pointer group transition-all">
+              <label className="flex items-center gap-3 p-3 rounded-2xl bg-gradient-to-br from-slate-900 to-slate-900/60 border border-studio-border hover:border-sky-500/50 cursor-pointer group transition-all">
                 <input
                   type="file"
                   accept="image/*"
@@ -442,7 +442,7 @@ export default function Dashboard() {
                 </div>
               </label>
 
-              <label className="flex items-center gap-3 p-3 rounded-2xl bg-gradient-to-br from-slate-900 to-slate-900/60 border border-slate-800 hover:border-amber-500/50 cursor-pointer group transition-all">
+              <label className="flex items-center gap-3 p-3 rounded-2xl bg-gradient-to-br from-slate-900 to-slate-900/60 border border-studio-border hover:border-brand-500/50 cursor-pointer group transition-all">
                 <input
                   type="file"
                   accept="image/*"
@@ -450,7 +450,7 @@ export default function Dashboard() {
                   onChange={handleImageUpload}
                   disabled={isProcessingVision}
                 />
-                <div className="w-9 h-9 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400 group-hover:scale-105 transition-transform shrink-0">
+                <div className="w-9 h-9 rounded-xl bg-brand-500/10 border border-brand-500/20 flex items-center justify-center text-brand-400 group-hover:scale-105 transition-transform shrink-0">
                   <ImageIcon className="w-4 h-4" />
                 </div>
                 <div className="overflow-hidden">
@@ -462,9 +462,9 @@ export default function Dashboard() {
 
             {/* Preview scan if present */}
             {previewImage && (
-              <div className="flex items-center gap-3 p-2.5 rounded-2xl bg-slate-900/60 border border-slate-800">
+              <div className="flex items-center gap-3 p-2.5 rounded-2xl bg-studio-panel/60 border border-studio-border">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={previewImage} alt="Scan preview" className="w-10 h-10 object-cover rounded-lg border border-slate-700" />
+                <img src={previewImage} alt="Scan preview" className="w-10 h-10 object-cover rounded-lg border border-studio-border-hover" />
                 <div className="text-xs">
                   <span className="text-emerald-400 font-bold block">Fiche manuscrite analysée</span>
                   <span className="text-[10px] text-slate-400">{pieces.length} cotes chargées</span>
@@ -488,15 +488,15 @@ export default function Dashboard() {
             )}
 
             {/* Stock Panel Dimensions (Compact Card) */}
-            <div className="p-4 rounded-2xl bg-slate-900/60 border border-slate-800/90 shadow-sm space-y-3">
+            <div className="p-4 rounded-2xl bg-studio-panel/60 border border-studio-border/90 shadow-sm space-y-3">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
-                  <Layers className="w-4 h-4 text-amber-400" />
+                  <Layers className="w-4 h-4 text-brand-400" />
                   <h2 className="text-xs font-bold uppercase tracking-wider text-slate-300">
                     Panneau Brut en Stock
                   </h2>
                 </div>
-                <span className="text-[10px] font-mono text-slate-400 bg-slate-950 px-2 py-0.5 rounded-md border border-slate-800">
+                <span className="text-[10px] font-mono text-slate-400 bg-studio-field px-2 py-0.5 rounded-md border border-studio-border">
                   Unité : cm
                 </span>
               </div>
@@ -509,7 +509,7 @@ export default function Dashboard() {
                     step="0.1"
                     value={sheet.height}
                     onChange={(e) => setSheet({ ...sheet, height: parseFloat(e.target.value) || 0 })}
-                    className="w-full px-2.5 py-1.5 rounded-xl bg-slate-950 border border-slate-800 text-slate-100 font-mono font-bold text-right outline-none focus:border-amber-500/50"
+                    className="w-full px-2.5 py-1.5 rounded-xl bg-studio-field border border-studio-border text-slate-100 font-mono font-bold text-right outline-none focus:border-brand-500/50"
                   />
                 </div>
                 <div>
@@ -519,7 +519,7 @@ export default function Dashboard() {
                     step="0.1"
                     value={sheet.width}
                     onChange={(e) => setSheet({ ...sheet, width: parseFloat(e.target.value) || 0 })}
-                    className="w-full px-2.5 py-1.5 rounded-xl bg-slate-950 border border-slate-800 text-slate-100 font-mono font-bold text-right outline-none focus:border-amber-500/50"
+                    className="w-full px-2.5 py-1.5 rounded-xl bg-studio-field border border-studio-border text-slate-100 font-mono font-bold text-right outline-none focus:border-brand-500/50"
                   />
                 </div>
                 <div>
@@ -527,7 +527,7 @@ export default function Dashboard() {
                   <select
                     value={sheet.material || 'mdf'}
                     onChange={(e) => setSheet({ ...sheet, material: e.target.value as MaterialType })}
-                    className="w-full px-2 py-1.5 rounded-xl bg-slate-950 border border-slate-800 text-slate-200 text-xs outline-none focus:border-amber-500/50"
+                    className="w-full px-2 py-1.5 rounded-xl bg-studio-field border border-studio-border text-slate-200 text-xs outline-none focus:border-brand-500/50"
                   >
                     <option value="mdf">MDF / Bois</option>
                     <option value="aluminium">Aluminium</option>
@@ -539,7 +539,7 @@ export default function Dashboard() {
             </div>
 
             {/* Pieces Manager Component */}
-            <div className="p-4 rounded-2xl bg-slate-900/60 border border-slate-800/90 shadow-sm">
+            <div className="p-4 rounded-2xl bg-studio-panel/60 border border-studio-border/90 shadow-sm">
               <PiecesManager
                 pieces={pieces}
                 onUpdatePieces={setPieces}
@@ -550,21 +550,21 @@ export default function Dashboard() {
             </div>
 
             {/* Collapsible Advanced Options */}
-            <div className="rounded-2xl bg-slate-900/40 border border-slate-800/80 overflow-hidden">
+            <div className="rounded-2xl bg-studio-panel/40 border border-studio-border/80 overflow-hidden">
               <button
                 type="button"
                 onClick={() => setShowAdvancedOptions(!showAdvancedOptions)}
                 className="w-full p-3.5 flex items-center justify-between text-xs font-semibold text-slate-300 hover:text-white transition-colors cursor-pointer"
               >
                 <div className="flex items-center gap-2">
-                  <SlidersHorizontal className="w-3.5 h-3.5 text-amber-400" />
+                  <SlidersHorizontal className="w-3.5 h-3.5 text-brand-400" />
                   <span>Options avancées de coupe & Kerf</span>
                 </div>
                 {showAdvancedOptions ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
               </button>
 
               {showAdvancedOptions && (
-                <div className="p-4 pt-0 border-t border-slate-800/60 animate-in fade-in duration-150">
+                <div className="p-4 pt-0 border-t border-studio-border/60 animate-in fade-in duration-150">
                   <OptionsPanel
                     options={options}
                     onChange={handleOptionsChange}
@@ -578,7 +578,7 @@ export default function Dashboard() {
             <button
               onClick={handleRunOptimization}
               disabled={isOptimizing || pieces.length === 0}
-              className="w-full py-4 rounded-2xl bg-gradient-to-r from-amber-500 via-amber-400 to-amber-500 hover:opacity-95 text-slate-950 font-black text-sm tracking-wider uppercase shadow-xl shadow-amber-500/20 transition-all flex items-center justify-center gap-2 disabled:opacity-40 cursor-pointer active:scale-[0.99]"
+              className="w-full py-4 rounded-2xl bg-gradient-to-r from-brand-500 via-amber-400 to-brand-500 hover:opacity-95 text-slate-950 font-black text-sm tracking-wider uppercase shadow-xl shadow-brand-500/20 transition-all flex items-center justify-center gap-2 disabled:opacity-40 cursor-pointer active:scale-[0.99]"
             >
               {isOptimizing ? (
                 <>
@@ -622,13 +622,13 @@ export default function Dashboard() {
 
                 {/* Performance Metrics Grid */}
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
-                  <div className="p-3 rounded-2xl bg-slate-900/60 border border-slate-800">
+                  <div className="p-3 rounded-2xl bg-studio-panel/60 border border-studio-border">
                     <span className="text-[10px] text-slate-400 font-medium block">Feuilles requises</span>
                     <p className="text-xl font-black text-white font-mono mt-0.5">{result.sheetsUsed}</p>
                     <span className="text-[10px] text-slate-500">{sheet.height} × {sheet.width} cm</span>
                   </div>
 
-                  <div className="p-3 rounded-2xl bg-slate-900/60 border border-slate-800">
+                  <div className="p-3 rounded-2xl bg-studio-panel/60 border border-studio-border">
                     <span className="text-[10px] text-slate-400 font-medium block">Surface utile</span>
                     <p className="text-xl font-black text-emerald-400 font-mono mt-0.5">
                       {(100 - result.wastePercentage).toFixed(1)}%
@@ -636,15 +636,15 @@ export default function Dashboard() {
                     <span className="text-[10px] text-emerald-500/80">Efficacité de coupe</span>
                   </div>
 
-                  <div className="p-3 rounded-2xl bg-slate-900/60 border border-slate-800">
+                  <div className="p-3 rounded-2xl bg-studio-panel/60 border border-studio-border">
                     <span className="text-[10px] text-slate-400 font-medium block">Taux de chute</span>
-                    <p className="text-xl font-black text-amber-400 font-mono mt-0.5">
+                    <p className="text-xl font-black text-brand-400 font-mono mt-0.5">
                       {result.wastePercentage.toFixed(1)}%
                     </p>
-                    <span className="text-[10px] text-amber-500/80">Chute résiduelle</span>
+                    <span className="text-[10px] text-brand-500/80">Chute résiduelle</span>
                   </div>
 
-                  <div className="p-3 rounded-2xl bg-slate-900/60 border border-slate-800">
+                  <div className="p-3 rounded-2xl bg-studio-panel/60 border border-studio-border">
                     <span className="text-[10px] text-slate-400 font-medium block">Pièces placées</span>
                     <p className="text-xl font-black text-sky-400 font-mono mt-0.5">
                       {result.placedPieces.length} pcs
@@ -654,7 +654,7 @@ export default function Dashboard() {
                 </div>
 
                 {/* 2D Visualizer Canvas Studio */}
-                <div className="rounded-3xl bg-slate-900/70 border border-slate-800/90 p-5 shadow-lg space-y-4">
+                <div className="rounded-3xl bg-studio-panel/70 border border-studio-border/90 p-5 shadow-lg space-y-4">
                   {/* Canvas Header */}
                   <div className="flex flex-wrap items-center justify-between gap-3">
                     <div className="flex items-center gap-2">
@@ -665,7 +665,7 @@ export default function Dashboard() {
 
                     <div className="flex items-center gap-2">
                       {result.sheetsUsed > 1 && (
-                        <div className="flex items-center bg-slate-950 rounded-xl border border-slate-800 p-0.5">
+                        <div className="flex items-center bg-studio-field rounded-xl border border-studio-border p-0.5">
                           <button
                             onClick={() => setActiveSheetIndex(Math.max(0, activeSheetIndex - 1))}
                             disabled={activeSheetIndex === 0}
@@ -686,7 +686,7 @@ export default function Dashboard() {
                         </div>
                       )}
 
-                      <div className="flex items-center bg-slate-950 rounded-xl border border-slate-800 p-0.5 text-slate-300">
+                      <div className="flex items-center bg-studio-field rounded-xl border border-studio-border p-0.5 text-slate-300">
                         <button
                           onClick={() => setZoomLevel(Math.max(0.6, zoomLevel - 0.2))}
                           className="p-1 rounded-lg hover:bg-slate-800 cursor-pointer"
@@ -705,7 +705,7 @@ export default function Dashboard() {
                   </div>
 
                   {/* SVG Drawing Canvas */}
-                  <div className="w-full rounded-2xl bg-[#040812] border border-slate-800/80 p-4 flex items-center justify-center min-h-[420px] overflow-auto">
+                  <div className="w-full rounded-2xl bg-[#040812] border border-studio-border/80 p-4 flex items-center justify-center min-h-[420px] overflow-auto">
                     <div
                       style={{
                         transform: `scale(${zoomLevel})`,
@@ -716,7 +716,7 @@ export default function Dashboard() {
                     >
                       <svg
                         viewBox={`0 0 ${sheet.width} ${sheet.height}`}
-                        className="w-full max-w-[460px] max-h-[580px] aspect-[208/278] bg-slate-950 rounded-lg shadow-2xl border-2 border-slate-700"
+                        className="w-full max-w-[460px] max-h-[580px] aspect-[208/278] bg-studio-field rounded-lg shadow-2xl border-2 border-studio-border-hover"
                       >
                         {/* Fond Panneau */}
                         <rect x="0" y="0" width={sheet.width} height={sheet.height} fill="#0B132B" stroke="#334155" strokeWidth="0.5" />
@@ -822,13 +822,13 @@ export default function Dashboard() {
                   {/* Actions Footer */}
                   <div className="flex flex-wrap items-center justify-between gap-3 pt-2">
                     <span className="text-xs text-slate-400">
-                      Chute panneau : <strong className="text-amber-400">{currentSheet?.wasteRate || 0}%</strong>
+                      Chute panneau : <strong className="text-brand-400">{currentSheet?.wasteRate || 0}%</strong>
                     </span>
 
                     <div className="flex items-center gap-2">
                       <button
                         onClick={handleDownloadDxf}
-                        className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-slate-950 hover:bg-slate-800 text-slate-200 text-xs font-bold border border-slate-800 transition-colors cursor-pointer"
+                        className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-studio-field hover:bg-slate-800 text-slate-200 text-xs font-bold border border-studio-border transition-colors cursor-pointer"
                       >
                         <FileCode2 className="w-3.5 h-3.5 text-sky-400" />
                         <span>DXF (CNC)</span>
@@ -854,15 +854,15 @@ export default function Dashboard() {
                 {currentSheet && (
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     {/* Pieces on Sheet */}
-                    <div className="p-4 rounded-2xl bg-slate-900/60 border border-slate-800/90 space-y-2">
+                    <div className="p-4 rounded-2xl bg-studio-panel/60 border border-studio-border/90 space-y-2">
                       <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 block">
                         Pièces du Panneau ({currentSheet.pieces.length})
                       </span>
                       <div className="space-y-1.5 max-h-48 overflow-y-auto pr-1">
                         {currentSheet.pieces.map((p) => (
-                          <div key={p.pieceNumber} className="p-2 rounded-xl bg-slate-950 border border-slate-800/80 flex items-center justify-between text-xs">
+                          <div key={p.pieceNumber} className="p-2 rounded-xl bg-studio-field border border-studio-border/80 flex items-center justify-between text-xs">
                             <div className="flex items-center gap-2 truncate">
-                              <span className="font-bold text-amber-400 font-mono">#{p.pieceNumber}</span>
+                              <span className="font-bold text-brand-400 font-mono">#{p.pieceNumber}</span>
                               <span className="text-slate-200 truncate">{p.name}</span>
                             </div>
                             <span className="font-mono text-slate-400 shrink-0">{Math.round(p.height * 10) / 10} × {Math.round(p.width * 10) / 10} cm</span>
@@ -872,15 +872,15 @@ export default function Dashboard() {
                     </div>
 
                     {/* Offcuts on Sheet */}
-                    <div className="p-4 rounded-2xl bg-slate-900/60 border border-slate-800/90 space-y-2">
+                    <div className="p-4 rounded-2xl bg-studio-panel/60 border border-studio-border/90 space-y-2">
                       <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 block">
                         Chutes Réutilisables ({currentSheet.offcuts.length})
                       </span>
                       <div className="space-y-1.5 max-h-48 overflow-y-auto pr-1">
                         {currentSheet.offcuts.map((off, idx) => (
-                          <div key={idx} className="p-2 rounded-xl bg-slate-950 border border-slate-800/80 flex items-center justify-between text-xs">
+                          <div key={idx} className="p-2 rounded-xl bg-studio-field border border-studio-border/80 flex items-center justify-between text-xs">
                             <span className="text-slate-400 font-mono text-[11px]">Chute #{idx + 1}</span>
-                            <span className="font-mono text-amber-400 font-bold">{Math.round(off.height * 10) / 10} × {Math.round(off.width * 10) / 10} cm</span>
+                            <span className="font-mono text-brand-400 font-bold">{Math.round(off.height * 10) / 10} × {Math.round(off.width * 10) / 10} cm</span>
                           </div>
                         ))}
                       </div>
@@ -890,9 +890,9 @@ export default function Dashboard() {
               </>
             ) : (
               /* Empty State Preview */
-              <div className="p-12 rounded-3xl bg-slate-900/40 border border-dashed border-slate-800 text-center flex flex-col items-center justify-center gap-3 min-h-[460px]">
-                <div className="w-14 h-14 rounded-2xl bg-slate-800/40 border border-slate-700/50 flex items-center justify-center text-slate-400 mb-1">
-                  <Scissors className="w-6 h-6 text-amber-400" />
+              <div className="p-12 rounded-3xl bg-studio-panel/40 border border-dashed border-studio-border text-center flex flex-col items-center justify-center gap-3 min-h-[460px]">
+                <div className="w-14 h-14 rounded-2xl bg-slate-800/40 border border-studio-border-hover/50 flex items-center justify-center text-slate-400 mb-1">
+                  <Scissors className="w-6 h-6 text-brand-400" />
                 </div>
                 <h3 className="text-sm font-bold text-slate-200">Prêt pour l&apos;optimisation</h3>
                 <p className="text-xs text-slate-400 max-w-sm">

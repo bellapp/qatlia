@@ -154,15 +154,15 @@ export const PiecesManager: React.FC<PiecesManagerProps> = ({
   return (
     <div className="space-y-4">
       {/* Saisie Rapide (Design Carte Minimaliste) */}
-      <form onSubmit={handleAddPieceQuick} className="p-3.5 rounded-2xl bg-slate-900/60 border border-slate-800/90 shadow-sm space-y-3">
+      <form onSubmit={handleAddPieceQuick} className="p-3.5 rounded-2xl bg-studio-panel/60 border border-studio-border/90 shadow-sm space-y-3">
         <div className="flex items-center justify-between">
           <span className="text-[11px] font-semibold text-slate-300 uppercase tracking-wider flex items-center gap-1.5">
-            <Plus className="w-3.5 h-3.5 text-amber-400" /> Ajouter une pièce (cm)
+            <Plus className="w-3.5 h-3.5 text-brand-400" /> Ajouter une pièce (cm)
           </span>
           <button
             type="button"
             onClick={() => setShowEdgeOptions(!showEdgeOptions)}
-            className={`text-[10px] font-medium px-2 py-0.5 rounded transition-colors ${showEdgeOptions ? 'bg-amber-400/10 text-amber-400' : 'text-slate-400 hover:text-slate-200'}`}
+            className={`text-[10px] font-medium px-2 py-0.5 rounded transition-colors ${showEdgeOptions ? 'bg-brand-400/10 text-brand-400' : 'text-slate-400 hover:text-slate-200'}`}
           >
             {showEdgeOptions ? 'Masquer chants' : '+ Options chants'}
           </button>
@@ -178,7 +178,7 @@ export const PiecesManager: React.FC<PiecesManagerProps> = ({
               placeholder="H (cm)"
               value={newHeight}
               onChange={(e) => setNewHeight(e.target.value)}
-              className="w-full px-2.5 py-1.5 rounded-xl bg-slate-950 border border-slate-800 text-slate-100 font-mono text-xs font-semibold focus:border-amber-500/50 outline-none text-right placeholder-slate-600"
+              className="w-full px-2.5 py-1.5 rounded-xl bg-studio-field border border-studio-border text-slate-100 font-mono text-xs font-semibold focus:border-brand-500/50 outline-none text-right placeholder-slate-600"
             />
           </div>
 
@@ -191,7 +191,7 @@ export const PiecesManager: React.FC<PiecesManagerProps> = ({
               placeholder="L (cm)"
               value={newWidth}
               onChange={(e) => setNewWidth(e.target.value)}
-              className="w-full px-2.5 py-1.5 rounded-xl bg-slate-950 border border-slate-800 text-slate-100 font-mono text-xs font-semibold focus:border-amber-500/50 outline-none text-right placeholder-slate-600"
+              className="w-full px-2.5 py-1.5 rounded-xl bg-studio-field border border-studio-border text-slate-100 font-mono text-xs font-semibold focus:border-brand-500/50 outline-none text-right placeholder-slate-600"
             />
           </div>
 
@@ -203,7 +203,7 @@ export const PiecesManager: React.FC<PiecesManagerProps> = ({
               placeholder="Qté"
               value={newQty}
               onChange={(e) => setNewQty(e.target.value)}
-              className="w-full px-2 py-1.5 rounded-xl bg-slate-950 border border-slate-800 text-slate-100 font-mono text-xs font-bold text-center focus:border-amber-500/50 outline-none placeholder-slate-600"
+              className="w-full px-2 py-1.5 rounded-xl bg-studio-field border border-studio-border text-slate-100 font-mono text-xs font-bold text-center focus:border-brand-500/50 outline-none placeholder-slate-600"
             />
           </div>
 
@@ -214,12 +214,12 @@ export const PiecesManager: React.FC<PiecesManagerProps> = ({
               placeholder="Nom (ex: Côté G)"
               value={newReference}
               onChange={(e) => setNewReference(e.target.value)}
-              className="w-full px-2.5 py-1.5 rounded-xl bg-slate-950 border border-slate-800 text-slate-200 text-xs font-medium focus:border-amber-500/50 outline-none placeholder-slate-600"
+              className="w-full px-2.5 py-1.5 rounded-xl bg-studio-field border border-studio-border text-slate-200 text-xs font-medium focus:border-brand-500/50 outline-none placeholder-slate-600"
             />
             <button
               type="submit"
               disabled={disabled}
-              className="px-3.5 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs shrink-0 transition-transform active:scale-95 shadow-sm cursor-pointer"
+              className="px-3.5 py-1.5 rounded-xl bg-brand-500 hover:bg-brand-400 text-slate-950 font-bold text-xs shrink-0 transition-transform active:scale-95 shadow-sm cursor-pointer"
             >
               Ajouter
             </button>
@@ -228,7 +228,7 @@ export const PiecesManager: React.FC<PiecesManagerProps> = ({
 
         {/* Chants optionnels */}
         {showEdgeOptions && (
-          <div className="flex items-center gap-3 pt-2 border-t border-slate-800/60 text-[10px] text-slate-300 animate-in fade-in duration-150">
+          <div className="flex items-center gap-3 pt-2 border-t border-studio-border/60 text-[10px] text-slate-300 animate-in fade-in duration-150">
             <span className="font-semibold text-slate-400">Bandes de chants :</span>
             {(['left', 'right', 'top', 'bottom'] as const).map((side) => {
               const label = side === 'left' ? 'G' : side === 'right' ? 'D' : side === 'top' ? 'H' : 'B';
@@ -238,7 +238,7 @@ export const PiecesManager: React.FC<PiecesManagerProps> = ({
                     type="checkbox"
                     checked={newEdges[side]}
                     onChange={(e) => setNewEdges({ ...newEdges, [side]: e.target.checked })}
-                    className="rounded text-amber-500 bg-slate-950 border-slate-700"
+                    className="rounded text-brand-500 bg-studio-field border-studio-border-hover"
                   />
                   <span>{label}</span>
                 </label>
@@ -257,7 +257,7 @@ export const PiecesManager: React.FC<PiecesManagerProps> = ({
             placeholder="Filtrer les pièces..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-8 pr-2.5 py-1.5 rounded-xl bg-slate-900/60 border border-slate-800 text-slate-200 placeholder-slate-500 text-xs outline-none focus:border-amber-500/50"
+            className="w-full pl-8 pr-2.5 py-1.5 rounded-xl bg-studio-panel/60 border border-studio-border text-slate-200 placeholder-slate-500 text-xs outline-none focus:border-brand-500/50"
           />
         </div>
 
@@ -276,7 +276,7 @@ export const PiecesManager: React.FC<PiecesManagerProps> = ({
           <button
             type="button"
             onClick={handleSelectAll}
-            className="px-2 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-300 text-xs font-semibold border border-slate-800 transition-colors"
+            className="px-2 py-1.5 rounded-xl bg-studio-panel hover:bg-slate-800 text-slate-300 text-xs font-semibold border border-studio-border transition-colors"
             title="Tout sélectionner / désélectionner"
           >
             {selectedIds.size === filteredPieces.length && filteredPieces.length > 0 ? 'Désél.' : 'Sélect.'}
@@ -286,7 +286,7 @@ export const PiecesManager: React.FC<PiecesManagerProps> = ({
             type="button"
             onClick={handleExportCsv}
             disabled={pieces.length === 0}
-            className="px-2.5 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-300 text-xs font-semibold border border-slate-800 transition-colors disabled:opacity-30"
+            className="px-2.5 py-1.5 rounded-xl bg-studio-panel hover:bg-slate-800 text-slate-300 text-xs font-semibold border border-studio-border transition-colors disabled:opacity-30"
             title="Exporter CSV"
           >
             <FileSpreadsheet className="w-3.5 h-3.5" />
@@ -297,7 +297,7 @@ export const PiecesManager: React.FC<PiecesManagerProps> = ({
       {/* Liste des Pièces (Cards Responsives & Fluides) */}
       <div className="space-y-1.5 max-h-[360px] overflow-y-auto pr-1">
         {filteredPieces.length === 0 ? (
-          <div className="p-8 text-center text-slate-500 text-xs rounded-2xl bg-slate-900/30 border border-dashed border-slate-800">
+          <div className="p-8 text-center text-slate-500 text-xs rounded-2xl bg-studio-panel/30 border border-dashed border-studio-border">
             Aucune pièce trouvée.
           </div>
         ) : (
@@ -310,19 +310,19 @@ export const PiecesManager: React.FC<PiecesManagerProps> = ({
                 key={p.id || idx}
                 className={`p-2.5 rounded-xl border transition-all flex flex-wrap items-center gap-2 ${
                   isSelected
-                    ? 'bg-amber-500/10 border-amber-500/30 shadow-sm'
-                    : 'bg-slate-900/40 hover:bg-slate-900/80 border-slate-800/70 hover:border-slate-700/80'
+                    ? 'bg-brand-500/10 border-brand-500/30 shadow-sm'
+                    : 'bg-studio-panel/40 hover:bg-studio-panel/80 border-studio-border/70 hover:border-studio-border-hover/80'
                 }`}
               >
                 <div className="flex items-center gap-2 shrink-0">
                   <button
                     type="button"
                     onClick={() => handleToggleSelect(p.id || '')}
-                    className="text-slate-600 hover:text-amber-400 transition-colors cursor-pointer"
+                    className="text-slate-600 hover:text-brand-400 transition-colors cursor-pointer"
                     aria-label="Sélectionner"
                   >
                     {isSelected ? (
-                      <CheckSquare className="w-4 h-4 text-amber-400" />
+                      <CheckSquare className="w-4 h-4 text-brand-400" />
                     ) : (
                       <Square className="w-4 h-4" />
                     )}
@@ -346,7 +346,7 @@ export const PiecesManager: React.FC<PiecesManagerProps> = ({
                     step="0.1"
                     value={Number(p.height.toFixed(1))}
                     onChange={(e) => handleUpdate(p.id || '', 'height', parseFloat(e.target.value) || 0)}
-                    className="w-16 px-1.5 py-1 rounded-lg bg-slate-950 border border-slate-800 focus:border-amber-500/50 text-slate-100 font-bold text-right outline-none"
+                    className="w-16 px-1.5 py-1 rounded-lg bg-studio-field border border-studio-border focus:border-brand-500/50 text-slate-100 font-bold text-right outline-none"
                     aria-label="Hauteur cm"
                   />
                   <span className="text-slate-600">×</span>
@@ -355,7 +355,7 @@ export const PiecesManager: React.FC<PiecesManagerProps> = ({
                     step="0.1"
                     value={Number(p.width.toFixed(1))}
                     onChange={(e) => handleUpdate(p.id || '', 'width', parseFloat(e.target.value) || 0)}
-                    className="w-16 px-1.5 py-1 rounded-lg bg-slate-950 border border-slate-800 focus:border-amber-500/50 text-slate-100 font-bold text-right outline-none"
+                    className="w-16 px-1.5 py-1 rounded-lg bg-studio-field border border-studio-border focus:border-brand-500/50 text-slate-100 font-bold text-right outline-none"
                     aria-label="Largeur cm"
                   />
                   <span className="text-slate-500 text-[10px] pl-0.5">cm</span>
@@ -368,7 +368,7 @@ export const PiecesManager: React.FC<PiecesManagerProps> = ({
                     min="1"
                     value={p.quantity || 1}
                     onChange={(e) => handleUpdate(p.id || '', 'quantity', parseInt(e.target.value, 10) || 1)}
-                    className="w-14 px-1.5 py-1 rounded-lg bg-slate-950 border border-amber-500/40 focus:border-amber-400 text-amber-400 font-mono font-black text-center text-sm outline-none"
+                    className="w-14 px-1.5 py-1 rounded-lg bg-studio-field border border-brand-500/40 focus:border-brand-400 text-brand-400 font-mono font-black text-center text-sm outline-none"
                     aria-label="Quantité"
                   />
                 </div>
@@ -382,7 +382,7 @@ export const PiecesManager: React.FC<PiecesManagerProps> = ({
                         type="button"
                         onClick={() => handleToggleEdge(p.id || '', side)}
                         className={`w-5 h-5 rounded font-bold transition-colors ${
-                          ed[side] ? 'bg-amber-400 text-slate-950' : 'bg-slate-800/60 text-slate-500 hover:text-slate-300'
+                          ed[side] ? 'bg-brand-400 text-slate-950' : 'bg-slate-800/60 text-slate-500 hover:text-slate-300'
                         }`}
                       >
                         {label}

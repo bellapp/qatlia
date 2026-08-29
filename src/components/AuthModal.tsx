@@ -88,23 +88,23 @@ export const AuthModal: React.FC<AuthModalProps> = ({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm">
-      <div className="relative w-full max-w-[420px] p-6 sm:p-7 rounded-3xl bg-[#0F1728] border border-slate-800 shadow-2xl space-y-5">
+      <div className="relative w-full max-w-[420px] p-6 sm:p-7 rounded-3xl bg-studio-panel border border-studio-border shadow-2xl space-y-5">
         <button
           onClick={onClose}
-          className="absolute right-4 top-4 p-2 text-slate-500 hover:text-white rounded-full hover:bg-slate-900"
+          className="absolute right-4 top-4 p-2 text-slate-500 hover:text-white rounded-full hover:bg-studio-panel"
           aria-label="Fermer"
         >
           <X className="w-5 h-5" />
         </button>
 
         <div className="space-y-2 pr-8">
-          <div className="w-10 h-10 rounded-xl bg-amber-500 text-slate-950 font-black text-lg flex items-center justify-center">Q</div>
+          <div className="w-10 h-10 rounded-xl bg-brand-500 text-slate-950 font-black text-lg flex items-center justify-center">Q</div>
           <h2 className="text-xl font-black text-white">{title}</h2>
           <p className="text-sm text-slate-400">{isLogin ? 'Connectez-vous pour enregistrer ce débit et exporter.' : subtitle}</p>
         </div>
 
-        <div className="flex items-center gap-2 p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-200 text-xs font-medium">
-          <Gift className="w-4 h-4 text-amber-400 shrink-0" />
+        <div className="flex items-center gap-2 p-2.5 rounded-xl bg-brand-500/10 border border-brand-500/20 text-brand-300 text-xs font-medium">
+          <Gift className="w-4 h-4 text-brand-400 shrink-0" />
           Historique cloud + 5 crédits Vision à l&apos;inscription
         </div>
 
@@ -123,8 +123,8 @@ export const AuthModal: React.FC<AuthModalProps> = ({
         </button>
 
         <div className="relative flex items-center">
-          <div className="border-t border-slate-800 w-full" />
-          <span className="px-3 text-[11px] font-semibold uppercase tracking-wider text-slate-500 bg-[#0F1728]">ou email</span>
+          <div className="border-t border-studio-border w-full" />
+          <span className="px-3 text-[11px] font-semibold uppercase tracking-wider text-slate-500 bg-studio-panel">ou email</span>
         </div>
 
         <form onSubmit={handleAuth} className="space-y-3">
@@ -137,7 +137,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                 value={fullName}
                 onChange={(e) => setFullName(e.target.value)}
                 placeholder="Nom d’atelier"
-                className="w-full bg-slate-950 border border-slate-800 rounded-xl pl-9 pr-3 py-2.5 text-sm text-white placeholder-slate-600 outline-none focus:border-amber-500/50"
+                className="w-full bg-studio-field border border-studio-border rounded-xl pl-9 pr-3 py-2.5 text-sm text-white placeholder-slate-600 outline-none focus:border-brand-500/50"
               />
             </div>
           )}
@@ -149,7 +149,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               placeholder="artisan@atelier.ma"
-              className="w-full bg-slate-950 border border-slate-800 rounded-xl pl-9 pr-3 py-2.5 text-sm text-white placeholder-slate-600 outline-none focus:border-amber-500/50"
+              className="w-full bg-studio-field border border-studio-border rounded-xl pl-9 pr-3 py-2.5 text-sm text-white placeholder-slate-600 outline-none focus:border-brand-500/50"
             />
           </div>
           <div className="relative">
@@ -161,7 +161,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               placeholder="Mot de passe"
-              className="w-full bg-slate-950 border border-slate-800 rounded-xl pl-9 pr-10 py-2.5 text-sm text-white placeholder-slate-600 outline-none focus:border-amber-500/50"
+              className="w-full bg-studio-field border border-studio-border rounded-xl pl-9 pr-10 py-2.5 text-sm text-white placeholder-slate-600 outline-none focus:border-brand-500/50"
             />
             <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-3 top-2.5 text-slate-500">
               {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
@@ -170,7 +170,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
           <button
             type="submit"
             disabled={loading || oauthLoading}
-            className="w-full py-3 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-sm flex items-center justify-center gap-2 disabled:opacity-50"
+            className="w-full py-3 rounded-xl bg-brand-500 hover:bg-brand-400 text-slate-950 font-black text-sm flex items-center justify-center gap-2 disabled:opacity-50"
           >
             {isLogin ? 'Se connecter & exporter' : 'Créer le compte'}
             <ArrowRight className="w-4 h-4" />
@@ -183,7 +183,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
             setIsLogin(!isLogin);
             setErrorMsg(null);
           }}
-          className="w-full text-center text-sm text-amber-400 font-semibold"
+          className="w-full text-center text-sm text-brand-400 font-semibold"
         >
           {isLogin ? 'Créer un compte (+ 5 crédits)' : 'Déjà un compte ? Se connecter'}
         </button>

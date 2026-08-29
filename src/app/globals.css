@@ -1,14 +1,16 @@
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700;800&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 @layer base {
   :root {
-    --bg-main: #0B1120;
-    --bg-card: #131E32;
-    --bg-subtle: #080D1A;
-    --border-main: #202D46;
-    --border-highlight: #334769;
+    --bg-main: #060B14;
+    --bg-card: #0B1424;
+    --bg-subtle: #060B14;
+    --border-main: #1A2744;
+    --border-highlight: #243356;
     --text-primary: #F8FAFC;
     --text-secondary: #94A3B8;
     --text-muted: #64748B;
@@ -22,6 +24,7 @@
     color: var(--text-primary);
     font-feature-settings: "cv02", "cv03", "cv04", "cv11";
     -webkit-font-smoothing: antialiased;
+    transition: background-color 0.2s ease;
   }
 }
 
@@ -32,16 +35,16 @@
 }
 
 ::-webkit-scrollbar-track {
-  background: #080D1A;
+  background: #060B14;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #202D46;
+  background: #1A2744;
   border-radius: 3px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #334769;
+  background: #243356;
 }
 
 /* High-contrast form inputs */

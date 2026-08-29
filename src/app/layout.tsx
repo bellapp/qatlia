@@ -1,6 +1,18 @@
 import type { Metadata } from "next";
+import { Inter, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
-import "../../public/styles.css";
+
+const inter = Inter({
+  subsets: ["latin"],
+  variable: "--font-inter",
+  display: "swap",
+});
+
+const jetbrainsMono = JetBrains_Mono({
+  subsets: ["latin"],
+  variable: "--font-mono",
+  display: "swap",
+});
 
 export const metadata: Metadata = {
   title: "QatlIA Pro 2026 — Optimisation de Découpe & Débit IA",
@@ -13,8 +25,8 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="fr" className="dark">
-      <body className="min-h-screen bg-[#070C18] text-slate-100 font-sans antialiased selection:bg-amber-500 selection:text-black">
+    <html lang="fr" className={`${inter.variable} ${jetbrainsMono.variable} dark`}>
+      <body className="min-h-screen bg-studio-canvas text-slate-100 font-body antialiased selection:bg-brand-500 selection:text-black">
         {children}
       </body>
     </html>

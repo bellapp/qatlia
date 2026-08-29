@@ -92,16 +92,16 @@ export default function AccountPage() {
   };
 
   return (
-    <div className="min-h-screen bg-[#070C18] text-slate-100 font-sans antialiased">
-      <header className="sticky top-0 z-40 bg-[#070C18]/90 backdrop-blur-xl border-b border-slate-800/80 px-4 sm:px-8 py-3">
+    <div className="min-h-screen bg-studio-canvas text-slate-100 font-sans antialiased">
+      <header className="sticky top-0 z-40 bg-studio-canvas/90 backdrop-blur-xl border-b border-studio-border/80 px-4 sm:px-8 py-3">
         <div className="max-w-4xl mx-auto flex items-center justify-between">
-          <Link href="/" className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-900 border border-slate-800 text-xs font-semibold text-slate-300">
+          <Link href="/" className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-studio-panel border border-studio-border text-xs font-semibold text-slate-300">
             <ArrowLeft className="w-4 h-4" />
             Atelier
           </Link>
           <div className="flex items-center gap-2.5">
-            <Link href="/credits" className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-300 text-xs font-semibold">
-              <Zap className="w-3.5 h-3.5 fill-amber-400 text-amber-400" />
+            <Link href="/credits" className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-brand-500/10 border border-brand-500/30 text-brand-400 text-xs font-semibold">
+              <Zap className="w-3.5 h-3.5 fill-brand-400 text-brand-400" />
               <span className="font-mono font-bold">{credits}</span>
             </Link>
             {email && <AccountMenu email={email} />}
@@ -111,18 +111,18 @@ export default function AccountPage() {
 
       <main className="max-w-4xl mx-auto px-4 sm:px-8 py-8 space-y-6">
         <div>
-          <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-amber-400/80">Compte</p>
+          <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-brand-400/80">Compte</p>
           <h1 className="text-2xl font-black text-white mt-1">Votre espace artisan</h1>
           <p className="text-sm text-slate-400 mt-1">{email}</p>
         </div>
 
-        <section id="credits" className="p-5 rounded-2xl bg-slate-900/70 border border-slate-800 space-y-4">
+        <section id="credits" className="p-5 rounded-2xl bg-studio-panel/70 border border-studio-border space-y-4">
           <div className="flex items-center justify-between gap-3">
             <div className="flex items-center gap-2">
-              <Receipt className="w-4 h-4 text-amber-400" />
+              <Receipt className="w-4 h-4 text-brand-400" />
               <h2 className="text-sm font-bold text-white">Usage des crédits</h2>
             </div>
-            <Link href="/credits" className="text-xs font-semibold text-amber-400 hover:text-amber-300">
+            <Link href="/credits" className="text-xs font-semibold text-brand-400 hover:text-brand-400">
               Recharger →
             </Link>
           </div>
@@ -151,9 +151,9 @@ export default function AccountPage() {
           )}
         </section>
 
-        <section id="password" className="p-5 rounded-2xl bg-slate-900/70 border border-slate-800 space-y-4">
+        <section id="password" className="p-5 rounded-2xl bg-studio-panel/70 border border-studio-border space-y-4">
           <div className="flex items-center gap-2">
-            <KeyRound className="w-4 h-4 text-amber-400" />
+            <KeyRound className="w-4 h-4 text-brand-400" />
             <h2 className="text-sm font-bold text-white">Changer le mot de passe</h2>
           </div>
           <p className="text-xs text-slate-400 flex items-center gap-1.5">
@@ -167,7 +167,7 @@ export default function AccountPage() {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               placeholder="Nouveau mot de passe"
-              className="px-3 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-sm outline-none focus:border-amber-500/50"
+              className="px-3 py-2.5 rounded-xl bg-studio-field border border-studio-border text-sm outline-none focus:border-brand-500/50"
             />
             <input
               type="password"
@@ -175,12 +175,12 @@ export default function AccountPage() {
               value={confirm}
               onChange={(e) => setConfirm(e.target.value)}
               placeholder="Confirmer"
-              className="px-3 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-sm outline-none focus:border-amber-500/50"
+              className="px-3 py-2.5 rounded-xl bg-studio-field border border-studio-border text-sm outline-none focus:border-brand-500/50"
             />
             <button
               type="submit"
               disabled={saving}
-              className="sm:col-span-2 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs disabled:opacity-50"
+              className="sm:col-span-2 py-2.5 rounded-xl bg-brand-500 hover:bg-brand-400 text-slate-950 font-black text-xs disabled:opacity-50"
             >
               {saving ? 'Enregistrement…' : 'Mettre à jour le mot de passe'}
             </button>

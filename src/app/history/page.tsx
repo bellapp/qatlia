@@ -129,26 +129,26 @@ export default function HistoryPage() {
       case 'verre':
         return <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-sky-500/20 text-sky-300 border border-sky-500/30">Verre</span>;
       case 'contreplaques':
-        return <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-amber-600/20 text-amber-300 border border-amber-600/30">Contreplaqué</span>;
+        return <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-brand-600 text-brand-400 border border-amber-600/30">Contreplaqué</span>;
       default:
         return <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">MDF</span>;
     }
   };
 
   return (
-    <div className="min-h-screen bg-[#070C18] text-slate-100 font-sans antialiased selection:bg-amber-500 selection:text-black pb-16">
-      <header className="sticky top-0 z-40 bg-[#070C18]/90 backdrop-blur-xl border-b border-slate-800/80 px-4 sm:px-8 py-3">
+    <div className="min-h-screen bg-studio-canvas text-slate-100 font-sans antialiased selection:bg-brand-500 selection:text-black pb-16">
+      <header className="sticky top-0 z-40 bg-studio-canvas/90 backdrop-blur-xl border-b border-studio-border/80 px-4 sm:px-8 py-3">
         <div className="max-w-6xl mx-auto flex items-center justify-between">
           <div className="flex items-center gap-3">
             <Link
               href="/"
-              className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-300 text-xs font-semibold border border-slate-800 transition-all"
+              className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-studio-panel hover:bg-slate-800 text-slate-300 text-xs font-semibold border border-studio-border transition-all"
             >
               <ArrowLeft className="w-4 h-4" />
               <span>Atelier</span>
             </Link>
             <div className="flex items-center gap-2">
-              <History className="w-5 h-5 text-amber-400" />
+              <History className="w-5 h-5 text-brand-400" />
               <h1 className="font-extrabold text-base text-white tracking-tight">Historique</h1>
             </div>
           </div>
@@ -156,9 +156,9 @@ export default function HistoryPage() {
           <div className="flex items-center gap-2.5">
             <Link
               href="/credits"
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-300 text-xs font-semibold"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-brand-500/10 border border-brand-500/30 text-brand-400 text-xs font-semibold"
             >
-              <Zap className="w-3.5 h-3.5 fill-amber-400 text-amber-400" />
+              <Zap className="w-3.5 h-3.5 fill-brand-400 text-brand-400" />
               <span className="font-mono font-bold">{userCredits}</span>
             </Link>
             {userEmail ? (
@@ -175,13 +175,13 @@ export default function HistoryPage() {
       <main className="max-w-6xl mx-auto px-4 sm:px-8 mt-8 space-y-6">
         <div className="flex flex-wrap items-end justify-between gap-4">
           <div>
-            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-amber-400/80">Atelier</p>
+            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-brand-400/80">Atelier</p>
             <h2 className="text-2xl font-black text-white mt-1">Vos débits</h2>
             <p className="text-sm text-slate-400 mt-1">Rouvrir un plan, relancer le calepinage ou réexporter le PDF.</p>
           </div>
           <button
             onClick={fetchHistory}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-300 text-xs font-semibold border border-slate-800"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-studio-panel hover:bg-slate-800 text-slate-300 text-xs font-semibold border border-studio-border"
           >
             <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
             Actualiser
@@ -189,19 +189,19 @@ export default function HistoryPage() {
         </div>
 
         {syncNote && (
-          <div className="flex items-center gap-2 px-3.5 py-2.5 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-200 text-xs">
+          <div className="flex items-center gap-2 px-3.5 py-2.5 rounded-xl bg-brand-500/10 border border-brand-500/20 text-brand-300 text-xs">
             <CloudOff className="w-4 h-4 shrink-0" />
             {syncNote}
           </div>
         )}
 
         {loading ? (
-          <div className="p-16 rounded-3xl bg-slate-900/50 border border-slate-800 text-center">
-            <RefreshCw className="w-8 h-8 text-amber-400 animate-spin mx-auto" />
+          <div className="p-16 rounded-3xl bg-studio-panel/50 border border-studio-border text-center">
+            <RefreshCw className="w-8 h-8 text-brand-400 animate-spin mx-auto" />
             <p className="text-sm font-bold text-white mt-3">Chargement de l&apos;historique…</p>
           </div>
         ) : projects.length === 0 ? (
-          <div className="p-12 rounded-3xl bg-slate-900/60 border border-slate-800 text-center space-y-4">
+          <div className="p-12 rounded-3xl bg-studio-panel/60 border border-studio-border text-center space-y-4">
             {userEmail ? <FolderOpen className="w-12 h-12 text-slate-600 mx-auto" /> : <Layers className="w-12 h-12 text-slate-600 mx-auto" />}
             <h3 className="text-base font-bold text-white">
               {userEmail ? 'Aucun débit enregistré' : 'Connectez-vous pour synchroniser vos débits'}
@@ -213,7 +213,7 @@ export default function HistoryPage() {
             </p>
             <Link
               href={userEmail ? '/' : '/auth/login?redirect=/history'}
-              className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs uppercase tracking-wider"
+              className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-brand-500 hover:bg-brand-400 text-slate-950 font-black text-xs uppercase tracking-wider"
             >
               {userEmail ? 'Créer un plan de coupe' : 'Se connecter'}
               <ArrowRight className="w-4 h-4" />
@@ -231,7 +231,7 @@ export default function HistoryPage() {
               return (
                 <div
                   key={proj.id}
-                  className="p-5 rounded-2xl bg-slate-900/70 border border-slate-800 hover:border-amber-400/40 transition-all flex flex-col justify-between gap-4"
+                  className="p-5 rounded-2xl bg-studio-panel/70 border border-studio-border hover:border-brand-400/40 transition-all flex flex-col justify-between gap-4"
                 >
                   <div className="space-y-2">
                     <div className="flex items-center justify-between gap-2">
@@ -248,18 +248,18 @@ export default function HistoryPage() {
                       {getMaterialBadge(proj.material)}
                     </div>
                     <h3 className="text-base font-black text-white truncate">{proj.name}</h3>
-                    <div className="grid grid-cols-3 gap-2 pt-2 border-t border-slate-800 text-xs font-mono">
-                      <div className="p-2 rounded-lg bg-[#070C18]">
+                    <div className="grid grid-cols-3 gap-2 pt-2 border-t border-studio-border text-xs font-mono">
+                      <div className="p-2 rounded-lg bg-studio-canvas">
                         <span className="text-[10px] text-slate-500 block">Panneau</span>
                         <span className="font-bold text-white">
                           {proj.sheet_height} × {proj.sheet_width} cm
                         </span>
                       </div>
-                      <div className="p-2 rounded-lg bg-[#070C18]">
+                      <div className="p-2 rounded-lg bg-studio-canvas">
                         <span className="text-[10px] text-slate-500 block">Pièces</span>
-                        <span className="font-bold text-amber-400">{pieceCount} pcs</span>
+                        <span className="font-bold text-brand-400">{pieceCount} pcs</span>
                       </div>
-                      <div className="p-2 rounded-lg bg-[#070C18]">
+                      <div className="p-2 rounded-lg bg-studio-canvas">
                         <span className="text-[10px] text-slate-500 block">Chute</span>
                         <span className="font-bold text-emerald-400">{wasteRate > 0 ? `${wasteRate}%` : '—'}</span>
                       </div>
@@ -269,7 +269,7 @@ export default function HistoryPage() {
                     <span className="text-[11px] font-mono font-bold text-slate-400">{sheetsUsed} feuille(s)</span>
                     <button
                       onClick={() => handleLoadProject(proj)}
-                      className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs"
+                      className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-brand-500 hover:bg-brand-400 text-slate-950 font-black text-xs"
                     >
                       Ouvrir
                       <ArrowRight className="w-3.5 h-3.5" />
