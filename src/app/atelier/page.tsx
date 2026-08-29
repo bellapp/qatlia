@@ -27,6 +27,9 @@ import {
   OptimizationOptions,
   OPTIONS_DEFAULTS,
   MaterialType,
+  CutMode,
+  optimizeCutting1D,
+  optimizeCutting2D,
 } from '@/lib/cutting/binpacking';
 import { OptionsPanel } from '@/components/OptionsPanel';
 import { PiecesManager } from '@/components/PiecesManager';
@@ -39,14 +42,9 @@ import { OnboardingTour } from '@/components/OnboardingTour';
 import { LocaleSwitcher } from '@/components/LocaleProvider';
 import { writeLocalHistoryItem, type LocalHistoryItem } from '@/lib/history';
 
-const DEFAULT_SHEET: Sheet = {
-  height: 278,
-  width: 208,
-  kerf: 0.3,
-  margin: 1.0,
-  grainDirection: false,
-  material: 'mdf',
-};
+const DEFAULT_SHEETS: Sheet[] = [
+  { id: 's0', height: 278, width: 208, kerf: 0.3, margin: 1.0, grainDirection: false, material: 'mdf', quantity: 1, label: 'Panneau standard 278×208' },
+];
 
 const INITIAL_PIECES: Piece[] = [
   { id: '1', name: 'Panneau Latéral G', height: 230, width: 120, quantity: 2, material: 'mdf', rotatable: true },
@@ -57,7 +55,8 @@ const INITIAL_PIECES: Piece[] = [
 ];
 
 export default function Dashboard() {
-  const [sheet, setSheet] = useState<Sheet>(DEFAULT_SHEET);
+  const [cutMode, setCutMode] = useState<CutMode>('2d');
+  const [sheets, setSheets] = useState<Sheet[]>(DEFAULT_SHEETS);
   const [pieces, setPieces] = useState<Piece[]>(INITIAL_PIECES);
   const [options, setOptions] = useState<OptimizationOptions>(OPTIONS_DEFAULTS);
   const [result, setResult] = useState<OptimizationResult | null>(null);
@@ -72,6 +71,8 @@ export default function Dashboard() {
   const [isAuthModalOpen, setIsAuthModalOpen] = useState<boolean>(false);
   const [isDownloadingPdf, setIsDownloadingPdf] = useState<boolean>(false);
   const [showAdvancedOptions, setShowAdvancedOptions] = useState<boolean>(false);
+
+  const activeSheet = sheets[0] || DEFAULT_SHEETS[0];
 
   useEffect(() => {
     async function loadUser() {
@@ -102,7 +103,8 @@ export default function Dashboard() {
       if (savedProj) {
         try {
           const parsed = JSON.parse(savedProj);
-          if (parsed.sheet) setSheet(parsed.sheet);
+          if (parsed.sheet) setSheets([parsed.sheet]);
+          if (parsed.sheets) setSheets(parsed.sheets);
           if (Array.isArray(parsed.pieces)) setPieces(parsed.pieces);
           if (parsed.options) setOptions((prev) => ({ ...prev, ...parsed.options }));
           sessionStorage.removeItem('qatlia_saved_project');
@@ -113,13 +115,10 @@ export default function Dashboard() {
     }
   }, []);
 
+
   const handleOptionsChange = (newOpts: OptimizationOptions) => {
     setOptions(newOpts);
-    setSheet((prev) => ({
-      ...prev,
-      kerf: newOpts.kerfWidth / 10,
-      grainDirection: newOpts.grainDirection,
-    }));
+    setSheets(prev => prev.map(s => ({ ...s, kerf: newOpts.kerfWidth / 10, grainDirection: newOpts.grainDirection })));
   };
 
   const persistProject = async (
@@ -127,8 +126,9 @@ export default function Dashboard() {
     source: 'optimize' | 'pdf'
   ) => {
     const payload = {
-      name: `Débit ${(sheet.material || 'MDF').toUpperCase()} — ${pieces.reduce((s, p) => s + (p.quantity || 1), 0)} pcs`,
-      sheet,
+      name: `${cutMode === '1d' ? 'Barres' : 'Débit'} ${(activeSheet.material || 'MDF').toUpperCase()} — ${pieces.reduce((s, p) => s + (p.quantity || 1), 0)} pcs`,
+      sheets,
+      sheet: activeSheet,
       pieces,
       options,
       result: nextResult,
@@ -137,11 +137,11 @@ export default function Dashboard() {
     writeLocalHistoryItem({
       id: `${source}_${Date.now()}`,
       name: payload.name,
-      material: sheet.material || 'mdf',
-      sheet_width: sheet.width,
-      sheet_height: sheet.height,
-      kerf: sheet.kerf,
-      grain_direction: !!sheet.grainDirection,
+      material: activeSheet.material || 'mdf',
+      sheet_width: activeSheet.width,
+      sheet_height: activeSheet.height,
+      kerf: activeSheet.kerf,
+      grain_direction: !!activeSheet.grainDirection,
       status: 'optimized',
       created_at: new Date().toISOString(),
       options_json: payload as unknown as LocalHistoryItem['options_json'],
@@ -166,21 +166,15 @@ export default function Dashboard() {
   const handleRunOptimization = async () => {
     setIsOptimizing(true);
     try {
-      const res = await fetch('/api/optimize', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          sheet,
-          pieces,
-          options,
-        }),
-      });
-      const data = await res.json();
-      if (data.success && data.result) {
-        setResult(data.result);
-        setActiveSheetIndex(0);
-        void persistProject(data.result, 'optimize');
+      let optResult: OptimizationResult;
+      if (cutMode === '1d') {
+        optResult = optimizeCutting1D(pieces, activeSheet.width, options.kerfWidth);
+      } else {
+        optResult = optimizeCutting2D(pieces, sheets, options);
       }
+      setResult(optResult);
+      setActiveSheetIndex(0);
+      void persistProject(optResult, 'optimize');
     } catch (err) {
       console.error('Erreur optimisation:', err);
     } finally {
@@ -204,7 +198,7 @@ export default function Dashboard() {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             imageBase64: base64,
-            sheetMaterial: sheet.material || 'mdf',
+            sheetMaterial: activeSheet.material || 'mdf',
           }),
         });
 
@@ -224,7 +218,7 @@ export default function Dashboard() {
               height: Math.round(h * 10) / 10,
               width: Math.round(w * 10) / 10,
               quantity: Number(p.quantity) || 1,
-              material: (p.material as MaterialType) || (sheet.material || 'mdf'),
+              material: (p.material as MaterialType) || (activeSheet.material || 'mdf'),
               rotatable: true,
             };
           });
@@ -300,8 +294,8 @@ export default function Dashboard() {
         body: JSON.stringify({
           projectName: 'QatlIA_CNC_Plan',
           sheet: {
-            width: sheet.width,
-            height: sheet.height,
+            width: activeSheet.width,
+            height: activeSheet.height,
           },
           placedPieces: result.placedPieces,
         }),
@@ -374,9 +368,9 @@ export default function Dashboard() {
         body: JSON.stringify({
           projectName: 'Plan Découpe QatlIA',
           sheet: {
-            width: sheet.width,
-            height: sheet.height,
-            material: sheet.material || 'mdf',
+            width: activeSheet.width,
+            height: activeSheet.height,
+            material: activeSheet.material || 'mdf',
           },
           pieces,
           result,
@@ -405,9 +399,9 @@ export default function Dashboard() {
 
   const currentSheet = result?.sheets[activeSheetIndex] || (result ? {
     index: 0,
-    material: sheet.material || 'mdf',
-    width: sheet.width,
-    height: sheet.height,
+    material: activeSheet.material || 'mdf',
+    width: activeSheet.width,
+    height: activeSheet.height,
     pieces: result.placedPieces.filter((p) => p.sheetIndex === activeSheetIndex),
     offcuts: result.offcuts.filter((o) => o.sheetIndex === activeSheetIndex),
     wasteRate: result.wastePercentage,
@@ -436,6 +430,18 @@ export default function Dashboard() {
           </div>
 
           <div className="flex items-center gap-2">
+            {/* Mode Toggle: 2D / 1D */}
+            <div className="flex items-center p-0.5 rounded-lg bg-studio-field border border-studio-border">
+              <button type="button" onClick={() => setCutMode('2d')}
+                className={`px-2.5 py-1 rounded-md text-[10px] font-bold transition-all ${cutMode === '2d' ? 'bg-brand-500 text-slate-950' : 'text-slate-500 hover:text-slate-300'}`}>
+                2D
+              </button>
+              <button type="button" onClick={() => setCutMode('1d')}
+                className={`px-2.5 py-1 rounded-md text-[10px] font-bold transition-all ${cutMode === '1d' ? 'bg-brand-500 text-slate-950' : 'text-slate-500 hover:text-slate-300'}`}>
+                1D
+              </button>
+            </div>
+
             <Link
               href="/history"
               className="group relative flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-medium text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:text-white hover:bg-studio-panel transition-all"
@@ -562,39 +568,39 @@ export default function Dashboard() {
                     <Layers className="w-4 h-4 text-brand-400" />
                   </span>
                   <div>
-                    <h2 className="text-xs font-bold text-slate-900 dark:text-white tracking-wide">Panneau brut en stock</h2>
-                    <p className="text-[10px] text-slate-500 dark:text-slate-400">Dimensions du matériau à optimiser</p>
+                    <h2 className="text-xs font-bold text-slate-900 dark:text-white tracking-wide">{cutMode === '1d' ? 'Barre en stock' : 'Panneau brut en stock'}</h2>
+                    <p className="text-[10px] text-slate-500 dark:text-slate-400">{cutMode === '1d' ? 'Longueur de la barre' : 'Dimensions du panneau'}</p>
                   </div>
                 </div>
                 <span className="text-[10px] font-mono font-semibold text-brand-400 bg-brand-500/10 px-2 py-0.5 rounded-md border border-brand-500/20">cm</span>
               </div>
 
-              <div className="p-4 grid grid-cols-3 gap-3">
-                <div className="space-y-1">
+              <div className={cutMode === '1d' ? 'p-4 grid grid-cols-2 gap-3' : 'p-4 grid grid-cols-3 gap-3'}>
+                {cutMode === '1d' ? null : <div className="space-y-1">
                   <label className="text-[10px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">Hauteur (Y)</label>
                   <input
                     type="number"
                     step="0.1"
-                    value={sheet.height}
-                    onChange={(e) => setSheet({ ...sheet, height: parseFloat(e.target.value) || 0 })}
+                    value={activeSheet.height}
+                    onChange={(e) => { setSheets([{ ...activeSheet, height: parseFloat(e.target.value) || 0 }]); }}
                     className="w-full px-3 py-2 rounded-xl bg-studio-field border border-studio-border text-slate-900 dark:text-slate-100 font-mono font-bold text-right outline-none focus:border-brand-500/50 focus:ring-1 focus:ring-brand-500/20 transition-all"
                   />
-                </div>
+                </div>}
                 <div className="space-y-1">
-                  <label className="text-[10px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">Largeur (X)</label>
+                  <label className="text-[10px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">{cutMode === '1d' ? 'Longueur (cm)' : 'Largeur (X)'}</label>
                   <input
                     type="number"
                     step="0.1"
-                    value={sheet.width}
-                    onChange={(e) => setSheet({ ...sheet, width: parseFloat(e.target.value) || 0 })}
+                    value={activeSheet.width}
+                    onChange={(e) => { setSheets([{ ...activeSheet, width: parseFloat(e.target.value) || 0 }]); }}
                     className="w-full px-3 py-2 rounded-xl bg-studio-field border border-studio-border text-slate-900 dark:text-slate-100 font-mono font-bold text-right outline-none focus:border-brand-500/50 focus:ring-1 focus:ring-brand-500/20 transition-all"
                   />
                 </div>
                 <div className="space-y-1">
                   <label className="text-[10px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">Matériau</label>
                   <select
-                    value={sheet.material || 'mdf'}
-                    onChange={(e) => setSheet({ ...sheet, material: e.target.value as MaterialType })}
+                    value={activeSheet.material || 'mdf'}
+                    onChange={(e) => { setSheets([{ ...activeSheet, material: e.target.value as MaterialType }]); }}
                     className="w-full px-3 py-2 rounded-xl bg-studio-field border border-studio-border text-slate-800 dark:text-slate-200 text-xs outline-none focus:border-brand-500/50 focus:ring-1 focus:ring-brand-500/20 transition-all"
                   >
                     <option value="mdf">MDF / Bois</option>
@@ -611,7 +617,7 @@ export default function Dashboard() {
               <PiecesManager
                 pieces={pieces}
                 onUpdatePieces={setPieces}
-                defaultMaterial={sheet.material || 'mdf'}
+                defaultMaterial={activeSheet.material || 'mdf'}
                 showMaterialCol={options.considerMaterial}
                 disabled={isOptimizing}
               />
@@ -693,7 +699,7 @@ export default function Dashboard() {
                   <div className="p-3.5 rounded-xl bg-studio-panel/60 border border-studio-border/80 flex flex-col items-center text-center gap-1">
                     <span className="text-[9px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Feuilles</span>
                     <span className="text-2xl font-black font-mono text-slate-900 dark:text-white tabular-nums">{result.sheetsUsed}</span>
-                    <span className="text-[9px] text-slate-600 truncate">{sheet.height}×{sheet.width}</span>
+                    <span className="text-[9px] text-slate-600 truncate">{activeSheet.height}×{activeSheet.width}</span>
                   </div>
                   <div className="p-3.5 rounded-xl bg-studio-panel/60 border border-studio-border/80 flex flex-col items-center text-center gap-1">
                     <span className="text-[9px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Utile</span>
@@ -749,7 +755,7 @@ export default function Dashboard() {
                   <div className="p-5 bg-[#040812] flex items-center justify-center min-h-[420px]">
                     <div style={{ transform: `scale(${zoomLevel})`, transformOrigin: 'center', transition: 'transform 0.2s ease' }}>
                       <svg
-                        viewBox={`0 0 ${sheet.width} ${sheet.height}`}
+                        viewBox={`0 0 ${activeSheet.width} ${activeSheet.height}`}
                         className="w-full max-w-[480px] aspect-[208/278] rounded-xl"
                         style={{ filter: 'drop-shadow(0 4px 6px rgba(0,0,0,0.4))' }}
                       >
@@ -764,7 +770,7 @@ export default function Dashboard() {
                           </pattern>
                         </defs>
 
-                        <rect x="0" y="0" width={sheet.width} height={sheet.height} fill="url(#sheetBg)" stroke="#1E3050" strokeWidth="0.6" rx="0.3" />
+                        <rect x="0" y="0" width={activeSheet.width} height={activeSheet.height} fill="url(#sheetBg)" stroke="#1E3050" strokeWidth="0.6" rx="0.3" />
 
                         {/* Offcuts with hatch pattern */}
                         {result.offcuts && result.offcuts.filter(o => o.sheetIndex === activeSheetIndex).map((off, oIdx) => {
