@@ -17,7 +17,6 @@ import {
   History,
   SlidersHorizontal,
   ChevronDown,
-  ChevronUp,
   FileCode2,
   FileText,
   TrendingUp,
@@ -565,21 +564,23 @@ export default function Dashboard() {
             </div>
 
             {/* Collapsible Advanced Options */}
-            <div className="rounded-2xl bg-studio-panel/40 border border-studio-border/80 overflow-hidden">
+            <div className="rounded-2xl overflow-hidden">
               <button
                 type="button"
                 onClick={() => setShowAdvancedOptions(!showAdvancedOptions)}
-                className="w-full p-3.5 flex items-center justify-between text-xs font-semibold text-slate-300 hover:text-white transition-colors cursor-pointer"
+                className="w-full px-4 py-3 flex items-center justify-between text-[11px] font-semibold uppercase tracking-wider text-slate-400 hover:text-white transition-colors"
               >
                 <div className="flex items-center gap-2">
                   <SlidersHorizontal className="w-3.5 h-3.5 text-brand-400" />
-                  <span>Options avancées de coupe & Kerf</span>
+                  <span>Réglages de coupe avancés</span>
                 </div>
-                {showAdvancedOptions ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                <span className={`transition-transform duration-200 ${showAdvancedOptions ? 'rotate-180' : ''}`}>
+                  <ChevronDown className="w-4 h-4" />
+                </span>
               </button>
 
               {showAdvancedOptions && (
-                <div className="p-4 pt-0 border-t border-studio-border/60 animate-in fade-in duration-150">
+                <div className="px-1 pb-2 animate-in fade-in slide-in-from-top-1 duration-200">
                   <OptionsPanel
                     options={options}
                     onChange={handleOptionsChange}
@@ -593,17 +594,17 @@ export default function Dashboard() {
             <button
               onClick={handleRunOptimization}
               disabled={isOptimizing || pieces.length === 0}
-              className="w-full py-4 rounded-2xl bg-gradient-to-r from-brand-500 via-amber-400 to-brand-500 hover:opacity-95 text-slate-950 font-black text-sm tracking-wider uppercase shadow-xl shadow-brand-500/20 transition-all flex items-center justify-center gap-2 disabled:opacity-40 cursor-pointer active:scale-[0.99]"
+              className="w-full py-4 rounded-2xl bg-brand-500 hover:bg-brand-400 text-studio-canvas font-black text-sm tracking-wider uppercase shadow-lg shadow-brand-500/25 transition-all flex items-center justify-center gap-2.5 disabled:opacity-30 disabled:shadow-none active:scale-[0.98]"
             >
               {isOptimizing ? (
                 <>
                   <RefreshCw className="w-4 h-4 animate-spin" />
-                  <span>Calcul d&apos;optimisation...</span>
+                  <span>Calcul du calepinage…</span>
                 </>
               ) : (
                 <>
                   <Scissors className="w-4 h-4" />
-                  <span>Générer le plan de débit</span>
+                  <span>Optimiser le plan de coupe</span>
                 </>
               )}
             </button>

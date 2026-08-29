@@ -2,11 +2,57 @@
 
 import React from 'react';
 import { OptimizationOptions } from '@/lib/cutting/binpacking';
+import { Gauge, Layers3, Lock, ScanLine, Scissors } from 'lucide-react';
 
 interface OptionsPanelProps {
   options: OptimizationOptions;
   onChange: (newOptions: OptimizationOptions) => void;
   disabled?: boolean;
+}
+
+function Switch({
+  checked,
+  onChange,
+  disabled,
+  label,
+  description,
+  icon: Icon,
+}: {
+  checked: boolean;
+  onChange: (v: boolean) => void;
+  disabled?: boolean;
+  label: string;
+  description: string;
+  icon: React.ComponentType<{ className?: string }>;
+}) {
+  return (
+    <button
+      type="button"
+      disabled={disabled}
+      onClick={() => onChange(!checked)}
+      className={`w-full flex items-start gap-3 p-3 rounded-xl text-left transition-all border ${
+        checked
+          ? 'bg-brand-500/10 border-brand-500/30'
+          : 'bg-studio-panel/40 border-studio-border/60 hover:border-studio-border-hover/60'
+      } disabled:opacity-50 cursor-pointer`}
+    >
+      <span className={`shrink-0 w-7 h-7 rounded-lg flex items-center justify-center transition-colors ${checked ? 'bg-brand-500/15 text-brand-400' : 'bg-studio-field text-slate-500'}`}>
+        <Icon className="w-3.5 h-3.5" />
+      </span>
+      <span className="flex-1 min-w-0">
+        <span className={`block text-[11px] font-semibold ${checked ? 'text-white' : 'text-slate-300'}`}>{label}</span>
+        <span className="block text-[10px] text-slate-500 mt-0.5 leading-tight">{description}</span>
+      </span>
+      <span
+        className={`shrink-0 relative inline-flex h-5 w-9 items-center rounded-full transition-colors duration-200 ${checked ? 'bg-brand-500' : 'bg-studio-border'}`}
+      >
+        <span
+          className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white shadow transition-transform duration-200 ${checked ? 'translate-x-4.5' : 'translate-x-1'}`}
+          style={{ transform: checked ? 'translateX(18px)' : 'translateX(4px)' }}
+        />
+      </span>
+    </button>
+  );
 }
 
 export const OptionsPanel: React.FC<OptionsPanelProps> = ({
@@ -18,105 +64,104 @@ export const OptionsPanel: React.FC<OptionsPanelProps> = ({
     field: K,
     value: OptimizationOptions[K]
   ) => {
-    onChange({
-      ...options,
-      [field]: value,
-    });
+    onChange({ ...options, [field]: value });
   };
 
+  const kerfPercent = ((options.kerfWidth || 0) / 10) * 100;
+
   return (
-    <div className="space-y-4 text-xs">
-      {/* Kerf & Priorité */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-        <div className="p-3 rounded-xl bg-studio-panel/60 border border-studio-border/80">
-          <div className="flex items-center justify-between mb-1.5">
-            <span className="text-[11px] font-medium text-slate-300">Trait de scie (Kerf)</span>
-            <span className="text-[10px] font-mono font-semibold text-brand-400 bg-brand-400/10 px-1.5 py-0.5 rounded">mm</span>
-          </div>
+    <div className="space-y-5 text-xs">
+      {/* Kerf Slider */}
+      <div className="p-4 rounded-xl bg-studio-panel/50 border border-studio-border/70">
+        <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-2">
-            <input
-              type="range"
-              min="0"
-              max="10"
-              step="0.5"
-              disabled={disabled}
-              value={options.kerfWidth}
-              onChange={(e) => updateField('kerfWidth', parseFloat(e.target.value) || 0)}
-              className="w-full accent-brand-500 cursor-pointer h-1.5 bg-slate-800 rounded-lg"
-            />
-            <span className="font-mono font-bold text-slate-100 w-8 text-right text-xs">
-              {options.kerfWidth}
+            <span className="w-7 h-7 rounded-lg bg-brand-500/10 border border-brand-500/20 flex items-center justify-center">
+              <Scissors className="w-3.5 h-3.5 text-brand-400" />
             </span>
+            <div>
+              <span className="block text-[11px] font-semibold text-white">Épaisseur de lame (Kerf)</span>
+              <span className="block text-[10px] text-slate-500">Trait de scie retiré entre chaque coupe</span>
+            </div>
           </div>
+          <span className="shrink-0 px-2 py-1 rounded-lg bg-studio-field border border-studio-border font-mono font-bold text-sm text-brand-400 tabular-nums">
+            {options.kerfWidth}<span className="text-[9px] text-slate-500 ml-0.5">mm</span>
+          </span>
         </div>
 
-        <div className="p-3 rounded-xl bg-studio-panel/60 border border-studio-border/80">
-          <span className="text-[11px] font-medium text-slate-300 block mb-1.5">Priorité d&apos;optimisation</span>
-          <select
+        <div className="relative">
+          <input
+            type="range"
+            min="0"
+            max="10"
+            step="0.5"
             disabled={disabled}
-            value={options.optimizationPriority}
-            onChange={(e) => updateField('optimizationPriority', e.target.value as OptimizationOptions['optimizationPriority'])}
-            className="w-full px-2.5 py-1.5 rounded-lg bg-studio-field border border-studio-border text-slate-200 text-xs outline-none focus:border-brand-500/50"
-          >
-            <option value="linear_guillotine">Coupe Linéaire (Atelier)</option>
-            <option value="min_waste">Minimiser les chutes (%)</option>
-            <option value="min_sheets">Minimiser les panneaux</option>
-            <option value="balanced">Équilibré</option>
-          </select>
+            value={options.kerfWidth}
+            onChange={(e) => updateField('kerfWidth', parseFloat(e.target.value) || 0)}
+            className="w-full appearance-none h-1.5 rounded-full bg-studio-border cursor-pointer disabled:opacity-50"
+            style={{
+              background: `linear-gradient(to right, #F5A623 ${kerfPercent}%, #1A2744 ${kerfPercent}%)`,
+            }}
+          />
+          <div className="flex justify-between mt-1.5 text-[9px] font-mono text-slate-600">
+            <span>0</span>
+            <span>5</span>
+            <span>10 mm</span>
+          </div>
         </div>
       </div>
 
+      {/* Priority Select */}
+      <div className="flex items-center gap-3">
+        <span className="shrink-0 w-7 h-7 rounded-lg bg-brand-500/10 border border-brand-500/20 flex items-center justify-center">
+          <Gauge className="w-3.5 h-3.5 text-brand-400" />
+        </span>
+        <select
+          disabled={disabled}
+          value={options.optimizationPriority}
+          onChange={(e) => updateField('optimizationPriority', e.target.value as OptimizationOptions['optimizationPriority'])}
+          className="flex-1 px-3 py-2 rounded-xl bg-studio-field border border-studio-border text-slate-200 text-xs outline-none focus:border-brand-500/50 disabled:opacity-50"
+        >
+          <option value="linear_guillotine">Coupe linéaire traversante (atelier)</option>
+          <option value="min_waste">Minimiser les chutes (%)</option>
+          <option value="min_sheets">Minimiser les panneaux</option>
+          <option value="balanced">Équilibré (facilité de coupe)</option>
+        </select>
+      </div>
+
       {/* Toggles */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
-        {/* Toggle 1: Étiquettes */}
-        <label className="flex items-center justify-between p-2.5 rounded-xl bg-studio-panel/40 border border-studio-border/60 hover:border-studio-border-hover/60 cursor-pointer transition-colors">
-          <span className="text-slate-300 text-[11px]">Étiquettes sur les pièces</span>
-          <input
-            type="checkbox"
-            disabled={disabled}
-            checked={options.showLabels}
-            onChange={(e) => updateField('showLabels', e.target.checked)}
-            className="w-4 h-4 rounded text-brand-500 bg-studio-field border-studio-border-hover focus:ring-0 focus:ring-offset-0"
-          />
-        </label>
-
-        {/* Toggle 2: Mode 1 Feuille */}
-        <label className="flex items-center justify-between p-2.5 rounded-xl bg-studio-panel/40 border border-studio-border/60 hover:border-studio-border-hover/60 cursor-pointer transition-colors">
-          <div className="flex items-center gap-1">
-            <span className="text-slate-300 text-[11px]">Mode 1 Feuille Unique</span>
-          </div>
-          <input
-            type="checkbox"
-            disabled={disabled}
-            checked={options.singleSheetOnly}
-            onChange={(e) => updateField('singleSheetOnly', e.target.checked)}
-            className="w-4 h-4 rounded text-brand-500 bg-studio-field border-studio-border-hover focus:ring-0 focus:ring-offset-0"
-          />
-        </label>
-
-        {/* Toggle 3: Multi-Matériaux */}
-        <label className="flex items-center justify-between p-2.5 rounded-xl bg-studio-panel/40 border border-studio-border/60 hover:border-studio-border-hover/60 cursor-pointer transition-colors">
-          <span className="text-slate-300 text-[11px]">Répartition Multi-Matériaux</span>
-          <input
-            type="checkbox"
-            disabled={disabled}
-            checked={options.considerMaterial}
-            onChange={(e) => updateField('considerMaterial', e.target.checked)}
-            className="w-4 h-4 rounded text-brand-500 bg-studio-field border-studio-border-hover focus:ring-0 focus:ring-offset-0"
-          />
-        </label>
-
-        {/* Toggle 4: Sens du fil */}
-        <label className="flex items-center justify-between p-2.5 rounded-xl bg-studio-panel/40 border border-studio-border/60 hover:border-studio-border-hover/60 cursor-pointer transition-colors">
-          <span className="text-slate-300 text-[11px]">Bloquer le sens du fil</span>
-          <input
-            type="checkbox"
-            disabled={disabled}
-            checked={options.grainDirection}
-            onChange={(e) => updateField('grainDirection', e.target.checked)}
-            className="w-4 h-4 rounded text-brand-500 bg-studio-field border-studio-border-hover focus:ring-0 focus:ring-offset-0"
-          />
-        </label>
+      <div className="space-y-2">
+        <Switch
+          checked={options.showLabels}
+          onChange={(v) => updateField('showLabels', v)}
+          disabled={disabled}
+          label="Étiquettes sur les pièces"
+          description="N° et dimensions visibles sur le plan"
+          icon={ScanLine}
+        />
+        <Switch
+          checked={options.singleSheetOnly}
+          onChange={(v) => updateField('singleSheetOnly', v)}
+          disabled={disabled}
+          label="Mode 1 feuille unique"
+          description="Limite stricte, alerte si des pièces restent"
+          icon={Layers3}
+        />
+        <Switch
+          checked={options.considerMaterial}
+          onChange={(v) => updateField('considerMaterial', v)}
+          disabled={disabled}
+          label="Répartition multi-matériaux"
+          description="Isole MDF, aluminium et verre"
+          icon={Layers3}
+        />
+        <Switch
+          checked={options.grainDirection}
+          onChange={(v) => updateField('grainDirection', v)}
+          disabled={disabled}
+          label="Verrouiller le sens du fil"
+          description="Interdit la rotation 90° des pièces"
+          icon={Lock}
+        />
       </div>
     </div>
   );
