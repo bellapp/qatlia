@@ -31,7 +31,7 @@ function AuthForm() {
 
   const router = useRouter();
   const searchParams = useSearchParams();
-  const redirectTo = searchParams?.get('redirect') || '/';
+  const redirectTo = searchParams?.get('redirect') || '/atelier';
 
   useEffect(() => {
     async function checkUser() {
@@ -247,7 +247,7 @@ function AuthForm() {
           </button>
 
           <p className="text-center text-[11px] text-slate-600">
-            <Link href="/" className="hover:text-slate-400">
+            <Link href="/atelier" className="hover:text-slate-400">
               Retour à l’atelier
             </Link>
           </p>

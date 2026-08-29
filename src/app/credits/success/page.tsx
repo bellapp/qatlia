@@ -25,7 +25,7 @@ export default function CreditsSuccessPage() {
         </div>
 
         <Link
-          href="/"
+          href="/atelier"
           className="w-full py-3.5 rounded-xl bg-[#F5A623] hover:bg-[#D97706] text-black font-extrabold text-sm flex items-center justify-center gap-2 shadow-lg shadow-orange-500/20 transition-all"
         >
           Retourner au Débit de Panneaux

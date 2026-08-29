@@ -71,7 +71,7 @@ export default function CreditsPage() {
         {/* Top bar */}
         <div className="flex items-center justify-between">
           <Link
-            href="/"
+            href="/atelier"
             className="flex items-center gap-2 text-xs font-bold text-[#94A3B8] hover:text-white transition-colors"
           >
             <ArrowLeft className="w-4 h-4" />

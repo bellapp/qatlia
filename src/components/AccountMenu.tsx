@@ -26,7 +26,7 @@ export function AccountMenu({ email }: AccountMenuProps) {
   const handleLogout = async () => {
     const supabase = createClient();
     await supabase.auth.signOut();
-    router.push('/');
+    router.push('/atelier');
     router.refresh();
   };
 

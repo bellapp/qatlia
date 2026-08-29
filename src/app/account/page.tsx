@@ -88,7 +88,7 @@ export default function AccountPage() {
   const handleLogout = async () => {
     const supabase = createClient();
     await supabase.auth.signOut();
-    router.push('/');
+    router.push('/atelier');
     router.refresh();
   };
 
@@ -97,7 +97,7 @@ export default function AccountPage() {
       <header className="sticky top-0 z-40 border-b border-studio-border/70 bg-studio-canvas/70 backdrop-blur-2xl backdrop-saturate-150">
         <div className="max-w-4xl mx-auto flex items-center justify-between px-4 sm:px-8 h-16">
           <div className="flex items-center gap-3">
-            <Link href="/" className="flex items-center gap-2 px-3 py-2 rounded-xl bg-studio-panel border border-studio-border text-xs font-semibold text-slate-300 hover:bg-studio-field transition-all">
+            <Link href="/atelier" className="flex items-center gap-2 px-3 py-2 rounded-xl bg-studio-panel border border-studio-border text-xs font-semibold text-slate-300 hover:bg-studio-field transition-all">
             <ArrowLeft className="w-4 h-4" />
               Atelier
             </Link>

@@ -136,7 +136,7 @@ export default function HistoryPage() {
   const handleLoadProject = (project: ProjectHistoryItem) => {
     if (project.options_json) {
       sessionStorage.setItem('qatlia_saved_project', JSON.stringify(project.options_json));
-      window.location.href = '/';
+      window.location.href = '/atelier';
     }
   };
 
@@ -154,7 +154,7 @@ export default function HistoryPage() {
       <header className="sticky top-0 z-40 border-b border-studio-border/70 bg-studio-canvas/70 backdrop-blur-2xl backdrop-saturate-150">
         <div className="max-w-6xl mx-auto flex items-center justify-between px-4 sm:px-8 h-16">
           <div className="flex items-center gap-3">
-            <Link href="/" className="flex items-center gap-2 px-3 py-2 rounded-xl bg-studio-panel hover:bg-studio-field text-slate-300 text-xs font-semibold border border-studio-border transition-all">
+            <Link href="/atelier" className="flex items-center gap-2 px-3 py-2 rounded-xl bg-studio-panel hover:bg-studio-field text-slate-300 text-xs font-semibold border border-studio-border transition-all">
               <ArrowLeft className="w-4 h-4" /><span>Atelier</span>
             </Link>
             <div className="flex items-center gap-2">
