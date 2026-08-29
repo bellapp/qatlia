@@ -3,6 +3,7 @@
 import React, { useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { ArrowRight, Lock, Mail, User, X, Gift, Eye, EyeOff } from 'lucide-react';
+import { QatlIALogo } from '@/components/QatlIALogo';
 
 interface AuthModalProps {
   isOpen: boolean;
@@ -87,18 +88,12 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm">
-      <div className="relative w-full max-w-[420px] p-6 sm:p-7 rounded-3xl bg-studio-panel border border-studio-border shadow-2xl space-y-5">
-        <button
-          onClick={onClose}
-          className="absolute right-4 top-4 p-2 text-slate-500 hover:text-white rounded-full hover:bg-studio-panel"
-          aria-label="Fermer"
-        >
-          <X className="w-5 h-5" />
-        </button>
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm animate-in fade-in duration-150">
+      <div className="relative w-full max-w-[420px] p-6 sm:p-7 rounded-3xl bg-studio-panel border border-studio-border shadow-2xl space-y-5 animate-in zoom-in-95 slide-in-from-bottom-4 duration-200">
+        <button onClick={onClose} className="absolute right-4 top-4 p-2 text-slate-500 hover:text-white rounded-full hover:bg-studio-field transition-colors" aria-label="Fermer"><X className="w-5 h-5" /></button>
 
         <div className="space-y-2 pr-8">
-          <div className="w-10 h-10 rounded-xl bg-brand-500 text-slate-950 font-black text-lg flex items-center justify-center">Q</div>
+          <div className="text-brand-400"><QatlIALogo size="md" /></div>
           <h2 className="text-xl font-black text-white">{title}</h2>
           <p className="text-sm text-slate-400">{isLogin ? 'Connectez-vous pour enregistrer ce débit et exporter.' : subtitle}</p>
         </div>

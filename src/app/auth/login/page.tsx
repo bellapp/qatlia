@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { createClient } from '@/lib/supabase/client';
 import { ArrowRight, Lock, Mail, User, Eye, EyeOff, Gift, ShieldCheck, Scissors } from 'lucide-react';
 import { useRouter, useSearchParams } from 'next/navigation';
+import { QatlIALogo } from '@/components/QatlIALogo';
 
 function GoogleMark() {
   return (
@@ -98,13 +99,13 @@ function AuthForm() {
   return (
     <div className="min-h-screen bg-studio-canvas text-slate-100 font-sans antialiased grid lg:grid-cols-2">
       <aside className="hidden lg:flex flex-col justify-between p-12 border-r border-studio-border/80 bg-[radial-gradient(1200px_circle_at_0%_0%,rgba(245,166,35,0.12),transparent_45%)]">
-        <Link href="/" className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-brand-500 to-brand-400 text-slate-950 font-black text-lg flex items-center justify-center">Q</div>
+        <div className="flex items-center gap-3">
+          <div className="text-brand-400"><QatlIALogo size="lg" /></div>
           <div>
-            <p className="font-extrabold tracking-tight">QatlIA</p>
+            <p className="font-display font-extrabold text-lg tracking-tight">QatlIA</p>
             <p className="text-[11px] text-slate-400">Atelier de calepinage</p>
           </div>
-        </Link>
+        </div>
 
         <div className="space-y-8 max-w-md">
           <div>
@@ -135,8 +136,8 @@ function AuthForm() {
       <main className="flex items-center justify-center p-6 sm:p-10">
         <div className="w-full max-w-[420px] space-y-6">
           <div className="lg:hidden flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl bg-brand-500 text-slate-950 font-black flex items-center justify-center">Q</div>
-            <span className="font-extrabold">QatlIA</span>
+            <div className="text-brand-400"><QatlIALogo size="sm" /></div>
+            <span className="font-display font-extrabold">QatlIA</span>
           </div>
 
           <div>

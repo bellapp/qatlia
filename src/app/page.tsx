@@ -31,6 +31,7 @@ import {
 import { OptionsPanel } from '@/components/OptionsPanel';
 import { PiecesManager } from '@/components/PiecesManager';
 import { AuthModal } from '@/components/AuthModal';
+import { EmptyState } from '@/components/EmptyState';
 import { AccountMenu } from '@/components/AccountMenu';
 import { QatlIALogo } from '@/components/QatlIALogo';
 import { writeLocalHistoryItem, type LocalHistoryItem } from '@/lib/history';
@@ -809,18 +810,7 @@ export default function Dashboard() {
                 )}
               </>
             ) : (
-              /* Empty State */
-              <div className="p-16 rounded-3xl bg-studio-panel/30 border border-dashed border-studio-border/80 text-center flex flex-col items-center gap-4 min-h-[460px] justify-center">
-                <div className="w-16 h-16 rounded-2xl bg-studio-field border border-studio-border flex items-center justify-center">
-                  <Scissors className="w-7 h-7 text-slate-600" />
-                </div>
-                <div>
-                  <h3 className="text-base font-black text-slate-300 mb-1">Prêt pour le calepinage</h3>
-                  <p className="text-xs text-slate-500 max-w-xs leading-relaxed">
-                    Ajoutez vos pièces et lancez l&apos;optimisation pour visualiser le plan de coupe.
-                  </p>
-                </div>
-              </div>
+              <EmptyState type="ready" />
             )}
           </div>
         </div>
