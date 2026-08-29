@@ -66,13 +66,13 @@ export default function CreditsPage() {
   };
 
   return (
-    <div className="min-h-screen bg-studio-panel text-[#E2E8F0] font-sans antialiased p-6 md:p-10">
+    <div className="min-h-screen bg-studio-panel text-slate-700 dark:text-slate-200 font-sans antialiased p-6 md:p-10">
       <div className="max-w-5xl mx-auto space-y-8">
         {/* Top bar */}
         <div className="flex items-center justify-between">
           <Link
             href="/atelier"
-            className="flex items-center gap-2 text-xs font-bold text-[#94A3B8] hover:text-slate-900 dark:text-white transition-colors"
+            className="flex items-center gap-2 text-xs font-bold text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:text-white transition-colors"
           >
             <ArrowLeft className="w-4 h-4" />
             Retour au Dashboard
@@ -91,7 +91,7 @@ export default function CreditsPage() {
           <h1 className="text-3xl md:text-4xl font-black text-slate-900 dark:text-white">
             10 DH = 10 Analyses IA de Mesures
           </h1>
-          <p className="text-sm text-[#94A3B8] max-w-xl mx-auto">
+          <p className="text-sm text-slate-600 dark:text-slate-400 max-w-xl mx-auto">
             1 crédit est consommé uniquement lors d&apos;une analyse photo IA réussie. L&apos;optimisation du schéma et les exports sont 100% gratuits et illimités.
           </p>
         </div>
@@ -104,7 +104,7 @@ export default function CreditsPage() {
               className={`rounded-2xl p-6 flex flex-col justify-between transition-all relative ${
                 p.highlight
                   ? 'bg-gradient-to-b from-[#1E3A5F] to-[#0F172A] border-2 border-[#F5A623] shadow-xl shadow-orange-500/10'
-                  : 'bg-studio-panel/60 border border-[#334155]'
+                  : 'bg-studio-panel/60 border border-studio-border'
               }`}
             >
               {p.highlight && (
@@ -119,13 +119,13 @@ export default function CreditsPage() {
                 </div>
                 <div className="flex items-baseline gap-1 my-3">
                   <span className="text-3xl font-black text-slate-900 dark:text-white">{p.priceMAD}</span>
-                  <span className="text-sm font-bold text-[#94A3B8]">
+                  <span className="text-sm font-bold text-slate-600 dark:text-slate-400">
                     DH {p.id === 'unlimited' ? '/mois' : ''}
                   </span>
                 </div>
-                <p className="text-xs text-[#94A3B8] leading-relaxed mb-6">{p.desc}</p>
+                <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed mb-6">{p.desc}</p>
 
-                <div className="space-y-2.5 pt-4 border-t border-[#334155]/60 text-xs">
+                <div className="space-y-2.5 pt-4 border-t border-studio-border/60 text-xs">
                   <div className="flex items-center gap-2 text-slate-900 dark:text-white">
                     <Check className="w-4 h-4 text-emerald-400 shrink-0" />
                     <span><strong>{p.credits}</strong> analyses photo IA</span>
@@ -164,7 +164,7 @@ export default function CreditsPage() {
         </div>
 
         {/* Payment Methods Banner */}
-        <div className="p-4 rounded-2xl bg-studio-panel/40 border border-[#334155] flex flex-wrap items-center justify-between text-xs text-[#94A3B8] gap-4">
+        <div className="p-4 rounded-2xl bg-studio-panel/40 border border-studio-border flex flex-wrap items-center justify-between text-xs text-slate-600 dark:text-slate-400 gap-4">
           <div className="flex items-center gap-2">
             <ShieldCheck className="w-4 h-4 text-sky-400" />
             <span>Paiement sécurisé par <strong>Stripe</strong> (Cartes bancaires Visa / Mastercard) et CMI / CashPlus</span>

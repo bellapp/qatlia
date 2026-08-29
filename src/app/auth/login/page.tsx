@@ -158,7 +158,7 @@ function AuthForm() {
             type="button"
             onClick={handleOAuthGoogle}
             disabled={oauthLoading || loading}
-            className="w-full py-3 px-4 rounded-xl bg-white dark:bg-studio-field hover:bg-slate-100 text-slate-900 font-semibold text-sm flex items-center justify-center gap-3 disabled:opacity-50"
+            className="w-full py-3 px-4 rounded-xl bg-white dark:bg-studio-field hover:bg-slate-100 dark:hover:bg-studio-border dark:hover:bg-studio-border text-slate-900 dark:text-white font-semibold text-sm flex items-center justify-center gap-3 disabled:opacity-50"
           >
             <GoogleMark />
             {oauthLoading ? 'Redirection Google…' : 'Continuer avec Google'}

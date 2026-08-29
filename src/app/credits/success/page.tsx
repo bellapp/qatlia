@@ -14,12 +14,12 @@ export default function CreditsSuccessPage() {
 
         <div className="space-y-2">
           <h1 className="text-2xl font-black text-slate-900 dark:text-white">Recharge Réussie !</h1>
-          <p className="text-sm text-[#94A3B8]">
+          <p className="text-sm text-slate-600 dark:text-slate-400">
             Vos crédits d&apos;analyse IA ont été ajoutés à votre compte. Vous pouvez maintenant analyser vos photos de découpe.
           </p>
         </div>
 
-        <div className="p-4 rounded-2xl bg-studio-panel border border-[#334155] flex items-center justify-center gap-2 text-brand-400 font-bold text-sm">
+        <div className="p-4 rounded-2xl bg-studio-panel border border-studio-border flex items-center justify-center gap-2 text-brand-400 font-bold text-sm">
           <Zap className="w-4 h-4 text-[#F5A623]" />
           <span>Solde de crédits mis à jour</span>
         </div>
