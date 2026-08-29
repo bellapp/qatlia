@@ -38,6 +38,7 @@ import { EmptyState } from '@/components/EmptyState';
 import { AccountMenu } from '@/components/AccountMenu';
 import { QatlIALogo } from '@/components/QatlIALogo';
 import { ThemeToggle } from '@/components/ThemeToggle';
+import { useTheme } from '@/components/ThemeProvider';
 import { OnboardingTour } from '@/components/OnboardingTour';
 import { LocaleSwitcher } from '@/components/LocaleProvider';
 import { writeLocalHistoryItem, type LocalHistoryItem } from '@/lib/history';
@@ -73,6 +74,8 @@ export default function Dashboard() {
   const [showAdvancedOptions, setShowAdvancedOptions] = useState<boolean>(false);
 
   const activeSheet = sheets[0] || DEFAULT_SHEETS[0];
+  const { theme } = useTheme();
+  const isDark = theme === 'dark';
 
   useEffect(() => {
     async function loadUser() {
@@ -752,35 +755,43 @@ export default function Dashboard() {
                   </div>
 
                   {/* SVG Canvas */}
-                  <div className="p-5 bg-[#040812] flex items-center justify-center min-h-[420px]">
+                  <div className={isDark ? 'p-5 bg-[#040812] flex items-center justify-center min-h-[420px]' : 'p-5 bg-[#F1F5F9] flex items-center justify-center min-h-[420px]'}>
                     <div style={{ transform: `scale(${zoomLevel})`, transformOrigin: 'center', transition: 'transform 0.2s ease' }}>
                       <svg
                         viewBox={`0 0 ${activeSheet.width} ${activeSheet.height}`}
                         className="w-full max-w-[480px] aspect-[208/278] rounded-xl"
                         style={{ filter: 'drop-shadow(0 4px 6px rgba(0,0,0,0.4))' }}
                       >
-                        {/* Sheet background with subtle gradient */}
                         <defs>
-                          <linearGradient id="sheetBg" x1="0" y1="0" x2="1" y2="1">
-                            <stop offset="0%" stopColor="#0D1A30" />
-                            <stop offset="100%" stopColor="#07101F" />
+                          <linearGradient id="sheetBgL" x1="0" y1="0" x2="1" y2="1">
+                            <stop offset="0%" stopColor="#FFFFFF" /><stop offset="100%" stopColor="#F8FAFC" />
                           </linearGradient>
-                          <pattern id="hatch" patternUnits="userSpaceOnUse" width="8" height="8" patternTransform="rotate(45)">
-                            <line x1="0" y1="0" x2="0" y2="8" stroke="#1A2744" strokeWidth="0.5" opacity="0.6"/>
+                          <linearGradient id="sheetBgD" x1="0" y1="0" x2="1" y2="1">
+                            <stop offset="0%" stopColor="#0D1A30" /><stop offset="100%" stopColor="#07101F" />
+                          </linearGradient>
+                          <pattern id="hatchL" patternUnits="userSpaceOnUse" width="8" height="8" patternTransform="rotate(45)">
+                            <line x1="0" y1="0" x2="0" y2="8" stroke="#CBD5E1" strokeWidth="0.5" opacity="0.9"/>
+                          </pattern>
+                          <pattern id="hatchD" patternUnits="userSpaceOnUse" width="8" height="8" patternTransform="rotate(45)">
+                            <line x1="0" y1="0" x2="0" y2="8" stroke="#1A2744" strokeWidth="0.5" opacity="0.7"/>
                           </pattern>
                         </defs>
 
-                        <rect x="0" y="0" width={activeSheet.width} height={activeSheet.height} fill="url(#sheetBg)" stroke="#1E3050" strokeWidth="0.6" rx="0.3" />
+                        <rect x="0" y="0" width={activeSheet.width} height={activeSheet.height}
+                          fill={isDark ? 'url(#sheetBgD)' : 'url(#sheetBgL)'}
+                          stroke={isDark ? '#4A5568' : '#94A3B8'} strokeWidth={isDark ? 1 : 1.5} rx="0.5" />
 
-                        {/* Offcuts with hatch pattern */}
                         {result.offcuts && result.offcuts.filter(o => o.sheetIndex === activeSheetIndex).map((off, oIdx) => {
                           const minSide = Math.min(off.width, off.height);
                           return (
                             <g key={`off_${oIdx}`}>
-                              <rect x={off.x} y={off.y} width={off.width} height={off.height} fill="url(#hatch)" stroke="#1A2744" strokeWidth="0.3" strokeDasharray="1.5 1" opacity="0.7" />
-                              <rect x={off.x} y={off.y} width={off.width} height={off.height} fill="none" stroke="#243356" strokeWidth="0.4" />
+                              <rect x={off.x} y={off.y} width={off.width} height={off.height}
+                                fill={isDark ? 'url(#hatchD)' : 'url(#hatchL)'}
+                                stroke={isDark ? '#2D3A5C' : '#94A3B8'} strokeWidth="0.4" strokeDasharray="2 2" opacity="0.8" />
                               {off.width>=14 && off.height>=10 && (
-                                <text x={off.x+off.width/2} y={off.y+off.height/2} textAnchor="middle" dominantBaseline="central" fill="#5B7DA6" fontSize={Math.min(4.5, Math.max(2.2, minSide/12))} fontFamily="monospace" fontWeight="bold">
+                                <text x={off.x+off.width/2} y={off.y+off.height/2} textAnchor="middle" dominantBaseline="central"
+                                  fill={isDark ? '#5B7DA6' : '#64748B'} fontSize={Math.min(4.5, Math.max(2.2, minSide/12))}
+                                  fontFamily="monospace" fontWeight="bold">
                                   {Math.round(off.height*10)/10} × {Math.round(off.width*10)/10}
                                 </text>
                               )}
@@ -788,7 +799,6 @@ export default function Dashboard() {
                           );
                         })}
 
-                        {/* Placed pieces with gradient fills */}
                         {result.placedPieces.filter(p => p.sheetIndex === activeSheetIndex).map((p) => {
                           const palette = ['#F59E0B','#3B82F6','#10B981','#EC4899','#8B5CF6','#F97316','#14B8A6','#6366F1'];
                           const col = palette[(p.pieceNumber-1)%palette.length];
@@ -798,23 +808,21 @@ export default function Dashboard() {
                             <g key={`${p.sheetIndex}_${p.pieceNumber}`}>
                               <defs>
                                 <linearGradient id={gradId} x1="0" y1="0" x2="1" y2="1">
-                                  <stop offset="0%" stopColor={col} stopOpacity="0.85"/>
-                                  <stop offset="100%" stopColor={col} stopOpacity="0.6"/>
+                                  <stop offset="0%" stopColor={col} stopOpacity="0.85"/><stop offset="100%" stopColor={col} stopOpacity="0.6"/>
                                 </linearGradient>
                               </defs>
-                              <rect x={p.x} y={p.y} width={p.width} height={p.height} fill={`url(#${gradId})`} stroke="#050A14" strokeWidth={Math.max(0.3, (options.kerfWidth||3)/10)} rx="0.3" />
-                              {options.showLabels && (
-                                <>
-                                  <text x={p.x+p.width/2} y={p.y+p.height/2-(minSide>=20?3:0)} textAnchor="middle" dominantBaseline="central" fill="#050A14" fontSize={Math.min(5.5,Math.max(2.5,minSide/12))} fontWeight="black" fontFamily="monospace">
-                                    #{p.pieceNumber}
-                                  </text>
-                                  {minSide>=10 && (
-                                    <text x={p.x+p.width/2} y={p.y+p.height/2+(minSide>=20?3.5:2)} textAnchor="middle" dominantBaseline="central" fill="#050A14" fontSize={Math.min(4.5,Math.max(2,minSide/14))} fontWeight="bold" fontFamily="monospace">
-                                      {Math.round(p.height*10)/10}×{Math.round(p.width*10)/10}
-                                    </text>
-                                  )}
-                                </>
-                              )}
+                              <rect x={p.x} y={p.y} width={p.width} height={p.height} fill={`url(#${gradId})`}
+                                stroke={isDark ? '#050A14' : '#334155'} strokeWidth={Math.max(0.4, (options.kerfWidth||3)/10)} rx="0.3" />
+                              {options.showLabels && (<>
+                                <text x={p.x+p.width/2} y={p.y+p.height/2-(minSide>=20?3:0)} textAnchor="middle" dominantBaseline="central"
+                                  fill={isDark ? '#050A14' : '#1E293B'} fontSize={Math.min(5.5,Math.max(2.5,minSide/12))}
+                                  fontWeight="black" fontFamily="monospace">#{p.pieceNumber}</text>
+                                {minSide>=10 && (
+                                  <text x={p.x+p.width/2} y={p.y+p.height/2+(minSide>=20?3.5:2)} textAnchor="middle" dominantBaseline="central"
+                                    fill={isDark ? '#050A14' : '#1E293B'} fontSize={Math.min(4.5,Math.max(2,minSide/14))}
+                                    fontWeight="bold" fontFamily="monospace">{Math.round(p.height*10)/10}×{Math.round(p.width*10)/10}</text>
+                                )}
+                              </>)}
                             </g>
                           );
                         })}

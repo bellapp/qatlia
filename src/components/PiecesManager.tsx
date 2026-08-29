@@ -281,7 +281,7 @@ export const PiecesManager: React.FC<PiecesManagerProps> = ({
                       step="0.1"
                       value={Number(p.height.toFixed(1))}
                       onChange={(e) => handleUpdate(p.id || '', 'height', parseFloat(e.target.value) || 0)}
-                      className="w-12 sm:w-14 text-right bg-transparent text-slate-900 dark:text-slate-100 font-bold outline-none focus:bg-studio-field/60 focus:rounded px-1 py-0.5 -mx-1 tabular-nums"
+                      className="w-12 sm:w-14 text-right bg-transparent text-slate-900 dark:text-slate-100 font-bold outline-none border-b border-dashed border-slate-300 dark:border-slate-600 hover:border-brand-400 focus:border-brand-400 focus:bg-studio-field/60 focus:rounded px-1 py-0.5 -mx-1 tabular-nums cursor-text transition-colors"
                       aria-label="Hauteur cm"
                     />
                     <span className="text-slate-600">×</span>
@@ -290,7 +290,7 @@ export const PiecesManager: React.FC<PiecesManagerProps> = ({
                       step="0.1"
                       value={Number(p.width.toFixed(1))}
                       onChange={(e) => handleUpdate(p.id || '', 'width', parseFloat(e.target.value) || 0)}
-                      className="w-12 sm:w-14 text-right bg-transparent text-slate-900 dark:text-slate-100 font-bold outline-none focus:bg-studio-field/60 focus:rounded px-1 py-0.5 -mx-1 tabular-nums"
+                      className="w-12 sm:w-14 text-right bg-transparent text-slate-900 dark:text-slate-100 font-bold outline-none border-b border-dashed border-slate-300 dark:border-slate-600 hover:border-brand-400 focus:border-brand-400 focus:bg-studio-field/60 focus:rounded px-1 py-0.5 -mx-1 tabular-nums cursor-text transition-colors"
                       aria-label="Largeur cm"
                     />
                   </div>
