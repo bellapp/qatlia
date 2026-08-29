@@ -6,7 +6,9 @@
     "dev": "next dev",
     "build": "npx tailwindcss -i ./src/app/globals.css -o ./public/styles.css --minify && next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "test:e2e": "playwright test",
+    "test:e2e:ui": "playwright test --ui"
   },
   "dependencies": {
     "@supabase/ssr": "^0.12.4",
