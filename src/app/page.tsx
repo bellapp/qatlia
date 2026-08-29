@@ -8,8 +8,6 @@ import {
   RefreshCw,
   ZoomIn,
   ZoomOut,
-  ChevronLeft,
-  ChevronRight,
   Zap,
   AlertTriangle,
   Camera,
@@ -616,287 +614,193 @@ export default function Dashboard() {
             {result ? (
               <>
                 {/* Financial Gain Banner */}
-                <div className="p-4 rounded-2xl bg-gradient-to-r from-emerald-950/40 via-slate-900/80 to-slate-900/80 border border-emerald-500/30 flex flex-wrap items-center justify-between gap-3 shadow-md">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400 font-bold shrink-0">
-                      <TrendingUp className="w-5 h-5" />
-                    </div>
+                <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-emerald-950/60 via-studio-panel/80 to-studio-panel border border-emerald-500/20 p-5">
+                  <div className="absolute top-0 right-0 w-48 h-48 bg-emerald-500/5 rounded-full blur-3xl -translate-y-1/2 translate-x-1/4 pointer-events-none" />
+                  <div className="relative flex flex-wrap items-center justify-between gap-4">
                     <div>
-                      <span className="text-[10px] font-bold text-emerald-400 uppercase tracking-wider">
-                        Gain Économique Estimé (Débit Optimisé)
-                      </span>
-                      <p className="text-xl font-black text-white">
-                        + {result.moneySavedMad?.toLocaleString('fr-FR') || 0} MAD Économisés
+                      <p className="text-[10px] font-bold uppercase tracking-[0.15em] text-emerald-400 mb-1">Gain économique estimé</p>
+                      <p className="text-3xl font-black text-white tracking-tight">
+                        + {result.moneySavedMad?.toLocaleString('fr-FR') || 0} <span className="text-emerald-400">MAD</span>
+                      </p>
+                      <p className="text-[11px] text-slate-500 mt-1">
+                        {result.totalLinearCutMeters || 0} m linéaires de coupe · {result.sheetsUsed} panneau{result.sheetsUsed > 1 ? 'x' : ''}
                       </p>
                     </div>
-                  </div>
-                  <div className="text-right">
-                    <span className="text-[10px] text-slate-400">Linéaire de coupe</span>
-                    <p className="text-xs font-mono font-bold text-slate-200">{result.totalLinearCutMeters || 0} m de passes</p>
+                    <div className="shrink-0 w-14 h-14 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center">
+                      <TrendingUp className="w-6 h-6 text-emerald-400" />
+                    </div>
                   </div>
                 </div>
 
                 {/* Performance Metrics Grid */}
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
-                  <div className="p-3 rounded-2xl bg-studio-panel/60 border border-studio-border">
-                    <span className="text-[10px] text-slate-400 font-medium block">Feuilles requises</span>
-                    <p className="text-xl font-black text-white font-mono mt-0.5">{result.sheetsUsed}</p>
-                    <span className="text-[10px] text-slate-500">{sheet.height} × {sheet.width} cm</span>
+                <div className="grid grid-cols-4 gap-2">
+                  <div className="p-3.5 rounded-xl bg-studio-panel/60 border border-studio-border/80 flex flex-col items-center text-center gap-1">
+                    <span className="text-[9px] font-bold uppercase tracking-wider text-slate-500">Feuilles</span>
+                    <span className="text-2xl font-black font-mono text-white tabular-nums">{result.sheetsUsed}</span>
+                    <span className="text-[9px] text-slate-600 truncate">{sheet.height}×{sheet.width}</span>
                   </div>
-
-                  <div className="p-3 rounded-2xl bg-studio-panel/60 border border-studio-border">
-                    <span className="text-[10px] text-slate-400 font-medium block">Surface utile</span>
-                    <p className="text-xl font-black text-emerald-400 font-mono mt-0.5">
-                      {(100 - result.wastePercentage).toFixed(1)}%
-                    </p>
-                    <span className="text-[10px] text-emerald-500/80">Efficacité de coupe</span>
+                  <div className="p-3.5 rounded-xl bg-studio-panel/60 border border-studio-border/80 flex flex-col items-center text-center gap-1">
+                    <span className="text-[9px] font-bold uppercase tracking-wider text-slate-500">Utile</span>
+                    <span className="text-2xl font-black font-mono text-emerald-400 tabular-nums">{(100 - result.wastePercentage).toFixed(0)}%</span>
+                    <span className="text-[9px] text-emerald-500/60">surface</span>
                   </div>
-
-                  <div className="p-3 rounded-2xl bg-studio-panel/60 border border-studio-border">
-                    <span className="text-[10px] text-slate-400 font-medium block">Taux de chute</span>
-                    <p className="text-xl font-black text-brand-400 font-mono mt-0.5">
-                      {result.wastePercentage.toFixed(1)}%
-                    </p>
-                    <span className="text-[10px] text-brand-500/80">Chute résiduelle</span>
+                  <div className="p-3.5 rounded-xl bg-studio-panel/60 border border-studio-border/80 flex flex-col items-center text-center gap-1">
+                    <span className="text-[9px] font-bold uppercase tracking-wider text-slate-500">Chute</span>
+                    <span className="text-2xl font-black font-mono text-brand-400 tabular-nums">{result.wastePercentage.toFixed(0)}%</span>
+                    <span className="text-[9px] text-brand-500/60">résiduelle</span>
                   </div>
-
-                  <div className="p-3 rounded-2xl bg-studio-panel/60 border border-studio-border">
-                    <span className="text-[10px] text-slate-400 font-medium block">Pièces placées</span>
-                    <p className="text-xl font-black text-sky-400 font-mono mt-0.5">
-                      {result.placedPieces.length} pcs
-                    </p>
-                    <span className="text-[10px] text-sky-400/80">100% complété</span>
+                  <div className="p-3.5 rounded-xl bg-studio-panel/60 border border-studio-border/80 flex flex-col items-center text-center gap-1">
+                    <span className="text-[9px] font-bold uppercase tracking-wider text-slate-500">Pièces</span>
+                    <span className="text-2xl font-black font-mono text-sky-400 tabular-nums">{result.placedPieces.length}</span>
+                    <span className="text-[9px] text-sky-400/60">placées</span>
                   </div>
                 </div>
 
-                {/* 2D Visualizer Canvas Studio */}
-                <div className="rounded-3xl bg-studio-panel/70 border border-studio-border/90 p-5 shadow-lg space-y-4">
-                  {/* Canvas Header */}
-                  <div className="flex flex-wrap items-center justify-between gap-3">
-                    <div className="flex items-center gap-2">
-                      <h3 className="text-xs font-bold uppercase tracking-wider text-white">
-                        Schéma de Coupe — Panneau {activeSheetIndex + 1} / {result.sheetsUsed}
-                      </h3>
-                    </div>
-
-                    <div className="flex items-center gap-2">
-                      {result.sheetsUsed > 1 && (
-                        <div className="flex items-center bg-studio-field rounded-xl border border-studio-border p-0.5">
-                          <button
-                            onClick={() => setActiveSheetIndex(Math.max(0, activeSheetIndex - 1))}
-                            disabled={activeSheetIndex === 0}
-                            className="p-1 rounded-lg hover:bg-slate-800 text-white disabled:opacity-30 cursor-pointer"
-                          >
-                            <ChevronLeft className="w-4 h-4" />
-                          </button>
-                          <span className="text-xs font-mono font-bold px-2 text-slate-300">
-                            {activeSheetIndex + 1} / {result.sheetsUsed}
+                {/* 2D Visualizer */}
+                <div className="overflow-hidden rounded-2xl border border-studio-border/80">
+                  {/* Tabs for sheets */}
+                  <div className="flex items-center justify-between px-4 py-2.5 bg-studio-panel/40 border-b border-studio-border/60">
+                    <div className="flex items-center gap-1">
+                      {Array.from({length: result.sheetsUsed}).map((_, i) => (
+                        <button
+                          key={i}
+                          onClick={() => setActiveSheetIndex(i)}
+                          className={`px-3 py-1.5 rounded-lg text-[11px] font-bold transition-all ${
+                            i === activeSheetIndex
+                              ? 'bg-brand-500/15 text-brand-400 border border-brand-500/30'
+                              : 'text-slate-500 hover:text-slate-300'
+                          }`}
+                        >
+                          Panneau {i+1}
+                          <span className="ml-1.5 text-[10px] text-slate-600 font-mono">
+                            {result.sheets[i]?.wasteRate?.toFixed(0)}%
                           </span>
-                          <button
-                            onClick={() => setActiveSheetIndex(Math.min(result.sheetsUsed - 1, activeSheetIndex + 1))}
-                            disabled={activeSheetIndex === result.sheetsUsed - 1}
-                            className="p-1 rounded-lg hover:bg-slate-800 text-white disabled:opacity-30 cursor-pointer"
-                          >
-                            <ChevronRight className="w-4 h-4" />
-                          </button>
-                        </div>
-                      )}
-
-                      <div className="flex items-center bg-studio-field rounded-xl border border-studio-border p-0.5 text-slate-300">
-                        <button
-                          onClick={() => setZoomLevel(Math.max(0.6, zoomLevel - 0.2))}
-                          className="p-1 rounded-lg hover:bg-slate-800 cursor-pointer"
-                        >
-                          <ZoomOut className="w-4 h-4" />
                         </button>
-                        <span className="text-[10px] font-mono px-1.5">{Math.round(zoomLevel * 100)}%</span>
-                        <button
-                          onClick={() => setZoomLevel(Math.min(2.5, zoomLevel + 0.2))}
-                          className="p-1 rounded-lg hover:bg-slate-800 cursor-pointer"
-                        >
-                          <ZoomIn className="w-4 h-4" />
-                        </button>
-                      </div>
+                      ))}
+                    </div>
+                    <div className="flex items-center gap-1.5 bg-studio-field rounded-lg border border-studio-border p-0.5">
+                      <button onClick={() => setZoomLevel(Math.max(0.5, zoomLevel - 0.25))} className="p-1 rounded-md hover:bg-studio-border transition-colors text-slate-400">
+                        <ZoomOut className="w-3.5 h-3.5" />
+                      </button>
+                      <span className="text-[10px] font-mono text-slate-400 tabular-nums px-1 w-10 text-center">{Math.round(zoomLevel*100)}%</span>
+                      <button onClick={() => setZoomLevel(Math.min(2.5, zoomLevel + 0.25))} className="p-1 rounded-md hover:bg-studio-border transition-colors text-slate-400">
+                        <ZoomIn className="w-3.5 h-3.5" />
+                      </button>
                     </div>
                   </div>
 
-                  {/* SVG Drawing Canvas */}
-                  <div className="w-full rounded-2xl bg-[#040812] border border-studio-border/80 p-4 flex items-center justify-center min-h-[420px] overflow-auto">
-                    <div
-                      style={{
-                        transform: `scale(${zoomLevel})`,
-                        transformOrigin: 'center center',
-                        transition: 'transform 0.15s ease',
-                      }}
-                      className="flex flex-col items-center"
-                    >
+                  {/* SVG Canvas */}
+                  <div className="p-5 bg-[#040812] flex items-center justify-center min-h-[420px]">
+                    <div style={{ transform: `scale(${zoomLevel})`, transformOrigin: 'center', transition: 'transform 0.2s ease' }}>
                       <svg
                         viewBox={`0 0 ${sheet.width} ${sheet.height}`}
-                        className="w-full max-w-[460px] max-h-[580px] aspect-[208/278] bg-studio-field rounded-lg shadow-2xl border-2 border-studio-border-hover"
+                        className="w-full max-w-[480px] aspect-[208/278] rounded-xl"
+                        style={{ filter: 'drop-shadow(0 4px 6px rgba(0,0,0,0.4))' }}
                       >
-                        {/* Fond Panneau */}
-                        <rect x="0" y="0" width={sheet.width} height={sheet.height} fill="#0B132B" stroke="#334155" strokeWidth="0.5" />
+                        {/* Sheet background with subtle gradient */}
+                        <defs>
+                          <linearGradient id="sheetBg" x1="0" y1="0" x2="1" y2="1">
+                            <stop offset="0%" stopColor="#0D1A30" />
+                            <stop offset="100%" stopColor="#07101F" />
+                          </linearGradient>
+                          <pattern id="hatch" patternUnits="userSpaceOnUse" width="8" height="8" patternTransform="rotate(45)">
+                            <line x1="0" y1="0" x2="0" y2="8" stroke="#1A2744" strokeWidth="0.5" opacity="0.6"/>
+                          </pattern>
+                        </defs>
 
-                        {/* Chutes Réutilisables Grisées avec Bordure */}
-                        {result.offcuts && result.offcuts
-                          .filter((o) => o.sheetIndex === activeSheetIndex)
-                          .map((off, oIdx) => {
-                            const dispH = Math.round(off.height * 10) / 10;
-                            const dispW = Math.round(off.width * 10) / 10;
+                        <rect x="0" y="0" width={sheet.width} height={sheet.height} fill="url(#sheetBg)" stroke="#1E3050" strokeWidth="0.6" rx="0.3" />
 
-                            return (
-                              <g key={`off_${oIdx}`}>
-                                <rect
-                                  x={off.x}
-                                  y={off.y}
-                                  width={off.width}
-                                  height={off.height}
-                                  fill="#162238"
-                                  stroke="#0A0F1D"
-                                  strokeWidth={0.4}
-                                  opacity="0.95"
-                                />
-                                {off.width >= 10 && off.height >= 7 && (
-                                  <text
-                                    x={off.x + off.width / 2}
-                                    y={off.y + off.height / 2}
-                                    textAnchor="middle"
-                                    dominantBaseline="central"
-                                    fill="#7E8FA6"
-                                    fontSize={Math.min(5, Math.max(2, Math.min(off.width, off.height) / 10))}
-                                    fontStyle="normal"
-                                    fontFamily="sans-serif"
-                                  >
-                                    {dispH} × {dispW} cm
+                        {/* Offcuts with hatch pattern */}
+                        {result.offcuts && result.offcuts.filter(o => o.sheetIndex === activeSheetIndex).map((off, oIdx) => {
+                          const minSide = Math.min(off.width, off.height);
+                          return (
+                            <g key={`off_${oIdx}`}>
+                              <rect x={off.x} y={off.y} width={off.width} height={off.height} fill="url(#hatch)" stroke="#1A2744" strokeWidth="0.3" strokeDasharray="1.5 1" opacity="0.7" />
+                              <rect x={off.x} y={off.y} width={off.width} height={off.height} fill="none" stroke="#243356" strokeWidth="0.4" />
+                              {off.width>=14 && off.height>=10 && (
+                                <text x={off.x+off.width/2} y={off.y+off.height/2} textAnchor="middle" dominantBaseline="central" fill="#5B7DA6" fontSize={Math.min(4.5, Math.max(2.2, minSide/12))} fontFamily="monospace" fontWeight="bold">
+                                  {Math.round(off.height*10)/10} × {Math.round(off.width*10)/10}
+                                </text>
+                              )}
+                            </g>
+                          );
+                        })}
+
+                        {/* Placed pieces with gradient fills */}
+                        {result.placedPieces.filter(p => p.sheetIndex === activeSheetIndex).map((p) => {
+                          const palette = ['#F59E0B','#3B82F6','#10B981','#EC4899','#8B5CF6','#F97316','#14B8A6','#6366F1'];
+                          const col = palette[(p.pieceNumber-1)%palette.length];
+                          const gradId = `g_${p.sheetIndex}_${p.pieceNumber}`;
+                          const minSide = Math.min(p.width, p.height);
+                          return (
+                            <g key={`${p.sheetIndex}_${p.pieceNumber}`}>
+                              <defs>
+                                <linearGradient id={gradId} x1="0" y1="0" x2="1" y2="1">
+                                  <stop offset="0%" stopColor={col} stopOpacity="0.85"/>
+                                  <stop offset="100%" stopColor={col} stopOpacity="0.6"/>
+                                </linearGradient>
+                              </defs>
+                              <rect x={p.x} y={p.y} width={p.width} height={p.height} fill={`url(#${gradId})`} stroke="#050A14" strokeWidth={Math.max(0.3, (options.kerfWidth||3)/10)} rx="0.3" />
+                              {options.showLabels && (
+                                <>
+                                  <text x={p.x+p.width/2} y={p.y+p.height/2-(minSide>=20?3:0)} textAnchor="middle" dominantBaseline="central" fill="#050A14" fontSize={Math.min(5.5,Math.max(2.5,minSide/12))} fontWeight="black" fontFamily="monospace">
+                                    #{p.pieceNumber}
                                   </text>
-                                )}
-                              </g>
-                            );
-                          })}
-
-                        {/* Pièces Placée Utiles */}
-                        {result.placedPieces
-                          .filter((p) => p.sheetIndex === activeSheetIndex)
-                          .map((p) => {
-                            const colors = [
-                              '#F59E0B', '#38BDF8', '#10B981', '#EC4899', '#8B5CF6', '#F97316', '#14B8A6', '#6366F1'
-                            ];
-                            const color = colors[(p.pieceNumber - 1) % colors.length];
-                            const dispH = Math.round(p.height * 10) / 10;
-                            const dispW = Math.round(p.width * 10) / 10;
-                            const minSide = Math.min(p.width, p.height);
-
-                            return (
-                              <g key={`${p.sheetIndex}_${p.pieceNumber}`}>
-                                <rect
-                                  x={p.x}
-                                  y={p.y}
-                                  width={p.width}
-                                  height={p.height}
-                                  fill={color}
-                                  stroke="#070C18"
-                                  strokeWidth={Math.max(0.3, options.kerfWidth / 10)}
-                                  rx={0.5}
-                                />
-                                {options.showLabels && (
-                                  <>
-                                    <text
-                                      x={p.x + p.width / 2}
-                                      y={p.y + p.height / 2 - (p.height >= 25 ? 3 : 0)}
-                                      textAnchor="middle"
-                                      dominantBaseline="central"
-                                      fill="#000000"
-                                      fontSize={Math.min(6, Math.max(2.2, minSide / 10))}
-                                      fontWeight="bold"
-                                      fontFamily="sans-serif"
-                                    >
-                                      #{p.pieceNumber} {p.name && minSide >= 30 ? `• ${p.name}` : ''}
+                                  {minSide>=10 && (
+                                    <text x={p.x+p.width/2} y={p.y+p.height/2+(minSide>=20?3.5:2)} textAnchor="middle" dominantBaseline="central" fill="#050A14" fontSize={Math.min(4.5,Math.max(2,minSide/14))} fontWeight="bold" fontFamily="monospace">
+                                      {Math.round(p.height*10)/10}×{Math.round(p.width*10)/10}
                                     </text>
-                                    {p.height >= 12 && p.width >= 12 && (
-                                      <text
-                                        x={p.x + p.width / 2}
-                                        y={p.y + p.height / 2 + (p.height >= 25 ? 3.5 : 0)}
-                                        textAnchor="middle"
-                                        dominantBaseline="central"
-                                        fill="#000000"
-                                        fontSize={Math.min(5, Math.max(1.8, minSide / 12))}
-                                        fontWeight="bold"
-                                        fontFamily="monospace"
-                                      >
-                                        {dispH} × {dispW} cm
-                                      </text>
-                                    )}
-                                  </>
-                                )}
-                              </g>
-                            );
-                          })}
+                                  )}
+                                </>
+                              )}
+                            </g>
+                          );
+                        })}
                       </svg>
                     </div>
                   </div>
-
-                  {/* Actions Footer */}
-                  <div className="flex flex-wrap items-center justify-between gap-3 pt-2">
-                    <span className="text-xs text-slate-400">
-                      Chute panneau : <strong className="text-brand-400">{currentSheet?.wasteRate || 0}%</strong>
-                    </span>
-
-                    <div className="flex items-center gap-2">
-                      <button
-                        onClick={handleDownloadDxf}
-                        className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-studio-field hover:bg-slate-800 text-slate-200 text-xs font-bold border border-studio-border transition-colors cursor-pointer"
-                      >
-                        <FileCode2 className="w-3.5 h-3.5 text-sky-400" />
-                        <span>DXF (CNC)</span>
-                      </button>
-
-                      <button
-                        onClick={handleDownloadPdf}
-                        disabled={isDownloadingPdf}
-                        className="flex items-center gap-2 px-4 py-2 rounded-xl bg-gradient-to-r from-blue-600 to-sky-600 hover:from-blue-500 hover:to-sky-500 text-white font-bold text-xs tracking-wide shadow-lg shadow-sky-500/20 transition-all cursor-pointer disabled:opacity-50"
-                      >
-                        {isDownloadingPdf ? (
-                          <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                        ) : (
-                          <FileText className="w-3.5 h-3.5" />
-                        )}
-                        <span>{isDownloadingPdf ? 'GÉNÉRATION DU PDF...' : 'RAPPORT PDF QATLIA'}</span>
-                      </button>
-                    </div>
-                  </div>
                 </div>
 
-                {/* Current Sheet Breakdown Cards */}
+                {/* Export Actions */}
+                <div className="flex items-center gap-2.5">
+                  <button onClick={handleDownloadDxf} className="flex-1 py-3 rounded-xl bg-studio-panel/60 border border-studio-border hover:border-studio-border-hover text-slate-300 font-bold text-xs flex items-center justify-center gap-2 transition-all">
+                    <FileCode2 className="w-4 h-4 text-sky-400" />
+                    Télécharger DXF (CNC)
+                  </button>
+                  <button onClick={handleDownloadPdf} disabled={isDownloadingPdf} className="flex-[2] py-3 rounded-xl bg-brand-500 hover:bg-brand-400 text-studio-canvas font-black text-xs flex items-center justify-center gap-2 shadow-lg shadow-brand-500/20 transition-all disabled:opacity-40">
+                    {isDownloadingPdf ? <RefreshCw className="w-4 h-4 animate-spin" /> : <FileText className="w-4 h-4" />}
+                    {isDownloadingPdf ? 'Génération…' : 'Exporter le rapport PDF'}
+                  </button>
+                </div>
+
+                {/* Sheet Breakdown */}
                 {currentSheet && (
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    {/* Pieces on Sheet */}
-                    <div className="p-4 rounded-2xl bg-studio-panel/60 border border-studio-border/90 space-y-2">
-                      <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 block">
-                        Pièces du Panneau ({currentSheet.pieces.length})
-                      </span>
-                      <div className="space-y-1.5 max-h-48 overflow-y-auto pr-1">
-                        {currentSheet.pieces.map((p) => (
-                          <div key={p.pieceNumber} className="p-2 rounded-xl bg-studio-field border border-studio-border/80 flex items-center justify-between text-xs">
-                            <div className="flex items-center gap-2 truncate">
-                              <span className="font-bold text-brand-400 font-mono">#{p.pieceNumber}</span>
-                              <span className="text-slate-200 truncate">{p.name}</span>
-                            </div>
-                            <span className="font-mono text-slate-400 shrink-0">{Math.round(p.height * 10) / 10} × {Math.round(p.width * 10) / 10} cm</span>
+                  <div className="grid grid-cols-2 gap-2.5">
+                    <div className="p-3.5 rounded-xl bg-studio-panel/50 border border-studio-border/70">
+                      <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-2.5">Pièces ({currentSheet.pieces.length})</p>
+                      <div className="space-y-1 max-h-[180px] overflow-y-auto">
+                        {currentSheet.pieces.map(pl => (
+                          <div key={pl.pieceNumber} className="flex items-center justify-between py-1 px-1.5 rounded-md hover:bg-studio-field/40 text-[11px] transition-colors">
+                            <span className="flex items-center gap-1.5 truncate">
+                              <span className="font-mono font-bold text-brand-400 text-[10px]">#{pl.pieceNumber}</span>
+                              <span className="text-slate-300 truncate">{pl.name}</span>
+                            </span>
+                            <span className="font-mono text-slate-500 shrink-0 ml-2 text-[10px] tabular-nums">
+                              {Math.round(pl.height*10)/10}×{Math.round(pl.width*10)/10}
+                            </span>
                           </div>
                         ))}
                       </div>
                     </div>
-
-                    {/* Offcuts on Sheet */}
-                    <div className="p-4 rounded-2xl bg-studio-panel/60 border border-studio-border/90 space-y-2">
-                      <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 block">
-                        Chutes Réutilisables ({currentSheet.offcuts.length})
-                      </span>
-                      <div className="space-y-1.5 max-h-48 overflow-y-auto pr-1">
-                        {currentSheet.offcuts.map((off, idx) => (
-                          <div key={idx} className="p-2 rounded-xl bg-studio-field border border-studio-border/80 flex items-center justify-between text-xs">
-                            <span className="text-slate-400 font-mono text-[11px]">Chute #{idx + 1}</span>
-                            <span className="font-mono text-brand-400 font-bold">{Math.round(off.height * 10) / 10} × {Math.round(off.width * 10) / 10} cm</span>
+                    <div className="p-3.5 rounded-xl bg-studio-panel/50 border border-studio-border/70">
+                      <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-2.5">Chutes ({currentSheet.offcuts?.length||0})</p>
+                      <div className="space-y-1 max-h-[180px] overflow-y-auto">
+                        {(currentSheet.offcuts||[]).map((off, i) => (
+                          <div key={i} className="flex items-center justify-between py-1 px-1.5 rounded-md hover:bg-studio-field/40 text-[11px] transition-colors">
+                            <span className="text-slate-500 font-mono text-[10px]">Chute #{i+1}</span>
+                            <span className="font-mono font-bold text-brand-400 text-[10px] tabular-nums">
+                              {Math.round(off.height*10)/10}×{Math.round(off.width*10)/10}
+                            </span>
                           </div>
                         ))}
                       </div>
@@ -905,15 +809,17 @@ export default function Dashboard() {
                 )}
               </>
             ) : (
-              /* Empty State Preview */
-              <div className="p-12 rounded-3xl bg-studio-panel/40 border border-dashed border-studio-border text-center flex flex-col items-center justify-center gap-3 min-h-[460px]">
-                <div className="w-14 h-14 rounded-2xl bg-slate-800/40 border border-studio-border-hover/50 flex items-center justify-center text-slate-400 mb-1">
-                  <Scissors className="w-6 h-6 text-brand-400" />
+              /* Empty State */
+              <div className="p-16 rounded-3xl bg-studio-panel/30 border border-dashed border-studio-border/80 text-center flex flex-col items-center gap-4 min-h-[460px] justify-center">
+                <div className="w-16 h-16 rounded-2xl bg-studio-field border border-studio-border flex items-center justify-center">
+                  <Scissors className="w-7 h-7 text-slate-600" />
                 </div>
-                <h3 className="text-sm font-bold text-slate-200">Prêt pour l&apos;optimisation</h3>
-                <p className="text-xs text-slate-400 max-w-sm">
-                  Renseignez vos dimensions dans la liste ou scannez une fiche manuscrite, puis lancez le calcul pour visualiser le plan de coupe 2D.
-                </p>
+                <div>
+                  <h3 className="text-base font-black text-slate-300 mb-1">Prêt pour le calepinage</h3>
+                  <p className="text-xs text-slate-500 max-w-xs leading-relaxed">
+                    Ajoutez vos pièces et lancez l&apos;optimisation pour visualiser le plan de coupe.
+                  </p>
+                </div>
               </div>
             )}
           </div>
