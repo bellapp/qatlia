@@ -9,7 +9,7 @@ import {
   CheckSquare,
   Square,
 } from 'lucide-react';
-import { Piece, MaterialType, EdgeBandingConfig } from '@/lib/cutting/binpacking';
+import { Piece, MaterialType, EdgeBandingConfig, MATERIAL_LIBRARY, EDGEBANDING_PRESETS } from '@/lib/cutting/binpacking';
 
 interface PiecesManagerProps {
   pieces: Piece[];
@@ -19,12 +19,10 @@ interface PiecesManagerProps {
   disabled?: boolean;
 }
 
-const MATERIAL_COLORS: Record<string, string> = {
-  mdf: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20',
-  aluminium: 'bg-slate-400/10 text-slate-700 dark:text-slate-300 border-slate-500/20',
-  verre: 'bg-sky-500/10 text-sky-400 border-sky-500/20',
-  contreplaques: 'bg-brand-600/10 text-brand-400 border-brand-500/20',
-};
+const MATERIAL_COLORS: Record<string, string> = {};
+for (const m of MATERIAL_LIBRARY) {
+  MATERIAL_COLORS[m.type] = `${m.bgClass} ${m.color} ${m.borderClass}`;
+}
 
 export const PiecesManager: React.FC<PiecesManagerProps> = ({
   pieces,
@@ -36,6 +34,7 @@ export const PiecesManager: React.FC<PiecesManagerProps> = ({
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [showQuickAdd, setShowQuickAdd] = useState(false);
   const [focusedRow, setFocusedRow] = useState<string | null>(null);
+  const [newEdgeColor, setNewEdgeColor] = useState('none');
   const listRef = useRef<HTMLDivElement>(null);
 
   const [newHeight, setNewHeight] = useState<string>('');
@@ -406,27 +405,30 @@ export const PiecesManager: React.FC<PiecesManagerProps> = ({
                 </button>
               </div>
             </div>
-            <div className="flex items-center gap-3 pt-2 mt-2 border-t border-studio-border/60 text-[10px]">
+            {/* Chants optionnels */}
+            <div className="flex items-center gap-3 pt-2 mt-2 border-t border-studio-border/60 text-[10px] flex-wrap">
               <span className="font-semibold text-slate-500 dark:text-slate-400">Chants :</span>
               {(['left', 'right', 'top', 'bottom'] as const).map((side) => {
                 const label = side === 'left' ? 'G' : side === 'right' ? 'D' : side === 'top' ? 'H' : 'B';
                 return (
                   <label key={side} className="flex items-center gap-1 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={newEdges[side]}
+                    <input type="checkbox" checked={newEdges[side]}
                       onChange={(e) => setNewEdges({ ...newEdges, [side]: e.target.checked })}
-                      className="rounded text-brand-500 bg-studio-field border-studio-border-hover w-3 h-3"
-                    />
+                      className="rounded text-brand-500 bg-studio-field border-studio-border-hover w-3 h-3" />
                     <span className="text-slate-600 dark:text-slate-400">{label}</span>
                   </label>
                 );
               })}
-              <button
-                type="button"
-                onClick={() => setShowQuickAdd(false)}
-                className="ml-auto text-[10px] text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:text-slate-300 font-semibold"
-              >
+              {(['left', 'right', 'top', 'bottom'] as const).some(s => newEdges[s]) && (
+                <select value={newEdgeColor} onChange={e => setNewEdgeColor(e.target.value)}
+                  className="px-2 py-0.5 rounded-md bg-studio-field border border-studio-border text-[10px] text-slate-200 outline-none">
+                  {EDGEBANDING_PRESETS.map(ep => (
+                    <option key={ep.id} value={ep.id}>{ep.label}{ep.pricePerM > 0 ? ` (${ep.pricePerM} MAD/m)` : ''}</option>
+                  ))}
+                </select>
+              )}
+              <button type="button" onClick={() => setShowQuickAdd(false)}
+                className="ml-auto text-[10px] text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:text-slate-300 font-semibold">
                 Annuler
               </button>
             </div>

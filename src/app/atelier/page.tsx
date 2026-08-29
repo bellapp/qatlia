@@ -831,14 +831,37 @@ export default function Dashboard() {
                     <div className="p-3.5 rounded-xl bg-studio-panel/50 border border-studio-border/70">
                       <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-2.5">Chutes ({currentSheet.offcuts?.length||0})</p>
                       <div className="space-y-1 max-h-[180px] overflow-y-auto">
-                        {(currentSheet.offcuts||[]).map((off, i) => (
-                          <div key={i} className="flex items-center justify-between py-1 px-1.5 rounded-md hover:bg-studio-field/40 text-[11px] transition-colors">
-                            <span className="text-slate-500 dark:text-slate-400 font-mono text-[10px]">Chute #{i+1}</span>
-                            <span className="font-mono font-bold text-brand-400 text-[10px] tabular-nums">
-                              {Math.round(off.height*10)/10}×{Math.round(off.width*10)/10}
-                            </span>
-                          </div>
-                        ))}
+                        {(currentSheet.offcuts||[]).map((off, i) => {
+                          return (
+                            <div key={i} className="flex items-center justify-between py-1 px-1.5 rounded-md hover:bg-studio-field/40 text-[11px] transition-colors gap-1">
+                              <span className="text-slate-500 dark:text-slate-400 font-mono text-[10px] truncate">Chute #{i+1}</span>
+                              <span className="font-mono font-bold text-brand-400 text-[10px] tabular-nums">
+                                {Math.round(off.height*10)/10}×{Math.round(off.width*10)/10}
+                              </span>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Cost Breakdown */}
+                {result && (
+                  <div className="p-3.5 rounded-xl bg-studio-panel/50 border border-studio-border/70 space-y-2">
+                    <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Estimation du coût</p>
+                    <div className="grid grid-cols-3 gap-2 text-xs">
+                      <div className="p-2 rounded-lg bg-studio-canvas/50 text-center">
+                        <span className="text-[9px] text-slate-500 block uppercase">Panneaux</span>
+                        <span className="font-mono font-black text-white">{result.materialCostMad ?? 0} MAD</span>
+                      </div>
+                      <div className="p-2 rounded-lg bg-studio-canvas/50 text-center">
+                        <span className="text-[9px] text-slate-500 block uppercase">Chants</span>
+                        <span className="font-mono font-black text-white">{result.edgeBandingCostMad ?? 0} MAD</span>
+                      </div>
+                      <div className="p-2 rounded-lg bg-studio-canvas/50 text-center">
+                        <span className="text-[9px] text-slate-500 block uppercase">Total</span>
+                        <span className="font-mono font-black text-brand-400">{result.totalCostMad ?? 0} MAD</span>
                       </div>
                     </div>
                   </div>
