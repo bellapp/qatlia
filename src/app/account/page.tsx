@@ -93,11 +93,11 @@ export default function AccountPage() {
   };
 
   return (
-    <div className="min-h-screen bg-studio-canvas text-slate-100 font-sans antialiased">
+    <div className="min-h-screen bg-studio-canvas text-slate-900 dark:text-slate-100 font-sans antialiased">
       <header className="sticky top-0 z-40 border-b border-studio-border/70 bg-studio-canvas/70 backdrop-blur-2xl backdrop-saturate-150">
         <div className="max-w-4xl mx-auto flex items-center justify-between px-4 sm:px-8 h-16">
           <div className="flex items-center gap-3">
-            <Link href="/atelier" className="flex items-center gap-2 px-3 py-2 rounded-xl bg-studio-panel border border-studio-border text-xs font-semibold text-slate-300 hover:bg-studio-field transition-all">
+            <Link href="/atelier" className="flex items-center gap-2 px-3 py-2 rounded-xl bg-studio-panel border border-studio-border text-xs font-semibold text-slate-700 dark:text-slate-300 hover:bg-studio-field transition-all">
             <ArrowLeft className="w-4 h-4" />
               Atelier
             </Link>
@@ -118,33 +118,33 @@ export default function AccountPage() {
       <main className="max-w-4xl mx-auto px-4 sm:px-8 py-8 space-y-6">
         <div>
           <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-brand-400/80">Compte</p>
-          <h1 className="text-2xl font-black text-white mt-1">Votre espace artisan</h1>
-          <p className="text-sm text-slate-400 mt-1">{email}</p>
+          <h1 className="text-2xl font-black text-slate-900 dark:text-white mt-1">Votre espace artisan</h1>
+          <p className="text-sm text-slate-600 dark:text-slate-400 mt-1">{email}</p>
         </div>
 
         <section id="credits" className="p-5 rounded-2xl bg-studio-panel/70 border border-studio-border space-y-4">
           <div className="flex items-center justify-between gap-3">
             <div className="flex items-center gap-2">
               <Receipt className="w-4 h-4 text-brand-400" />
-              <h2 className="text-sm font-bold text-white">Usage des crédits</h2>
+              <h2 className="text-sm font-bold text-slate-900 dark:text-white">Usage des crédits</h2>
             </div>
             <Link href="/credits" className="text-xs font-semibold text-brand-400 hover:text-brand-400">
               Recharger →
             </Link>
           </div>
           <div className="flex items-end gap-3">
-            <p className="text-3xl font-black font-mono text-white">{credits}</p>
-            <p className="text-xs text-slate-400 pb-1">crédits restants</p>
+            <p className="text-3xl font-black font-mono text-slate-900 dark:text-white">{credits}</p>
+            <p className="text-xs text-slate-600 dark:text-slate-400 pb-1">crédits restants</p>
           </div>
           {txs.length === 0 ? (
-            <p className="text-xs text-slate-500">Aucun mouvement pour l’instant. Un crédit est débité à chaque export PDF.</p>
+            <p className="text-xs text-slate-500 dark:text-slate-400">Aucun mouvement pour l’instant. Un crédit est débité à chaque export PDF.</p>
           ) : (
             <ul className="divide-y divide-slate-800">
               {txs.map((tx) => (
                 <li key={tx.id} className="py-2.5 flex items-center justify-between gap-3 text-xs">
                   <div>
-                    <p className="text-slate-200 font-medium">{tx.description || (tx.amount < 0 ? 'Export PDF' : 'Crédit')}</p>
-                    <p className="text-slate-500 font-mono mt-0.5">
+                    <p className="text-slate-800 dark:text-slate-200 font-medium">{tx.description || (tx.amount < 0 ? 'Export PDF' : 'Crédit')}</p>
+                    <p className="text-slate-500 dark:text-slate-400 font-mono mt-0.5">
                       {new Date(tx.created_at).toLocaleString('fr-FR', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
                     </p>
                   </div>
@@ -160,9 +160,9 @@ export default function AccountPage() {
         <section id="password" className="p-5 rounded-2xl bg-studio-panel/70 border border-studio-border space-y-4">
           <div className="flex items-center gap-2">
             <KeyRound className="w-4 h-4 text-brand-400" />
-            <h2 className="text-sm font-bold text-white">Changer le mot de passe</h2>
+            <h2 className="text-sm font-bold text-slate-900 dark:text-white">Changer le mot de passe</h2>
           </div>
-          <p className="text-xs text-slate-400 flex items-center gap-1.5">
+          <p className="text-xs text-slate-600 dark:text-slate-400 flex items-center gap-1.5">
             <Shield className="w-3.5 h-3.5" />
             Si vous vous connectez uniquement via Google, un mot de passe n’est pas obligatoire.
           </p>

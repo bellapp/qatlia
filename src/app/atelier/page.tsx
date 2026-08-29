@@ -34,6 +34,7 @@ import { AuthModal } from '@/components/AuthModal';
 import { EmptyState } from '@/components/EmptyState';
 import { AccountMenu } from '@/components/AccountMenu';
 import { QatlIALogo } from '@/components/QatlIALogo';
+import { ThemeToggle } from '@/components/ThemeToggle';
 import { writeLocalHistoryItem, type LocalHistoryItem } from '@/lib/history';
 
 const DEFAULT_SHEET: Sheet = {
@@ -363,7 +364,7 @@ export default function Dashboard() {
   } : null);
 
   return (
-    <div className="min-h-screen bg-studio-canvas text-slate-100 font-sans antialiased selection:bg-brand-500 selection:text-black">
+    <div className="min-h-screen bg-studio-canvas text-slate-900 dark:text-slate-100 font-sans antialiased selection:bg-brand-500 selection:text-black">
       {/* Top Navbar Studio */}
       <header className="sticky top-0 z-40 border-b border-studio-border/70 bg-studio-canvas/70 backdrop-blur-2xl backdrop-saturate-150">
         <div className="absolute inset-0 -z-10 bg-gradient-to-b from-brand-500/[0.04] to-transparent pointer-events-none" />
@@ -374,24 +375,25 @@ export default function Dashboard() {
             </div>
             <div className="leading-tight">
               <div className="flex items-center gap-2">
-                <span className="font-display font-extrabold text-[17px] tracking-tight text-white">QatlIA</span>
+                <span className="font-display font-extrabold text-[17px] tracking-tight text-slate-900 dark:text-white">QatlIA</span>
                 <span className="text-[9px] font-mono font-bold px-1.5 py-0.5 rounded-md bg-brand-500/10 text-brand-400 border border-brand-500/20 tracking-wide">
                   PRO
                 </span>
               </div>
-              <p className="text-[11px] text-slate-400 hidden sm:block -mt-0.5">Atelier de découpe &amp; calepinage</p>
+              <p className="text-[11px] text-slate-600 dark:text-slate-400 hidden sm:block -mt-0.5">Atelier de découpe &amp; calepinage</p>
             </div>
           </div>
 
           <div className="flex items-center gap-2">
             <Link
               href="/history"
-              className="group relative flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-medium text-slate-300 hover:text-white hover:bg-studio-panel transition-all"
+              className="group relative flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-medium text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:text-white hover:bg-studio-panel transition-all"
             >
-              <History className="w-4 h-4 text-slate-400 group-hover:text-brand-400 transition-colors" />
+              <History className="w-4 h-4 text-slate-600 dark:text-slate-400 group-hover:text-brand-400 transition-colors" />
               <span className="hidden sm:inline">Historique</span>
             </Link>
 
+            <ThemeToggle />
             <Link
               href="/credits"
               className="group relative flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-brand-500/10 border border-brand-500/25 text-brand-400 hover:bg-brand-500/15 hover:border-brand-500/40 text-xs font-semibold transition-all"
@@ -410,7 +412,7 @@ export default function Dashboard() {
             ) : (
               <Link
                 href="/auth/login"
-                className="px-4 py-2 rounded-xl bg-white hover:bg-slate-100 text-slate-950 font-bold text-xs transition-all shadow-sm hover:shadow-md"
+                className="px-4 py-2 rounded-xl bg-white dark:bg-studio-field hover:bg-slate-100 text-slate-950 font-bold text-xs transition-all shadow-sm hover:shadow-md"
               >
                 Connexion
               </Link>
@@ -437,8 +439,8 @@ export default function Dashboard() {
                     <Camera className="w-5 h-5 text-sky-400" />
                   </span>
                   <div>
-                    <p className="text-sm font-bold text-slate-200 group-hover:text-white transition-colors">Appareil photo</p>
-                    <p className="text-[11px] text-slate-500 leading-tight">Scanner une fiche de débit papier</p>
+                    <p className="text-sm font-bold text-slate-800 dark:text-slate-200 group-hover:text-slate-900 dark:text-white transition-colors">Appareil photo</p>
+                    <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-tight">Scanner une fiche de débit papier</p>
                   </div>
                 </div>
                 <span className="self-start px-2 py-0.5 rounded-md bg-sky-500/10 text-sky-400 text-[10px] font-bold font-mono border border-sky-500/20">📷 Scan IA</span>
@@ -453,8 +455,8 @@ export default function Dashboard() {
                     <ImageIcon className="w-5 h-5 text-brand-400" />
                   </span>
                   <div>
-                    <p className="text-sm font-bold text-slate-200 group-hover:text-white transition-colors">Importer un fichier</p>
-                    <p className="text-[11px] text-slate-500 leading-tight">Photo, scan ou capture d&apos;écran</p>
+                    <p className="text-sm font-bold text-slate-800 dark:text-slate-200 group-hover:text-slate-900 dark:text-white transition-colors">Importer un fichier</p>
+                    <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-tight">Photo, scan ou capture d&apos;écran</p>
                   </div>
                 </div>
                 <span className="self-start px-2 py-0.5 rounded-md bg-brand-500/10 text-brand-400 text-[10px] font-bold font-mono border border-brand-500/20">JPG PNG WebP</span>
@@ -507,8 +509,8 @@ export default function Dashboard() {
                     <Layers className="w-4 h-4 text-brand-400" />
                   </span>
                   <div>
-                    <h2 className="text-xs font-bold text-white tracking-wide">Panneau brut en stock</h2>
-                    <p className="text-[10px] text-slate-500">Dimensions du matériau à optimiser</p>
+                    <h2 className="text-xs font-bold text-slate-900 dark:text-white tracking-wide">Panneau brut en stock</h2>
+                    <p className="text-[10px] text-slate-500 dark:text-slate-400">Dimensions du matériau à optimiser</p>
                   </div>
                 </div>
                 <span className="text-[10px] font-mono font-semibold text-brand-400 bg-brand-500/10 px-2 py-0.5 rounded-md border border-brand-500/20">cm</span>
@@ -516,31 +518,31 @@ export default function Dashboard() {
 
               <div className="p-4 grid grid-cols-3 gap-3">
                 <div className="space-y-1">
-                  <label className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">Hauteur (Y)</label>
+                  <label className="text-[10px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">Hauteur (Y)</label>
                   <input
                     type="number"
                     step="0.1"
                     value={sheet.height}
                     onChange={(e) => setSheet({ ...sheet, height: parseFloat(e.target.value) || 0 })}
-                    className="w-full px-3 py-2 rounded-xl bg-studio-field border border-studio-border text-slate-100 font-mono font-bold text-right outline-none focus:border-brand-500/50 focus:ring-1 focus:ring-brand-500/20 transition-all"
+                    className="w-full px-3 py-2 rounded-xl bg-studio-field border border-studio-border text-slate-900 dark:text-slate-100 font-mono font-bold text-right outline-none focus:border-brand-500/50 focus:ring-1 focus:ring-brand-500/20 transition-all"
                   />
                 </div>
                 <div className="space-y-1">
-                  <label className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">Largeur (X)</label>
+                  <label className="text-[10px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">Largeur (X)</label>
                   <input
                     type="number"
                     step="0.1"
                     value={sheet.width}
                     onChange={(e) => setSheet({ ...sheet, width: parseFloat(e.target.value) || 0 })}
-                    className="w-full px-3 py-2 rounded-xl bg-studio-field border border-studio-border text-slate-100 font-mono font-bold text-right outline-none focus:border-brand-500/50 focus:ring-1 focus:ring-brand-500/20 transition-all"
+                    className="w-full px-3 py-2 rounded-xl bg-studio-field border border-studio-border text-slate-900 dark:text-slate-100 font-mono font-bold text-right outline-none focus:border-brand-500/50 focus:ring-1 focus:ring-brand-500/20 transition-all"
                   />
                 </div>
                 <div className="space-y-1">
-                  <label className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">Matériau</label>
+                  <label className="text-[10px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">Matériau</label>
                   <select
                     value={sheet.material || 'mdf'}
                     onChange={(e) => setSheet({ ...sheet, material: e.target.value as MaterialType })}
-                    className="w-full px-3 py-2 rounded-xl bg-studio-field border border-studio-border text-slate-200 text-xs outline-none focus:border-brand-500/50 focus:ring-1 focus:ring-brand-500/20 transition-all"
+                    className="w-full px-3 py-2 rounded-xl bg-studio-field border border-studio-border text-slate-800 dark:text-slate-200 text-xs outline-none focus:border-brand-500/50 focus:ring-1 focus:ring-brand-500/20 transition-all"
                   >
                     <option value="mdf">MDF / Bois</option>
                     <option value="aluminium">Aluminium</option>
@@ -567,7 +569,7 @@ export default function Dashboard() {
               <button
                 type="button"
                 onClick={() => setShowAdvancedOptions(!showAdvancedOptions)}
-                className="w-full px-4 py-3 flex items-center justify-between text-[11px] font-semibold uppercase tracking-wider text-slate-400 hover:text-white transition-colors"
+                className="w-full px-4 py-3 flex items-center justify-between text-[11px] font-semibold uppercase tracking-wider text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:text-white transition-colors"
               >
                 <div className="flex items-center gap-2">
                   <SlidersHorizontal className="w-3.5 h-3.5 text-brand-400" />
@@ -593,7 +595,7 @@ export default function Dashboard() {
             <button
               onClick={handleRunOptimization}
               disabled={isOptimizing || pieces.length === 0}
-              className="w-full py-4 rounded-2xl bg-brand-500 hover:bg-brand-400 text-studio-canvas font-black text-sm tracking-wider uppercase shadow-lg shadow-brand-500/25 transition-all flex items-center justify-center gap-2.5 disabled:opacity-30 disabled:shadow-none active:scale-[0.98]"
+              className="w-full py-4 rounded-2xl bg-brand-500 hover:bg-brand-400 text-slate-950 font-black text-sm tracking-wider uppercase shadow-lg shadow-brand-500/25 transition-all flex items-center justify-center gap-2.5 disabled:opacity-30 disabled:shadow-none active:scale-[0.98]"
             >
               {isOptimizing ? (
                 <>
@@ -620,10 +622,10 @@ export default function Dashboard() {
                   <div className="relative flex flex-wrap items-center justify-between gap-4">
                     <div>
                       <p className="text-[10px] font-bold uppercase tracking-[0.15em] text-emerald-400 mb-1">Gain économique estimé</p>
-                      <p className="text-3xl font-black text-white tracking-tight">
+                      <p className="text-3xl font-black text-slate-900 dark:text-white tracking-tight">
                         + {result.moneySavedMad?.toLocaleString('fr-FR') || 0} <span className="text-emerald-400">MAD</span>
                       </p>
-                      <p className="text-[11px] text-slate-500 mt-1">
+                      <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1">
                         {result.totalLinearCutMeters || 0} m linéaires de coupe · {result.sheetsUsed} panneau{result.sheetsUsed > 1 ? 'x' : ''}
                       </p>
                     </div>
@@ -636,22 +638,22 @@ export default function Dashboard() {
                 {/* Performance Metrics Grid */}
                 <div className="grid grid-cols-4 gap-2">
                   <div className="p-3.5 rounded-xl bg-studio-panel/60 border border-studio-border/80 flex flex-col items-center text-center gap-1">
-                    <span className="text-[9px] font-bold uppercase tracking-wider text-slate-500">Feuilles</span>
-                    <span className="text-2xl font-black font-mono text-white tabular-nums">{result.sheetsUsed}</span>
+                    <span className="text-[9px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Feuilles</span>
+                    <span className="text-2xl font-black font-mono text-slate-900 dark:text-white tabular-nums">{result.sheetsUsed}</span>
                     <span className="text-[9px] text-slate-600 truncate">{sheet.height}×{sheet.width}</span>
                   </div>
                   <div className="p-3.5 rounded-xl bg-studio-panel/60 border border-studio-border/80 flex flex-col items-center text-center gap-1">
-                    <span className="text-[9px] font-bold uppercase tracking-wider text-slate-500">Utile</span>
+                    <span className="text-[9px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Utile</span>
                     <span className="text-2xl font-black font-mono text-emerald-400 tabular-nums">{(100 - result.wastePercentage).toFixed(0)}%</span>
                     <span className="text-[9px] text-emerald-500/60">surface</span>
                   </div>
                   <div className="p-3.5 rounded-xl bg-studio-panel/60 border border-studio-border/80 flex flex-col items-center text-center gap-1">
-                    <span className="text-[9px] font-bold uppercase tracking-wider text-slate-500">Chute</span>
+                    <span className="text-[9px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Chute</span>
                     <span className="text-2xl font-black font-mono text-brand-400 tabular-nums">{result.wastePercentage.toFixed(0)}%</span>
                     <span className="text-[9px] text-brand-500/60">résiduelle</span>
                   </div>
                   <div className="p-3.5 rounded-xl bg-studio-panel/60 border border-studio-border/80 flex flex-col items-center text-center gap-1">
-                    <span className="text-[9px] font-bold uppercase tracking-wider text-slate-500">Pièces</span>
+                    <span className="text-[9px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Pièces</span>
                     <span className="text-2xl font-black font-mono text-sky-400 tabular-nums">{result.placedPieces.length}</span>
                     <span className="text-[9px] text-sky-400/60">placées</span>
                   </div>
@@ -669,7 +671,7 @@ export default function Dashboard() {
                           className={`px-3 py-1.5 rounded-lg text-[11px] font-bold transition-all ${
                             i === activeSheetIndex
                               ? 'bg-brand-500/15 text-brand-400 border border-brand-500/30'
-                              : 'text-slate-500 hover:text-slate-300'
+                              : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:text-slate-300'
                           }`}
                         >
                           Panneau {i+1}
@@ -680,11 +682,11 @@ export default function Dashboard() {
                       ))}
                     </div>
                     <div className="flex items-center gap-1.5 bg-studio-field rounded-lg border border-studio-border p-0.5">
-                      <button onClick={() => setZoomLevel(Math.max(0.5, zoomLevel - 0.25))} className="p-1 rounded-md hover:bg-studio-border transition-colors text-slate-400">
+                      <button onClick={() => setZoomLevel(Math.max(0.5, zoomLevel - 0.25))} className="p-1 rounded-md hover:bg-studio-border transition-colors text-slate-600 dark:text-slate-400">
                         <ZoomOut className="w-3.5 h-3.5" />
                       </button>
-                      <span className="text-[10px] font-mono text-slate-400 tabular-nums px-1 w-10 text-center">{Math.round(zoomLevel*100)}%</span>
-                      <button onClick={() => setZoomLevel(Math.min(2.5, zoomLevel + 0.25))} className="p-1 rounded-md hover:bg-studio-border transition-colors text-slate-400">
+                      <span className="text-[10px] font-mono text-slate-600 dark:text-slate-400 tabular-nums px-1 w-10 text-center">{Math.round(zoomLevel*100)}%</span>
+                      <button onClick={() => setZoomLevel(Math.min(2.5, zoomLevel + 0.25))} className="p-1 rounded-md hover:bg-studio-border transition-colors text-slate-600 dark:text-slate-400">
                         <ZoomIn className="w-3.5 h-3.5" />
                       </button>
                     </div>
@@ -764,11 +766,11 @@ export default function Dashboard() {
 
                 {/* Export Actions */}
                 <div className="flex items-center gap-2.5">
-                  <button onClick={handleDownloadDxf} className="flex-1 py-3 rounded-xl bg-studio-panel/60 border border-studio-border hover:border-studio-border-hover text-slate-300 font-bold text-xs flex items-center justify-center gap-2 transition-all">
+                  <button onClick={handleDownloadDxf} className="flex-1 py-3 rounded-xl bg-studio-panel/60 border border-studio-border hover:border-studio-border-hover text-slate-700 dark:text-slate-300 font-bold text-xs flex items-center justify-center gap-2 transition-all">
                     <FileCode2 className="w-4 h-4 text-sky-400" />
                     Télécharger DXF (CNC)
                   </button>
-                  <button onClick={handleDownloadPdf} disabled={isDownloadingPdf} className="flex-[2] py-3 rounded-xl bg-brand-500 hover:bg-brand-400 text-studio-canvas font-black text-xs flex items-center justify-center gap-2 shadow-lg shadow-brand-500/20 transition-all disabled:opacity-40">
+                  <button onClick={handleDownloadPdf} disabled={isDownloadingPdf} className="flex-[2] py-3 rounded-xl bg-brand-500 hover:bg-brand-400 text-slate-950 font-black text-xs flex items-center justify-center gap-2 shadow-lg shadow-brand-500/20 transition-all disabled:opacity-40">
                     {isDownloadingPdf ? <RefreshCw className="w-4 h-4 animate-spin" /> : <FileText className="w-4 h-4" />}
                     {isDownloadingPdf ? 'Génération…' : 'Exporter le rapport PDF'}
                   </button>
@@ -778,15 +780,15 @@ export default function Dashboard() {
                 {currentSheet && (
                   <div className="grid grid-cols-2 gap-2.5">
                     <div className="p-3.5 rounded-xl bg-studio-panel/50 border border-studio-border/70">
-                      <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-2.5">Pièces ({currentSheet.pieces.length})</p>
+                      <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-2.5">Pièces ({currentSheet.pieces.length})</p>
                       <div className="space-y-1 max-h-[180px] overflow-y-auto">
                         {currentSheet.pieces.map(pl => (
                           <div key={pl.pieceNumber} className="flex items-center justify-between py-1 px-1.5 rounded-md hover:bg-studio-field/40 text-[11px] transition-colors">
                             <span className="flex items-center gap-1.5 truncate">
                               <span className="font-mono font-bold text-brand-400 text-[10px]">#{pl.pieceNumber}</span>
-                              <span className="text-slate-300 truncate">{pl.name}</span>
+                              <span className="text-slate-700 dark:text-slate-300 truncate">{pl.name}</span>
                             </span>
-                            <span className="font-mono text-slate-500 shrink-0 ml-2 text-[10px] tabular-nums">
+                            <span className="font-mono text-slate-500 dark:text-slate-400 shrink-0 ml-2 text-[10px] tabular-nums">
                               {Math.round(pl.height*10)/10}×{Math.round(pl.width*10)/10}
                             </span>
                           </div>
@@ -794,11 +796,11 @@ export default function Dashboard() {
                       </div>
                     </div>
                     <div className="p-3.5 rounded-xl bg-studio-panel/50 border border-studio-border/70">
-                      <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-2.5">Chutes ({currentSheet.offcuts?.length||0})</p>
+                      <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-2.5">Chutes ({currentSheet.offcuts?.length||0})</p>
                       <div className="space-y-1 max-h-[180px] overflow-y-auto">
                         {(currentSheet.offcuts||[]).map((off, i) => (
                           <div key={i} className="flex items-center justify-between py-1 px-1.5 rounded-md hover:bg-studio-field/40 text-[11px] transition-colors">
-                            <span className="text-slate-500 font-mono text-[10px]">Chute #{i+1}</span>
+                            <span className="text-slate-500 dark:text-slate-400 font-mono text-[10px]">Chute #{i+1}</span>
                             <span className="font-mono font-bold text-brand-400 text-[10px] tabular-nums">
                               {Math.round(off.height*10)/10}×{Math.round(off.width*10)/10}
                             </span>

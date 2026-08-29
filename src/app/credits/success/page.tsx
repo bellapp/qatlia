@@ -13,7 +13,7 @@ export default function CreditsSuccessPage() {
         </div>
 
         <div className="space-y-2">
-          <h1 className="text-2xl font-black text-white">Recharge Réussie !</h1>
+          <h1 className="text-2xl font-black text-slate-900 dark:text-white">Recharge Réussie !</h1>
           <p className="text-sm text-[#94A3B8]">
             Vos crédits d&apos;analyse IA ont été ajoutés à votre compte. Vous pouvez maintenant analyser vos photos de découpe.
           </p>

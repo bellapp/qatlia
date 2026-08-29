@@ -14,11 +14,11 @@ const config: Config = {
         background: "var(--background)",
         foreground: "var(--foreground)",
         studio: {
-          canvas: '#060B14',
-          panel: '#0B1424',
-          field: '#0F1A2E',
-          border: '#1A2744',
-          'border-hover': '#243356',
+          canvas: 'var(--color-canvas)',
+          panel: 'var(--color-panel)',
+          field: 'var(--color-field)',
+          border: 'var(--color-border)',
+          'border-hover': 'var(--color-border-hover)',
         },
         brand: {
           300: '#FFD08C',

@@ -29,8 +29,8 @@ export function EmptyState({ type }: EmptyStateProps) {
           <Scissors className="w-7 h-7 text-slate-600" />
         </div>
         <div>
-          <h3 className="text-base font-black text-slate-300 mb-1">Aucun résultat</h3>
-          <p className="text-xs text-slate-500 max-w-xs leading-relaxed">
+          <h3 className="text-base font-black text-slate-700 dark:text-slate-300 mb-1">Aucun résultat</h3>
+          <p className="text-xs text-slate-500 dark:text-slate-400 max-w-xs leading-relaxed">
             Aucun projet ne correspond à cette recherche. Essayez un autre filtre.
           </p>
         </div>
@@ -44,8 +44,8 @@ export function EmptyState({ type }: EmptyStateProps) {
         <Scissors className="w-7 h-7 text-slate-600" />
       </div>
       <div className="space-y-2">
-        <h3 className="text-base font-black text-slate-300">Prêt pour le calepinage</h3>
-        <p className="text-xs text-slate-500 max-w-sm leading-relaxed">
+        <h3 className="text-base font-black text-slate-700 dark:text-slate-300">Prêt pour le calepinage</h3>
+        <p className="text-xs text-slate-500 dark:text-slate-400 max-w-sm leading-relaxed">
           Ajoutez vos pièces et lancez l&apos;optimisation pour visualiser le plan de coupe 2D.
         </p>
       </div>
@@ -56,8 +56,8 @@ export function EmptyState({ type }: EmptyStateProps) {
             <Camera className="w-4 h-4 text-sky-400" />
           </span>
           <div>
-            <p className="text-[10px] font-bold text-white">1. Photo</p>
-            <p className="text-[9px] text-slate-500">Scannez une fiche</p>
+            <p className="text-[10px] font-bold text-slate-900 dark:text-white">1. Photo</p>
+            <p className="text-[9px] text-slate-500 dark:text-slate-400">Scannez une fiche</p>
           </div>
         </div>
 
@@ -66,8 +66,8 @@ export function EmptyState({ type }: EmptyStateProps) {
             <Scissors className="w-4 h-4 text-brand-400" />
           </span>
           <div>
-            <p className="text-[10px] font-bold text-white">2. Pièces</p>
-            <p className="text-[9px] text-slate-500">Ajoutez les dimensions</p>
+            <p className="text-[10px] font-bold text-slate-900 dark:text-white">2. Pièces</p>
+            <p className="text-[9px] text-slate-500 dark:text-slate-400">Ajoutez les dimensions</p>
           </div>
         </div>
 
@@ -76,8 +76,8 @@ export function EmptyState({ type }: EmptyStateProps) {
             <FileText className="w-4 h-4 text-emerald-400" />
           </span>
           <div>
-            <p className="text-[10px] font-bold text-white">3. Optimiser</p>
-            <p className="text-[9px] text-slate-500">Générez le plan</p>
+            <p className="text-[10px] font-bold text-slate-900 dark:text-white">3. Optimiser</p>
+            <p className="text-[9px] text-slate-500 dark:text-slate-400">Générez le plan</p>
           </div>
         </div>
       </div>

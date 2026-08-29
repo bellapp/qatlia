@@ -6,14 +6,40 @@
 
 @layer base {
   :root {
+    /* Light mode */
+    --color-canvas: #F8FAFC;
+    --color-panel: #FFFFFF;
+    --color-field: #F1F5F9;
+    --color-border: #E2E8F0;
+    --color-border-hover: #CBD5E1;
+    --text-primary: #0F172A;
+    --text-secondary: #475569;
+    --text-muted: #94A3B8;
+    --bg-main: #F8FAFC;
+    --bg-card: #FFFFFF;
+    --bg-subtle: #F1F5F9;
+    --border-main: #E2E8F0;
+    --border-highlight: #CBD5E1;
+    --accent-primary: #F5A623;
+    --accent-hover: #E09612;
+    --accent-glow: rgba(245, 166, 35, 0.18);
+  }
+
+  .dark {
+    /* Dark mode */
+    --color-canvas: #060B14;
+    --color-panel: #0B1424;
+    --color-field: #0F1A2E;
+    --color-border: #1A2744;
+    --color-border-hover: #243356;
+    --text-primary: #F8FAFC;
+    --text-secondary: #94A3B8;
+    --text-muted: #64748B;
     --bg-main: #060B14;
     --bg-card: #0B1424;
     --bg-subtle: #060B14;
     --border-main: #1A2744;
     --border-highlight: #243356;
-    --text-primary: #F8FAFC;
-    --text-secondary: #94A3B8;
-    --text-muted: #64748B;
     --accent-primary: #F5A623;
     --accent-hover: #E09612;
     --accent-glow: rgba(245, 166, 35, 0.18);
@@ -24,27 +50,27 @@
     color: var(--text-primary);
     font-feature-settings: "cv02", "cv03", "cv04", "cv11";
     -webkit-font-smoothing: antialiased;
-    transition: background-color 0.2s ease;
+    transition: background-color 0.2s ease, color 0.2s ease;
   }
 }
 
-/* Custom Scrollbar for professional workshop look */
+/* Custom Scrollbar */
 ::-webkit-scrollbar {
   width: 6px;
   height: 6px;
 }
 
 ::-webkit-scrollbar-track {
-  background: #060B14;
+  background: transparent;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #1A2744;
+  background: var(--border-main);
   border-radius: 3px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #243356;
+  background: var(--border-highlight);
 }
 
 /* High-contrast form inputs */

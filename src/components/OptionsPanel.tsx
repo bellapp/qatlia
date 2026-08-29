@@ -36,18 +36,18 @@ function Switch({
           : 'bg-studio-panel/40 border-studio-border/60 hover:border-studio-border-hover/60'
       } disabled:opacity-50 cursor-pointer`}
     >
-      <span className={`shrink-0 w-7 h-7 rounded-lg flex items-center justify-center transition-colors ${checked ? 'bg-brand-500/15 text-brand-400' : 'bg-studio-field text-slate-500'}`}>
+      <span className={`shrink-0 w-7 h-7 rounded-lg flex items-center justify-center transition-colors ${checked ? 'bg-brand-500/15 text-brand-400' : 'bg-studio-field text-slate-500 dark:text-slate-400'}`}>
         <Icon className="w-3.5 h-3.5" />
       </span>
       <span className="flex-1 min-w-0">
-        <span className={`block text-[11px] font-semibold ${checked ? 'text-white' : 'text-slate-300'}`}>{label}</span>
-        <span className="block text-[10px] text-slate-500 mt-0.5 leading-tight">{description}</span>
+        <span className={`block text-[11px] font-semibold ${checked ? 'text-slate-900 dark:text-white' : 'text-slate-700 dark:text-slate-300'}`}>{label}</span>
+        <span className="block text-[10px] text-slate-500 dark:text-slate-400 mt-0.5 leading-tight">{description}</span>
       </span>
       <span
         className={`shrink-0 relative inline-flex h-5 w-9 items-center rounded-full transition-colors duration-200 ${checked ? 'bg-brand-500' : 'bg-studio-border'}`}
       >
         <span
-          className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white shadow transition-transform duration-200 ${checked ? 'translate-x-4.5' : 'translate-x-1'}`}
+          className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white dark:bg-studio-field shadow transition-transform duration-200 ${checked ? 'translate-x-4.5' : 'translate-x-1'}`}
           style={{ transform: checked ? 'translateX(18px)' : 'translateX(4px)' }}
         />
       </span>
@@ -79,12 +79,12 @@ export const OptionsPanel: React.FC<OptionsPanelProps> = ({
               <Scissors className="w-3.5 h-3.5 text-brand-400" />
             </span>
             <div>
-              <span className="block text-[11px] font-semibold text-white">Épaisseur de lame (Kerf)</span>
-              <span className="block text-[10px] text-slate-500">Trait de scie retiré entre chaque coupe</span>
+              <span className="block text-[11px] font-semibold text-slate-900 dark:text-white">Épaisseur de lame (Kerf)</span>
+              <span className="block text-[10px] text-slate-500 dark:text-slate-400">Trait de scie retiré entre chaque coupe</span>
             </div>
           </div>
           <span className="shrink-0 px-2 py-1 rounded-lg bg-studio-field border border-studio-border font-mono font-bold text-sm text-brand-400 tabular-nums">
-            {options.kerfWidth}<span className="text-[9px] text-slate-500 ml-0.5">mm</span>
+            {options.kerfWidth}<span className="text-[9px] text-slate-500 dark:text-slate-400 ml-0.5">mm</span>
           </span>
         </div>
 
@@ -119,7 +119,7 @@ export const OptionsPanel: React.FC<OptionsPanelProps> = ({
           disabled={disabled}
           value={options.optimizationPriority}
           onChange={(e) => updateField('optimizationPriority', e.target.value as OptimizationOptions['optimizationPriority'])}
-          className="flex-1 px-3 py-2 rounded-xl bg-studio-field border border-studio-border text-slate-200 text-xs outline-none focus:border-brand-500/50 disabled:opacity-50"
+          className="flex-1 px-3 py-2 rounded-xl bg-studio-field border border-studio-border text-slate-800 dark:text-slate-200 text-xs outline-none focus:border-brand-500/50 disabled:opacity-50"
         >
           <option value="linear_guillotine">Coupe linéaire traversante (atelier)</option>
           <option value="min_waste">Minimiser les chutes (%)</option>

@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Inter, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
+import { ThemeProvider } from "@/components/ThemeProvider";
 
 const inter = Inter({
   subsets: ["latin"],
@@ -25,9 +26,9 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="fr" className={`${inter.variable} ${jetbrainsMono.variable} dark`}>
-      <body className="min-h-screen bg-studio-canvas text-slate-100 font-body antialiased selection:bg-brand-500 selection:text-black">
-        {children}
+    <html lang="fr" className={`${inter.variable} ${jetbrainsMono.variable}`} suppressHydrationWarning>
+      <body className="min-h-screen bg-studio-canvas text-slate-700 dark:text-slate-100 font-body antialiased selection:bg-brand-500 selection:text-black">
+        <ThemeProvider>{children}</ThemeProvider>
       </body>
     </html>
   );

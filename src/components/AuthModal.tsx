@@ -90,12 +90,12 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm animate-in fade-in duration-150">
       <div className="relative w-full max-w-[420px] p-6 sm:p-7 rounded-3xl bg-studio-panel border border-studio-border shadow-2xl space-y-5 animate-in zoom-in-95 slide-in-from-bottom-4 duration-200">
-        <button onClick={onClose} className="absolute right-4 top-4 p-2 text-slate-500 hover:text-white rounded-full hover:bg-studio-field transition-colors" aria-label="Fermer"><X className="w-5 h-5" /></button>
+        <button onClick={onClose} className="absolute right-4 top-4 p-2 text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:text-white rounded-full hover:bg-studio-field transition-colors" aria-label="Fermer"><X className="w-5 h-5" /></button>
 
         <div className="space-y-2 pr-8">
           <div className="text-brand-400"><QatlIALogo size="md" /></div>
-          <h2 className="text-xl font-black text-white">{title}</h2>
-          <p className="text-sm text-slate-400">{isLogin ? 'Connectez-vous pour enregistrer ce débit et exporter.' : subtitle}</p>
+          <h2 className="text-xl font-black text-slate-900 dark:text-white">{title}</h2>
+          <p className="text-sm text-slate-600 dark:text-slate-400">{isLogin ? 'Connectez-vous pour enregistrer ce débit et exporter.' : subtitle}</p>
         </div>
 
         <div className="flex items-center gap-2 p-2.5 rounded-xl bg-brand-500/10 border border-brand-500/20 text-brand-300 text-xs font-medium">
@@ -111,7 +111,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
           type="button"
           onClick={handleOAuthGoogle}
           disabled={oauthLoading || loading}
-          className="w-full py-3 px-4 rounded-xl bg-white hover:bg-slate-100 text-slate-900 font-semibold text-sm flex items-center justify-center gap-3 disabled:opacity-50"
+          className="w-full py-3 px-4 rounded-xl bg-white dark:bg-studio-field hover:bg-slate-100 text-slate-900 font-semibold text-sm flex items-center justify-center gap-3 disabled:opacity-50"
         >
           <GoogleMark />
           {oauthLoading ? 'Redirection Google…' : 'Continuer avec Google'}
@@ -119,36 +119,36 @@ export const AuthModal: React.FC<AuthModalProps> = ({
 
         <div className="relative flex items-center">
           <div className="border-t border-studio-border w-full" />
-          <span className="px-3 text-[11px] font-semibold uppercase tracking-wider text-slate-500 bg-studio-panel">ou email</span>
+          <span className="px-3 text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 bg-studio-panel">ou email</span>
         </div>
 
         <form onSubmit={handleAuth} className="space-y-3">
           {!isLogin && (
             <div className="relative">
-              <User className="w-4 h-4 text-slate-500 absolute left-3 top-3" />
+              <User className="w-4 h-4 text-slate-500 dark:text-slate-400 absolute left-3 top-3" />
               <input
                 type="text"
                 required
                 value={fullName}
                 onChange={(e) => setFullName(e.target.value)}
                 placeholder="Nom d’atelier"
-                className="w-full bg-studio-field border border-studio-border rounded-xl pl-9 pr-3 py-2.5 text-sm text-white placeholder-slate-600 outline-none focus:border-brand-500/50"
+                className="w-full bg-studio-field border border-studio-border rounded-xl pl-9 pr-3 py-2.5 text-sm text-slate-900 dark:text-white placeholder-slate-600 outline-none focus:border-brand-500/50"
               />
             </div>
           )}
           <div className="relative">
-            <Mail className="w-4 h-4 text-slate-500 absolute left-3 top-3" />
+            <Mail className="w-4 h-4 text-slate-500 dark:text-slate-400 absolute left-3 top-3" />
             <input
               type="email"
               required
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               placeholder="artisan@atelier.ma"
-              className="w-full bg-studio-field border border-studio-border rounded-xl pl-9 pr-3 py-2.5 text-sm text-white placeholder-slate-600 outline-none focus:border-brand-500/50"
+              className="w-full bg-studio-field border border-studio-border rounded-xl pl-9 pr-3 py-2.5 text-sm text-slate-900 dark:text-white placeholder-slate-600 outline-none focus:border-brand-500/50"
             />
           </div>
           <div className="relative">
-            <Lock className="w-4 h-4 text-slate-500 absolute left-3 top-3" />
+            <Lock className="w-4 h-4 text-slate-500 dark:text-slate-400 absolute left-3 top-3" />
             <input
               type={showPassword ? 'text' : 'password'}
               required
@@ -156,9 +156,9 @@ export const AuthModal: React.FC<AuthModalProps> = ({
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               placeholder="Mot de passe"
-              className="w-full bg-studio-field border border-studio-border rounded-xl pl-9 pr-10 py-2.5 text-sm text-white placeholder-slate-600 outline-none focus:border-brand-500/50"
+              className="w-full bg-studio-field border border-studio-border rounded-xl pl-9 pr-10 py-2.5 text-sm text-slate-900 dark:text-white placeholder-slate-600 outline-none focus:border-brand-500/50"
             />
-            <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-3 top-2.5 text-slate-500">
+            <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-3 top-2.5 text-slate-500 dark:text-slate-400">
               {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
             </button>
           </div>

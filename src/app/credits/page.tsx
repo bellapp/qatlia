@@ -72,7 +72,7 @@ export default function CreditsPage() {
         <div className="flex items-center justify-between">
           <Link
             href="/atelier"
-            className="flex items-center gap-2 text-xs font-bold text-[#94A3B8] hover:text-white transition-colors"
+            className="flex items-center gap-2 text-xs font-bold text-[#94A3B8] hover:text-slate-900 dark:text-white transition-colors"
           >
             <ArrowLeft className="w-4 h-4" />
             Retour au Dashboard
@@ -88,7 +88,7 @@ export default function CreditsPage() {
           <span className="text-xs font-black uppercase tracking-widest text-[#F5A623] bg-brand-500/10 px-3 py-1 rounded-full border border-brand-500/20">
             Recharge de Crédits
           </span>
-          <h1 className="text-3xl md:text-4xl font-black text-white">
+          <h1 className="text-3xl md:text-4xl font-black text-slate-900 dark:text-white">
             10 DH = 10 Analyses IA de Mesures
           </h1>
           <p className="text-sm text-[#94A3B8] max-w-xl mx-auto">
@@ -115,10 +115,10 @@ export default function CreditsPage() {
 
               <div>
                 <div className="flex items-center justify-between mb-2">
-                  <h3 className="text-base font-bold text-white">{p.name}</h3>
+                  <h3 className="text-base font-bold text-slate-900 dark:text-white">{p.name}</h3>
                 </div>
                 <div className="flex items-baseline gap-1 my-3">
-                  <span className="text-3xl font-black text-white">{p.priceMAD}</span>
+                  <span className="text-3xl font-black text-slate-900 dark:text-white">{p.priceMAD}</span>
                   <span className="text-sm font-bold text-[#94A3B8]">
                     DH {p.id === 'unlimited' ? '/mois' : ''}
                   </span>
@@ -126,7 +126,7 @@ export default function CreditsPage() {
                 <p className="text-xs text-[#94A3B8] leading-relaxed mb-6">{p.desc}</p>
 
                 <div className="space-y-2.5 pt-4 border-t border-[#334155]/60 text-xs">
-                  <div className="flex items-center gap-2 text-white">
+                  <div className="flex items-center gap-2 text-slate-900 dark:text-white">
                     <Check className="w-4 h-4 text-emerald-400 shrink-0" />
                     <span><strong>{p.credits}</strong> analyses photo IA</span>
                   </div>
@@ -147,7 +147,7 @@ export default function CreditsPage() {
                 className={`w-full mt-6 py-3 rounded-xl font-black text-xs uppercase tracking-wider transition-all flex items-center justify-center gap-2 ${
                   p.highlight
                     ? 'bg-[#F5A623] hover:bg-[#D97706] text-black shadow-lg shadow-orange-500/20'
-                    : 'bg-[#0284C7] hover:bg-[#0369A1] text-white'
+                    : 'bg-[#0284C7] hover:bg-[#0369A1] text-slate-900 dark:text-white'
                 }`}
               >
                 {loadingPack === p.id ? (
