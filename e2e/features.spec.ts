@@ -56,6 +56,22 @@ test.describe('Responsive', () => {
     expect(after.main?.right ?? after.viewportWidth + 2).toBeLessThanOrEqual(after.viewportWidth + 1);
   });
 
+  test('initial Arabic load keeps the mobile atelier inside the viewport', async ({ page }) => {
+    await page.setViewportSize({ width: 375, height: 812 });
+    await page.addInitScript(() => localStorage.setItem('qatlia-locale', 'ar'));
+    await page.goto('/atelier');
+
+    await expect(page.locator('html')).toHaveAttribute('dir', 'rtl');
+    await expect(page.locator('html')).toHaveAttribute('lang', 'ar');
+
+    const widths = await page.evaluate(() => ({
+      viewportWidth: window.innerWidth,
+      documentWidth: document.documentElement.scrollWidth,
+      bodyWidth: document.body.scrollWidth,
+    }));
+    expect(Math.max(widths.documentWidth, widths.bodyWidth)).toBeLessThanOrEqual(widths.viewportWidth + 1);
+  });
+
   test('desktop header actions remain right aligned', async ({ page }) => {
     await page.setViewportSize({ width: 1280, height: 1024 });
     await page.addInitScript(() => localStorage.setItem('qatlia-locale', 'fr'));

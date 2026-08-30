@@ -469,7 +469,7 @@ export default function Dashboard() {
             </div>
           </div>
 
-          <div dir="ltr" className="flex min-w-0 items-center gap-2 overflow-x-auto overscroll-x-contain">
+          <div dir="ltr" role="group" aria-label="Actions de coupe" className="flex min-w-0 items-center gap-2 overflow-x-auto overscroll-x-contain">
             {/* Mode Toggle: 2D / 1D */}
             <div className="flex items-center p-0.5 rounded-lg bg-studio-field border border-studio-border">
               <button type="button" onClick={() => setCutMode('2d')} aria-pressed={cutMode === '2d'}

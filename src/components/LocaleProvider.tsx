@@ -141,12 +141,16 @@ export function LocaleProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     setMounted(true);
     const stored = localStorage.getItem('qatlia-locale') as Locale | null;
-    if (stored && locales.includes(stored)) setLocaleState(stored);
+    let resolved: Locale = 'fr';
+    if (stored && locales.includes(stored)) resolved = stored;
     else {
       const nav = navigator.language?.slice(0, 2);
-      if (nav === 'ar') setLocaleState('ar');
-      else if (nav === 'en') setLocaleState('en');
+      if (nav === 'ar') resolved = 'ar';
+      else if (nav === 'en') resolved = 'en';
     }
+    setLocaleState(resolved);
+    document.documentElement.dir = resolved === 'ar' ? 'rtl' : 'ltr';
+    document.documentElement.lang = resolved;
   }, []);
 
   const setLocale = (l: Locale) => {
