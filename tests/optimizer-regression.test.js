@@ -151,8 +151,30 @@ function assertOptimizationInvariants(result, sheet, expectedExpandedCount) {
         );
       }
     }
+
+    const offcuts = currentSheet.offcuts || [];
+    for (const off of offcuts) {
+      assert.ok(off.width > 0 && off.height > 0 && off.areaM2 > 0, `Offcut ${off.id} on sheet ${currentSheet.index} must have positive geometry`);
+      assert.ok(off.x >= 0 && off.y >= 0, `Offcut ${off.id} on sheet ${currentSheet.index} must stay within the sheet`);
+      assert.ok(off.x + off.width <= currentSheet.width + 1e-9, `Offcut ${off.id} exceeds sheet width`);
+      assert.ok(off.y + off.height <= currentSheet.height + 1e-9, `Offcut ${off.id} exceeds sheet height`);
+
+      for (const piece of currentSheet.pieces) {
+        assert.equal(rectanglesOverlap(off, piece), false, `Offcut ${off.id} overlaps placed piece ${piece.pieceId} on sheet ${currentSheet.index}`);
+      }
+    }
+    for (let i = 0; i < offcuts.length; i += 1) {
+      for (let j = i + 1; j < offcuts.length; j += 1) {
+        assert.equal(rectanglesOverlap(offcuts[i], offcuts[j]), false, `Offcuts ${offcuts[i].id} and ${offcuts[j].id} overlap on sheet ${currentSheet.index}`);
+      }
+    }
+
+    const placedArea = currentSheet.pieces.reduce((sum, p) => sum + p.width * p.height, 0);
+    const offcutArea = offcuts.reduce((sum, o) => sum + o.width * o.height, 0);
+    assert.ok(placedArea + offcutArea <= sheetArea + 1e-9, `Sheet ${currentSheet.index} placed + offcut area must not exceed sheet area`);
   }
 
+  assert.deepEqual(result.offcuts, result.sheets.flatMap((s) => s.offcuts), 'Aggregate offcuts must equal the concatenation of per-sheet offcuts');
   assert.ok(result.wastePercentage >= 0 && result.wastePercentage <= 100, 'Overall waste must stay within 0..100');
 }
 

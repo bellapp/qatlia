@@ -184,4 +184,67 @@ test.describe('Atelier Dashboard (/atelier)', () => {
     await expect(firstDataRow.getByText(/\d+([.,]\d+)? × \d+([.,]\d+)?/)).toBeVisible();
     await expect(cutList.getByRole('row', { name: /test rotation/i }).getByText(/oui|90°/i)).toBeVisible();
   });
+
+  test('optimized offcuts stay consistent across engine, plan and list', async ({ page }) => {
+    const round1 = (value: number) => Math.round(value * 10) / 10;
+
+    await page.getByRole('button', { name: /optimiser/i }).click();
+
+    const listItems = page.getByTestId('offcut-list-item');
+    await expect(listItems.first()).toBeVisible({ timeout: 15000 });
+
+    const svgRects = page.getByTestId('offcut-svg-rect');
+    const listCount = await listItems.count();
+    expect(listCount).toBeGreaterThan(0);
+    await expect(svgRects).toHaveCount(listCount);
+
+    const listData = await listItems.evaluateAll((items: HTMLElement[]) =>
+      items.map((item) => ({
+        id: item.getAttribute('data-offcut-id'),
+        width: item.getAttribute('data-offcut-width'),
+        height: item.getAttribute('data-offcut-height'),
+        text: item.textContent || '',
+      }))
+    );
+
+    const rectData = await svgRects.evaluateAll((rects: SVGRectElement[]) =>
+      rects.map((rect) => ({
+        id: rect.getAttribute('data-offcut-id'),
+        width: rect.getAttribute('data-offcut-width'),
+        height: rect.getAttribute('data-offcut-height'),
+        x: rect.x.baseVal.value,
+        y: rect.y.baseVal.value,
+        rectWidth: rect.width.baseVal.value,
+        rectHeight: rect.height.baseVal.value,
+      }))
+    );
+
+    const svg = page.getByTestId('cut-plan-svg');
+    const viewBox = await svg.evaluate((element: SVGSVGElement) => {
+      const box = element.viewBox.baseVal;
+      return { x: box.x, y: box.y, width: box.width, height: box.height };
+    });
+    expect(viewBox.width).toBeGreaterThan(0);
+    expect(viewBox.height).toBeGreaterThan(0);
+
+    for (let i = 0; i < listCount; i++) {
+      const listItem = listData[i];
+      const rect = rectData[i];
+
+      expect(rect.id).toBe(listItem.id);
+      expect(rect.width).toBe(listItem.width);
+      expect(rect.height).toBe(listItem.height);
+
+      const height = round1(Number(listItem.height));
+      const width = round1(Number(listItem.width));
+      expect(listItem.text).toContain(`${height}×${width}`);
+
+      expect(rect.rectWidth).toBeGreaterThan(0);
+      expect(rect.rectHeight).toBeGreaterThan(0);
+      expect(rect.x).toBeGreaterThanOrEqual(viewBox.x);
+      expect(rect.y).toBeGreaterThanOrEqual(viewBox.y);
+      expect(rect.x + rect.rectWidth).toBeLessThanOrEqual(viewBox.x + viewBox.width);
+      expect(rect.y + rect.rectHeight).toBeLessThanOrEqual(viewBox.y + viewBox.height);
+    }
+  });
 });

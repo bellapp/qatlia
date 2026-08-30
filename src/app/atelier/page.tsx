@@ -43,6 +43,7 @@ import { useTheme } from '@/components/ThemeProvider';
 import { OnboardingTour } from '@/components/OnboardingTour';
 import { LocaleSwitcher } from '@/components/LocaleProvider';
 import { writeLocalHistoryItem, type LocalHistoryItem } from '@/lib/history';
+import { buildPdfPayload } from '@/lib/pdf-payload';
 
 const DEFAULT_SHEETS: Sheet[] = [
   { id: 's0', height: 278, width: 208, kerf: 0.3, margin: 1.0, grainDirection: false, material: 'mdf', quantity: 1, label: 'Panneau standard 278×208' },
@@ -404,16 +405,7 @@ export default function Dashboard() {
       const res = await fetch('/api/export-pdf', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          projectName: 'Plan Découpe QatlIA',
-          sheet: {
-            width: activeSheet.width,
-            height: activeSheet.height,
-            material: activeSheet.material || 'mdf',
-          },
-          pieces,
-          result,
-        }),
+        body: JSON.stringify(buildPdfPayload('Plan Découpe QatlIA', activeSheet, pieces, result)),
       });
 
       if (res.ok) {
@@ -800,6 +792,7 @@ export default function Dashboard() {
                       style={{ width: `${zoomLevel * 100}%`, maxWidth: `${480 * zoomLevel}px` }}
                     >
                       <svg
+                        data-testid="cut-plan-svg"
                         viewBox={`0 0 ${activeSheet.width} ${activeSheet.height}`}
                         className="block w-full aspect-[208/278] rounded-xl"
                         style={{ filter: 'drop-shadow(0 4px 6px rgba(0,0,0,0.4))' }}
@@ -823,11 +816,11 @@ export default function Dashboard() {
                           fill={isDark ? 'url(#sheetBgD)' : 'url(#sheetBgL)'}
                           stroke={isDark ? '#4A5568' : '#94A3B8'} strokeWidth={isDark ? 1 : 1.5} rx="0.5" />
 
-                        {result.offcuts && result.offcuts.filter(o => o.sheetIndex === activeSheetIndex).map((off, oIdx) => {
+                        {result.offcuts && result.offcuts.filter(o => o.sheetIndex === activeSheetIndex).map((off) => {
                           const minSide = Math.min(off.width, off.height);
                           return (
-                            <g key={`off_${oIdx}`}>
-                              <rect x={off.x} y={off.y} width={off.width} height={off.height}
+                            <g key={off.id} data-testid="offcut-svg-group" data-offcut-id={off.id}>
+                              <rect data-testid="offcut-svg-rect" data-offcut-id={off.id} data-offcut-width={off.width} data-offcut-height={off.height} x={off.x} y={off.y} width={off.width} height={off.height}
                                 fill={isDark ? 'url(#hatchD)' : 'url(#hatchL)'}
                                 stroke={isDark ? '#2D3A5C' : '#94A3B8'} strokeWidth="0.4" strokeDasharray="2 2" opacity="0.8" />
                               {off.width>=14 && off.height>=10 && (
@@ -934,12 +927,12 @@ export default function Dashboard() {
                         </table>
                       </div>
                     </section>
-                    <div className="p-3.5 rounded-xl bg-studio-panel/50 border border-studio-border/70">
+                    <div data-testid="offcuts-list" className="p-3.5 rounded-xl bg-studio-panel/50 border border-studio-border/70">
                       <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-2.5">Chutes ({currentSheet.offcuts?.length||0})</p>
                       <div className="space-y-1 max-h-[180px] overflow-y-auto">
                         {(currentSheet.offcuts||[]).map((off, i) => {
                           return (
-                            <div key={i} className="flex items-center justify-between py-1 px-1.5 rounded-md hover:bg-studio-field/40 text-[11px] transition-colors gap-1">
+                            <div key={off.id} data-testid="offcut-list-item" data-offcut-id={off.id} data-offcut-width={off.width} data-offcut-height={off.height} className="flex items-center justify-between py-1 px-1.5 rounded-md hover:bg-studio-field/40 text-[11px] transition-colors gap-1">
                               <span className="text-slate-500 dark:text-slate-400 font-mono text-[10px] truncate">Chute #{i+1}</span>
                               <span className="font-mono font-bold text-brand-400 text-[10px] tabular-nums">
                                 {Math.round(off.height*10)/10}×{Math.round(off.width*10)/10}

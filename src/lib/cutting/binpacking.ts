@@ -44,10 +44,15 @@ export interface OptimizationOptions {
   considerMaterial: boolean; edgeBanding: boolean; grainDirection: boolean;
   optimizationPriority: 'linear_guillotine' | 'min_waste' | 'min_sheets' | 'balanced';
   defaultMaterial?: MaterialType;
+  /** Minimum offcut width in cm below which a remnant is not classified as reusable. */
+  minReusableOffcutWidth?: number;
+  /** Minimum offcut height in cm below which a remnant is not classified as reusable. */
+  minReusableOffcutHeight?: number;
 }
 export const OPTIONS_DEFAULTS: OptimizationOptions = {
   kerfWidth: 3, showLabels: true, singleSheetOnly: false, considerMaterial: false,
   edgeBanding: false, grainDirection: false, optimizationPriority: 'linear_guillotine', defaultMaterial: 'mdf',
+  minReusableOffcutWidth: 15, minReusableOffcutHeight: 15,
 };
 
 export interface PlacedPiece {
@@ -55,7 +60,7 @@ export interface PlacedPiece {
   originalHeight: number; originalWidth: number; height: number; width: number;
   x: number; y: number; rotated: boolean; sheetIndex: number; material?: MaterialType | null; color?: string;
 }
-export interface Offcut { x: number; y: number; width: number; height: number; sheetIndex: number; areaM2: number; isReusable: boolean; }
+export interface Offcut { id: string; x: number; y: number; width: number; height: number; sheetIndex: number; areaM2: number; isReusable: boolean; }
 export interface SheetResult { index: number; material: MaterialType; width: number; height: number; pieces: PlacedPiece[]; offcuts: Offcut[]; usedArea: number; wasteRate: number; }
 export interface MaterialStats { material: MaterialType; sheetsUsed: number; totalPieces: number; usedArea: number; wasteRate: number; }
 
@@ -142,7 +147,7 @@ export function optimizeCutting1D(pieces: Piece[], stockLength: number, kerf: nu
       sheetIndex: i, material: 'mdf' as MaterialType,
       color: p.color,
     })),
-    offcuts: [{ x: b.usedLength, y: 0, width: stockLength - b.usedLength, height: 1, sheetIndex: i, areaM2: 0, isReusable: (stockLength - b.usedLength) > 1 }],
+    offcuts: [{ id: `sheet${i}_offcut_bar`, x: b.usedLength, y: 0, width: stockLength - b.usedLength, height: 1, sheetIndex: i, areaM2: 0, isReusable: (stockLength - b.usedLength) > 1 }],
     usedArea: b.usedLength, wasteRate: b.wasteRate,
   }));
   const totalAvail = bars.length * stockLength;
@@ -190,6 +195,7 @@ interface SheetPackingCandidate {
   pieces: PlacedPiece[];
   remaining: ExpandedPiece[];
   usedArea: number;
+  freeRects: FreeRect[];
 }
 
 interface PlanCandidate {
@@ -376,12 +382,23 @@ function splitFreeRect(rect: FreeRect, width: number, height: number, kerf: numb
 function pruneFreeRects(freeRects: FreeRect[]): FreeRect[] {
   return freeRects.filter((rect, rectIndex) => !freeRects.some((other, otherIndex) => {
     if (rectIndex === otherIndex) return false;
-    return (
+    const contained = (
       rect.x >= other.x - 1e-9 &&
       rect.y >= other.y - 1e-9 &&
       rect.x + rect.width <= other.x + other.width + 1e-9 &&
       rect.y + rect.height <= other.y + other.height + 1e-9
     );
+    if (!contained) return false;
+    // Exact duplicates are mutually "contained" in each other; without a tiebreaker
+    // every copy would drop itself, leaving zero survivors instead of one. Keep the
+    // lowest-indexed copy so exact duplicates dedupe to a single rectangle.
+    const isExactDuplicate = (
+      Math.abs(rect.x - other.x) <= 1e-9 &&
+      Math.abs(rect.y - other.y) <= 1e-9 &&
+      Math.abs(rect.width - other.width) <= 1e-9 &&
+      Math.abs(rect.height - other.height) <= 1e-9
+    );
+    return isExactDuplicate ? otherIndex < rectIndex : true;
   }));
 }
 
@@ -443,10 +460,56 @@ function packSheetWithStrategy(
     pieces,
     remaining: orderedItems.filter((item) => !placedIds.has(item.id || '')),
     usedArea,
+    freeRects,
   };
 }
 
-function buildSheetResult(sheet: Sheet, sheetIndex: number, defaultMaterial: MaterialType, pieces: PlacedPiece[], usedArea: number): SheetResult {
+// Round to a fixed cm precision so IDs/areas are stable across floating-point noise.
+function roundTo(value: number, decimals: number): number {
+  const factor = 10 ** decimals;
+  return Math.round(value * factor) / factor;
+}
+
+function buildOffcutId(sheetIndex: number, x: number, y: number, width: number, height: number): string {
+  return `sheet${sheetIndex}_offcut_${roundTo(x, 2)}x${roundTo(y, 2)}_${roundTo(width, 2)}x${roundTo(height, 2)}`;
+}
+
+function buildOffcutsForSheet(freeRects: FreeRect[], sheet: Sheet, sheetIndex: number, options: OptimizationOptions): Offcut[] {
+  const margin = Math.max(0, sheet.margin || 0);
+  const minX = margin;
+  const minY = margin;
+  const maxX = sheet.width - margin;
+  const maxY = sheet.height - margin;
+  const minWidth = options.minReusableOffcutWidth ?? OPTIONS_DEFAULTS.minReusableOffcutWidth ?? 0;
+  const minHeight = options.minReusableOffcutHeight ?? OPTIONS_DEFAULTS.minReusableOffcutHeight ?? 0;
+
+  // Keep only geometrically valid, in-bounds terminal free rectangles, then drop any
+  // that are fully contained within another (defensive: packSheetWithStrategy already
+  // prunes contained rectangles after every placement, but this guards the final set too).
+  const valid = freeRects.filter((rect) => (
+    rect.width > 1e-9 && rect.height > 1e-9 &&
+    rect.x >= minX - 1e-9 && rect.y >= minY - 1e-9 &&
+    rect.x + rect.width <= maxX + 1e-9 && rect.y + rect.height <= maxY + 1e-9
+  ));
+  const deduped = pruneFreeRects(valid);
+  const ordered = [...deduped].sort((a, b) => a.y - b.y || a.x - b.x || a.width - b.width || a.height - b.height);
+
+  return ordered.map((rect) => {
+    const areaM2 = roundTo((rect.width * rect.height) / 10000, 4);
+    return {
+      id: buildOffcutId(sheetIndex, rect.x, rect.y, rect.width, rect.height),
+      x: rect.x,
+      y: rect.y,
+      width: rect.width,
+      height: rect.height,
+      sheetIndex,
+      areaM2,
+      isReusable: rect.width >= minWidth && rect.height >= minHeight,
+    };
+  });
+}
+
+function buildSheetResult(sheet: Sheet, sheetIndex: number, defaultMaterial: MaterialType, pieces: PlacedPiece[], usedArea: number, freeRects: FreeRect[], options: OptimizationOptions): SheetResult {
   const sheetArea = sheet.width * sheet.height;
   return {
     index: sheetIndex,
@@ -454,7 +517,7 @@ function buildSheetResult(sheet: Sheet, sheetIndex: number, defaultMaterial: Mat
     width: sheet.width,
     height: sheet.height,
     pieces,
-    offcuts: [],
+    offcuts: buildOffcutsForSheet(freeRects, sheet, sheetIndex, options),
     usedArea,
     wasteRate: sheetArea > 0 ? Math.round((1 - usedArea / sheetArea) * 1000) / 10 : 0,
   };
@@ -515,7 +578,7 @@ function simulatePlanForStrategy(
 
         producedCandidate = true;
         nextFrontier.push({
-          sheets: [...plan.sheets, buildSheetResult(sheet, sheetIndex, defaultMaterial, candidate.pieces, candidate.usedArea)],
+          sheets: [...plan.sheets, buildSheetResult(sheet, sheetIndex, defaultMaterial, candidate.pieces, candidate.usedArea, candidate.freeRects, mergedOptions)],
           placedPieces: [...plan.placedPieces, ...candidate.pieces],
           unplacedPieces: candidate.remaining,
           totalAreaUsed: plan.totalAreaUsed + candidate.usedArea,
@@ -659,7 +722,7 @@ export function optimizeCutting2D(
 
   return {
     cutMode: '2d', sheetsUsed: finalPlan.sheets.length, sheets: finalPlan.sheets, placedPieces: finalPlan.placedPieces,
-    offcuts: [],
+    offcuts: finalPlan.sheets.flatMap((sheet) => sheet.offcuts),
     unplacedPieces: finalPlan.unplacedPieces, totalAreaAvailable: totalAvail, totalAreaUsed: totalUsed,
     wastePercentage: wp, totalLinearCutMeters: totalM, moneySavedMad: saved,
     materialCostMad: matCost, edgeBandingCostMad: edgeCost, totalCostMad: matCost + edgeCost,
@@ -674,4 +737,5 @@ export function optimizeCutting(pieces: Piece[], sheet: Sheet, options?: Partial
 
 export const GuillotinePacker = {
   strategies: PACKING_STRATEGIES,
+  pruneFreeRects,
 };

@@ -24,8 +24,8 @@ test('optimizeCutting2D preserves per-piece colors on placed and unplaced pieces
 });
 
 test('optimize API schema accepts only optional six-digit hex piece colors', () => {
-  const routeSource = fs.readFileSync(path.resolve('src/app/api/optimize/route.ts'), 'utf8');
+  const schemaSource = fs.readFileSync(path.resolve('src/lib/cutting/optimize-schema.ts'), 'utf8');
 
-  assert.match(routeSource, /color:\s*z\.string\(\)\.regex\(\/\^#\[0-9A-Fa-f\]\{6\}\$\//, 'Optimize API input schema must constrain optional piece colors to #RRGGBB');
-  assert.match(routeSource, /color:[^\n]+\.optional\(\)/, 'Optimize API piece color must remain optional');
+  assert.match(schemaSource, /color:\s*z\.string\(\)\.regex\(\/\^#\[0-9A-Fa-f\]\{6\}\$\//, 'Optimize API input schema must constrain optional piece colors to #RRGGBB');
+  assert.match(schemaSource, /color:[^\n]+\.optional\(\)/, 'Optimize API piece color must remain optional');
 });
