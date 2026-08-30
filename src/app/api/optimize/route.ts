@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { optimizeCutting, Piece, Sheet, OptimizationOptions } from '@/lib/cutting/binpacking';
+import { optimizeCutting2D, Piece, Sheet, OptimizationOptions } from '@/lib/cutting/binpacking';
 import { z } from 'zod';
 
 const OptimizeSchema = z.object({
@@ -47,7 +47,7 @@ export async function POST(req: Request) {
     }
 
     const { sheet, pieces, options } = parsed.data;
-    const result = optimizeCutting(pieces as Piece[], sheet as Sheet, options as Partial<OptimizationOptions>);
+    const result = optimizeCutting2D(pieces as Piece[], [sheet as Sheet], options as Partial<OptimizationOptions>);
 
     return NextResponse.json({
       success: true,

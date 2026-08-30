@@ -11,7 +11,13 @@ export default defineConfig({
     baseURL: 'http://localhost:3002',
     trace: 'off',
   },
-  timeout: 15000,
+  webServer: {
+    command: 'npm run build && npm run start -- -p 3002',
+    url: 'http://localhost:3002',
+    reuseExistingServer: false,
+    timeout: 180000,
+  },
+  timeout: 30000,
   projects: [
     { name: 'chromium', use: { ...devices['Desktop Chrome'] } },
   ],

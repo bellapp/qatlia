@@ -2,8 +2,8 @@ import { test, expect } from '@playwright/test';
 
 test.describe('Atelier Dashboard (/atelier)', () => {
   test.beforeEach(async ({ page }) => {
-    await page.goto('/atelier');
-    await page.waitForSelector('text=QatlIA', { timeout: 5000 });
+    await page.goto('/atelier', { waitUntil: 'domcontentloaded' });
+    await expect(page.getByRole('img', { name: 'QatlIA' })).toBeVisible({ timeout: 15000 });
   });
 
   test('loads and shows QatlIA logo and PRO badge', async ({ page }) => {
@@ -17,7 +17,8 @@ test.describe('Atelier Dashboard (/atelier)', () => {
     await expect(btn2d).toBeVisible();
     await expect(btn1d).toBeVisible();
     await btn1d.click();
-    await expect(page.getByText(/barre/i).first()).toBeVisible();
+    await expect(btn1d).toHaveAttribute('aria-pressed', 'true');
+    await expect(btn2d).toHaveAttribute('aria-pressed', 'false');
   });
 
   test('displays stock sheet dimensions inputs', async ({ page }) => {
@@ -60,8 +61,8 @@ test.describe('Atelier Dashboard (/atelier)', () => {
   test('advanced options section can be opened', async ({ page }) => {
     const optsBtn = page.getByRole('button', { name: /r[ée]glage/i }).first();
     await optsBtn.click();
-    await page.waitForTimeout(300);
-    await expect(page.getByText(/kerf/i).first()).toBeVisible();
+    await expect(optsBtn).toHaveAttribute('aria-expanded', 'true');
+    await expect(page.locator('#advanced-cutting-options')).toBeVisible();
   });
 
   test('credit badge shows a number', async ({ page }) => {

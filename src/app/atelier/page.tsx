@@ -435,11 +435,11 @@ export default function Dashboard() {
           <div className="flex items-center gap-2">
             {/* Mode Toggle: 2D / 1D */}
             <div className="flex items-center p-0.5 rounded-lg bg-studio-field border border-studio-border">
-              <button type="button" onClick={() => setCutMode('2d')}
+              <button type="button" onClick={() => setCutMode('2d')} aria-pressed={cutMode === '2d'}
                 className={`px-2.5 py-1 rounded-md text-[10px] font-bold transition-all ${cutMode === '2d' ? 'bg-brand-500 text-slate-950' : 'text-slate-500 hover:text-slate-300'}`}>
                 2D
               </button>
-              <button type="button" onClick={() => setCutMode('1d')}
+              <button type="button" onClick={() => setCutMode('1d')} aria-pressed={cutMode === '1d'}
                 className={`px-2.5 py-1 rounded-md text-[10px] font-bold transition-all ${cutMode === '1d' ? 'bg-brand-500 text-slate-950' : 'text-slate-500 hover:text-slate-300'}`}>
                 1D
               </button>
@@ -631,6 +631,8 @@ export default function Dashboard() {
               <button
                 type="button"
                 onClick={() => setShowAdvancedOptions(!showAdvancedOptions)}
+                aria-expanded={showAdvancedOptions}
+                aria-controls="advanced-cutting-options"
                 className="w-full px-4 py-3 flex items-center justify-between text-[11px] font-semibold uppercase tracking-wider text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:text-white transition-colors"
               >
                 <div className="flex items-center gap-2">
@@ -643,7 +645,7 @@ export default function Dashboard() {
               </button>
 
               {showAdvancedOptions && (
-                <div className="px-1 pb-2 animate-in fade-in slide-in-from-top-1 duration-200">
+                <div id="advanced-cutting-options" className="px-1 pb-2 animate-in fade-in slide-in-from-top-1 duration-200">
                   <OptionsPanel
                     options={options}
                     onChange={handleOptionsChange}

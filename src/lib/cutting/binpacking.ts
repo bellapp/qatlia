@@ -156,40 +156,460 @@ export function optimizeCutting1D(pieces: Piece[], stockLength: number, kerf: nu
 }
 
 // ─── 2D Guillotine Packer ─────────────────────────────────────────
-class LinearGuillotinePacker {
-  private levels: { y: number; x: number; rowH: number; remainingW: number }[] = [];
-  constructor(private sheetW: number, private sheetH: number, private kerf: number, private material: MaterialType) {
-    this.levels = [{ y: 0, x: 0, rowH: 0, remainingW: sheetW }];
+type StripAxis = 'rows' | 'columns';
+type PieceOrdering = 'area_desc' | 'height_desc' | 'width_desc' | 'long_side_desc' | 'perimeter_desc';
+type LevelSelection = 'first_fit' | 'tight_primary' | 'tight_secondary';
+
+interface PackingStrategy {
+  id: string;
+  axis: StripAxis;
+  order: PieceOrdering;
+  levelSelection: LevelSelection;
+}
+
+interface PlacementCandidate {
+  freeRectIndex: number;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  rotated: boolean;
+  score: [number, number, number, number];
+}
+
+interface FreeRect {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+interface SheetPackingCandidate {
+  pieces: PlacedPiece[];
+  remaining: ExpandedPiece[];
+  usedArea: number;
+}
+
+interface PlanCandidate {
+  sheets: SheetResult[];
+  placedPieces: PlacedPiece[];
+  unplacedPieces: ExpandedPiece[];
+  totalAreaUsed: number;
+  totalAreaAvailable: number;
+}
+
+interface PartialPlanCandidate extends PlanCandidate {
+  remaining: ExpandedPiece[];
+  nextPieceNumber: number;
+}
+
+const PACKING_STRATEGIES: PackingStrategy[] = [
+  { id: 'row-area-first', axis: 'rows', order: 'area_desc', levelSelection: 'first_fit' },
+  { id: 'row-height-tight-primary', axis: 'rows', order: 'height_desc', levelSelection: 'tight_primary' },
+  { id: 'row-width-tight-secondary', axis: 'rows', order: 'width_desc', levelSelection: 'tight_secondary' },
+  { id: 'row-long-side-tight-primary', axis: 'rows', order: 'long_side_desc', levelSelection: 'tight_primary' },
+  { id: 'column-area-first', axis: 'columns', order: 'area_desc', levelSelection: 'first_fit' },
+  { id: 'column-width-tight-primary', axis: 'columns', order: 'width_desc', levelSelection: 'tight_primary' },
+  { id: 'column-height-tight-secondary', axis: 'columns', order: 'height_desc', levelSelection: 'tight_secondary' },
+  { id: 'column-perimeter-tight-primary', axis: 'columns', order: 'perimeter_desc', levelSelection: 'tight_primary' },
+];
+
+function compareNumbersDesc(a: number, b: number): number {
+  return b - a;
+}
+
+function compareTuples(a: number[], b: number[]): number {
+  for (let i = 0; i < Math.max(a.length, b.length); i += 1) {
+    const diff = (a[i] || 0) - (b[i] || 0);
+    if (diff !== 0) return diff;
   }
-  tryFit(item: ExpandedPiece, sheetIndex: number, pieceNumber: number, grainLock: boolean): PlacedPiece | null {
-    for (let r = 0; r <= (item.rotatable && !grainLock ? 1 : 0); r++) {
-      const h = r === 0 ? item.height : item.width, w = r === 0 ? item.width : item.height;
-      if (h <= 0 || w <= 0 || h > this.sheetH || w > this.sheetW) continue;
-      for (const lv of this.levels) {
-        if (w <= lv.remainingW) {
-          if (lv.y + h > this.sheetH) continue;
-          const placed: PlacedPiece = {
-            pieceId: item.id, pieceNumber, name: item.name,
-            originalHeight: item.originalHeight, originalWidth: item.originalWidth,
-            height: h, width: w, x: lv.x, y: lv.y, rotated: r === 1,
-            sheetIndex, material: item.material,
-          };
-          lv.x += w + this.kerf; lv.remainingW -= (w + this.kerf); lv.rowH = Math.max(lv.rowH, h);
-          return placed;
-        }
-      }
-      const maxH = Math.max(0, ...this.levels.map(l => l.rowH));
-      const ny = maxH + this.kerf;
-      if (ny + h > this.sheetH) continue;
-      this.levels.push({ y: ny, x: 0, rowH: h, remainingW: this.sheetW - w - this.kerf });
-      return {
-        pieceId: item.id, pieceNumber, name: item.name,
-        originalHeight: item.originalHeight, originalWidth: item.originalWidth,
-        height: h, width: w, x: 0, y: ny, rotated: r === 1, sheetIndex, material: item.material,
-      };
+  return 0;
+}
+
+function getPieceSortComparator(order: PieceOrdering): (a: ExpandedPiece, b: ExpandedPiece) => number {
+  return (a, b) => {
+    const areaDiff = compareNumbersDesc(a.width * a.height, b.width * b.height);
+    const longSideDiff = compareNumbersDesc(Math.max(a.width, a.height), Math.max(b.width, b.height));
+    const heightDiff = compareNumbersDesc(a.height, b.height);
+    const widthDiff = compareNumbersDesc(a.width, b.width);
+    const perimeterDiff = compareNumbersDesc((a.width + a.height), (b.width + b.height));
+    const idDiff = String(a.id || '').localeCompare(String(b.id || ''));
+
+    switch (order) {
+      case 'height_desc':
+        return heightDiff || widthDiff || areaDiff || idDiff;
+      case 'width_desc':
+        return widthDiff || heightDiff || areaDiff || idDiff;
+      case 'long_side_desc':
+        return longSideDiff || areaDiff || heightDiff || widthDiff || idDiff;
+      case 'perimeter_desc':
+        return perimeterDiff || areaDiff || longSideDiff || idDiff;
+      case 'area_desc':
+      default:
+        return areaDiff || longSideDiff || heightDiff || widthDiff || idDiff;
     }
-    return null;
+  };
+}
+
+function getStockSequence(sheets: Sheet[]): Sheet[] {
+  const expanded: Sheet[] = [];
+  for (const sheet of sheets) {
+    const qty = Math.max(1, Math.floor(sheet.quantity || 1));
+    for (let i = 0; i < qty; i += 1) expanded.push(sheet);
   }
+  return expanded.length > 0 ? expanded : [{ width: 0, height: 0, kerf: 0 }];
+}
+
+function getSheetForIndex(stockSequence: Sheet[], originalSheets: Sheet[], sheetIndex: number): Sheet {
+  if (sheetIndex < stockSequence.length) return stockSequence[sheetIndex];
+  return stockSequence[stockSequence.length - 1] || originalSheets[originalSheets.length - 1];
+}
+
+function buildPlacementScore(
+  strategy: PackingStrategy,
+  primarySlack: number,
+  secondarySlack: number,
+  areaSlack: number,
+  origin: number
+): [number, number, number, number] {
+  if (strategy.levelSelection === 'first_fit') {
+    return [
+      origin,
+      primarySlack,
+      secondarySlack,
+      areaSlack,
+    ];
+  }
+
+  if (strategy.levelSelection === 'tight_secondary') {
+    return [
+      secondarySlack,
+      primarySlack,
+      areaSlack,
+      origin,
+    ];
+  }
+
+  return [
+    primarySlack,
+    secondarySlack,
+    areaSlack,
+    origin,
+  ];
+}
+
+function tryPlaceOnSheet(
+  item: ExpandedPiece,
+  sheet: Sheet,
+  strategy: PackingStrategy,
+  freeRects: FreeRect[]
+): PlacementCandidate | null {
+  const allowRotation = item.rotatable;
+  const candidates: PlacementCandidate[] = [];
+
+  for (let rotationIndex = 0; rotationIndex <= (allowRotation ? 1 : 0); rotationIndex += 1) {
+    const rotated = rotationIndex === 1;
+    const width = rotated ? item.height : item.width;
+    const height = rotated ? item.width : item.height;
+    if (width <= 0 || height <= 0) continue;
+
+    for (let freeRectIndex = 0; freeRectIndex < freeRects.length; freeRectIndex += 1) {
+      const freeRect = freeRects[freeRectIndex];
+      if (width > freeRect.width + 1e-9 || height > freeRect.height + 1e-9) continue;
+
+      const primarySlack = strategy.axis === 'rows' ? freeRect.width - width : freeRect.height - height;
+      const secondarySlack = strategy.axis === 'rows' ? freeRect.height - height : freeRect.width - width;
+      const areaSlack = (freeRect.width * freeRect.height) - (width * height);
+      const origin = strategy.axis === 'rows'
+        ? (freeRect.y * Math.max(1, sheet.width)) + freeRect.x
+        : (freeRect.x * Math.max(1, sheet.height)) + freeRect.y;
+
+      candidates.push({
+        freeRectIndex,
+        x: freeRect.x,
+        y: freeRect.y,
+        width,
+        height,
+        rotated,
+        score: buildPlacementScore(strategy, primarySlack, secondarySlack, areaSlack, origin),
+      });
+    }
+  }
+
+  if (candidates.length === 0) return null;
+
+  candidates.sort((a, b) => {
+    const scoreDiff = compareTuples(a.score, b.score);
+    if (scoreDiff !== 0) return scoreDiff;
+    return a.rotated === b.rotated ? 0 : (a.rotated ? 1 : -1);
+  });
+
+  return candidates[0];
+}
+
+function splitFreeRect(rect: FreeRect, width: number, height: number, kerf: number, axis: StripAxis): FreeRect[] {
+  const rightWidth = rect.width - width - kerf;
+  const bottomHeight = rect.height - height - kerf;
+  const next: FreeRect[] = [];
+
+  if (axis === 'rows') {
+    if (rightWidth > 1e-9 && height > 1e-9) {
+      next.push({ x: rect.x + width + kerf, y: rect.y, width: rightWidth, height });
+    }
+    if (bottomHeight > 1e-9) {
+      next.push({ x: rect.x, y: rect.y + height + kerf, width: rect.width, height: bottomHeight });
+    }
+  } else {
+    if (rightWidth > 1e-9) {
+      next.push({ x: rect.x + width + kerf, y: rect.y, width: rightWidth, height: rect.height });
+    }
+    if (bottomHeight > 1e-9 && width > 1e-9) {
+      next.push({ x: rect.x, y: rect.y + height + kerf, width, height: bottomHeight });
+    }
+  }
+
+  return next;
+}
+
+function pruneFreeRects(freeRects: FreeRect[]): FreeRect[] {
+  return freeRects.filter((rect, rectIndex) => !freeRects.some((other, otherIndex) => {
+    if (rectIndex === otherIndex) return false;
+    return (
+      rect.x >= other.x - 1e-9 &&
+      rect.y >= other.y - 1e-9 &&
+      rect.x + rect.width <= other.x + other.width + 1e-9 &&
+      rect.y + rect.height <= other.y + other.height + 1e-9
+    );
+  }));
+}
+
+function sortFreeRects(freeRects: FreeRect[], axis: StripAxis): FreeRect[] {
+  return [...freeRects].sort((a, b) => {
+    if (axis === 'rows') return a.y - b.y || a.x - b.x || a.width - b.width || a.height - b.height;
+    return a.x - b.x || a.y - b.y || a.height - b.height || a.width - b.width;
+  });
+}
+
+function packSheetWithStrategy(
+  items: ExpandedPiece[],
+  sheet: Sheet,
+  strategy: PackingStrategy,
+  sheetIndex: number,
+  nextPieceNumber: number
+): SheetPackingCandidate {
+  const margin = Math.max(0, sheet.margin || 0);
+  const usableWidth = Math.max(0, sheet.width - (margin * 2));
+  const usableHeight = Math.max(0, sheet.height - (margin * 2));
+  const kerf = Math.max(0, sheet.kerf || 0);
+  let freeRects: FreeRect[] = usableWidth > 0 && usableHeight > 0
+    ? [{ x: margin, y: margin, width: usableWidth, height: usableHeight }]
+    : [];
+  const orderedItems = [...items].sort(getPieceSortComparator(strategy.order));
+  const placedIds = new Set<string>();
+  const pieces: PlacedPiece[] = [];
+  let usedArea = 0;
+
+  for (const item of orderedItems) {
+    const placement = tryPlaceOnSheet(item, sheet, strategy, freeRects);
+    if (!placement) continue;
+
+    const targetRect = freeRects[placement.freeRectIndex];
+    freeRects = freeRects.filter((_, index) => index !== placement.freeRectIndex);
+    freeRects.push(...splitFreeRect(targetRect, placement.width, placement.height, kerf, strategy.axis));
+    freeRects = sortFreeRects(pruneFreeRects(freeRects), strategy.axis);
+
+    placedIds.add(item.id || '');
+    pieces.push({
+      pieceId: item.id,
+      pieceNumber: nextPieceNumber + pieces.length,
+      name: item.name,
+      originalHeight: item.originalHeight,
+      originalWidth: item.originalWidth,
+      height: placement.height,
+      width: placement.width,
+      x: placement.x,
+      y: placement.y,
+      rotated: placement.rotated,
+      sheetIndex,
+      material: item.material,
+    });
+    usedArea += placement.width * placement.height;
+  }
+
+  return {
+    pieces,
+    remaining: orderedItems.filter((item) => !placedIds.has(item.id || '')),
+    usedArea,
+  };
+}
+
+function buildSheetResult(sheet: Sheet, sheetIndex: number, defaultMaterial: MaterialType, pieces: PlacedPiece[], usedArea: number): SheetResult {
+  const sheetArea = sheet.width * sheet.height;
+  return {
+    index: sheetIndex,
+    material: (sheet.material || defaultMaterial) as MaterialType,
+    width: sheet.width,
+    height: sheet.height,
+    pieces,
+    offcuts: [],
+    usedArea,
+    wasteRate: sheetArea > 0 ? Math.round((1 - usedArea / sheetArea) * 1000) / 10 : 0,
+  };
+}
+
+function simulatePlanForStrategy(
+  items: ExpandedPiece[],
+  sheets: Sheet[],
+  strategy: PackingStrategy,
+  mergedOptions: OptimizationOptions,
+  defaultMaterial: MaterialType
+): PlanCandidate {
+  const stockSequence = getStockSequence(sheets);
+    const candidateStrategies = [
+      strategy,
+      ...PACKING_STRATEGIES.filter((candidate) => candidate.id !== strategy.id),
+    ];
+  const maxSheetArea = sheets.reduce((max, sheet) => Math.max(max, sheet.width * sheet.height), 0);
+  const beamWidth = 6;
+  let frontier: PartialPlanCandidate[] = [{
+    sheets: [],
+    placedPieces: [],
+    unplacedPieces: items,
+    totalAreaUsed: 0,
+    totalAreaAvailable: 0,
+    remaining: items,
+    nextPieceNumber: 1,
+  }];
+  const completed: PartialPlanCandidate[] = [];
+
+  const rankPartialPlan = (plan: PartialPlanCandidate): [number, number, number, number] => {
+    const remainingArea = plan.remaining.reduce((sum, piece) => sum + (piece.width * piece.height), 0);
+    const lowerBoundSheets = maxSheetArea > 0 ? Math.ceil((remainingArea - 1e-9) / maxSheetArea) : Number.MAX_SAFE_INTEGER;
+    return [
+      plan.sheets.length + lowerBoundSheets,
+      plan.remaining.length,
+      -(plan.placedPieces.length),
+      plan.totalAreaAvailable - plan.totalAreaUsed,
+    ];
+  };
+
+  while (frontier.length > 0) {
+    const nextFrontier: PartialPlanCandidate[] = [];
+
+    for (const plan of frontier) {
+      if (plan.remaining.length === 0 || (mergedOptions.singleSheetOnly && plan.sheets.length >= 1)) {
+        completed.push(plan);
+        continue;
+      }
+
+      const sheetIndex = plan.sheets.length;
+      const sheet = getSheetForIndex(stockSequence, sheets, sheetIndex);
+      let producedCandidate = false;
+
+      for (const candidateStrategy of candidateStrategies) {
+        const candidate = packSheetWithStrategy(plan.remaining, sheet, candidateStrategy, sheetIndex, plan.nextPieceNumber);
+        if (candidate.pieces.length === 0) continue;
+
+        producedCandidate = true;
+        nextFrontier.push({
+          sheets: [...plan.sheets, buildSheetResult(sheet, sheetIndex, defaultMaterial, candidate.pieces, candidate.usedArea)],
+          placedPieces: [...plan.placedPieces, ...candidate.pieces],
+          unplacedPieces: candidate.remaining,
+          totalAreaUsed: plan.totalAreaUsed + candidate.usedArea,
+          totalAreaAvailable: plan.totalAreaAvailable + (sheet.width * sheet.height),
+          remaining: candidate.remaining,
+          nextPieceNumber: plan.nextPieceNumber + candidate.pieces.length,
+        });
+      }
+
+      if (!producedCandidate) {
+        completed.push(plan);
+      }
+    }
+
+    if (nextFrontier.length === 0) break;
+
+    const deduped = new Map<string, PartialPlanCandidate>();
+    for (const plan of nextFrontier) {
+      const key = `${plan.sheets.length}|${plan.remaining.map((piece) => piece.id).join(',')}`;
+      const current = deduped.get(key);
+      if (!current) {
+        deduped.set(key, plan);
+        continue;
+      }
+
+      const better = chooseBetterPlan(current, plan);
+      deduped.set(key, better === current ? current : plan);
+    }
+
+    frontier = Array.from(deduped.values())
+      .sort((a, b) => compareTuples(rankPartialPlan(a), rankPartialPlan(b)))
+      .slice(0, beamWidth);
+
+    if (mergedOptions.singleSheetOnly) {
+      completed.push(...frontier);
+      break;
+    }
+  }
+
+  let best: PlanCandidate | null = null;
+  for (const plan of [...completed, ...frontier]) {
+    best = chooseBetterPlan(best, {
+      sheets: plan.sheets,
+      placedPieces: plan.placedPieces,
+      unplacedPieces: plan.remaining,
+      totalAreaUsed: plan.totalAreaUsed,
+      totalAreaAvailable: plan.totalAreaAvailable,
+    });
+  }
+
+  return best || {
+    sheets: [],
+    placedPieces: [],
+    unplacedPieces: items,
+    totalAreaUsed: 0,
+    totalAreaAvailable: 0,
+  };
+}
+
+function chooseBetterPlan(current: PlanCandidate | null, next: PlanCandidate): PlanCandidate {
+  if (!current) return next;
+  if (next.unplacedPieces.length !== current.unplacedPieces.length) {
+    return next.unplacedPieces.length < current.unplacedPieces.length ? next : current;
+  }
+  if (next.sheets.length !== current.sheets.length) {
+    return next.sheets.length < current.sheets.length ? next : current;
+  }
+  const currentWaste = current.totalAreaAvailable - current.totalAreaUsed;
+  const nextWaste = next.totalAreaAvailable - next.totalAreaUsed;
+  if (Math.abs(nextWaste - currentWaste) > 1e-9) {
+    return nextWaste < currentWaste ? next : current;
+  }
+  if (Math.abs(next.totalAreaUsed - current.totalAreaUsed) > 1e-9) {
+    return next.totalAreaUsed > current.totalAreaUsed ? next : current;
+  }
+  return next.placedPieces.length > current.placedPieces.length ? next : current;
+}
+
+function buildMaterialStats(sheets: SheetResult[]): MaterialStats[] {
+  const byMaterial = new Map<MaterialType, { sheetsUsed: number; totalPieces: number; usedArea: number; totalArea: number }>();
+
+  for (const sheet of sheets) {
+    const current = byMaterial.get(sheet.material) || { sheetsUsed: 0, totalPieces: 0, usedArea: 0, totalArea: 0 };
+    current.sheetsUsed += 1;
+    current.totalPieces += sheet.pieces.length;
+    current.usedArea += sheet.usedArea;
+    current.totalArea += sheet.width * sheet.height;
+    byMaterial.set(sheet.material, current);
+  }
+
+  return Array.from(byMaterial.entries()).map(([material, stats]) => ({
+    material,
+    sheetsUsed: stats.sheetsUsed,
+    totalPieces: stats.totalPieces,
+    usedArea: stats.usedArea,
+    wasteRate: stats.totalArea > 0 ? Math.round((1 - stats.usedArea / stats.totalArea) * 1000) / 10 : 0,
+  }));
 }
 
 // ─── Main 2D Optimizer (multi-sheet) ──────────────────────────────
@@ -199,43 +619,30 @@ export function optimizeCutting2D(
   const mergedOptions: OptimizationOptions = { ...OPTIONS_DEFAULTS, ...options };
   const defaultMat: MaterialType = mergedOptions.defaultMaterial || 'mdf';
   const allExpanded = expandPieces(pieces, defaultMat, mergedOptions.grainDirection);
+  let bestPlan: PlanCandidate | null = null;
 
-  const placedPieces: PlacedPiece[] = [], allSheets: SheetResult[] = [];
-  let globalIdx = 0, totalUsed = 0;
-
-  for (let si = 0; si < sheets.length; si++) {
-    const sh = sheets[si];
-    const sheetQty = Math.max(1, sh.quantity || 1);
-    for (let qi = 0; qi < sheetQty; qi++) {
-      const packer = new LinearGuillotinePacker(sh.width, sh.height, sh.kerf, (sh.material || defaultMat) as MaterialType);
-      const sheetPcs: PlacedPiece[] = [];
-      for (const item of allExpanded) {
-        if (placedPieces.find(pp => pp.pieceId === item.id)) continue;
-        const placed = packer.tryFit(item, globalIdx, placedPieces.length + sheetPcs.length + 1, mergedOptions.grainDirection);
-        if (placed) { placedPieces.push(placed); sheetPcs.push(placed); }
-      }
-      if (sheetPcs.length === 0 && qi > 0) break;
-      const usedArea = sheetPcs.reduce((s, p) => s + p.height * p.width, 0);
-      totalUsed += usedArea;
-      const shArea = sh.width * sh.height;
-      allSheets.push({
-        index: globalIdx, material: (sh.material || defaultMat) as MaterialType,
-        width: sh.width, height: sh.height, pieces: sheetPcs, offcuts: [], usedArea,
-        wasteRate: shArea > 0 ? Math.round((1 - usedArea / shArea) * 1000) / 10 : 0,
-      });
-      globalIdx++;
-      if (mergedOptions.singleSheetOnly) break;
-    }
-    if (mergedOptions.singleSheetOnly && globalIdx > 0) break;
+  for (const strategy of PACKING_STRATEGIES) {
+    const candidate = simulatePlanForStrategy(allExpanded, sheets, strategy, mergedOptions, defaultMat);
+    bestPlan = chooseBetterPlan(bestPlan, candidate);
   }
 
-  const totalAvail = allSheets.reduce((s, sh) => s + sh.width * sh.height, 0);
+  const finalPlan = bestPlan || {
+    sheets: [],
+    placedPieces: [],
+    unplacedPieces: allExpanded,
+    totalAreaUsed: 0,
+    totalAreaAvailable: 0,
+  };
+  const totalAvail = finalPlan.totalAreaAvailable;
+  const totalUsed = finalPlan.totalAreaUsed;
   const wp = totalAvail > 0 ? Math.round((1 - totalUsed / totalAvail) * 1000) / 10 : 0;
-  const totalM = globalIdx > 0 ? Math.round(globalIdx * (sheets[0].width + sheets[0].height) / 100 * 10) / 10 : 0;
-  const saved = Math.round((totalAvail - totalUsed) / 10000 * 200);
+  const totalM = finalPlan.sheets.length > 0 ? Math.round(finalPlan.sheets.reduce((sum, sheet) => sum + ((sheet.width + sheet.height) / 100), 0) * 10) / 10 : 0;
+  const saved = Math.round(Math.max(0, totalAvail - totalUsed) / 10000 * 200);
 
-  const mats = sheets.length > 0 ? getMaterialDef(sheets[0].material || defaultMat) : getMaterialDef(defaultMat);
-  const matCost = Math.round(totalAvail / 10000 * mats.pricePerM2);
+  const matCost = Math.round(finalPlan.sheets.reduce((sum, sheet) => {
+    const material = getMaterialDef(sheet.material);
+    return sum + ((sheet.width * sheet.height) / 10000 * material.pricePerM2);
+  }, 0));
   let edgeCost = 0;
   for (const p of pieces) {
     if (!p.edges) continue;
@@ -246,12 +653,14 @@ export function optimizeCutting2D(
     if (m === 0) m = (p.height + p.width) * 2 / 100;
     edgeCost += Math.round(m * preset.pricePerM * (p.quantity || 1));
   }
+
   return {
-    cutMode: '2d', sheetsUsed: globalIdx, sheets: allSheets, placedPieces, offcuts: [],
-    unplacedPieces: [], totalAreaAvailable: totalAvail, totalAreaUsed: totalUsed,
+    cutMode: '2d', sheetsUsed: finalPlan.sheets.length, sheets: finalPlan.sheets, placedPieces: finalPlan.placedPieces,
+    offcuts: [],
+    unplacedPieces: finalPlan.unplacedPieces, totalAreaAvailable: totalAvail, totalAreaUsed: totalUsed,
     wastePercentage: wp, totalLinearCutMeters: totalM, moneySavedMad: saved,
     materialCostMad: matCost, edgeBandingCostMad: edgeCost, totalCostMad: matCost + edgeCost,
-    materialStats: [{ material: defaultMat, sheetsUsed: globalIdx, totalPieces: placedPieces.length, usedArea: totalUsed, wasteRate: wp }],
+    materialStats: buildMaterialStats(finalPlan.sheets),
   };
 }
 
@@ -260,4 +669,6 @@ export function optimizeCutting(pieces: Piece[], sheet: Sheet, options?: Partial
   return optimizeCutting2D(pieces, [{ ...sheet, quantity: 1 }], options);
 }
 
-export { LinearGuillotinePacker as GuillotinePacker };
+export const GuillotinePacker = {
+  strategies: PACKING_STRATEGIES,
+};
