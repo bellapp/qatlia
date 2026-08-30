@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { createClient as createAdminClient } from '@supabase/supabase-js';
+import { resolveRequestUnitMetadata, type RequestUnitMetadataInput } from '@/lib/projects/unit-metadata';
 
 async function getSessionAndDb() {
   const supabase = createClient();
@@ -73,6 +74,11 @@ export async function POST(request: Request) {
       result?: { sheetsUsed?: number; wastePercentage?: number; totalAreaUsed?: number };
     };
 
+    // Never trust the client's displayUnit/canonicalUnit/migratedFromLegacyUnit
+    // strings/booleans as-is; narrow them through the same legacy-safe gate
+    // resolveProjectUnitMetadata uses (missing/garbage -> cm/cm/migratedFromLegacyUnit=true).
+    const unitMetadata = resolveRequestUnitMetadata(body as RequestUnitMetadataInput);
+
     await db.from('profiles').upsert(
       {
         id: user.id,
@@ -95,7 +101,7 @@ export async function POST(request: Request) {
 
     let insert = await db
       .from('projects')
-      .insert({ ...baseRow, options_json: { options, pieces, sheet, result } })
+      .insert({ ...baseRow, options_json: { options, pieces, sheet, result, ...unitMetadata } })
       .select('id')
       .single();
 

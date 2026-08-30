@@ -16,6 +16,7 @@ import { readLocalHistory, type LocalHistoryItem } from '@/lib/history';
 import { AccountMenu } from '@/components/AccountMenu';
 import { QatlIALogo } from '@/components/QatlIALogo';
 import { EmptyState } from '@/components/EmptyState';
+import type { DisplayUnit } from '@/lib/units';
 
 interface ProjectHistoryItem {
   id: string;
@@ -32,6 +33,12 @@ interface ProjectHistoryItem {
     sheet?: { width: number; height: number; material: string };
     options?: Record<string, unknown>;
     result?: { sheetsUsed?: number; wastePercentage?: number };
+    // Persistence metadata (see src/lib/units.ts ProjectUnitPersistenceMetadata):
+    // which display unit the artisan was using, and whether this record's
+    // unit metadata traces back to a legacy (pre-metadata) project.
+    displayUnit?: DisplayUnit;
+    canonicalUnit?: 'cm';
+    migratedFromLegacyUnit?: boolean;
   };
 }
 

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useLayoutEffect } from 'react';
 import Link from 'next/link';
 import { createClient } from '@/lib/supabase/client';
 import {
@@ -44,10 +44,34 @@ import { OnboardingTour } from '@/components/OnboardingTour';
 import { LocaleSwitcher } from '@/components/LocaleProvider';
 import { writeLocalHistoryItem, type LocalHistoryItem } from '@/lib/history';
 import { buildPdfPayload } from '@/lib/pdf-payload';
+import {
+  type DisplayUnit,
+  DEFAULT_DISPLAY_UNIT,
+  parseDisplayInputToCanonical,
+  formatDisplayValue,
+  readStoredDisplayUnit,
+  writeStoredDisplayUnit,
+  resolveProjectUnitMetadata,
+  buildProjectUnitPersistenceMetadata,
+} from '@/lib/units';
 
 const DEFAULT_SHEETS: Sheet[] = [
   { id: 's0', height: 278, width: 208, kerf: 0.3, margin: 1.0, grainDirection: false, material: 'mdf', quantity: 1, label: 'Panneau standard 278×208' },
 ];
+
+/**
+ * Vision extraction returns raw, unverified numbers from a model response.
+ * Only a finite, strictly positive number is trusted; anything else (missing,
+ * NaN, `Infinity`, a negative or zero value) falls back deterministically to
+ * `fallback` instead of propagating a value that would silently corrupt
+ * placed-piece geometry downstream (`Math.round(Infinity * 10) / 10` stays
+ * `Infinity`, no throw, but a broken piece). No magnitude-based unit
+ * conversion is ever applied here — see the comment at the call site.
+ */
+function safeFinitePositive(value: unknown, fallback: number): number {
+  const n = Number(value);
+  return Number.isFinite(n) && n > 0 ? n : fallback;
+}
 
 function normalizePiecesWithColors(sourcePieces: Piece[]): Piece[] {
   return sourcePieces.map((piece, index) => ({
@@ -89,10 +113,58 @@ export default function Dashboard() {
   const [isAuthModalOpen, setIsAuthModalOpen] = useState<boolean>(false);
   const [isDownloadingPdf, setIsDownloadingPdf] = useState<boolean>(false);
   const [showAdvancedOptions, setShowAdvancedOptions] = useState<boolean>(false);
+  const [displayUnit, setDisplayUnit] = useState<DisplayUnit>(DEFAULT_DISPLAY_UNIT);
+  // True while the restored/current project still owes its next save an
+  // explicit unit-metadata rewrite (legacy project with no metadata at all).
+  // Fresh projects (no restore) start false; cleared once a save/local
+  // history rewrite has stamped explicit metadata.
+  const [pendingUnitMigration, setPendingUnitMigration] = useState<boolean>(false);
+  // Free-typed string drafts for the sheet height/width inputs. Kept
+  // separate from canonical state so an artisan can type a decimal
+  // ("27.5") without every keystroke being immediately reformatted to
+  // `toFixed(1)` — that only happens once the value is committed (blur /
+  // Enter) or when the source (`activeSheet`/`displayUnit`) changes under
+  // the draft, e.g. after a cm↔mm toggle or a fresh optimization run.
+  const [sheetHeightDraft, setSheetHeightDraft] = useState<string>('');
+  const [sheetWidthDraft, setSheetWidthDraft] = useState<string>('');
+  // Persisted historical marker: does this project's unit metadata trace
+  // back to a legacy (pre-metadata) record? Unlike `pendingUnitMigration`,
+  // this never resets to false once true — a rewritten legacy record keeps
+  // this `true` forever even after its pending rewrite is done. Fresh
+  // projects (no restore) start false.
+  const [migratedFromLegacyUnit, setMigratedFromLegacyUnit] = useState<boolean>(false);
 
   const activeSheet = sheets[0] || DEFAULT_SHEETS[0];
   const { theme } = useTheme();
   const isDark = theme === 'dark';
+
+  // Re-sync the free-typed drafts whenever the canonical sheet dimensions or
+  // the display unit change from *outside* the draft itself (a cm↔mm toggle,
+  // a fresh optimization, a restored project). This never fires on every
+  // keystroke — only on these external changes — so mid-typing values are
+  // never clobbered.
+  useEffect(() => {
+    setSheetHeightDraft(formatDisplayValue(activeSheet.height, displayUnit));
+    setSheetWidthDraft(formatDisplayValue(activeSheet.width, displayUnit));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeSheet.height, activeSheet.width, displayUnit]);
+
+  /**
+   * Commits a sheet height/width draft on blur/Enter. Invalid input (empty,
+   * non-finite like `1e400`/`Infinity`, or <= 0) is rejected without ever
+   * touching canonical state — the draft is simply reverted to the
+   * last-known-good canonical value formatted in the current display unit.
+   */
+  const commitSheetDimension = (field: 'height' | 'width', raw: string) => {
+    const canonical = parseDisplayInputToCanonical(raw, displayUnit);
+    const setDraft = field === 'height' ? setSheetHeightDraft : setSheetWidthDraft;
+    if (canonical === null || canonical <= 0) {
+      setDraft(formatDisplayValue(activeSheet[field], displayUnit));
+      return;
+    }
+    setSheets([{ ...activeSheet, [field]: canonical }]);
+    setDraft(formatDisplayValue(canonical, displayUnit));
+  };
 
   useEffect(() => {
     async function loadUser() {
@@ -117,23 +189,59 @@ export default function Dashboard() {
       }
     }
     loadUser();
+  }, []);
 
-    if (typeof window !== 'undefined') {
-      const savedProj = sessionStorage.getItem('qatlia_saved_project');
-      if (savedProj) {
-        try {
-          const parsed = JSON.parse(savedProj);
-          if (parsed.sheet) setSheets([parsed.sheet]);
-          if (parsed.sheets) setSheets(parsed.sheets);
-          if (Array.isArray(parsed.pieces)) setPieces(normalizePiecesWithColors(parsed.pieces));
-          if (parsed.options) setOptions((prev) => ({ ...prev, ...parsed.options }));
-          sessionStorage.removeItem('qatlia_saved_project');
-        } catch (e) {
-          console.error('Erreur restauration projet:', e);
-        }
+  // Runs synchronously before paint so the restored sheets/pieces/options,
+  // display unit, and migration markers all land in the same commit — no
+  // frame is ever painted with default state before the restore applies.
+  useLayoutEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    setDisplayUnit(readStoredDisplayUnit(window.localStorage));
+
+    const savedProj = sessionStorage.getItem('qatlia_saved_project');
+    if (savedProj) {
+      try {
+        const parsed = JSON.parse(savedProj);
+        if (parsed.sheet) setSheets([parsed.sheet]);
+        if (parsed.sheets) setSheets(parsed.sheets);
+        if (Array.isArray(parsed.pieces)) setPieces(normalizePiecesWithColors(parsed.pieces));
+        if (parsed.options) setOptions((prev) => ({ ...prev, ...parsed.options }));
+        // Legacy saved projects carry no unit metadata at all; they predate
+        // this feature and were always canonical cm. `resolveProjectUnitMetadata`
+        // assumes cm in that case and flags it `migrated` so the next save
+        // (persistProject below) rewrites the project with explicit metadata.
+        // `migratedFromLegacyUnit` is the separate, persisted historical
+        // marker: it stays true forever once a record's metadata traces
+        // back to a legacy save, even after that pending rewrite is done.
+        const unitMeta = resolveProjectUnitMetadata(parsed);
+        setDisplayUnit(unitMeta.displayUnit);
+        setPendingUnitMigration(unitMeta.migrated);
+        setMigratedFromLegacyUnit(unitMeta.migratedFromLegacyUnit);
+        // Defer the removal to a macrotask instead of clearing it inline:
+        // React (StrictMode/dev, or concurrent double-invoke) can run this
+        // effect twice before either pass's state updates commit, so an
+        // immediate removeItem here lets the first pass consume the key
+        // while the second pass finds it already gone and silently keeps
+        // the default state. Pushing the removal past the current
+        // microtask/render lets every duplicate pass read the same
+        // sessionStorage value before it disappears.
+        window.setTimeout(() => sessionStorage.removeItem('qatlia_saved_project'), 0);
+      } catch (e) {
+        console.error('Erreur restauration projet:', e);
+        // Malformed JSON will never parse successfully, so don't leave it
+        // sitting in sessionStorage forever — clear it right away.
+        sessionStorage.removeItem('qatlia_saved_project');
       }
     }
   }, []);
+
+  const handleDisplayUnitChange = (unit: DisplayUnit) => {
+    setDisplayUnit(unit);
+    if (typeof window !== 'undefined') {
+      writeStoredDisplayUnit(window.localStorage, unit);
+    }
+  };
 
 
   const handleOptionsChange = (newOpts: OptimizationOptions) => {
@@ -145,6 +253,10 @@ export default function Dashboard() {
     nextResult: OptimizationResult,
     source: 'optimize' | 'pdf'
   ) => {
+    // The persisted historical marker stays true forever once true: either
+    // this save is itself the rewrite of a legacy record (pendingUnitMigration),
+    // or a prior save already carried that historical origin forward.
+    const persistedMigratedFromLegacyUnit = pendingUnitMigration || migratedFromLegacyUnit;
     const payload = {
       name: `${cutMode === '1d' ? 'Barres' : 'Débit'} ${(activeSheet.material || 'MDF').toUpperCase()} — ${pieces.reduce((s, p) => s + (p.quantity || 1), 0)} pcs`,
       sheets,
@@ -152,6 +264,11 @@ export default function Dashboard() {
       pieces,
       options,
       result: nextResult,
+      // Geometry above (sheets/pieces) always stays canonical cm; this is
+      // metadata only, so history/atelier can restore the artisan's chosen
+      // display unit instead of re-defaulting to cm, and know whether this
+      // record still owes a rewrite with explicit unit metadata.
+      ...buildProjectUnitPersistenceMetadata(displayUnit, persistedMigratedFromLegacyUnit),
     };
 
     writeLocalHistoryItem({
@@ -166,6 +283,11 @@ export default function Dashboard() {
       created_at: new Date().toISOString(),
       options_json: payload as unknown as LocalHistoryItem['options_json'],
     });
+    // The local history entry above now carries explicit unit metadata, so
+    // this project no longer owes a migration rewrite on its next save —
+    // but the historical marker itself is carried forward, not reset.
+    setPendingUnitMigration(false);
+    setMigratedFromLegacyUnit(persistedMigratedFromLegacyUnit);
 
     try {
       const supabase = createClient();
@@ -226,18 +348,22 @@ export default function Dashboard() {
         if (data.success && Array.isArray(data.pieces) && data.pieces.length > 0) {
           setPreviewImage(base64);
           const newPieces: Piece[] = data.pieces.map((p: { name?: string; width?: number | string; height?: number | string; quantity?: number | string; material?: string; color?: string }, i: number) => {
-            let h = Number(p.height) || 10;
-            let w = Number(p.width) || 10;
-            if (h > 500 || w > 500) {
-              h = h / 10;
-              w = w / 10;
-            }
+            // /api/vision always extracts and returns canonical centimetres
+            // (see its prompt), so no magnitude-based mm heuristic is applied
+            // here — a legitimate 600 cm bar must survive untouched. Only a
+            // finite, strictly positive number is trusted (see
+            // `safeFinitePositive`); anything else (missing, NaN, Infinity,
+            // <= 0) falls back deterministically instead of reaching
+            // `Math.round` with a non-finite value.
+            const h = safeFinitePositive(p.height, 10);
+            const w = safeFinitePositive(p.width, 10);
+            const quantity = Math.max(1, Math.round(safeFinitePositive(p.quantity, 1)));
             return {
               id: `ext_${Date.now()}_${i}`,
               name: p.name || `Pièce ${i + 1}`,
               height: Math.round(h * 10) / 10,
               width: Math.round(w * 10) / 10,
-              quantity: Number(p.quantity) || 1,
+              quantity,
               material: (p.material as MaterialType) || (activeSheet.material || 'mdf'),
               rotatable: true,
               color: getResolvedPieceColor({
@@ -246,7 +372,7 @@ export default function Dashboard() {
                 name: p.name,
                 height: h,
                 width: w,
-                quantity: Number(p.quantity) || 1,
+                quantity,
                 index: i,
               }),
             };
@@ -268,6 +394,9 @@ export default function Dashboard() {
   const handleDownloadJson = () => {
     if (!result) return;
     const json = JSON.stringify({
+      // Geometry below is always canonical cm; this only records which unit
+      // the artisan had selected for display at export time.
+      displayUnit,
       sheetsUsed: result.sheetsUsed,
       wastePercentage: result.wastePercentage,
       totalCostMad: result.totalCostMad,
@@ -333,6 +462,9 @@ export default function Dashboard() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           projectName: 'QatlIA_CNC_Plan',
+          // Coordinates/dimensions below stay canonical cm; displayUnit is
+          // metadata only (see src/lib/units.ts).
+          displayUnit,
           sheet: {
             width: activeSheet.width,
             height: activeSheet.height,
@@ -405,7 +537,7 @@ export default function Dashboard() {
       const res = await fetch('/api/export-pdf', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(buildPdfPayload('Plan Découpe QatlIA', activeSheet, pieces, result)),
+        body: JSON.stringify(buildPdfPayload('Plan Découpe QatlIA', activeSheet, pieces, result, displayUnit)),
       });
 
       if (res.ok) {
@@ -604,27 +736,48 @@ export default function Dashboard() {
                     <p className="text-[10px] text-slate-500 dark:text-slate-400">{cutMode === '1d' ? 'Longueur de la barre' : 'Dimensions du panneau'}</p>
                   </div>
                 </div>
-                <span className="text-[10px] font-mono font-semibold text-brand-400 bg-brand-500/10 px-2 py-0.5 rounded-md border border-brand-500/20">cm</span>
+                <div role="group" aria-label="Unité d'affichage du projet" className="flex items-center p-0.5 rounded-lg bg-studio-field border border-studio-border">
+                  {(['cm', 'mm'] as const).map((unit) => (
+                    <button
+                      key={unit}
+                      type="button"
+                      data-testid={`unit-toggle-${unit}`}
+                      onClick={() => handleDisplayUnitChange(unit)}
+                      aria-pressed={displayUnit === unit}
+                      className={`px-2.5 py-1 rounded-md text-[10px] font-bold transition-all ${displayUnit === unit ? 'bg-brand-500 text-slate-950' : 'text-slate-500 hover:text-slate-300'}`}
+                    >
+                      {unit}
+                    </button>
+                  ))}
+                </div>
               </div>
 
               <div className={cutMode === '1d' ? 'p-4 grid grid-cols-2 gap-3' : 'p-4 grid grid-cols-3 gap-3'}>
                 {cutMode === '1d' ? null : <div className="space-y-1">
-                  <label className="text-[10px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">Hauteur (Y)</label>
+                  <label className="text-[10px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">Hauteur (Y) — {displayUnit}</label>
                   <input
                     type="number"
                     step="0.1"
-                    value={activeSheet.height}
-                    onChange={(e) => { setSheets([{ ...activeSheet, height: parseFloat(e.target.value) || 0 }]); }}
+                    data-testid="sheet-height-input"
+                    aria-label={`Hauteur ${displayUnit}`}
+                    value={sheetHeightDraft}
+                    onChange={(e) => setSheetHeightDraft(e.target.value)}
+                    onBlur={(e) => commitSheetDimension('height', e.target.value)}
+                    onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur(); }}
                     className="w-full px-3 py-2 rounded-xl bg-studio-field border border-studio-border text-slate-900 dark:text-slate-100 font-mono font-bold text-right outline-none focus:border-brand-500/50 focus:ring-1 focus:ring-brand-500/20 transition-all"
                   />
                 </div>}
                 <div className="space-y-1">
-                  <label className="text-[10px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">{cutMode === '1d' ? 'Longueur (cm)' : 'Largeur (X)'}</label>
+                  <label className="text-[10px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">{cutMode === '1d' ? `Longueur (${displayUnit})` : `Largeur (X) — ${displayUnit}`}</label>
                   <input
                     type="number"
                     step="0.1"
-                    value={activeSheet.width}
-                    onChange={(e) => { setSheets([{ ...activeSheet, width: parseFloat(e.target.value) || 0 }]); }}
+                    data-testid="sheet-width-input"
+                    aria-label={cutMode === '1d' ? `Longueur ${displayUnit}` : `Largeur ${displayUnit}`}
+                    value={sheetWidthDraft}
+                    onChange={(e) => setSheetWidthDraft(e.target.value)}
+                    onBlur={(e) => commitSheetDimension('width', e.target.value)}
+                    onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur(); }}
                     className="w-full px-3 py-2 rounded-xl bg-studio-field border border-studio-border text-slate-900 dark:text-slate-100 font-mono font-bold text-right outline-none focus:border-brand-500/50 focus:ring-1 focus:ring-brand-500/20 transition-all"
                   />
                 </div>
@@ -650,6 +803,7 @@ export default function Dashboard() {
                 pieces={pieces}
                 onUpdatePieces={setPieces}
                 defaultMaterial={activeSheet.material || 'mdf'}
+                displayUnit={displayUnit}
                 showMaterialCol={options.considerMaterial}
                 disabled={isOptimizing}
               />
@@ -733,7 +887,9 @@ export default function Dashboard() {
                   <div className="p-3.5 rounded-xl bg-studio-panel/60 border border-studio-border/80 flex flex-col items-center text-center gap-1">
                     <span className="text-[9px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Feuilles</span>
                     <span className="text-2xl font-black font-mono text-slate-900 dark:text-white tabular-nums">{result.sheetsUsed}</span>
-                    <span className="text-[9px] text-slate-600 truncate">{activeSheet.height}×{activeSheet.width}</span>
+                    <span className="text-[9px] text-slate-600 truncate">
+                      {formatDisplayValue(activeSheet.height, displayUnit)}×{formatDisplayValue(activeSheet.width, displayUnit)} {displayUnit}
+                    </span>
                   </div>
                   <div className="p-3.5 rounded-xl bg-studio-panel/60 border border-studio-border/80 flex flex-col items-center text-center gap-1">
                     <span className="text-[9px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Utile</span>
@@ -827,7 +983,7 @@ export default function Dashboard() {
                                 <text x={off.x+off.width/2} y={off.y+off.height/2} textAnchor="middle" dominantBaseline="central"
                                   fill={isDark ? '#5B7DA6' : '#64748B'} fontSize={Math.min(4.5, Math.max(2.2, minSide/12))}
                                   fontFamily="monospace" fontWeight="bold">
-                                  {Math.round(off.height*10)/10} × {Math.round(off.width*10)/10}
+                                  {formatDisplayValue(off.height, displayUnit)} × {formatDisplayValue(off.width, displayUnit)} {displayUnit}
                                 </text>
                               )}
                             </g>
@@ -854,7 +1010,7 @@ export default function Dashboard() {
                                 {minSide>=10 && (
                                   <text x={p.x+p.width/2} y={p.y+p.height/2+(minSide>=20?3.5:2)} textAnchor="middle" dominantBaseline="central"
                                     fill={isDark ? '#050A14' : '#1E293B'} fontSize={Math.min(4.5,Math.max(2,minSide/14))}
-                                    fontWeight="bold" fontFamily="monospace">{Math.round(p.height*10)/10}×{Math.round(p.width*10)/10}</text>
+                                    fontWeight="bold" fontFamily="monospace">{formatDisplayValue(p.height, displayUnit)}×{formatDisplayValue(p.width, displayUnit)} {displayUnit}</text>
                                 )}
                               </>)}
                             </g>
@@ -899,7 +1055,7 @@ export default function Dashboard() {
                             <tr className="border-b border-studio-border/70 text-[10px] uppercase tracking-wider text-slate-500 dark:text-slate-400">
                               <th scope="col" className="py-2 pr-3 font-bold">#</th>
                               <th scope="col" className="py-2 pr-3 font-bold">Pièce</th>
-                              <th scope="col" className="py-2 pr-3 font-bold">H × L</th>
+                              <th scope="col" className="py-2 pr-3 font-bold">H × L ({displayUnit})</th>
                               <th scope="col" className="py-2 font-bold">Rotation</th>
                             </tr>
                           </thead>
@@ -918,7 +1074,7 @@ export default function Dashboard() {
                                   </div>
                                 </td>
                                 <td className="py-2 pr-3 font-mono text-slate-600 dark:text-slate-300 tabular-nums">
-                                  {Math.round(piece.height * 10) / 10} × {Math.round(piece.width * 10) / 10}
+                                  {formatDisplayValue(piece.height, displayUnit)} × {formatDisplayValue(piece.width, displayUnit)} {displayUnit}
                                 </td>
                                 <td className="py-2 text-slate-600 dark:text-slate-300">{piece.rotated ? 'Oui (90°)' : 'Non'}</td>
                               </tr>
@@ -935,7 +1091,7 @@ export default function Dashboard() {
                             <div key={off.id} data-testid="offcut-list-item" data-offcut-id={off.id} data-offcut-width={off.width} data-offcut-height={off.height} className="flex items-center justify-between py-1 px-1.5 rounded-md hover:bg-studio-field/40 text-[11px] transition-colors gap-1">
                               <span className="text-slate-500 dark:text-slate-400 font-mono text-[10px] truncate">Chute #{i+1}</span>
                               <span className="font-mono font-bold text-brand-400 text-[10px] tabular-nums">
-                                {Math.round(off.height*10)/10}×{Math.round(off.width*10)/10}
+                                {formatDisplayValue(off.height, displayUnit)}×{formatDisplayValue(off.width, displayUnit)} {displayUnit}
                               </span>
                             </div>
                           );

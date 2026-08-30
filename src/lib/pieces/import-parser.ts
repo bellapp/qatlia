@@ -1,3 +1,5 @@
+import { toCanonicalCm, type DisplayUnit } from '@/lib/units';
+
 export type MaterialType = 'mdf' | 'aluminium' | 'verre' | 'contreplaques' | 'melamine' | 'chene' | 'stratifié' | 'medium';
 
 export interface ImportedPiece {
@@ -13,6 +15,13 @@ export interface ImportedPiece {
 export interface ParsePiecesImportParams {
   input: string;
   defaultMaterial: MaterialType;
+  /**
+   * The unit the pasted dimensions are written in, as explicitly selected by
+   * the artisan for this project. There is no guessing from magnitude — a
+   * legitimate 600 cm bar and a 600 mm offcut are only told apart by this
+   * flag, never by a `value > 500` heuristic.
+   */
+  unit: DisplayUnit;
 }
 
 export interface ParsePiecesImportResult {
@@ -112,10 +121,8 @@ function parseNumber(value: string): number | null {
   return parsed;
 }
 
-function normalizeDimensions(height: number, width: number): [number, number] {
-  const shouldConvertFromMm = height > 500 || width > 500;
-  const divisor = shouldConvertFromMm ? 10 : 1;
-  const round = (value: number) => Math.round((value / divisor) * 10) / 10;
+function normalizeDimensions(height: number, width: number, unit: DisplayUnit): [number, number] {
+  const round = (value: number) => Math.round(toCanonicalCm(value, unit) * 10) / 10;
   return [round(height), round(width)];
 }
 
@@ -126,6 +133,7 @@ function pluralize(count: number, singular: string, plural: string): string {
 export function parsePiecesImport({
   input,
   defaultMaterial,
+  unit,
 }: ParsePiecesImportParams): ParsePiecesImportResult {
   const lines = input
     .split(/\r?\n/)
@@ -164,7 +172,7 @@ export function parsePiecesImport({
       continue;
     }
 
-    const [normalizedHeight, normalizedWidth] = normalizeDimensions(height, width);
+    const [normalizedHeight, normalizedWidth] = normalizeDimensions(height, width, unit);
 
     importedPieces.push({
       id: `import_${importedPieces.length + 1}`,

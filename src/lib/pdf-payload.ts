@@ -1,4 +1,5 @@
 import type { Piece, Sheet, OptimizationResult, MaterialType } from '@/lib/cutting/binpacking';
+import { DEFAULT_DISPLAY_UNIT, type DisplayUnit } from '@/lib/units';
 
 export interface PdfPayloadSheet {
   width: number;
@@ -11,6 +12,12 @@ export interface PdfExportPayload {
   sheet: PdfPayloadSheet;
   pieces: Piece[];
   result: OptimizationResult;
+  /**
+   * The unit the artisan had selected for display at export time. All
+   * geometry above (sheet/pieces/result) stays canonical cm; this field only
+   * tells /api/export-pdf which unit to use when labeling dimensions.
+   */
+  displayUnit: DisplayUnit;
 }
 
 /**
@@ -21,7 +28,8 @@ export function buildPdfPayload(
   projectName: string,
   activeSheet: Sheet,
   pieces: Piece[],
-  result: OptimizationResult
+  result: OptimizationResult,
+  displayUnit: DisplayUnit = DEFAULT_DISPLAY_UNIT
 ): PdfExportPayload {
   return {
     projectName,
@@ -32,5 +40,6 @@ export function buildPdfPayload(
     },
     pieces,
     result,
+    displayUnit,
   };
 }

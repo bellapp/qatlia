@@ -1,24 +1,6 @@
 import { NextResponse } from 'next/server';
-import { z } from 'zod';
-
-const DxfSchema = z.object({
-  projectName: z.string().default('QatlIA_Plan'),
-  sheet: z.object({
-    width: z.number(),
-    height: z.number(),
-  }),
-  placedPieces: z.array(
-    z.object({
-      pieceNumber: z.number(),
-      name: z.string(),
-      sheetIndex: z.number(),
-      x: z.number(),
-      y: z.number(),
-      width: z.number(),
-      height: z.number(),
-    })
-  ),
-});
+import { fromCanonicalCm } from '@/lib/units';
+import { DxfSchema } from '@/lib/exports/dxf-schema';
 
 /**
  * Générateur DXF (AutoCAD R12 ASCII) pour machines CNC et découpeuses laser / scies numériques
@@ -32,7 +14,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'INVALID_INPUT', details: parsed.error.format() }, { status: 400 });
     }
 
-    const { projectName, sheet, placedPieces } = parsed.data;
+    const { projectName, sheet, placedPieces, displayUnit } = parsed.data;
 
     let dxf = '';
 
@@ -90,10 +72,12 @@ export async function POST(req: Request) {
         }
         dxf += '0\nSEQEND\n';
 
-        // Label Text
+        // Label Text: display-unit converted dimensions, geometry stays canonical cm above.
         const textX = px + p.width / 2;
         const textY = py + p.height / 2;
-        dxf += `0\nTEXT\n8\nTEXTE\n10\n${textX}\n20\n${textY}\n30\n0.0\n40\n4.0\n1\n#${p.pieceNumber} (${p.width}x${p.height})\n`;
+        const displayWidth = fromCanonicalCm(p.width, displayUnit).toFixed(1);
+        const displayHeight = fromCanonicalCm(p.height, displayUnit).toFixed(1);
+        dxf += `0\nTEXT\n8\nTEXTE\n10\n${textX}\n20\n${textY}\n30\n0.0\n40\n4.0\n1\n#${p.pieceNumber} (${displayWidth}x${displayHeight} ${displayUnit})\n`;
       }
     }
 

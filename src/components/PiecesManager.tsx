@@ -14,11 +14,14 @@ import { Piece, MaterialType, EdgeBandingConfig, MATERIAL_LIBRARY, EDGEBANDING_P
 import { parsePiecesImport } from '@/lib/pieces/import-parser';
 import { createFurnitureTemplatePieces, FURNITURE_TEMPLATES, type TemplateName } from '@/lib/pieces/templates';
 import { ensureUniquePieceId, getResolvedPieceColor } from '@/lib/pieces/catalog';
+import { parseDisplayInputToCanonical, formatDisplayValue, type DisplayUnit } from '@/lib/units';
 
 interface PiecesManagerProps {
   pieces: Piece[];
   onUpdatePieces: (pieces: Piece[]) => void;
   defaultMaterial: MaterialType;
+  /** Project-wide display unit (cm or mm). Domain state (`pieces`) always stays canonical cm. */
+  displayUnit: DisplayUnit;
   showMaterialCol?: boolean;
   disabled?: boolean;
 }
@@ -49,14 +52,16 @@ function getFeedbackClasses(tone: FeedbackTone): string {
     : 'border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-300';
 }
 
-function normalizeManualDimension(value: number): number {
-  return value > 500 ? Math.round(value) / 10 : Math.round(value * 10) / 10;
+/** Rounds an already-canonical cm value to the same 0.1 cm precision used everywhere else. */
+function roundCanonical(valueCm: number): number {
+  return Math.round(valueCm * 10) / 10;
 }
 
 export const PiecesManager: React.FC<PiecesManagerProps> = ({
   pieces,
   onUpdatePieces,
   defaultMaterial,
+  displayUnit,
   disabled = false,
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
@@ -66,6 +71,7 @@ export const PiecesManager: React.FC<PiecesManagerProps> = ({
   const [newEdgeColor, setNewEdgeColor] = useState('none');
   const [feedback, setFeedback] = useState<{ tone: FeedbackTone; text: string } | null>(null);
   const [importText, setImportText] = useState('');
+  const [importUnit, setImportUnit] = useState<DisplayUnit>(displayUnit);
   const [selectedTemplate, setSelectedTemplate] = useState<TemplateName>('Meuble TV');
   const listRef = useRef<HTMLDivElement>(null);
 
@@ -134,20 +140,25 @@ export const PiecesManager: React.FC<PiecesManagerProps> = ({
 
   const handleAddPieceQuick = (event: React.FormEvent) => {
     event.preventDefault();
-    const height = parseFloat(newHeight);
-    const width = parseFloat(newWidth);
+    // parseDisplayInputToCanonical never throws: it returns null for empty,
+    // non-numeric or non-finite text (including "1e400"/"Infinity"), so a
+    // pasted garbage value is rejected here instead of reaching
+    // `toCanonicalCm` (which would throw) or silently corrupting the new
+    // piece's canonical dimensions.
+    const height = parseDisplayInputToCanonical(newHeight, displayUnit);
+    const width = parseDisplayInputToCanonical(newWidth, displayUnit);
     const quantity = parseInt(newQty, 10) || 1;
 
-    if (!height || !width || height <= 0 || width <= 0) {
-      setFeedback({ tone: 'warning', text: 'Renseignez des dimensions valides en cm.' });
+    if (height === null || width === null || height <= 0 || width <= 0) {
+      setFeedback({ tone: 'warning', text: `Renseignez des dimensions valides en ${displayUnit}.` });
       return;
     }
 
     appendPieces([
       {
         name: newReference.trim() || `Pièce ${pieces.length + 1}`,
-        height: normalizeManualDimension(height),
-        width: normalizeManualDimension(width),
+        height: roundCanonical(height),
+        width: roundCanonical(width),
         quantity,
         material: defaultMaterial,
         edges: { ...newEdges, color: newEdgeColor },
@@ -160,7 +171,7 @@ export const PiecesManager: React.FC<PiecesManagerProps> = ({
   };
 
   const handleImportSubmit = () => {
-    const result = parsePiecesImport({ input: importText, defaultMaterial });
+    const result = parsePiecesImport({ input: importText, defaultMaterial, unit: importUnit });
     appendPieces(result.importedPieces, result.summary, result.summary);
     if (result.importedPieces.length > 0) {
       setImportText('');
@@ -188,12 +199,11 @@ export const PiecesManager: React.FC<PiecesManagerProps> = ({
     const updated = pieces.map((piece, index) => {
       if (piece.id !== id) return piece;
 
-      let finalValue = value;
-      if ((field === 'height' || field === 'width') && typeof value === 'number' && value > 500) {
-        finalValue = value / 10;
-      }
-
-      const nextPiece = { ...piece, [field]: finalValue } as Piece;
+      // `value` for `height`/`width` arrives already converted to the
+      // canonical cm domain by the caller (via `parseDisplayInputToCanonical`,
+      // see the H/L inputs below) — this function never guesses a unit from
+      // magnitude, it only ever stores what it's given.
+      const nextPiece = { ...piece, [field]: value } as Piece;
       if (field !== 'color') {
         nextPiece.color = getResolvedPieceColor({
           color: nextPiece.color,
@@ -246,9 +256,11 @@ export const PiecesManager: React.FC<PiecesManagerProps> = ({
   };
 
   const handleExportCsv = () => {
-    let csv = 'Numéro,Hauteur (cm),Largeur (cm),Quantité,Référence,Couleur\n';
+    let csv = `Numéro,Hauteur (${displayUnit}),Largeur (${displayUnit}),Quantité,Référence,Couleur\n`;
     pieces.forEach((piece, index) => {
-      csv += `${index + 1},${piece.height},${piece.width},${piece.quantity || 1},"${piece.name || ''}",${piece.color || ''}\n`;
+      const height = formatDisplayValue(piece.height, displayUnit);
+      const width = formatDisplayValue(piece.width, displayUnit);
+      csv += `${index + 1},${height},${width},${piece.quantity || 1},"${piece.name || ''}",${piece.color || ''}\n`;
     });
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
@@ -279,7 +291,10 @@ export const PiecesManager: React.FC<PiecesManagerProps> = ({
           </span>
           <button
             type="button"
-            onClick={() => setActivePanel(activePanel === 'import' ? null : 'import')}
+            onClick={() => {
+              if (activePanel !== 'import') setImportUnit(displayUnit);
+              setActivePanel(activePanel === 'import' ? null : 'import');
+            }}
             disabled={disabled}
             className={`px-2 py-1 rounded-lg border text-[10px] font-semibold transition-all ${
               activePanel === 'import'
@@ -348,6 +363,21 @@ export const PiecesManager: React.FC<PiecesManagerProps> = ({
                   <p className="text-[10px] text-slate-500 dark:text-slate-400">
                     Format accepté : <span className="font-mono">Nom;Hauteur;Largeur;Quantité</span> ou collage Excel avec tabulations.
                   </p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <label htmlFor="pieces-import-unit" className="text-[10px] font-semibold text-slate-600 dark:text-slate-400">
+                    Unité des dimensions collées
+                  </label>
+                  <select
+                    id="pieces-import-unit"
+                    value={importUnit}
+                    onChange={(event) => setImportUnit(event.target.value as DisplayUnit)}
+                    aria-label="Unité des dimensions collées"
+                    className="px-2 py-1 rounded-lg bg-studio-field border border-studio-border text-[11px] font-semibold text-slate-800 dark:text-slate-200 outline-none focus:border-brand-500/40"
+                  >
+                    <option value="cm">cm</option>
+                    <option value="mm">mm</option>
+                  </select>
                 </div>
                 <textarea
                   id="pieces-import-textarea"
@@ -431,7 +461,7 @@ export const PiecesManager: React.FC<PiecesManagerProps> = ({
       <div className="grid grid-cols-12 gap-1.5 px-3 py-2 text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 border-y border-studio-border/50">
         <div className="col-span-1 pl-1">#</div>
         <div className="col-span-4 sm:col-span-4">Pièce</div>
-        <div className="col-span-3 sm:col-span-3 text-right">H × L (cm)</div>
+        <div className="col-span-3 sm:col-span-3 text-right">H × L ({displayUnit})</div>
         <div className="col-span-1 text-center">Qté</div>
         <div className="hidden sm:flex col-span-2 gap-0.5 justify-center">Chants</div>
         <div className="col-span-3 sm:col-span-1 text-right pr-1">Coul.</div>
@@ -464,6 +494,8 @@ export const PiecesManager: React.FC<PiecesManagerProps> = ({
               return (
                 <div
                   key={piece.id || index}
+                  data-testid="piece-row"
+                  data-piece-name={piece.name}
                   onMouseEnter={() => setFocusedRow(piece.id || null)}
                   onMouseLeave={() => setFocusedRow(null)}
                   className={`grid grid-cols-12 gap-1.5 items-center px-3 py-2 transition-all group ${
@@ -509,19 +541,31 @@ export const PiecesManager: React.FC<PiecesManagerProps> = ({
                     <input
                       type="number"
                       step="0.1"
-                      value={Number(piece.height.toFixed(1))}
-                      onChange={(event) => handleUpdate(piece.id || '', 'height', parseFloat(event.target.value) || 0)}
+                      value={formatDisplayValue(piece.height, displayUnit)}
+                      onChange={(event) => {
+                        // Safe boundary: reject anything null/non-finite/<=0
+                        // (empty string, "abc", "1e400", "Infinity", 0, a
+                        // negative) instead of letting it corrupt canonical
+                        // state or reach `toCanonicalCm`, which throws.
+                        const canonical = parseDisplayInputToCanonical(event.target.value, displayUnit);
+                        if (canonical === null || canonical <= 0) return;
+                        handleUpdate(piece.id || '', 'height', canonical);
+                      }}
                       className="w-12 sm:w-14 text-right bg-transparent text-slate-900 dark:text-slate-100 font-bold outline-none border-b border-dashed border-slate-300 dark:border-slate-600 hover:border-brand-400 focus:border-brand-400 focus:bg-studio-field/60 focus:rounded px-1 py-0.5 -mx-1 tabular-nums cursor-text transition-colors"
-                      aria-label="Hauteur cm"
+                      aria-label={`Hauteur ${displayUnit}`}
                     />
                     <span className="text-slate-600">×</span>
                     <input
                       type="number"
                       step="0.1"
-                      value={Number(piece.width.toFixed(1))}
-                      onChange={(event) => handleUpdate(piece.id || '', 'width', parseFloat(event.target.value) || 0)}
+                      value={formatDisplayValue(piece.width, displayUnit)}
+                      onChange={(event) => {
+                        const canonical = parseDisplayInputToCanonical(event.target.value, displayUnit);
+                        if (canonical === null || canonical <= 0) return;
+                        handleUpdate(piece.id || '', 'width', canonical);
+                      }}
                       className="w-12 sm:w-14 text-right bg-transparent text-slate-900 dark:text-slate-100 font-bold outline-none border-b border-dashed border-slate-300 dark:border-slate-600 hover:border-brand-400 focus:border-brand-400 focus:bg-studio-field/60 focus:rounded px-1 py-0.5 -mx-1 tabular-nums cursor-text transition-colors"
-                      aria-label="Largeur cm"
+                      aria-label={`Largeur ${displayUnit}`}
                     />
                   </div>
 
@@ -589,7 +633,7 @@ export const PiecesManager: React.FC<PiecesManagerProps> = ({
           <form onSubmit={handleAddPieceQuick} className="p-3 rounded-xl bg-studio-panel/80 border border-brand-500/30 backdrop-blur-sm shadow-lg animate-in slide-in-from-bottom-2 duration-150">
             <div className="grid grid-cols-12 gap-2 items-end">
               <div className="col-span-3">
-                <label htmlFor="quick-piece-height" className="text-[9px] font-semibold uppercase text-slate-500 dark:text-slate-400 block mb-0.5">H (cm)</label>
+                <label htmlFor="quick-piece-height" className="text-[9px] font-semibold uppercase text-slate-500 dark:text-slate-400 block mb-0.5">H ({displayUnit})</label>
                 <input
                   id="quick-piece-height"
                   type="number"
@@ -603,7 +647,7 @@ export const PiecesManager: React.FC<PiecesManagerProps> = ({
                 />
               </div>
               <div className="col-span-3">
-                <label htmlFor="quick-piece-width" className="text-[9px] font-semibold uppercase text-slate-500 dark:text-slate-400 block mb-0.5">L (cm)</label>
+                <label htmlFor="quick-piece-width" className="text-[9px] font-semibold uppercase text-slate-500 dark:text-slate-400 block mb-0.5">L ({displayUnit})</label>
                 <input
                   id="quick-piece-width"
                   type="number"

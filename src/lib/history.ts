@@ -1,3 +1,5 @@
+import type { DisplayUnit } from '@/lib/units';
+
 export const LOCAL_HISTORY_KEY = 'qatlia_local_history_v1';
 
 export interface LocalHistoryItem {
@@ -15,6 +17,13 @@ export interface LocalHistoryItem {
     sheet?: Record<string, unknown>;
     options?: Record<string, unknown>;
     result?: { sheetsUsed?: number; wastePercentage?: number };
+    // Persistence metadata (see src/lib/units.ts ProjectUnitPersistenceMetadata):
+    // geometry above always stays canonical cm; these fields only record which
+    // display unit the artisan was using and whether this record still owes a
+    // rewrite with explicit unit metadata.
+    displayUnit?: DisplayUnit;
+    canonicalUnit?: 'cm';
+    migratedFromLegacyUnit?: boolean;
   };
 }
 

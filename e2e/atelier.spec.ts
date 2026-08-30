@@ -237,7 +237,7 @@ test.describe('Atelier Dashboard (/atelier)', () => {
 
       const height = round1(Number(listItem.height));
       const width = round1(Number(listItem.width));
-      expect(listItem.text).toContain(`${height}×${width}`);
+      expect(listItem.text).toContain(`${height.toFixed(1)}×${width.toFixed(1)} cm`);
 
       expect(rect.rectWidth).toBeGreaterThan(0);
       expect(rect.rectHeight).toBeGreaterThan(0);
@@ -246,5 +246,129 @@ test.describe('Atelier Dashboard (/atelier)', () => {
       expect(rect.x + rect.rectWidth).toBeLessThanOrEqual(viewBox.x + viewBox.width);
       expect(rect.y + rect.rectHeight).toBeLessThanOrEqual(viewBox.y + viewBox.height);
     }
+  });
+
+  test('switching sheet unit to mm converts dimensions and persists after reload', async ({ page }) => {
+    await page.evaluate(() => localStorage.clear());
+    await page.goto('/atelier', { waitUntil: 'domcontentloaded' });
+    await expect(page.getByRole('img', { name: 'QatlIA' })).toBeVisible({ timeout: 15000 });
+
+    const heightInput = page.getByTestId('sheet-height-input');
+    const widthInput = page.getByTestId('sheet-width-input');
+    await expect(heightInput).toHaveValue('278.0');
+    await expect(widthInput).toHaveValue('208.0');
+
+    const unitGroup = page.getByRole('group', { name: /unité/i });
+    await unitGroup.getByRole('button', { name: 'mm' }).click();
+
+    await expect(heightInput).toHaveValue('2780.0');
+    await expect(widthInput).toHaveValue('2080.0');
+
+    await page.getByRole('button', { name: /optimiser/i }).click();
+    await expect(page.getByTestId('cut-plan-svg')).toBeVisible({ timeout: 15000 });
+
+    await page.reload();
+    await expect(page.getByRole('img', { name: 'QatlIA' })).toBeVisible({ timeout: 15000 });
+
+    const mmButtonAfterReload = page.getByRole('group', { name: /unité/i }).getByRole('button', { name: 'mm' });
+    await expect(mmButtonAfterReload).toHaveAttribute('aria-pressed', 'true');
+    await expect(page.getByTestId('sheet-height-input')).toHaveValue('2780.0');
+    await expect(page.getByTestId('sheet-width-input')).toHaveValue('2080.0');
+  });
+
+  test('imported piece dimensions convert correctly between mm and cm', async ({ page }) => {
+    await page.evaluate(() => localStorage.clear());
+    await page.goto('/atelier', { waitUntil: 'domcontentloaded' });
+    await expect(page.getByRole('img', { name: 'QatlIA' })).toBeVisible({ timeout: 15000 });
+
+    const unitGroup = page.getByRole('group', { name: /unité/i });
+    await unitGroup.getByRole('button', { name: 'mm' }).click();
+
+    await page.getByRole('button', { name: /coller excel/i }).click();
+    await page.getByLabel(/unité des dimensions collées/i).selectOption('mm');
+    await page.getByLabel(/coller une liste de pièces/i).fill('Test unité;600;500;1');
+    await page.getByRole('button', { name: /^importer$/i }).click();
+
+    const pieceRow = page.locator('[data-piece-name="Test unité"]');
+    await expect(pieceRow).toBeVisible();
+    await expect(pieceRow.getByLabel('Hauteur mm')).toHaveValue('600.0');
+    await expect(pieceRow.getByLabel('Largeur mm')).toHaveValue('500.0');
+
+    await unitGroup.getByRole('button', { name: 'cm' }).click();
+
+    await expect(pieceRow.getByLabel('Hauteur cm')).toHaveValue('60.0');
+    await expect(pieceRow.getByLabel('Largeur cm')).toHaveValue('50.0');
+  });
+
+  test('legacy projects default to canonical cm and rewrite migration metadata', async ({ page }) => {
+    const legacyProject = {
+      sheet: { height: 600, width: 120, material: 'mdf', kerf: 0.3, margin: 1, quantity: 1 },
+      pieces: [
+        { id: '1', name: 'Panneau legacy', height: 100, width: 50, quantity: 1, material: 'mdf', rotatable: true },
+      ],
+      options: {
+        kerfWidth: 3, showLabels: true, singleSheetOnly: false, considerMaterial: false,
+        edgeBanding: false, grainDirection: false, optimizationPriority: 'linear_guillotine', defaultMaterial: 'mdf',
+        minReusableOffcutWidth: 15, minReusableOffcutHeight: 15,
+      },
+      // No `displayUnit`/`canonicalUnit` fields at all — this is what a
+      // legacy (pre-unit-metadata) saved project looked like.
+    };
+
+    await page.goto('/atelier', { waitUntil: 'domcontentloaded' });
+    await page.evaluate(
+      (legacy) => sessionStorage.setItem('qatlia_saved_project', JSON.stringify(legacy)),
+      legacyProject
+    );
+    await page.reload({ waitUntil: 'domcontentloaded' });
+    await expect(page.getByRole('img', { name: 'QatlIA' })).toBeVisible({ timeout: 15000 });
+
+    const unitGroup = page.getByRole('group', { name: /unité/i });
+    await expect(unitGroup.getByRole('button', { name: 'cm' })).toHaveAttribute('aria-pressed', 'true');
+
+    // Legacy geometry is already canonical cm; it must display as-is, never
+    // magnitude-guessed into mm (e.g. no `600 > 500 ? /10 : value` heuristic).
+    await expect(page.getByTestId('sheet-height-input')).toHaveValue('600.0');
+    await expect(page.getByTestId('sheet-width-input')).toHaveValue('120.0');
+
+    await page.getByRole('button', { name: /optimiser/i }).click();
+    await expect(page.getByTestId('cut-plan-svg')).toBeVisible({ timeout: 15000 });
+
+    const firstHistoryOptions = await page.evaluate(() => {
+      const raw = localStorage.getItem('qatlia_local_history_v1');
+      const items = raw ? JSON.parse(raw) : [];
+      return items[0]?.options_json ?? null;
+    });
+
+    expect(firstHistoryOptions?.displayUnit).toBe('cm');
+    expect(firstHistoryOptions?.canonicalUnit).toBe('cm');
+    expect(firstHistoryOptions?.migratedFromLegacyUnit).toBe(true);
+  });
+
+  test('entering an extreme numeric value (1e400) in sheet height stays safe and reverts', async ({ page }) => {
+    const pageErrors: Error[] = [];
+    page.on('pageerror', (error) => pageErrors.push(error));
+
+    await page.goto('/atelier', { waitUntil: 'domcontentloaded' });
+    await expect(page.getByRole('img', { name: 'QatlIA' })).toBeVisible({ timeout: 15000 });
+
+    const heightInput = page.getByTestId('sheet-height-input');
+    await expect(heightInput).toHaveValue('278.0');
+
+    await heightInput.evaluate((element: HTMLInputElement) => {
+      element.focus();
+      const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value')!.set!;
+      setter.call(element, '1e400');
+      element.dispatchEvent(new Event('input', { bubbles: true }));
+      element.dispatchEvent(new Event('change', { bubbles: true }));
+      element.blur();
+    });
+
+    // The page must stay responsive (no uncaught error broke rendering) and
+    // the input must safely revert to its last valid value, whether the
+    // browser normalized 1e400 to '' or left it as an out-of-range string.
+    await expect(page.getByRole('img', { name: 'QatlIA' })).toBeVisible();
+    await expect(heightInput).toHaveValue('278.0');
+    expect(pageErrors).toEqual([]);
   });
 });

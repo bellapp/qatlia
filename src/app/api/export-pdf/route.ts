@@ -1,51 +1,8 @@
 import { NextResponse } from 'next/server';
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
-import { z } from 'zod';
-
-const ExportSchema = z.object({
-  projectName: z.string().default('PROJET DÉBIT'),
-  material: z.string().default('MDF'),
-  costPerSheet: z.number().default(450.0),
-  costCutPerMeter: z.number().default(5.0),
-  sheet: z.object({
-    width: z.number(),
-    height: z.number(),
-    kerf: z.number().default(0.3),
-    margin: z.number().default(0.0),
-    grainDirection: z.boolean().default(false),
-  }),
-  result: z.object({
-    sheetsUsed: z.number(),
-    wastePercentage: z.number(),
-    totalAreaUsed: z.number(),
-    totalAreaAvailable: z.number(),
-    moneySavedMad: z.number().optional().default(0),
-    offcuts: z.array(
-      z.object({
-        sheetIndex: z.number(),
-        width: z.number(),
-        height: z.number(),
-        x: z.number(),
-        y: z.number(),
-        areaM2: z.number(),
-        isReusable: z.boolean(),
-      })
-    ).optional().default([]),
-    placedPieces: z.array(
-      z.object({
-        pieceNumber: z.number(),
-        name: z.string(),
-        sheetIndex: z.number(),
-        width: z.number(),
-        height: z.number(),
-        rotated: z.boolean(),
-        x: z.number(),
-        y: z.number(),
-      })
-    ),
-  }),
-});
+import { fromCanonicalCm } from '@/lib/units';
+import { ExportSchema } from '@/lib/exports/pdf-schema';
 
 /**
  * Modèle QatlIA Pro (Débit Industriel avec Cotation Précise des Chutes & Colonnes Traversantes)
@@ -59,12 +16,15 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'INVALID_DATA', details: parsed.error.format() }, { status: 400 });
     }
 
-    const { projectName, material, sheet, result, costPerSheet, costCutPerMeter } = parsed.data;
+    const { projectName, material, sheet, result, costPerSheet, costCutPerMeter, displayUnit } = parsed.data;
 
-    // Conversion d'affichage en mm si dimension > 500, sinon conversion en mm pour uniformité industrielle
-    const isMm = sheet.width > 500;
-    const toMm = (val: number) => (isMm ? Math.round(val) : Math.round(val * 10));
-    const toM2 = (w: number, h: number) => (toMm(w) * toMm(h)) / 1_000_000;
+    // Input geometry (sheet/pieces/offcuts) is always canonical centimetres —
+    // there is no magnitude-based mm/cm guessing here. `fmt` is the only
+    // place a value is converted, and only for a human-readable label;
+    // every calculation below stays in cm (converted to m² by /10000, to
+    // metres by /100), regardless of the artisan's chosen `displayUnit`.
+    const fmt = (valueCm: number) => fromCanonicalCm(valueCm, displayUnit).toFixed(1);
+    const toM2 = (w: number, h: number) => (w * h) / 10_000;
 
     const sheetAreaM2 = toM2(sheet.width, sheet.height);
     const totalSheetsAreaM2 = sheetAreaM2 * result.sheetsUsed;
@@ -72,7 +32,7 @@ export async function POST(req: Request) {
     const globalWasteRate = totalSheetsAreaM2 > 0 ? ((totalSheetsAreaM2 - totalPiecesAreaM2) / totalSheetsAreaM2) * 100 : 0;
     const nonReusableWasteRate = Math.min(2.5, globalWasteRate * 0.15);
 
-    const linearCutMeters = result.placedPieces.reduce((sum, p) => sum + (2 * (toMm(p.width) + toMm(p.height))) / 1000, 0) * 0.65;
+    const linearCutMeters = result.placedPieces.reduce((sum, p) => sum + (2 * (p.width + p.height)) / 100, 0) * 0.65;
 
     const totalSheetCost = result.sheetsUsed * costPerSheet;
     const pieceCost = totalPiecesAreaM2 * (costPerSheet / sheetAreaM2);
@@ -100,8 +60,10 @@ export async function POST(req: Request) {
       const sPieces = result.placedPieces.filter((p) => p.sheetIndex === s);
       const sOffcuts = result.offcuts ? result.offcuts.filter((o) => o.sheetIndex === s) : [];
 
+      // Signature precision only needs to distinguish patterns; rounding to
+      // the nearest 0.1cm (an mm-equivalent step) is unrelated to `displayUnit`.
       const signature = sPieces
-        .map((p) => `${toMm(p.width)}x${toMm(p.height)}@${Math.round(p.x)}_${Math.round(p.y)}`)
+        .map((p) => `${Math.round(p.width * 10)}x${Math.round(p.height * 10)}@${Math.round(p.x)}_${Math.round(p.y)}`)
         .sort()
         .join('|');
 
@@ -137,7 +99,7 @@ export async function POST(req: Request) {
     const aggMap = new Map<string, AggregatedPiece>();
     let pNum = 1;
     for (const p of result.placedPieces) {
-      const key = `${p.height.toFixed(1)} × ${p.width.toFixed(1)} cm`;
+      const key = `${fmt(p.height)} × ${fmt(p.width)} ${displayUnit}`;
       if (aggMap.has(key)) {
         aggMap.get(key)!.quantity += 1;
       } else {
@@ -219,7 +181,7 @@ export async function POST(req: Request) {
       startY: 45,
       margin: { left: 14 },
       tableWidth: 88,
-      head: [['', 'Matériau', 'Dimension (cm)', 'Quantité']],
+      head: [['', 'Matériau', `Dimension (${displayUnit})`, 'Quantité']],
       body: debitRows,
       theme: 'plain',
       headStyles: {
@@ -253,12 +215,12 @@ export async function POST(req: Request) {
       startY: 45,
       margin: { left: 108 },
       tableWidth: 88,
-      head: [['Matériau', 'Référence', 'Dimension (cm)', 'Quantité', 'Surface']],
+      head: [['Matériau', 'Référence', `Dimension (${displayUnit})`, 'Quantité', 'Surface']],
       body: [
         [
           material.toUpperCase(),
           'Stock Brut',
-          `${sheet.height.toFixed(1)} × ${sheet.width.toFixed(1)} cm`,
+          `${fmt(sheet.height)} × ${fmt(sheet.width)} ${displayUnit}`,
           result.sheetsUsed,
           `${totalSheetsAreaM2.toFixed(2)} m²`,
         ],
@@ -297,7 +259,7 @@ export async function POST(req: Request) {
       idx + 1,
       material.toUpperCase(),
       'Stock',
-      `${sheet.height.toFixed(1)} × ${sheet.width.toFixed(1)} cm`,
+      `${fmt(sheet.height)} × ${fmt(sheet.width)} ${displayUnit}`,
       pat.count,
       pat.pieces.length,
       `${pat.wasteRate.toFixed(2)} %`,
@@ -308,7 +270,7 @@ export async function POST(req: Request) {
     autoTable(doc, {
       startY: planCutStartY,
       margin: { left: 14, right: 14 },
-      head: [['', 'Matériau', 'Référence', 'Dimension (mm)', 'Quantité', 'Pièces', 'Taux de chutes', 'Coût net (MAD)']],
+      head: [['', 'Matériau', 'Référence', `Dimension (${displayUnit})`, 'Quantité', 'Pièces', 'Taux de chutes', 'Coût net (MAD)']],
       body: planCutRows,
       theme: 'plain',
       headStyles: {
@@ -392,7 +354,7 @@ export async function POST(req: Request) {
       doc.setTextColor(0, 0, 0);
       const exemplairesText = pat.count === 1 ? 'Exemplaire unique' : `À fabriquer en ${pat.count} exemplaires`;
       doc.text(
-        `${pIndex + 1}/${uniquePatterns.length} -- ${material.toUpperCase()} -- ${toMm(sheet.width)} × ${toMm(sheet.height)} -- ${exemplairesText}`,
+        `${pIndex + 1}/${uniquePatterns.length} -- ${material.toUpperCase()} -- ${fmt(sheet.width)} × ${fmt(sheet.height)} ${displayUnit} -- ${exemplairesText}`,
         14,
         32
       );
@@ -425,12 +387,12 @@ export async function POST(req: Request) {
         doc.setLineWidth(0.4);
         doc.rect(ox, oy, ow, oh, 'FD');
 
-        // Cotation explicite Hauteur x Largeur en cm au centre de la chute
+        // Cotation explicite Hauteur x Largeur au centre de la chute, dans l'unité choisie
         if (ow > 12 && oh > 5) {
           doc.setFont('helvetica', 'normal');
           doc.setFontSize(Math.min(7.0, Math.max(4.0, Math.min(ow, oh) / 4.5)));
           doc.setTextColor(30, 41, 59);
-          doc.text(`${off.height.toFixed(1)} × ${off.width.toFixed(1)} cm`, ox + ow / 2, oy + oh / 2, {
+          doc.text(`${fmt(off.height)} × ${fmt(off.width)} ${displayUnit}`, ox + ow / 2, oy + oh / 2, {
             align: 'center',
             baseline: 'middle',
           });
@@ -449,7 +411,7 @@ export async function POST(req: Request) {
         doc.setLineWidth(0.4);
         doc.rect(px, py, pw, ph, 'FD');
 
-        const dimText = `${p.height.toFixed(1)} × ${p.width.toFixed(1)} cm`;
+        const dimText = `${fmt(p.height)} × ${fmt(p.width)} ${displayUnit}`;
         doc.setFont('helvetica', 'normal');
         doc.setFontSize(Math.min(7.5, Math.max(4.2, Math.min(pw, ph) / 4)));
         doc.setTextColor(0, 0, 0);
@@ -457,7 +419,7 @@ export async function POST(req: Request) {
         if (pw > 14 && ph > 6) {
           doc.text(dimText, px + pw / 2, py + ph / 2, { align: 'center', baseline: 'middle' });
         } else if (ph > 9) {
-          doc.text(`${p.height.toFixed(1)}\n×\n${p.width.toFixed(1)}`, px + pw / 2, py + ph / 2 - 2, { align: 'center' });
+          doc.text(`${fmt(p.height)}\n×\n${fmt(p.width)}`, px + pw / 2, py + ph / 2 - 2, { align: 'center' });
         }
       });
     });
