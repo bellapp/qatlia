@@ -453,8 +453,8 @@ export default function Dashboard() {
       {/* Top Navbar Studio */}
       <header className="sticky top-0 z-40 border-b border-studio-border/70 bg-studio-canvas/70 backdrop-blur-2xl backdrop-saturate-150">
         <div className="absolute inset-0 -z-10 bg-gradient-to-b from-brand-500/[0.04] to-transparent pointer-events-none" />
-        <div className="max-w-7xl mx-auto flex items-center justify-between px-4 sm:px-8 h-16">
-          <div className="flex items-center gap-3">
+        <div className="max-w-7xl mx-auto flex min-w-0 items-center justify-between overflow-hidden px-4 sm:px-8 h-16">
+          <div className="flex shrink-0 items-center gap-3">
             <div className="text-brand-400">
               <QatlIALogo size="md" />
             </div>
@@ -469,7 +469,7 @@ export default function Dashboard() {
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div dir="ltr" className="flex min-w-0 items-center gap-2 overflow-x-auto overscroll-x-contain">
             {/* Mode Toggle: 2D / 1D */}
             <div className="flex items-center p-0.5 rounded-lg bg-studio-field border border-studio-border">
               <button type="button" onClick={() => setCutMode('2d')} aria-pressed={cutMode === '2d'}

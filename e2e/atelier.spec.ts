@@ -114,6 +114,8 @@ test.describe('Atelier Dashboard (/atelier)', () => {
 
     const piecesList = page.getByTestId('pieces-list');
     const addPiece = page.getByRole('button', { name: /ajouter une pièce/i });
+    await expect(piecesList).toBeVisible();
+    await expect(addPiece).toBeVisible();
     const piecesListBox = await piecesList.boundingBox();
     const addPieceBox = await addPiece.boundingBox();
 
