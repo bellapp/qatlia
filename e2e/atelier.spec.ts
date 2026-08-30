@@ -107,4 +107,79 @@ test.describe('Atelier Dashboard (/atelier)', () => {
     expect((toolbarBox?.y ?? 0) + (toolbarBox?.height ?? 0)).toBeLessThanOrEqual((viewportBox?.y ?? 0) + 1);
     expect(await viewport.evaluate((element) => element.scrollHeight > element.clientHeight)).toBe(true);
   });
+
+  test('add-piece action stays below the piece rows', async ({ page }) => {
+    await page.setViewportSize({ width: 1280, height: 1024 });
+    await page.reload();
+
+    const piecesList = page.getByTestId('pieces-list');
+    const addPiece = page.getByRole('button', { name: /ajouter une pièce/i });
+    const piecesListBox = await piecesList.boundingBox();
+    const addPieceBox = await addPiece.boundingBox();
+
+    expect(piecesListBox).not.toBeNull();
+    expect(addPieceBox).not.toBeNull();
+    expect(addPieceBox?.y ?? 0).toBeGreaterThanOrEqual((piecesListBox?.y ?? 0) + (piecesListBox?.height ?? 0));
+  });
+
+  test('can paste Excel rows and append valid pieces', async ({ page }) => {
+    await page.getByRole('button', { name: /coller excel/i }).click();
+    await page.getByLabel(/coller une liste de pièces/i).fill([
+      'Nom;Hauteur;Largeur;Quantité',
+      'Façade test;72;59,7;2',
+      'Tablette test;230;120;1',
+    ].join('\n'));
+    await page.getByRole('button', { name: /^importer$/i }).click();
+
+    await expect(page.getByText(/2 pièces importées · 0 ligne ignorée/i)).toBeVisible();
+    const importedNames = await page.locator('input[placeholder="Nom"]').evaluateAll((inputs) =>
+      inputs.map((input) => (input as HTMLInputElement).value)
+    );
+    expect(importedNames).toContain('Façade test');
+    expect(importedNames).toContain('Tablette test');
+  });
+
+  test('can append a furniture template without replacing current pieces', async ({ page }) => {
+    const initialRows = await page.getByLabel('Quantité').count();
+    await page.getByRole('button', { name: /modèles/i }).click();
+    await page.getByLabel(/ajouter un modèle de meuble/i).selectOption('Bibliothèque');
+    await page.getByRole('button', { name: /^ajouter$/i }).click();
+
+    await expect(page.getByText(/6 pièces ajoutées depuis Bibliothèque/i)).toBeVisible();
+    expect(await page.getByLabel('Quantité').count()).toBeGreaterThan(initialRows);
+    const templateNames = await page.locator('input[placeholder="Nom"]').evaluateAll((inputs) =>
+      inputs.map((input) => (input as HTMLInputElement).value)
+    );
+    expect(templateNames).toContain('Tablette réglable');
+  });
+
+  test('can choose a custom color for a piece', async ({ page }) => {
+    const color = page.getByLabel(/couleur panneau latéral g/i);
+    await color.fill('#22c55e');
+    await expect(color).toHaveValue('#22c55e');
+  });
+
+  test('optimized result shows a numbered cut list for the active sheet', async ({ page }) => {
+    await page.getByRole('button', { name: /ajouter une pièce/i }).click();
+    const form = page.locator('form').first();
+    await form.getByLabel(/h \(cm\)/i).fill('120');
+    await form.getByLabel(/l \(cm\)/i).fill('230');
+    await form.getByLabel(/qté/i).fill('1');
+    await form.getByLabel(/nom/i).fill('Test rotation');
+    await form.getByRole('button', { name: '+' }).click();
+
+    await page.getByRole('button', { name: /optimiser/i }).click();
+    await expect(page.getByRole('heading', { name: /ordre de coupe/i })).toBeVisible({ timeout: 15000 });
+
+    const cutList = page.getByRole('table', { name: /ordre de coupe/i });
+    await expect(cutList.getByRole('columnheader', { name: '#', exact: true })).toBeVisible();
+    await expect(cutList.getByRole('columnheader', { name: /pièce/i })).toBeVisible();
+    await expect(cutList.getByRole('columnheader', { name: /h × l/i })).toBeVisible();
+    await expect(cutList.getByRole('columnheader', { name: /rotation/i })).toBeVisible();
+
+    const firstDataRow = cutList.getByRole('row').nth(1);
+    await expect(firstDataRow.getByText(/^1$/)).toBeVisible();
+    await expect(firstDataRow.getByText(/\d+([.,]\d+)? × \d+([.,]\d+)?/)).toBeVisible();
+    await expect(cutList.getByRole('row', { name: /test rotation/i }).getByText(/oui|90°/i)).toBeVisible();
+  });
 });

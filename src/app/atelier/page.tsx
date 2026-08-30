@@ -31,6 +31,7 @@ import {
   optimizeCutting1D,
   optimizeCutting2D,
 } from '@/lib/cutting/binpacking';
+import { PIECE_COLOR_PALETTE, getResolvedPieceColor } from '@/lib/pieces/catalog';
 import { OptionsPanel } from '@/components/OptionsPanel';
 import { PiecesManager } from '@/components/PiecesManager';
 import { AuthModal } from '@/components/AuthModal';
@@ -47,13 +48,28 @@ const DEFAULT_SHEETS: Sheet[] = [
   { id: 's0', height: 278, width: 208, kerf: 0.3, margin: 1.0, grainDirection: false, material: 'mdf', quantity: 1, label: 'Panneau standard 278×208' },
 ];
 
-const INITIAL_PIECES: Piece[] = [
+function normalizePiecesWithColors(sourcePieces: Piece[]): Piece[] {
+  return sourcePieces.map((piece, index) => ({
+    ...piece,
+    color: getResolvedPieceColor({
+      color: piece.color,
+      id: piece.id,
+      name: piece.name,
+      height: piece.height,
+      width: piece.width,
+      quantity: piece.quantity,
+      index,
+    }),
+  }));
+}
+
+const INITIAL_PIECES: Piece[] = normalizePiecesWithColors([
   { id: '1', name: 'Panneau Latéral G', height: 230, width: 120, quantity: 2, material: 'mdf', rotatable: true },
   { id: '2', name: 'Panneau Latéral D', height: 118, width: 48, quantity: 1, material: 'mdf', rotatable: true },
   { id: '3', name: 'Étagère Mobile', height: 41.8, width: 38, quantity: 7, material: 'mdf', rotatable: true },
   { id: '4', name: 'Séparation Centrale', height: 53.1, width: 48, quantity: 4, material: 'mdf', rotatable: true },
   { id: '5', name: 'Socle Bas', height: 51.3, width: 48, quantity: 2, material: 'mdf', rotatable: true },
-];
+]);
 
 export default function Dashboard() {
   const [cutMode, setCutMode] = useState<CutMode>('2d');
@@ -108,7 +124,7 @@ export default function Dashboard() {
           const parsed = JSON.parse(savedProj);
           if (parsed.sheet) setSheets([parsed.sheet]);
           if (parsed.sheets) setSheets(parsed.sheets);
-          if (Array.isArray(parsed.pieces)) setPieces(parsed.pieces);
+          if (Array.isArray(parsed.pieces)) setPieces(normalizePiecesWithColors(parsed.pieces));
           if (parsed.options) setOptions((prev) => ({ ...prev, ...parsed.options }));
           sessionStorage.removeItem('qatlia_saved_project');
         } catch (e) {
@@ -208,7 +224,7 @@ export default function Dashboard() {
         const data = await res.json();
         if (data.success && Array.isArray(data.pieces) && data.pieces.length > 0) {
           setPreviewImage(base64);
-          const newPieces: Piece[] = data.pieces.map((p: { name?: string; width?: number | string; height?: number | string; quantity?: number | string; material?: string }, i: number) => {
+          const newPieces: Piece[] = data.pieces.map((p: { name?: string; width?: number | string; height?: number | string; quantity?: number | string; material?: string; color?: string }, i: number) => {
             let h = Number(p.height) || 10;
             let w = Number(p.width) || 10;
             if (h > 500 || w > 500) {
@@ -223,9 +239,18 @@ export default function Dashboard() {
               quantity: Number(p.quantity) || 1,
               material: (p.material as MaterialType) || (activeSheet.material || 'mdf'),
               rotatable: true,
+              color: getResolvedPieceColor({
+                color: p.color,
+                id: `ext_${Date.now()}_${i}`,
+                name: p.name,
+                height: h,
+                width: w,
+                quantity: Number(p.quantity) || 1,
+                index: i,
+              }),
             };
           });
-          setPieces(newPieces);
+          setPieces(normalizePiecesWithColors(newPieces));
         } else {
           setVisionError(data.message || 'Aucune mesure détectée dans l\'image.');
         }
@@ -248,9 +273,20 @@ export default function Dashboard() {
       sheets: result.sheets.map(s => ({
         index: s.index, material: s.material,
         width: s.width, height: s.height,
-        pieces: s.pieces.map(p => ({ name: p.name, height: p.height, width: p.width, rotated: p.rotated, x: p.x, y: p.y })),
+        pieces: s.pieces.map(p => ({ name: p.name, height: p.height, width: p.width, rotated: p.rotated, x: p.x, y: p.y, color: p.color, pieceNumber: p.pieceNumber })),
         offcuts: s.offcuts.map(o => ({ height: o.height, width: o.width, x: o.x, y: o.y }))
-      }))
+      })),
+      placedPieces: result.placedPieces.map((piece) => ({
+        pieceNumber: piece.pieceNumber,
+        name: piece.name,
+        height: piece.height,
+        width: piece.width,
+        rotated: piece.rotated,
+        x: piece.x,
+        y: piece.y,
+        sheetIndex: piece.sheetIndex,
+        color: piece.color,
+      })),
     }, null, 2);
     const blob = new Blob([json], { type: 'application/json;charset=utf-8' });
     const a = document.createElement('a');
@@ -410,6 +446,7 @@ export default function Dashboard() {
     wasteRate: result.wastePercentage,
     usedArea: result.totalAreaUsed,
   } : null);
+  const currentSheetPieces = currentSheet ? [...currentSheet.pieces].sort((a, b) => a.pieceNumber - b.pieceNumber) : [];
 
   return (
     <div className="min-h-screen bg-studio-canvas text-slate-900 dark:text-slate-100 font-sans antialiased selection:bg-brand-500 selection:text-black">
@@ -805,8 +842,7 @@ export default function Dashboard() {
                         })}
 
                         {result.placedPieces.filter(p => p.sheetIndex === activeSheetIndex).map((p) => {
-                          const palette = ['#F59E0B','#3B82F6','#10B981','#EC4899','#8B5CF6','#F97316','#14B8A6','#6366F1'];
-                          const col = palette[(p.pieceNumber-1)%palette.length];
+                          const col = p.color || PIECE_COLOR_PALETTE[(p.pieceNumber - 1) % PIECE_COLOR_PALETTE.length];
                           const gradId = `g_${p.sheetIndex}_${p.pieceNumber}`;
                           const minSide = Math.min(p.width, p.height);
                           return (
@@ -858,23 +894,46 @@ export default function Dashboard() {
 
                 {/* Sheet Breakdown */}
                 {currentSheet && (
-                  <div className="grid grid-cols-2 gap-2.5">
-                    <div className="p-3.5 rounded-xl bg-studio-panel/50 border border-studio-border/70">
-                      <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-2.5">Pièces ({currentSheet.pieces.length})</p>
-                      <div className="space-y-1 max-h-[180px] overflow-y-auto">
-                        {currentSheet.pieces.map(pl => (
-                          <div key={pl.pieceNumber} className="flex items-center justify-between py-1 px-1.5 rounded-md hover:bg-studio-field/40 text-[11px] transition-colors">
-                            <span className="flex items-center gap-1.5 truncate">
-                              <span className="font-mono font-bold text-brand-400 text-[10px]">#{pl.pieceNumber}</span>
-                              <span className="text-slate-700 dark:text-slate-300 truncate">{pl.name}</span>
-                            </span>
-                            <span className="font-mono text-slate-500 dark:text-slate-400 shrink-0 ml-2 text-[10px] tabular-nums">
-                              {Math.round(pl.height*10)/10}×{Math.round(pl.width*10)/10}
-                            </span>
-                          </div>
-                        ))}
+                  <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1.35fr)_minmax(0,0.85fr)] gap-2.5">
+                    <section className="p-3.5 rounded-xl bg-studio-panel/50 border border-studio-border/70">
+                      <div className="flex items-center justify-between gap-2 mb-2.5">
+                        <h3 className="text-sm font-bold text-slate-900 dark:text-white">Ordre de coupe</h3>
+                        <span className="text-[10px] font-mono text-slate-500 dark:text-slate-400">{currentSheetPieces.length} pièces</span>
                       </div>
-                    </div>
+                      <div className="overflow-x-auto">
+                        <table aria-label="Ordre de coupe" className="min-w-full text-left text-[11px]">
+                          <thead>
+                            <tr className="border-b border-studio-border/70 text-[10px] uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                              <th scope="col" className="py-2 pr-3 font-bold">#</th>
+                              <th scope="col" className="py-2 pr-3 font-bold">Pièce</th>
+                              <th scope="col" className="py-2 pr-3 font-bold">H × L</th>
+                              <th scope="col" className="py-2 font-bold">Rotation</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {currentSheetPieces.map((piece) => (
+                              <tr key={piece.pieceNumber} className="border-b border-studio-border/40 last:border-b-0">
+                                <td className="py-2 pr-3 font-mono font-bold text-brand-400">{piece.pieceNumber}</td>
+                                <td className="py-2 pr-3">
+                                  <div className="flex items-center gap-2 min-w-0">
+                                    <span
+                                      aria-hidden="true"
+                                      className="h-2.5 w-2.5 rounded-full shrink-0"
+                                      style={{ backgroundColor: piece.color || PIECE_COLOR_PALETTE[(piece.pieceNumber - 1) % PIECE_COLOR_PALETTE.length] }}
+                                    />
+                                    <span className="truncate text-slate-700 dark:text-slate-300">{piece.name}</span>
+                                  </div>
+                                </td>
+                                <td className="py-2 pr-3 font-mono text-slate-600 dark:text-slate-300 tabular-nums">
+                                  {Math.round(piece.height * 10) / 10} × {Math.round(piece.width * 10) / 10}
+                                </td>
+                                <td className="py-2 text-slate-600 dark:text-slate-300">{piece.rotated ? 'Oui (90°)' : 'Non'}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </section>
                     <div className="p-3.5 rounded-xl bg-studio-panel/50 border border-studio-border/70">
                       <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-2.5">Chutes ({currentSheet.offcuts?.length||0})</p>
                       <div className="space-y-1 max-h-[180px] overflow-y-auto">

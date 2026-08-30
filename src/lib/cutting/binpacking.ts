@@ -33,7 +33,7 @@ export const EDGEBANDING_PRESETS: EdgeBandingPreset[] = [
 export interface Piece {
   id?: string; name?: string; height: number; width: number; quantity: number;
   material?: MaterialType | null; grainDirection?: boolean; edges?: EdgeBandingConfig;
-  preCut?: { height?: number; width?: number }; rotatable?: boolean;
+  preCut?: { height?: number; width?: number }; rotatable?: boolean; color?: string;
 }
 export interface Sheet {
   id?: string; height: number; width: number; kerf: number; margin?: number;
@@ -53,7 +53,7 @@ export const OPTIONS_DEFAULTS: OptimizationOptions = {
 export interface PlacedPiece {
   pieceId?: string; pieceNumber: number; name?: string;
   originalHeight: number; originalWidth: number; height: number; width: number;
-  x: number; y: number; rotated: boolean; sheetIndex: number; material?: MaterialType | null;
+  x: number; y: number; rotated: boolean; sheetIndex: number; material?: MaterialType | null; color?: string;
 }
 export interface Offcut { x: number; y: number; width: number; height: number; sheetIndex: number; areaM2: number; isReusable: boolean; }
 export interface SheetResult { index: number; material: MaterialType; width: number; height: number; pieces: PlacedPiece[]; offcuts: Offcut[]; usedArea: number; wasteRate: number; }
@@ -71,7 +71,7 @@ export interface OptimizationResult {
 
 export interface ExpandedPiece extends Required<Pick<Piece, 'height' | 'width' | 'quantity' | 'material'>> {
   originalIndex: number; id?: string; name?: string; originalHeight: number; originalWidth: number;
-  rotatable: boolean; edges?: EdgeBandingConfig;
+  rotatable: boolean; edges?: EdgeBandingConfig; color?: string;
 }
 
 function expandPieces(pieces: Piece[], defaultMaterial: MaterialType, globalGrain: boolean): ExpandedPiece[] {
@@ -87,6 +87,7 @@ function expandPieces(pieces: Piece[], defaultMaterial: MaterialType, globalGrai
         originalHeight: p.height, originalWidth: p.width,
         rotatable: p.rotatable !== false && !(p.grainDirection || globalGrain),
         edges: p.edges,
+        color: p.color,
       });
     }
   });
@@ -95,15 +96,15 @@ function expandPieces(pieces: Piece[], defaultMaterial: MaterialType, globalGrai
 
 // ─── 1D Linear Bar Optimization ───────────────────────────────────
 export interface BarResult {
-  barIndex: number; length: number; pieces: { name: string; length: number; x: number }[];
+  barIndex: number; length: number; pieces: { name: string; length: number; x: number; color?: string }[];
   usedLength: number; wasteRate: number;
 }
 
 function optimize1D(pieces: Piece[], stockLength: number, kerf: number): BarResult[] {
-  const items: { name: string; length: number }[] = [];
+  const items: { name: string; length: number; color?: string }[] = [];
   pieces.forEach(p => {
     for (let j = 0; j < Math.max(1, p.quantity || 1); j++) {
-      items.push({ name: p.name || `Barre ${items.length + 1}`, length: Math.max(p.width, p.height) });
+      items.push({ name: p.name || `Barre ${items.length + 1}`, length: Math.max(p.width, p.height), color: p.color });
     }
   });
   items.sort((a, b) => b.length - a.length); // Largest-first fit
@@ -139,6 +140,7 @@ export function optimizeCutting1D(pieces: Piece[], stockLength: number, kerf: nu
       originalHeight: 1, originalWidth: p.length,
       height: 1, width: p.length, x: p.x, y: 0, rotated: false,
       sheetIndex: i, material: 'mdf' as MaterialType,
+      color: p.color,
     })),
     offcuts: [{ x: b.usedLength, y: 0, width: stockLength - b.usedLength, height: 1, sheetIndex: i, areaM2: 0, isReusable: (stockLength - b.usedLength) > 1 }],
     usedArea: b.usedLength, wasteRate: b.wasteRate,
@@ -432,6 +434,7 @@ function packSheetWithStrategy(
       rotated: placement.rotated,
       sheetIndex,
       material: item.material,
+      color: item.color,
     });
     usedArea += placement.width * placement.height;
   }

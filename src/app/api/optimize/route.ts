@@ -20,6 +20,7 @@ const OptimizeSchema = z.object({
       quantity: z.coerce.number().int().positive().default(1),
       material: z.string().optional().nullable(),
       rotatable: z.boolean().optional(),
+      color: z.string().regex(/^#[0-9A-Fa-f]{6}$/).optional(),
     }).passthrough()
   ).min(1),
   options: z.object({
