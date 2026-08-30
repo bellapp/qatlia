@@ -2,8 +2,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
-const ts = require('typescript');
-const Module = require('node:module');
+const { loadTsModule } = require('./helpers/load-ts-module');
 
 const DATASET_1_CSV_PATH = '/home/ubuntu/.hermes/cache/documents/doc_a22afcceb50c_qatlia_pieces_1787493030653.csv';
 const SHEET_208_X_278 = {
@@ -24,25 +23,6 @@ const OPTIONS_208_X_278 = {
   grainDirection: false,
   optimizationPriority: 'linear_guillotine',
 };
-
-function loadTsModule(filePath) {
-  const absolutePath = path.resolve(filePath);
-  const source = fs.readFileSync(absolutePath, 'utf8');
-  const transpiled = ts.transpileModule(source, {
-    compilerOptions: {
-      module: ts.ModuleKind.CommonJS,
-      target: ts.ScriptTarget.ES2020,
-      esModuleInterop: true,
-    },
-    fileName: absolutePath,
-  });
-
-  const mod = new Module.Module(absolutePath, module);
-  mod.filename = absolutePath;
-  mod.paths = Module._nodeModulePaths(path.dirname(absolutePath));
-  mod._compile(transpiled.outputText, absolutePath);
-  return mod.exports;
-}
 
 function parseCsvPieceLine(line, index) {
   const columns = line.match(/(".*?"|[^",]+)(?=\s*,|\s*$)/g);

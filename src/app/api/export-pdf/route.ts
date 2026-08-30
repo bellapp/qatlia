@@ -3,6 +3,7 @@ import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { fromCanonicalCm } from '@/lib/units';
 import { ExportSchema } from '@/lib/exports/pdf-schema';
+import { computeCostBreakdown } from '@/lib/costing';
 
 /**
  * Modèle QatlIA Pro (Débit Industriel avec Cotation Précise des Chutes & Colonnes Traversantes)
@@ -16,7 +17,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'INVALID_DATA', details: parsed.error.format() }, { status: 400 });
     }
 
-    const { projectName, material, sheet, result, costPerSheet, costCutPerMeter, displayUnit } = parsed.data;
+    const { projectName, material, sheet, result, displayUnit } = parsed.data;
 
     // Input geometry (sheet/pieces/offcuts) is always canonical centimetres —
     // there is no magnitude-based mm/cm guessing here. `fmt` is the only
@@ -25,25 +26,32 @@ export async function POST(req: Request) {
     // metres by /100), regardless of the artisan's chosen `displayUnit`.
     const fmt = (valueCm: number) => fromCanonicalCm(valueCm, displayUnit).toFixed(1);
     const toM2 = (w: number, h: number) => (w * h) / 10_000;
+    const fmtMad = (valueMad: number) => `${valueMad.toFixed(2).replace('.', ',')} MAD`;
 
     const sheetAreaM2 = toM2(sheet.width, sheet.height);
     const totalSheetsAreaM2 = sheetAreaM2 * result.sheetsUsed;
     const totalPiecesAreaM2 = result.placedPieces.reduce((sum, p) => sum + toM2(p.width, p.height), 0);
     const globalWasteRate = totalSheetsAreaM2 > 0 ? ((totalSheetsAreaM2 - totalPiecesAreaM2) / totalSheetsAreaM2) * 100 : 0;
-    const nonReusableWasteRate = Math.min(2.5, globalWasteRate * 0.15);
 
-    const linearCutMeters = result.placedPieces.reduce((sum, p) => sum + (2 * (p.width + p.height)) / 100, 0) * 0.65;
+    // Non-reusable waste is measured directly from the optimizer's own
+    // reusable-offcut classification (see Offcut.isReusable in
+    // src/lib/cutting/binpacking.ts), not an invented cap/multiplier.
+    const nonReusableOffcutAreaM2 = result.offcuts
+      .filter((o) => !o.isReusable)
+      .reduce((sum, o) => sum + o.areaM2, 0);
+    const nonReusableWasteRate = totalSheetsAreaM2 > 0 ? (nonReusableOffcutAreaM2 / totalSheetsAreaM2) * 100 : 0;
 
-    const totalSheetCost = result.sheetsUsed * costPerSheet;
-    const pieceCost = totalPiecesAreaM2 * (costPerSheet / sheetAreaM2);
-    const wasteCost = totalSheetCost - pieceCost;
-    const nonReusableCost = wasteCost * (nonReusableWasteRate / (globalWasteRate || 1));
-    const cuttingCost = linearCutMeters * costCutPerMeter;
-    const totalNetCost = totalSheetCost - wasteCost + nonReusableCost + cuttingCost;
-
-    const baselineSheets = Math.ceil(totalPiecesAreaM2 / (sheetAreaM2 * 0.65));
-    const savedPanelsCount = Math.max(0, baselineSheets - result.sheetsUsed);
-    const estimatedSavingsMad = result.moneySavedMad || (savedPanelsCount * costPerSheet + Math.round(linearCutMeters * 2));
+    // This route never renders `result.costBreakdown` directly — a client
+    // could submit any figure there, forged or stale, independent of the
+    // components that are supposed to sum to it. Instead it recomputes the
+    // breakdown itself, from `result.costingInput` (the exact input the
+    // optimizer passed to computeCostBreakdown — see
+    // OptimizationResult.costingInput in src/lib/cutting/binpacking.ts),
+    // through the same single shared calculator. When no costingInput is
+    // present (e.g. a legacy 1D plan, which never had pricing wired up),
+    // the cost is reported unavailable rather than falling back to whatever
+    // totals the client happened to submit.
+    const costBreakdown = result.costingInput ? computeCostBreakdown(result.costingInput) : undefined;
 
     interface SheetPattern {
       patternId: string;
@@ -52,7 +60,6 @@ export async function POST(req: Request) {
       pieces: typeof result.placedPieces;
       offcuts: typeof result.offcuts;
       wasteRate: number;
-      netCost: number;
     }
 
     const patternsMap = new Map<string, SheetPattern>();
@@ -69,7 +76,6 @@ export async function POST(req: Request) {
 
       const sArea = sPieces.reduce((sum, p) => sum + toM2(p.width, p.height), 0);
       const sWaste = sheetAreaM2 > 0 ? Math.max(0, ((sheetAreaM2 - sArea) / sheetAreaM2) * 100) : 0;
-      const sNetCost = (costPerSheet * (100 - sWaste) / 100) + (sPieces.length * 2.5);
 
       if (patternsMap.has(signature)) {
         const existing = patternsMap.get(signature)!;
@@ -83,7 +89,6 @@ export async function POST(req: Request) {
           pieces: sPieces,
           offcuts: sOffcuts,
           wasteRate: sWaste,
-          netCost: sNetCost,
         });
       }
     }
@@ -163,11 +168,11 @@ export async function POST(req: Request) {
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(8.5);
     doc.setTextColor(30, 58, 95);
-    doc.text('GAIN ÉCONOMIQUE APRÈS OPTIMISATION QATLIA :', 18, 34.5);
+    doc.text('COÛT TOTAL ESTIMÉ DU DÉBIT :', 18, 34.5);
 
     doc.setFontSize(9.5);
-    doc.setTextColor(39, 174, 96);
-    doc.text(`+ ${estimatedSavingsMad.toLocaleString('fr-FR')} MAD ÉCONOMISÉS`, pW1 - 18, 34.5, { align: 'right' });
+    doc.setTextColor(30, 58, 95);
+    doc.text(costBreakdown ? fmtMad(costBreakdown.subtotal) : 'Non calculé', pW1 - 18, 34.5, { align: 'right' });
 
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(9.5);
@@ -263,14 +268,13 @@ export async function POST(req: Request) {
       pat.count,
       pat.pieces.length,
       `${pat.wasteRate.toFixed(2)} %`,
-      `${pat.netCost.toFixed(2).replace('.', ',')} MAD`,
     ]);
-    planCutRows.push(['', 'TOTAL', '', '', result.sheetsUsed, totalDebitQty, `${globalWasteRate.toFixed(2)} %`, `${totalNetCost.toFixed(2).replace('.', ',')} MAD`]);
+    planCutRows.push(['', 'TOTAL', '', '', result.sheetsUsed, totalDebitQty, `${globalWasteRate.toFixed(2)} %`]);
 
     autoTable(doc, {
       startY: planCutStartY,
       margin: { left: 14, right: 14 },
-      head: [['', 'Matériau', 'Référence', `Dimension (${displayUnit})`, 'Quantité', 'Pièces', 'Taux de chutes', 'Coût net (MAD)']],
+      head: [['', 'Matériau', 'Référence', `Dimension (${displayUnit})`, 'Quantité', 'Pièces', 'Taux de chutes']],
       body: planCutRows,
       theme: 'plain',
       headStyles: {
@@ -294,7 +298,6 @@ export async function POST(req: Request) {
         4: { halign: 'right', cellWidth: 16 },
         5: { halign: 'right', cellWidth: 16 },
         6: { halign: 'right', cellWidth: 28 },
-        7: { halign: 'right', cellWidth: 32 },
       },
     });
 
@@ -305,16 +308,34 @@ export async function POST(req: Request) {
     doc.setFontSize(9.5);
     doc.text('Récapitulatif Données & Chiffrage MAD', 14, recapStartY - 2);
 
-    const recapRows = [
-      ['Nombre de panneaux utilisés', result.sheetsUsed, 'Coût des pièces', `${pieceCost.toFixed(2).replace('.', ',')} MAD`],
-      ['Nombre de plans de coupe', uniquePatterns.length, 'Coût en panneaux bruts', `${totalSheetCost.toFixed(2).replace('.', ',')} MAD`],
-      ['Surface totale des panneaux', `${totalSheetsAreaM2.toFixed(2)} m²`, 'Coût des chutes', `${wasteCost.toFixed(2).replace('.', ',')} MAD`],
-      ['Surface totale des pièces', `${totalPiecesAreaM2.toFixed(2)} m²`, 'Coût des chutes non réutilisables', `${nonReusableCost.toFixed(2).replace('.', ',')} MAD`],
-      ['Taux de chutes', `${globalWasteRate.toFixed(2)} %`, 'Coût du linéaire de découpe', `${cuttingCost.toFixed(2).replace('.', ',')} MAD`],
-      ['Taux des chutes non réutilisables', `${nonReusableWasteRate.toFixed(2)} %`, 'Coût net total du débit', `${totalNetCost.toFixed(2).replace('.', ',')} MAD`],
-      ['Linéaire de découpe opérateur', `${linearCutMeters.toFixed(2)} m`, 'Gain estimé après optimisation', `+ ${estimatedSavingsMad.toLocaleString('fr-FR')} MAD`],
-      ['Linéaire des chants', '0.00 m', 'Rentabilité matière', `${(100 - globalWasteRate).toFixed(1)} %`],
+    // Technical (left) and financial (right) columns are independent lists —
+    // the financial figures come from the `costBreakdown` recomputed above
+    // from `result.costingInput` (see src/lib/costing.ts), never from
+    // `result.costBreakdown` as submitted.
+    const technicalRows: [string, string | number][] = [
+      ['Nombre de panneaux utilisés', result.sheetsUsed],
+      ['Nombre de plans de coupe', uniquePatterns.length],
+      ['Surface totale des panneaux', `${totalSheetsAreaM2.toFixed(2)} m²`],
+      ['Surface totale des pièces', `${totalPiecesAreaM2.toFixed(2)} m²`],
+      ['Taux de chutes', `${globalWasteRate.toFixed(2)} %`],
+      ['Taux des chutes non réutilisables', `${nonReusableWasteRate.toFixed(2)} %`],
+      ['Linéaire de découpe opérateur', `${result.totalLinearCutMeters.toFixed(2)} m`],
+      ['Rentabilité matière', `${(100 - globalWasteRate).toFixed(1)} %`],
     ];
+    const financialRows: [string, string][] = costBreakdown
+      ? [
+          ['Coût matière', fmtMad(costBreakdown.materialCost)],
+          ['Coût chants', fmtMad(costBreakdown.edgeCost)],
+          ["Coût main d'œuvre", fmtMad(costBreakdown.laborCost)],
+          ['Sous-total du débit', fmtMad(costBreakdown.subtotal)],
+        ]
+      : [['Chiffrage', 'Non disponible']];
+
+    const recapRowCount = Math.max(technicalRows.length, financialRows.length);
+    const recapRows = Array.from({ length: recapRowCount }, (_, i) => [
+      ...(technicalRows[i] ?? ['', '']),
+      ...(financialRows[i] ?? ['', '']),
+    ]);
 
     autoTable(doc, {
       startY: recapStartY,

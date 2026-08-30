@@ -44,6 +44,7 @@ import { OnboardingTour } from '@/components/OnboardingTour';
 import { LocaleSwitcher } from '@/components/LocaleProvider';
 import { writeLocalHistoryItem, type LocalHistoryItem } from '@/lib/history';
 import { buildPdfPayload } from '@/lib/pdf-payload';
+import { buildPersistedProjectPayload } from '@/lib/projects/persistence-payload';
 import {
   type DisplayUnit,
   DEFAULT_DISPLAY_UNIT,
@@ -52,7 +53,6 @@ import {
   readStoredDisplayUnit,
   writeStoredDisplayUnit,
   resolveProjectUnitMetadata,
-  buildProjectUnitPersistenceMetadata,
 } from '@/lib/units';
 
 const DEFAULT_SHEETS: Sheet[] = [
@@ -257,19 +257,21 @@ export default function Dashboard() {
     // this save is itself the rewrite of a legacy record (pendingUnitMigration),
     // or a prior save already carried that historical origin forward.
     const persistedMigratedFromLegacyUnit = pendingUnitMigration || migratedFromLegacyUnit;
-    const payload = {
+    const payload = buildPersistedProjectPayload({
       name: `${cutMode === '1d' ? 'Barres' : 'Débit'} ${(activeSheet.material || 'MDF').toUpperCase()} — ${pieces.reduce((s, p) => s + (p.quantity || 1), 0)} pcs`,
       sheets,
       sheet: activeSheet,
       pieces,
       options,
       result: nextResult,
-      // Geometry above (sheets/pieces) always stays canonical cm; this is
-      // metadata only, so history/atelier can restore the artisan's chosen
-      // display unit instead of re-defaulting to cm, and know whether this
-      // record still owes a rewrite with explicit unit metadata.
-      ...buildProjectUnitPersistenceMetadata(displayUnit, persistedMigratedFromLegacyUnit),
-    };
+      // Geometry above (sheets/pieces) always stays canonical cm; the unit
+      // fields are metadata only, so history/atelier can restore the
+      // artisan's chosen display unit instead of re-defaulting to cm, and
+      // know whether this record still owes a rewrite with explicit unit
+      // metadata.
+      displayUnit,
+      migratedFromLegacyUnit: persistedMigratedFromLegacyUnit,
+    });
 
     writeLocalHistoryItem({
       id: `${source}_${Date.now()}`,
@@ -399,7 +401,7 @@ export default function Dashboard() {
       displayUnit,
       sheetsUsed: result.sheetsUsed,
       wastePercentage: result.wastePercentage,
-      totalCostMad: result.totalCostMad,
+      costBreakdown: result.costBreakdown,
       sheets: result.sheets.map(s => ({
         index: s.index, material: s.material,
         width: s.width, height: s.height,
@@ -863,14 +865,17 @@ export default function Dashboard() {
             
             {result ? (
               <>
-                {/* Financial Gain Banner */}
+                {/* Cost Summary Banner — the subtotal comes from result.costBreakdown
+                    (src/lib/costing.ts), the same figure shown in the cost
+                    breakdown below and rendered in the PDF export. No estimated
+                    "savings" claim is shown here. */}
                 <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-emerald-950/60 via-studio-panel/80 to-studio-panel border border-emerald-500/20 p-5">
                   <div className="absolute top-0 right-0 w-48 h-48 bg-emerald-500/5 rounded-full blur-3xl -translate-y-1/2 translate-x-1/4 pointer-events-none" />
                   <div className="relative flex flex-wrap items-center justify-between gap-4">
                     <div>
-                      <p className="text-[10px] font-bold uppercase tracking-[0.15em] text-emerald-400 mb-1">Gain économique estimé</p>
+                      <p className="text-[10px] font-bold uppercase tracking-[0.15em] text-emerald-400 mb-1">Coût total estimé</p>
                       <p className="text-3xl font-black text-slate-900 dark:text-white tracking-tight">
-                        + {result.moneySavedMad?.toLocaleString('fr-FR') || 0} <span className="text-emerald-400">MAD</span>
+                        {result.costBreakdown?.subtotal.toLocaleString('fr-FR') ?? '—'} <span className="text-emerald-400">MAD</span>
                       </p>
                       <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1">
                         {result.totalLinearCutMeters || 0} m linéaires de coupe · {result.sheetsUsed} panneau{result.sheetsUsed > 1 ? 'x' : ''}
@@ -1101,22 +1106,28 @@ export default function Dashboard() {
                   </div>
                 )}
 
-                {/* Cost Breakdown */}
+                {/* Cost Breakdown — all four figures come verbatim from
+                    result.costBreakdown (src/lib/costing.ts); this panel
+                    never recomputes them. */}
                 {result && (
                   <div className="p-3.5 rounded-xl bg-studio-panel/50 border border-studio-border/70 space-y-2">
                     <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Estimation du coût</p>
-                    <div className="grid grid-cols-3 gap-2 text-xs">
+                    <div className="grid grid-cols-4 gap-2 text-xs">
                       <div className="p-2 rounded-lg bg-studio-canvas/50 text-center">
                         <span className="text-[9px] text-slate-500 block uppercase">Panneaux</span>
-                        <span className="font-mono font-black text-white">{result.materialCostMad ?? 0} MAD</span>
+                        <span className="font-mono font-black text-white">{result.costBreakdown?.materialCost ?? 0} MAD</span>
                       </div>
                       <div className="p-2 rounded-lg bg-studio-canvas/50 text-center">
                         <span className="text-[9px] text-slate-500 block uppercase">Chants</span>
-                        <span className="font-mono font-black text-white">{result.edgeBandingCostMad ?? 0} MAD</span>
+                        <span className="font-mono font-black text-white">{result.costBreakdown?.edgeCost ?? 0} MAD</span>
+                      </div>
+                      <div className="p-2 rounded-lg bg-studio-canvas/50 text-center">
+                        <span className="text-[9px] text-slate-500 block uppercase">Main d&apos;œuvre</span>
+                        <span className="font-mono font-black text-white">{result.costBreakdown?.laborCost ?? 0} MAD</span>
                       </div>
                       <div className="p-2 rounded-lg bg-studio-canvas/50 text-center">
                         <span className="text-[9px] text-slate-500 block uppercase">Total</span>
-                        <span className="font-mono font-black text-brand-400">{result.totalCostMad ?? 0} MAD</span>
+                        <span className="font-mono font-black text-brand-400">{result.costBreakdown?.subtotal ?? 0} MAD</span>
                       </div>
                     </div>
                   </div>

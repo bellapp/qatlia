@@ -1,3 +1,14 @@
+import {
+  computeCostBreakdown,
+  resolveEdgeRatePerMeter,
+  type CostBreakdown,
+  type CostBreakdownInput,
+  type LaborPricing,
+  type StockPricing,
+  type SheetCostLine,
+  type EdgeSegmentCostLine,
+} from '@/lib/costing';
+
 // Single source of truth for supported material types, shared by the API
 // schema (enum validation) and the material library below, so neither can
 // silently drift from the other.
@@ -58,20 +69,46 @@ export interface OptimizationOptions {
   minReusableOffcutWidth?: number;
   /** Minimum offcut height in cm below which a remnant is not classified as reusable. */
   minReusableOffcutHeight?: number;
+  /**
+   * Cut/labor pricing fed into the shared cost calculator (see
+   * `src/lib/costing.ts`). Defaults to a $0 fixed charge so a caller that
+   * never configures labor pricing sees no fabricated cost, rather than an
+   * invented per-meter estimate.
+   */
+  laborPricing?: LaborPricing;
+  /**
+   * Per-material stock price override fed into the shared cost calculator.
+   * A material absent from this map keeps using the material library's
+   * `pricePerM2` (today's default behavior) — this is strictly an opt-in
+   * override, never a required input, so existing callers see no change.
+   */
+  stockPricingOverrides?: Partial<Record<MaterialType, StockPricing>>;
 }
+const DEFAULT_LABOR_PRICING: LaborPricing = { mode: 'fixed', value: 0 };
 export const OPTIONS_DEFAULTS: OptimizationOptions = {
   kerfWidth: 3, showLabels: true, singleSheetOnly: false, considerMaterial: false,
   edgeBanding: false, grainDirection: false, optimizationPriority: 'linear_guillotine', defaultMaterial: 'mdf',
-  minReusableOffcutWidth: 15, minReusableOffcutHeight: 15,
+  minReusableOffcutWidth: 15, minReusableOffcutHeight: 15, laborPricing: DEFAULT_LABOR_PRICING,
 };
 
 export interface PlacedPiece {
   pieceId?: string; pieceNumber: number; name?: string;
   originalHeight: number; originalWidth: number; height: number; width: number;
   x: number; y: number; rotated: boolean; sheetIndex: number; material?: MaterialType | null; color?: string;
+  /** Which original request-level `pieces[]` entry this placed unit expands from (see `ExpandedPiece.originalIndex`). */
+  originalIndex?: number;
+  /** Copied verbatim from the source piece — see `computeCostBreakdown`'s edge cost, which sums this per *placed* unit rather than per requested quantity. */
+  edges?: EdgeBandingConfig;
 }
 export interface Offcut { id: string; x: number; y: number; width: number; height: number; sheetIndex: number; areaM2: number; isReusable: boolean; }
-export interface SheetResult { index: number; material: MaterialType; width: number; height: number; pieces: PlacedPiece[]; offcuts: Offcut[]; usedArea: number; wasteRate: number; }
+/**
+ * One straight guillotine saw pass, produced exactly when `splitFreeRect`
+ * divides a free rectangle to free up a placed piece. `lengthCm` is the
+ * literal span of that cut (never a perimeter or area-derived estimate) —
+ * see `splitFreeRect` for where each instruction comes from.
+ */
+export interface CutInstruction { id: string; sheetIndex: number; axis: 'horizontal' | 'vertical'; lengthCm: number; }
+export interface SheetResult { index: number; material: MaterialType; width: number; height: number; pieces: PlacedPiece[]; offcuts: Offcut[]; cuts: CutInstruction[]; usedArea: number; wasteRate: number; }
 export interface MaterialStats { material: MaterialType; sheetsUsed: number; totalPieces: number; usedArea: number; wasteRate: number; }
 
 // Customer-safe summary of how a plan was chosen: what goal was pursued, which
@@ -89,8 +126,18 @@ export interface OptimizationResult {
   sheetsUsed: number; sheets: SheetResult[];
   placedPieces: PlacedPiece[]; offcuts: Offcut[]; unplacedPieces: ExpandedPiece[];
   totalAreaAvailable: number; totalAreaUsed: number; wastePercentage: number;
-  totalLinearCutMeters: number; moneySavedMad: number;
-  materialCostMad?: number; edgeBandingCostMad?: number; totalCostMad?: number;
+  totalLinearCutMeters: number;
+  /** Computed once by the shared calculator (src/lib/costing.ts). Absent when no pricing input is available (e.g. 1D mode today). */
+  costBreakdown?: CostBreakdown;
+  /**
+   * The exact `CostBreakdownInput` passed to `computeCostBreakdown` to
+   * produce `costBreakdown` above. Callers that render cost figures from an
+   * untrusted copy of this result (e.g. the PDF export route, which receives
+   * it back over the network) must recompute `costBreakdown` from this field
+   * themselves rather than trust the `costBreakdown` a client sent — see
+   * src/app/api/export-pdf/route.ts. Absent exactly when `costBreakdown` is.
+   */
+  costingInput?: CostBreakdownInput;
   materialStats?: MaterialStats[];
   explanation?: OptimizationExplanation;
 }
@@ -187,6 +234,9 @@ export function optimizeCutting1D(pieces: Piece[], stockLength: number, kerf: nu
       color: p.color,
     })),
     offcuts: [{ id: `sheet${i}_offcut_bar`, x: b.usedLength, y: 0, width: stockLength - b.usedLength, height: 1, sheetIndex: i, areaM2: 0, isReusable: (stockLength - b.usedLength) > 1 }],
+    // 1D mode does not (yet) model individual guillotine cuts per bar — see
+    // optimizeCutting2D's `cuts`/`totalLinearCutMeters` for the 2D model.
+    cuts: [],
     usedArea: b.usedLength, wasteRate: b.wasteRate,
   }));
   const totalAvail = bars.length * stockLength;
@@ -197,7 +247,9 @@ export function optimizeCutting1D(pieces: Piece[], stockLength: number, kerf: nu
     unplacedPieces: [], totalAreaAvailable: totalAvail, totalAreaUsed: totalUsed,
     wastePercentage: totalAvail > 0 ? Math.round((1 - totalUsed / totalAvail) * 1000) / 10 : 0,
     totalLinearCutMeters: bars.reduce((s, b) => s + b.pieces.length, 0) * kerf / 10000,
-    moneySavedMad: Math.round(totalAvail * 0.18),
+    // No pricing input flows into 1D mode today (no per-bar stock price is
+    // configured anywhere upstream), so costBreakdown is left undefined
+    // rather than fabricated — see src/lib/costing.ts's module doc.
   };
 }
 
@@ -235,6 +287,7 @@ interface SheetPackingCandidate {
   remaining: ExpandedPiece[];
   usedArea: number;
   freeRects: FreeRect[];
+  cuts: CutInstruction[];
 }
 
 interface PlanCandidate {
@@ -394,28 +447,44 @@ function tryPlaceOnSheet(
   return candidates[0];
 }
 
-function splitFreeRect(rect: FreeRect, width: number, height: number, kerf: number, axis: StripAxis): FreeRect[] {
+interface SplitCut { axis: 'horizontal' | 'vertical'; lengthCm: number; }
+interface SplitOutcome { rects: FreeRect[]; cuts: SplitCut[]; }
+
+// Every branch below both (a) carves the leftover free area and (b) records
+// the exact saw pass that carving represents — the two are the same
+// geometric fact, so `lengthCm` is never anything but the literal span
+// `splitFreeRect` itself computes (no perimeter/area-derived estimate).
+function splitFreeRect(rect: FreeRect, width: number, height: number, kerf: number, axis: StripAxis): SplitOutcome {
   const rightWidth = rect.width - width - kerf;
   const bottomHeight = rect.height - height - kerf;
-  const next: FreeRect[] = [];
+  const rects: FreeRect[] = [];
+  const cuts: SplitCut[] = [];
 
   if (axis === 'rows') {
     if (rightWidth > 1e-9 && height > 1e-9) {
-      next.push({ x: rect.x + width + kerf, y: rect.y, width: rightWidth, height });
+      rects.push({ x: rect.x + width + kerf, y: rect.y, width: rightWidth, height });
+      // Vertical cut trimming the placed piece from the rest of its shelf.
+      cuts.push({ axis: 'vertical', lengthCm: height });
     }
     if (bottomHeight > 1e-9) {
-      next.push({ x: rect.x, y: rect.y + height + kerf, width: rect.width, height: bottomHeight });
+      rects.push({ x: rect.x, y: rect.y + height + kerf, width: rect.width, height: bottomHeight });
+      // Horizontal cut separating this shelf from the remainder below it.
+      cuts.push({ axis: 'horizontal', lengthCm: rect.width });
     }
   } else {
     if (rightWidth > 1e-9) {
-      next.push({ x: rect.x + width + kerf, y: rect.y, width: rightWidth, height: rect.height });
+      rects.push({ x: rect.x + width + kerf, y: rect.y, width: rightWidth, height: rect.height });
+      // Vertical cut separating this column from the remainder to its right.
+      cuts.push({ axis: 'vertical', lengthCm: rect.height });
     }
     if (bottomHeight > 1e-9 && width > 1e-9) {
-      next.push({ x: rect.x, y: rect.y + height + kerf, width, height: bottomHeight });
+      rects.push({ x: rect.x, y: rect.y + height + kerf, width, height: bottomHeight });
+      // Horizontal cut trimming the placed piece from the rest of its column.
+      cuts.push({ axis: 'horizontal', lengthCm: width });
     }
   }
 
-  return next;
+  return { rects, cuts };
 }
 
 function pruneFreeRects(freeRects: FreeRect[]): FreeRect[] {
@@ -465,6 +534,7 @@ function packSheetWithStrategy(
   const orderedItems = [...items].sort(getPieceSortComparator(strategy.order));
   const placedIds = new Set<string>();
   const pieces: PlacedPiece[] = [];
+  const cuts: CutInstruction[] = [];
   let usedArea = 0;
 
   for (const item of orderedItems) {
@@ -473,8 +543,12 @@ function packSheetWithStrategy(
 
     const targetRect = freeRects[placement.freeRectIndex];
     freeRects = freeRects.filter((_, index) => index !== placement.freeRectIndex);
-    freeRects.push(...splitFreeRect(targetRect, placement.width, placement.height, kerf, strategy.axis));
+    const split = splitFreeRect(targetRect, placement.width, placement.height, kerf, strategy.axis);
+    freeRects.push(...split.rects);
     freeRects = sortFreeRects(pruneFreeRects(freeRects), strategy.axis);
+    for (const cut of split.cuts) {
+      cuts.push({ id: `sheet${sheetIndex}_cut_${cuts.length}`, sheetIndex, axis: cut.axis, lengthCm: cut.lengthCm });
+    }
 
     placedIds.add(item.id || '');
     pieces.push({
@@ -491,6 +565,8 @@ function packSheetWithStrategy(
       sheetIndex,
       material: item.material,
       color: item.color,
+      originalIndex: item.originalIndex,
+      edges: item.edges,
     });
     usedArea += placement.width * placement.height;
   }
@@ -500,6 +576,7 @@ function packSheetWithStrategy(
     remaining: orderedItems.filter((item) => !placedIds.has(item.id || '')),
     usedArea,
     freeRects,
+    cuts,
   };
 }
 
@@ -548,7 +625,7 @@ function buildOffcutsForSheet(freeRects: FreeRect[], sheet: Sheet, sheetIndex: n
   });
 }
 
-function buildSheetResult(sheet: Sheet, sheetIndex: number, defaultMaterial: MaterialType, pieces: PlacedPiece[], usedArea: number, freeRects: FreeRect[], options: OptimizationOptions): SheetResult {
+function buildSheetResult(sheet: Sheet, sheetIndex: number, defaultMaterial: MaterialType, pieces: PlacedPiece[], usedArea: number, freeRects: FreeRect[], options: OptimizationOptions, cuts: CutInstruction[]): SheetResult {
   const sheetArea = sheet.width * sheet.height;
   return {
     index: sheetIndex,
@@ -557,6 +634,7 @@ function buildSheetResult(sheet: Sheet, sheetIndex: number, defaultMaterial: Mat
     height: sheet.height,
     pieces,
     offcuts: buildOffcutsForSheet(freeRects, sheet, sheetIndex, options),
+    cuts,
     usedArea,
     wasteRate: sheetArea > 0 ? Math.round((1 - usedArea / sheetArea) * 1000) / 10 : 0,
   };
@@ -617,7 +695,7 @@ function simulatePlanForStrategy(
 
         producedCandidate = true;
         nextFrontier.push({
-          sheets: [...plan.sheets, buildSheetResult(sheet, sheetIndex, defaultMaterial, candidate.pieces, candidate.usedArea, candidate.freeRects, mergedOptions)],
+          sheets: [...plan.sheets, buildSheetResult(sheet, sheetIndex, defaultMaterial, candidate.pieces, candidate.usedArea, candidate.freeRects, mergedOptions, candidate.cuts)],
           placedPieces: [...plan.placedPieces, ...candidate.pieces],
           unplacedPieces: candidate.remaining,
           totalAreaUsed: plan.totalAreaUsed + candidate.usedArea,
@@ -811,7 +889,12 @@ function renumberPlan(plan: PlanCandidate, sheetIndexOffset: number, pieceNumber
       sheetIndex: newSheetIndex,
       id: buildOffcutId(newSheetIndex, offcut.x, offcut.y, offcut.width, offcut.height),
     }));
-    return { ...sheet, index: newSheetIndex, pieces, offcuts };
+    const cuts = sheet.cuts.map((cut, position) => ({
+      ...cut,
+      sheetIndex: newSheetIndex,
+      id: `sheet${newSheetIndex}_cut_${position}`,
+    }));
+    return { ...sheet, index: newSheetIndex, pieces, offcuts, cuts };
   });
 
   return {
@@ -997,30 +1080,74 @@ export function optimizeCutting2D(
   const totalAvail = finalPlan.totalAreaAvailable;
   const totalUsed = finalPlan.totalAreaUsed;
   const wp = totalAvail > 0 ? Math.round((1 - totalUsed / totalAvail) * 1000) / 10 : 0;
-  const totalM = finalPlan.sheets.length > 0 ? Math.round(finalPlan.sheets.reduce((sum, sheet) => sum + ((sheet.width + sheet.height) / 100), 0) * 10) / 10 : 0;
-  const saved = Math.round(Math.max(0, totalAvail - totalUsed) / 10000 * 200);
+  // Measured from the actual guillotine saw passes the packer performed
+  // (see `splitFreeRect`/`CutInstruction`), never a perimeter/area estimate.
+  const totalCutLengthCm = finalPlan.sheets.reduce(
+    (sum, sheet) => sum + sheet.cuts.reduce((sheetSum, cut) => sheetSum + cut.lengthCm, 0),
+    0
+  );
+  const totalM = Math.round((totalCutLengthCm / 100) * 10) / 10;
 
-  const matCost = Math.round(finalPlan.sheets.reduce((sum, sheet) => {
-    const material = getMaterialDef(sheet.material);
-    return sum + ((sheet.width * sheet.height) / 10000 * material.pricePerM2);
-  }, 0));
-  let edgeCost = 0;
-  for (const p of pieces) {
-    if (!p.edges) continue;
-    const preset = EDGEBANDING_PRESETS.find(e => e.id === (p.edges!.color || 'none')) || EDGEBANDING_PRESETS[0];
-    if (preset.pricePerM <= 0) continue;
-    let m = 0; if (p.edges.top) m += p.width / 100; if (p.edges.bottom) m += p.width / 100;
-    if (p.edges.left) m += p.height / 100; if (p.edges.right) m += p.height / 100;
-    if (m === 0) m = (p.height + p.width) * 2 / 100;
-    edgeCost += Math.round(m * preset.pricePerM * (p.quantity || 1));
+  // Material cost: one line per physical sheet actually used, priced per m²
+  // from the material library unless the caller supplied an explicit
+  // per-material override. This is 'measured' because it is derived from
+  // the real plan (finalPlan.sheets), not a pre-optimization guess.
+  const sheetCostLines: SheetCostLine[] = finalPlan.sheets.map((sheet) => ({
+    areaM2: (sheet.width * sheet.height) / 10000,
+    quantity: 1,
+    pricing: mergedOptions.stockPricingOverrides?.[sheet.material] ?? { mode: 'per_m2', value: getMaterialDef(sheet.material).pricePerM2 },
+  }));
+
+  // Edge banding cost: derived from the pieces the packer actually placed
+  // (`finalPlan.placedPieces`, one entry per placed unit), never from the
+  // requested `pieces[]` multiplied by quantity — a piece left unplaced, or
+  // only partially placed, must cost nothing to band for the copies that
+  // never made it onto a sheet. Only the sides an artisan actually flagged
+  // on the source piece are counted; no full-perimeter fallback.
+  const edgeSegments: EdgeSegmentCostLine[] = [];
+  for (const placed of finalPlan.placedPieces) {
+    if (!placed.edges) continue;
+    const presetId = placed.edges.color || 'none';
+    const preset = EDGEBANDING_PRESETS.find((e) => e.id === presetId) || EDGEBANDING_PRESETS[0];
+    const pricePerMeter = resolveEdgeRatePerMeter(
+      placed.edges.pricePerM !== undefined
+        ? { kind: 'explicit', pricePerMeter: placed.edges.pricePerM }
+        : { kind: 'preset', preset: { id: preset.id, pricePerMeter: preset.pricePerM } }
+    );
+    if (pricePerMeter <= 0) continue;
+    // Edge flags (top/bottom/left/right) refer to the piece's own labeled
+    // sides, not its as-placed (possibly rotated) orientation — so this
+    // always uses originalWidth/originalHeight, never the rotated width/height.
+    let lengthM = 0;
+    if (placed.edges.top) lengthM += placed.originalWidth / 100;
+    if (placed.edges.bottom) lengthM += placed.originalWidth / 100;
+    if (placed.edges.left) lengthM += placed.originalHeight / 100;
+    if (placed.edges.right) lengthM += placed.originalHeight / 100;
+    if (lengthM === 0) continue;
+    edgeSegments.push({ lengthM, pricePerMeter });
   }
+
+  // Built once, then handed to computeCostBreakdown *and* returned verbatim
+  // as `costingInput` — so any caller that needs to re-verify `costBreakdown`
+  // later (see OptimizationResult.costingInput) recomputes from this exact
+  // object rather than re-deriving its own formula.
+  const costBreakdownInput: CostBreakdownInput = {
+    material: { sheets: sheetCostLines, basis: 'measured' },
+    edge: { segments: edgeSegments, basis: 'measured' },
+    labor:
+      mergedOptions.laborPricing && mergedOptions.laborPricing.mode === 'per_meter'
+        ? { pricing: mergedOptions.laborPricing, cutLengthM: totalM, basis: 'measured' }
+        : { pricing: mergedOptions.laborPricing ?? DEFAULT_LABOR_PRICING },
+  };
+  const costBreakdown = computeCostBreakdown(costBreakdownInput);
 
   return {
     cutMode: '2d', sheetsUsed: finalPlan.sheets.length, sheets: finalPlan.sheets, placedPieces: finalPlan.placedPieces,
     offcuts: finalPlan.sheets.flatMap((sheet) => sheet.offcuts),
     unplacedPieces: finalPlan.unplacedPieces, totalAreaAvailable: totalAvail, totalAreaUsed: totalUsed,
-    wastePercentage: wp, totalLinearCutMeters: totalM, moneySavedMad: saved,
-    materialCostMad: matCost, edgeBandingCostMad: edgeCost, totalCostMad: matCost + edgeCost,
+    wastePercentage: wp, totalLinearCutMeters: totalM,
+    costBreakdown,
+    costingInput: costBreakdownInput,
     materialStats: buildMaterialStats(finalPlan.sheets),
     explanation: {
       chosenGoal: mergedOptions.optimizationPriority,

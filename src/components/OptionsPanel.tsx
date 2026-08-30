@@ -1,8 +1,9 @@
 'use client';
 
 import React from 'react';
-import { OptimizationOptions, OptimizationPriority, OPTIMIZATION_PRIORITY_VALUES } from '@/lib/cutting/binpacking';
-import { Gauge, Layers3, Lock, ScanLine, Scissors } from 'lucide-react';
+import { OptimizationOptions, OptimizationPriority, OPTIMIZATION_PRIORITY_VALUES, MaterialType } from '@/lib/cutting/binpacking';
+import type { LaborPricing, StockPricing } from '@/lib/costing';
+import { Gauge, Layers3, Lock, ScanLine, Scissors, Coins } from 'lucide-react';
 import { Tooltip } from '@/components/Tooltip';
 
 interface OptionsPanelProps {
@@ -54,11 +55,29 @@ const PRIORITY_LABELS: Record<OptimizationPriority, string> = {
   balanced: 'Équilibré (facilité de coupe)',
 };
 
+// Compact pricing controls default to today's behavior when a caller never
+// touches them: fixed MAD 0 labor, and the material-library per_m2 stock
+// price (no override at all) — see OPTIONS_DEFAULTS/DEFAULT_LABOR_PRICING in
+// src/lib/cutting/binpacking.ts, which this UI must never drift from.
+const DEFAULT_LABOR_PRICING: LaborPricing = { mode: 'fixed', value: 0 };
+
 export const OptionsPanel: React.FC<OptionsPanelProps> = ({ options, onChange, disabled = false }) => {
   const updateField = <K extends keyof OptimizationOptions>(field: K, value: OptimizationOptions[K]) => {
     onChange({ ...options, [field]: value });
   };
   const kerfPercent = ((options.kerfWidth || 0) / 10) * 100;
+
+  const defaultMaterial: MaterialType = options.defaultMaterial || 'mdf';
+  const laborPricing: LaborPricing = options.laborPricing ?? DEFAULT_LABOR_PRICING;
+  const stockOverride: StockPricing | undefined = options.stockPricingOverrides?.[defaultMaterial];
+
+  const updateLaborPricing = (next: LaborPricing) => updateField('laborPricing', next);
+  const updateStockOverride = (next: StockPricing | undefined) => {
+    const overrides = { ...(options.stockPricingOverrides || {}) };
+    if (next) overrides[defaultMaterial] = next;
+    else delete overrides[defaultMaterial];
+    updateField('stockPricingOverrides', Object.keys(overrides).length > 0 ? overrides : undefined);
+  };
 
   return (
     <div className="space-y-5 text-xs">
@@ -110,6 +129,54 @@ export const OptionsPanel: React.FC<OptionsPanelProps> = ({ options, onChange, d
         label="Verrouiller le sens du fil" description="Interdit la rotation 90° des pièces"
         icon={Lock}
         tooltip="Empêche la rotation des pièces. À activer pour le bois massif ou le stratifié avec sens de veinage." />
+
+      <Tooltip text="Tarifs utilisés pour le chiffrage (src/lib/costing.ts). Par défaut : main d'œuvre à 0 MAD, panneau au tarif catalogue du matériau.">
+        <div className="p-4 rounded-xl bg-studio-panel/50 border border-studio-border/70 space-y-3">
+          <div className="flex items-center gap-2">
+            <span className="w-7 h-7 rounded-lg bg-brand-500/10 border border-brand-500/20 flex items-center justify-center">
+              <Coins className="w-3.5 h-3.5 text-brand-400" />
+            </span>
+            <span className="block text-[11px] font-semibold text-white">Tarification</span>
+          </div>
+
+          <div className="space-y-1.5">
+            <span className="block text-[10px] text-slate-500">Main d&apos;œuvre / découpe</span>
+            <div className="flex gap-1.5">
+              <select disabled={disabled} value={laborPricing.mode}
+                onChange={(e) => updateLaborPricing({ mode: e.target.value as LaborPricing['mode'], value: laborPricing.value })}
+                className="px-2 py-1.5 rounded-lg bg-studio-field border border-studio-border text-slate-200 text-[11px] outline-none disabled:opacity-50">
+                <option value="fixed">Forfait (MAD)</option>
+                <option value="per_meter">Au mètre (MAD/m)</option>
+              </select>
+              <input type="number" min={0} step="0.5" disabled={disabled} value={laborPricing.value}
+                onChange={(e) => updateLaborPricing({ mode: laborPricing.mode, value: Math.max(0, parseFloat(e.target.value) || 0) })}
+                className="w-20 px-2 py-1.5 rounded-lg bg-studio-field border border-studio-border text-slate-200 text-[11px] outline-none disabled:opacity-50" />
+            </div>
+          </div>
+
+          <div className="space-y-1.5">
+            <label className="flex items-center gap-2 text-[10px] text-slate-500 cursor-pointer">
+              <input type="checkbox" disabled={disabled} checked={!!stockOverride}
+                onChange={(e) => updateStockOverride(e.target.checked ? { mode: 'per_m2', value: 0 } : undefined)}
+                className="rounded border-studio-border" />
+              Remplacer le tarif catalogue du panneau
+            </label>
+            {stockOverride && (
+              <div className="flex gap-1.5">
+                <select disabled={disabled} value={stockOverride.mode}
+                  onChange={(e) => updateStockOverride({ mode: e.target.value as StockPricing['mode'], value: stockOverride.value })}
+                  className="px-2 py-1.5 rounded-lg bg-studio-field border border-studio-border text-slate-200 text-[11px] outline-none disabled:opacity-50">
+                  <option value="per_m2">MAD / m²</option>
+                  <option value="per_sheet">MAD / panneau</option>
+                </select>
+                <input type="number" min={0} step="1" disabled={disabled} value={stockOverride.value}
+                  onChange={(e) => updateStockOverride({ mode: stockOverride.mode, value: Math.max(0, parseFloat(e.target.value) || 0) })}
+                  className="w-20 px-2 py-1.5 rounded-lg bg-studio-field border border-studio-border text-slate-200 text-[11px] outline-none disabled:opacity-50" />
+              </div>
+            )}
+          </div>
+        </div>
+      </Tooltip>
     </div>
   );
 };
