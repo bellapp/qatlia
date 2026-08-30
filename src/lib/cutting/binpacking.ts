@@ -1,4 +1,8 @@
-export type MaterialType = 'mdf' | 'aluminium' | 'verre' | 'contreplaques' | 'melamine' | 'chene' | 'stratifié' | 'medium';
+// Single source of truth for supported material types, shared by the API
+// schema (enum validation) and the material library below, so neither can
+// silently drift from the other.
+export const MATERIAL_TYPE_VALUES = ['mdf', 'aluminium', 'verre', 'contreplaques', 'melamine', 'chene', 'stratifié', 'medium'] as const;
+export type MaterialType = (typeof MATERIAL_TYPE_VALUES)[number];
 export type CutMode = '2d' | '1d';
 
 export interface MaterialDef {
@@ -39,10 +43,16 @@ export interface Sheet {
   id?: string; height: number; width: number; kerf: number; margin?: number;
   grainDirection?: boolean; material?: MaterialType; quantity?: number; label?: string;
 }
+// Single source of truth for supported optimization goals, shared by the API
+// schema (enum validation) and the options UI (rendered choices), so neither
+// can silently drift from what the optimizer actually implements.
+export const OPTIMIZATION_PRIORITY_VALUES = ['linear_guillotine', 'min_waste', 'min_sheets', 'balanced'] as const;
+export type OptimizationPriority = (typeof OPTIMIZATION_PRIORITY_VALUES)[number];
+
 export interface OptimizationOptions {
   kerfWidth: number; showLabels: boolean; singleSheetOnly: boolean;
   considerMaterial: boolean; edgeBanding: boolean; grainDirection: boolean;
-  optimizationPriority: 'linear_guillotine' | 'min_waste' | 'min_sheets' | 'balanced';
+  optimizationPriority: OptimizationPriority;
   defaultMaterial?: MaterialType;
   /** Minimum offcut width in cm below which a remnant is not classified as reusable. */
   minReusableOffcutWidth?: number;
@@ -64,6 +74,16 @@ export interface Offcut { id: string; x: number; y: number; width: number; heigh
 export interface SheetResult { index: number; material: MaterialType; width: number; height: number; pieces: PlacedPiece[]; offcuts: Offcut[]; usedArea: number; wasteRate: number; }
 export interface MaterialStats { material: MaterialType; sheetsUsed: number; totalPieces: number; usedArea: number; wasteRate: number; }
 
+// Customer-safe summary of how a plan was chosen: what goal was pursued, which
+// optional constraints were active, and how many candidate layouts were
+// evaluated. Deliberately excludes strategy names/ids or any other
+// implementation detail of the packing algorithm.
+export interface OptimizationExplanation {
+  chosenGoal: OptimizationPriority;
+  activeConstraints: string[];
+  candidatesEvaluated: number;
+}
+
 export interface OptimizationResult {
   success?: boolean; cutMode?: CutMode;
   sheetsUsed: number; sheets: SheetResult[];
@@ -72,11 +92,30 @@ export interface OptimizationResult {
   totalLinearCutMeters: number; moneySavedMad: number;
   materialCostMad?: number; edgeBandingCostMad?: number; totalCostMad?: number;
   materialStats?: MaterialStats[];
+  explanation?: OptimizationExplanation;
 }
+
+/** Reason code for a piece left unplaced for a structural (non-geometric) reason. */
+export type UnplacedReasonCode = 'no_matching_stock' | 'single_sheet_material_limit';
+
+// Fixed, translated-safe sentences for each `UnplacedReasonCode`. These are
+// deliberately static strings — never built by interpolating the piece's raw
+// `material` (or any other user-controlled value) — so a malicious or very
+// long material string can never be reflected back in API output. The
+// material itself remains available, untouched, as the separate typed
+// `material` field on `ExpandedPiece`.
+const UNPLACED_REASON_TEXT: Record<UnplacedReasonCode, string> = {
+  no_matching_stock: 'Aucun panneau en stock ne correspond au matériau de cette pièce.',
+  single_sheet_material_limit: 'Cette pièce n\'a pas pu être incluse car une seule plaque est utilisée pour l\'ensemble de la commande, réservée à un autre matériau.',
+};
 
 export interface ExpandedPiece extends Required<Pick<Piece, 'height' | 'width' | 'quantity' | 'material'>> {
   originalIndex: number; id?: string; name?: string; originalHeight: number; originalWidth: number;
   rotatable: boolean; edges?: EdgeBandingConfig; color?: string;
+  /** Set when a piece was never attempted for packing (e.g. no compatible stock). */
+  unplacedReasonCode?: UnplacedReasonCode;
+  /** Customer-safe, human-readable explanation of `unplacedReasonCode`. */
+  unplacedReason?: string;
 }
 
 function expandPieces(pieces: Piece[], defaultMaterial: MaterialType, globalGrain: boolean): ExpandedPiece[] {
@@ -604,7 +643,7 @@ function simulatePlanForStrategy(
         continue;
       }
 
-      const better = chooseBetterPlan(current, plan);
+      const better = chooseBetterPlan(current, plan, mergedOptions.optimizationPriority);
       deduped.set(key, better === current ? current : plan);
     }
 
@@ -626,7 +665,7 @@ function simulatePlanForStrategy(
       unplacedPieces: plan.remaining,
       totalAreaUsed: plan.totalAreaUsed,
       totalAreaAvailable: plan.totalAreaAvailable,
-    });
+    }, mergedOptions.optimizationPriority);
   }
 
   return best || {
@@ -638,22 +677,49 @@ function simulatePlanForStrategy(
   };
 }
 
-function chooseBetterPlan(current: PlanCandidate | null, next: PlanCandidate): PlanCandidate {
+// Deterministic scoring tuples per `optimizationPriority`. Lower is better in
+// every position (compared left-to-right via `compareTuples`); feasibility
+// (fewest unplaced pieces) always gates every policy first, since no
+// optimization goal should be allowed to sacrifice placement.
+//
+// Waste is expressed as a 0..1 fraction of available sheet area so it can
+// never outweigh a whole extra sheet when summed with a sheet count.
+function planScoreTuple(plan: PlanCandidate, priority: OptimizationPriority): number[] {
+  const waste = plan.totalAreaAvailable > 0
+    ? (plan.totalAreaAvailable - plan.totalAreaUsed) / plan.totalAreaAvailable
+    : 0;
+
+  switch (priority) {
+    case 'min_sheets':
+      // Sheet count is the sole objective beyond feasibility: this policy
+      // deliberately does not compare waste, so a tie in sheet count is left
+      // to the caller's stable placed-count/first-seen fallback rather than
+      // being resolved by which candidate happens to waste less material.
+      return [plan.unplacedPieces.length, plan.sheets.length];
+    case 'min_waste':
+      // Sheet count still gates first: using more sheets than necessary is
+      // never "less wasteful" for the same piece set. Among equal feasible
+      // sheet counts, the lower waste percentage wins.
+      return [plan.unplacedPieces.length, plan.sheets.length, waste, -plan.totalAreaUsed];
+    case 'balanced':
+      // Deterministic composite: sheets stay dominant (waste is always < 1)
+      // while still tie-breaking on waste when sheet counts are equal.
+      return [plan.unplacedPieces.length, plan.sheets.length + waste];
+    case 'linear_guillotine':
+    default:
+      // Every layout produced by this packer is guillotine/through-cut valid
+      // by construction (see splitFreeRect), so no additional geometric
+      // preference is needed for validity. This matches the historical
+      // fewest-sheets/lowest-waste ordering that the locked benchmark
+      // fixtures were verified against.
+      return [plan.unplacedPieces.length, plan.sheets.length, waste, -plan.totalAreaUsed];
+  }
+}
+
+function chooseBetterPlan(current: PlanCandidate | null, next: PlanCandidate, priority: OptimizationPriority): PlanCandidate {
   if (!current) return next;
-  if (next.unplacedPieces.length !== current.unplacedPieces.length) {
-    return next.unplacedPieces.length < current.unplacedPieces.length ? next : current;
-  }
-  if (next.sheets.length !== current.sheets.length) {
-    return next.sheets.length < current.sheets.length ? next : current;
-  }
-  const currentWaste = current.totalAreaAvailable - current.totalAreaUsed;
-  const nextWaste = next.totalAreaAvailable - next.totalAreaUsed;
-  if (Math.abs(nextWaste - currentWaste) > 1e-9) {
-    return nextWaste < currentWaste ? next : current;
-  }
-  if (Math.abs(next.totalAreaUsed - current.totalAreaUsed) > 1e-9) {
-    return next.totalAreaUsed > current.totalAreaUsed ? next : current;
-  }
+  const comparison = compareTuples(planScoreTuple(next, priority), planScoreTuple(current, priority));
+  if (comparison !== 0) return comparison < 0 ? next : current;
   return next.placedPieces.length > current.placedPieces.length ? next : current;
 }
 
@@ -678,6 +744,244 @@ function buildMaterialStats(sheets: SheetResult[]): MaterialStats[] {
   }));
 }
 
+// Defensive trim/lowercase comparison key. `Piece.material` is typed as a
+// closed `MaterialType` union, but this keeps material matching robust
+// against incidental whitespace/case coming from imports rather than relying
+// on values always being exactly canonical.
+function normalizeMaterialKey(material: string | null | undefined): string {
+  return String(material || '').trim().toLowerCase();
+}
+
+// Customer-safe list of optional constraints that actually changed optimizer
+// behavior for this run. Intentionally omits kerf/margin (always present) and
+// any internal strategy/search terminology.
+//
+// `single_sheet_only` is only reported when the merged result actually stayed
+// within one sheet (`sheetsUsed <= 1`). This is a safety net: the option is
+// meant to be a hard global cap enforced by the optimizer (single-sheet mode,
+// and the single-winning-material-group rule under `considerMaterial`), so
+// this guards against ever claiming the constraint held if some future
+// regression let sheetsUsed grow past 1 while the option was still on.
+function buildActiveConstraints(options: OptimizationOptions, sheetsUsed: number): string[] {
+  const constraints: string[] = [];
+  if (options.singleSheetOnly && sheetsUsed <= 1) constraints.push('single_sheet_only');
+  if (options.considerMaterial) constraints.push('material_separation');
+  if (options.grainDirection) constraints.push('grain_locked');
+  return constraints;
+}
+
+interface StrategySearchOutcome { plan: PlanCandidate; candidatesEvaluated: number; }
+
+// Runs every packing strategy against one homogeneous set of items/stock and
+// keeps the best plan per the active `optimizationPriority` scoring policy.
+function runStrategySearch(
+  items: ExpandedPiece[],
+  candidateSheets: Sheet[],
+  mergedOptions: OptimizationOptions,
+  defaultMaterial: MaterialType
+): StrategySearchOutcome {
+  let bestPlan: PlanCandidate | null = null;
+
+  for (const strategy of PACKING_STRATEGIES) {
+    const candidate = simulatePlanForStrategy(items, candidateSheets, strategy, mergedOptions, defaultMaterial);
+    bestPlan = chooseBetterPlan(bestPlan, candidate, mergedOptions.optimizationPriority);
+  }
+
+  return {
+    plan: bestPlan || { sheets: [], placedPieces: [], unplacedPieces: items, totalAreaUsed: 0, totalAreaAvailable: 0 },
+    candidatesEvaluated: PACKING_STRATEGIES.length,
+  };
+}
+
+// Re-assigns sheet indexes, piece numbers, and offcut IDs so a plan produced
+// in isolation (e.g. one material group) can be concatenated into a larger
+// merged result without colliding with sheets/pieces/offcuts from other
+// groups. IDs on the pieces themselves (`pieceId`) are already globally
+// unique from `expandPieces` and are left untouched.
+function renumberPlan(plan: PlanCandidate, sheetIndexOffset: number, pieceNumberOffset: number): PlanCandidate {
+  const sheets = plan.sheets.map((sheet, position) => {
+    const newSheetIndex = sheetIndexOffset + position;
+    const pieces = sheet.pieces.map((piece) => ({
+      ...piece,
+      sheetIndex: newSheetIndex,
+      pieceNumber: pieceNumberOffset + piece.pieceNumber,
+    }));
+    const offcuts = sheet.offcuts.map((offcut) => ({
+      ...offcut,
+      sheetIndex: newSheetIndex,
+      id: buildOffcutId(newSheetIndex, offcut.x, offcut.y, offcut.width, offcut.height),
+    }));
+    return { ...sheet, index: newSheetIndex, pieces, offcuts };
+  });
+
+  return {
+    sheets,
+    placedPieces: sheets.flatMap((sheet) => sheet.pieces),
+    unplacedPieces: plan.unplacedPieces,
+    totalAreaUsed: plan.totalAreaUsed,
+    totalAreaAvailable: plan.totalAreaAvailable,
+  };
+}
+
+interface EvaluatedMaterialGroup {
+  materialKey: string;
+  groupItems: ExpandedPiece[];
+  outcome: StrategySearchOutcome;
+}
+
+// Picks the material group whose plan places the most pieces — the primary,
+// non-negotiable criterion for the single-global-sheet contest — and only
+// falls back to the active `optimizationPriority` scoring (via
+// `chooseBetterPlan`, which already ends in a stable "keep current on exact
+// tie" fallback) to break a tie between equally-placed groups.
+function pickWinningMaterialGroup(
+  a: EvaluatedMaterialGroup,
+  b: EvaluatedMaterialGroup,
+  priority: OptimizationPriority
+): EvaluatedMaterialGroup {
+  const placedA = a.outcome.plan.placedPieces.length;
+  const placedB = b.outcome.plan.placedPieces.length;
+  if (placedA !== placedB) return placedA > placedB ? a : b;
+
+  const better = chooseBetterPlan(a.outcome.plan, b.outcome.plan, priority);
+  return better === b.outcome.plan ? b : a;
+}
+
+// Global single-sheet contest across material groups: with `singleSheetOnly`
+// active, the merged result must use at most ONE sheet in total, not one per
+// material group. Every matched group is still evaluated independently
+// in single-sheet mode against its own compatible stock (so
+// `candidatesEvaluated` stays accurate), but only the group that places the
+// most pieces keeps its sheet; every other matched group's pieces are marked
+// unplaced with `single_sheet_material_limit` instead of silently dropped.
+function buildSingleSheetGroupedResult(
+  evaluatedGroups: EvaluatedMaterialGroup[],
+  noStockUnplaced: ExpandedPiece[],
+  priority: OptimizationPriority,
+  candidatesEvaluated: number
+): StrategySearchOutcome {
+  if (evaluatedGroups.length === 0) {
+    return {
+      plan: { sheets: [], placedPieces: [], unplacedPieces: noStockUnplaced, totalAreaUsed: 0, totalAreaAvailable: 0 },
+      candidatesEvaluated,
+    };
+  }
+
+  let winner = evaluatedGroups[0];
+  for (const candidate of evaluatedGroups.slice(1)) {
+    winner = pickWinningMaterialGroup(winner, candidate, priority);
+  }
+
+  const renumbered = renumberPlan(winner.outcome.plan, 0, 0);
+  const unplacedPieces: ExpandedPiece[] = [...renumbered.unplacedPieces];
+
+  for (const group of evaluatedGroups) {
+    if (group === winner) continue;
+    for (const item of group.groupItems) {
+      unplacedPieces.push({
+        ...item,
+        unplacedReasonCode: 'single_sheet_material_limit',
+        unplacedReason: UNPLACED_REASON_TEXT.single_sheet_material_limit,
+      });
+    }
+  }
+  unplacedPieces.push(...noStockUnplaced);
+
+  return {
+    plan: {
+      sheets: renumbered.sheets,
+      placedPieces: renumbered.placedPieces,
+      unplacedPieces,
+      totalAreaUsed: winner.outcome.plan.totalAreaUsed,
+      totalAreaAvailable: winner.outcome.plan.totalAreaAvailable,
+    },
+    candidatesEvaluated,
+  };
+}
+
+// considerMaterial=true path: groups expanded pieces by normalized material,
+// matches each group only against stock of the same material, and merges the
+// per-group plans into one collision-free result. A material with no
+// compatible stock at all is never attempted for packing — its pieces are
+// left explicitly unplaced with a customer-safe reason instead of silently
+// falling back to mismatched stock.
+//
+// Under `singleSheetOnly`, the merge instead runs a single-global-sheet
+// contest (see `buildSingleSheetGroupedResult`) so the option remains a
+// global budget rather than one sheet per material group.
+function runMaterialGroupedSearch(
+  items: ExpandedPiece[],
+  sheets: Sheet[],
+  mergedOptions: OptimizationOptions,
+  defaultMaterial: MaterialType
+): StrategySearchOutcome {
+  const groups = new Map<string, ExpandedPiece[]>();
+  for (const item of items) {
+    const key = normalizeMaterialKey(item.material);
+    const group = groups.get(key);
+    if (group) group.push(item);
+    else groups.set(key, [item]);
+  }
+
+  const evaluatedGroups: EvaluatedMaterialGroup[] = [];
+  const noStockUnplaced: ExpandedPiece[] = [];
+  let candidatesEvaluated = 0;
+
+  for (const [materialKey, groupItems] of Array.from(groups.entries())) {
+    const matchingSheets = sheets.filter((sheet) => normalizeMaterialKey(sheet.material || defaultMaterial) === materialKey);
+
+    if (matchingSheets.length === 0) {
+      for (const item of groupItems) {
+        noStockUnplaced.push({
+          ...item,
+          unplacedReasonCode: 'no_matching_stock',
+          unplacedReason: UNPLACED_REASON_TEXT.no_matching_stock,
+        });
+      }
+      continue;
+    }
+
+    const outcome = runStrategySearch(groupItems, matchingSheets, mergedOptions, defaultMaterial);
+    candidatesEvaluated += outcome.candidatesEvaluated;
+    evaluatedGroups.push({ materialKey, groupItems, outcome });
+  }
+
+  if (mergedOptions.singleSheetOnly) {
+    return buildSingleSheetGroupedResult(evaluatedGroups, noStockUnplaced, mergedOptions.optimizationPriority, candidatesEvaluated);
+  }
+
+  let sheetOffset = 0;
+  let pieceNumberOffset = 0;
+  const mergedSheets: SheetResult[] = [];
+  const mergedPlaced: PlacedPiece[] = [];
+  const mergedUnplaced: ExpandedPiece[] = [...noStockUnplaced];
+  let totalAreaUsed = 0;
+  let totalAreaAvailable = 0;
+
+  for (const group of evaluatedGroups) {
+    const { plan } = group.outcome;
+    const renumbered = renumberPlan(plan, sheetOffset, pieceNumberOffset);
+    mergedSheets.push(...renumbered.sheets);
+    mergedPlaced.push(...renumbered.placedPieces);
+    mergedUnplaced.push(...renumbered.unplacedPieces);
+    totalAreaUsed += plan.totalAreaUsed;
+    totalAreaAvailable += plan.totalAreaAvailable;
+    sheetOffset += plan.sheets.length;
+    pieceNumberOffset += plan.placedPieces.length;
+  }
+
+  return {
+    plan: {
+      sheets: mergedSheets,
+      placedPieces: mergedPlaced,
+      unplacedPieces: mergedUnplaced,
+      totalAreaUsed,
+      totalAreaAvailable,
+    },
+    candidatesEvaluated,
+  };
+}
+
 // ─── Main 2D Optimizer (multi-sheet) ──────────────────────────────
 export function optimizeCutting2D(
   pieces: Piece[], sheets: Sheet[], options: Partial<OptimizationOptions> = {}
@@ -685,20 +989,11 @@ export function optimizeCutting2D(
   const mergedOptions: OptimizationOptions = { ...OPTIONS_DEFAULTS, ...options };
   const defaultMat: MaterialType = mergedOptions.defaultMaterial || 'mdf';
   const allExpanded = expandPieces(pieces, defaultMat, mergedOptions.grainDirection);
-  let bestPlan: PlanCandidate | null = null;
 
-  for (const strategy of PACKING_STRATEGIES) {
-    const candidate = simulatePlanForStrategy(allExpanded, sheets, strategy, mergedOptions, defaultMat);
-    bestPlan = chooseBetterPlan(bestPlan, candidate);
-  }
+  const { plan: finalPlan, candidatesEvaluated } = mergedOptions.considerMaterial
+    ? runMaterialGroupedSearch(allExpanded, sheets, mergedOptions, defaultMat)
+    : runStrategySearch(allExpanded, sheets, mergedOptions, defaultMat);
 
-  const finalPlan = bestPlan || {
-    sheets: [],
-    placedPieces: [],
-    unplacedPieces: allExpanded,
-    totalAreaUsed: 0,
-    totalAreaAvailable: 0,
-  };
   const totalAvail = finalPlan.totalAreaAvailable;
   const totalUsed = finalPlan.totalAreaUsed;
   const wp = totalAvail > 0 ? Math.round((1 - totalUsed / totalAvail) * 1000) / 10 : 0;
@@ -727,6 +1022,11 @@ export function optimizeCutting2D(
     wastePercentage: wp, totalLinearCutMeters: totalM, moneySavedMad: saved,
     materialCostMad: matCost, edgeBandingCostMad: edgeCost, totalCostMad: matCost + edgeCost,
     materialStats: buildMaterialStats(finalPlan.sheets),
+    explanation: {
+      chosenGoal: mergedOptions.optimizationPriority,
+      activeConstraints: buildActiveConstraints(mergedOptions, finalPlan.sheets.length),
+      candidatesEvaluated,
+    },
   };
 }
 
@@ -738,4 +1038,5 @@ export function optimizeCutting(pieces: Piece[], sheet: Sheet, options?: Partial
 export const GuillotinePacker = {
   strategies: PACKING_STRATEGIES,
   pruneFreeRects,
+  chooseBetterPlan,
 };

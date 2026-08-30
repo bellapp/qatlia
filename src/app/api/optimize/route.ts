@@ -15,8 +15,19 @@ export async function POST(req: Request) {
       );
     }
 
-    const { sheet, pieces, options } = parsed.data;
-    const result = optimizeCutting2D(pieces as Piece[], [sheet as Sheet], options as Partial<OptimizationOptions>);
+    const { sheet, sheets, pieces, options } = parsed.data;
+    const stockSheets = sheets ?? (sheet ? [sheet] : []);
+    if (stockSheets.length === 0) {
+      // Defensive, practically unreachable: `OptimizeSchema`'s refine already
+      // guarantees at least one of `sheet`/non-empty `sheets` is present, so
+      // this guards against a future schema change silently letting an empty
+      // stock list reach the optimizer instead of ever executing.
+      return NextResponse.json(
+        { error: 'INVALID_INPUT', details: 'Either `sheet` or a non-empty `sheets` array must be provided' },
+        { status: 400 }
+      );
+    }
+    const result = optimizeCutting2D(pieces as Piece[], stockSheets as Sheet[], options as Partial<OptimizationOptions>);
 
     return NextResponse.json({
       success: true,

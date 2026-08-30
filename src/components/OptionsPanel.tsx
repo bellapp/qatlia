@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { OptimizationOptions } from '@/lib/cutting/binpacking';
+import { OptimizationOptions, OptimizationPriority, OPTIMIZATION_PRIORITY_VALUES } from '@/lib/cutting/binpacking';
 import { Gauge, Layers3, Lock, ScanLine, Scissors } from 'lucide-react';
 import { Tooltip } from '@/components/Tooltip';
 
@@ -44,6 +44,16 @@ function Switch({
   );
 }
 
+// Exhaustive over `OptimizationPriority`: TypeScript rejects this object if a
+// value is missing or an extra key is added, keeping the rendered <select>
+// permanently in sync with the values the optimizer/API schema support.
+const PRIORITY_LABELS: Record<OptimizationPriority, string> = {
+  linear_guillotine: 'Coupe linéaire traversante (atelier)',
+  min_waste: 'Minimiser les chutes (%)',
+  min_sheets: 'Minimiser les panneaux',
+  balanced: 'Équilibré (facilité de coupe)',
+};
+
 export const OptionsPanel: React.FC<OptionsPanelProps> = ({ options, onChange, disabled = false }) => {
   const updateField = <K extends keyof OptimizationOptions>(field: K, value: OptimizationOptions[K]) => {
     onChange({ ...options, [field]: value });
@@ -78,10 +88,9 @@ export const OptionsPanel: React.FC<OptionsPanelProps> = ({ options, onChange, d
           <select disabled={disabled} value={options.optimizationPriority}
             onChange={(e) => updateField('optimizationPriority', e.target.value as OptimizationOptions['optimizationPriority'])}
             className="flex-1 px-3 py-2 rounded-xl bg-studio-field border border-studio-border text-slate-200 text-xs outline-none focus:border-brand-500/50 disabled:opacity-50">
-            <option value="linear_guillotine">Coupe linéaire traversante (atelier)</option>
-            <option value="min_waste">Minimiser les chutes (%)</option>
-            <option value="min_sheets">Minimiser les panneaux</option>
-            <option value="balanced">Équilibré (facilité de coupe)</option>
+            {OPTIMIZATION_PRIORITY_VALUES.map((value) => (
+              <option key={value} value={value}>{PRIORITY_LABELS[value]}</option>
+            ))}
           </select>
         </div>
       </Tooltip>

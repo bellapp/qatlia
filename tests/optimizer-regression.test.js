@@ -181,12 +181,10 @@ function assertOptimizationInvariants(result, sheet, expectedExpandedCount) {
 function runBenchmark(benchmarkInput, overrideOptions = {}) {
   const { optimizeCutting2D } = loadTsModule('src/lib/cutting/binpacking.ts');
   const expectedExpandedCount = benchmarkInput.pieces.reduce((sum, piece) => sum + (piece.quantity || 1), 0);
-  const result = optimizeCutting2D(benchmarkInput.pieces, [{ ...benchmarkInput.sheet }], {
-    ...benchmarkInput.options,
-    ...overrideOptions,
-  });
+  const mergedOptions = { ...benchmarkInput.options, ...overrideOptions };
+  const result = optimizeCutting2D(benchmarkInput.pieces, [{ ...benchmarkInput.sheet }], mergedOptions);
 
-  return { result, expectedExpandedCount };
+  return { result, expectedExpandedCount, mergedOptions };
 }
 
 test('2D optimizer preserves placement invariants on dataset 1 with the 208x278 benchmark sheet', () => {
@@ -228,9 +226,27 @@ test('dataset 2 benchmark packs all pieces within 2 sheets or better', () => {
   assertOptimizationInvariants(result, benchmarkInput.sheet, expectedExpandedCount);
 });
 
+test('dataset 2 benchmark exposes explanation metadata matching the linear_guillotine priority without regressing sheet count', () => {
+  const benchmarkInput = loadDataset2BenchmarkInput();
+  const { result, expectedExpandedCount, mergedOptions } = runBenchmark(benchmarkInput);
+
+  assert.equal(mergedOptions.optimizationPriority, 'linear_guillotine');
+  assert.ok(result.explanation, 'result must carry explanation metadata');
+  assert.equal(result.explanation.chosenGoal, 'linear_guillotine');
+  assert.ok(Array.isArray(result.explanation.activeConstraints));
+  assert.ok(result.explanation.candidatesEvaluated > 0);
+  assert.ok(result.sheetsUsed <= 2, `dataset 2 must still use at most 2 sheets under linear_guillotine, received ${result.sheetsUsed}`);
+  assertOptimizationInvariants(result, benchmarkInput.sheet, expectedExpandedCount);
+});
+
 test('optimize API route is wired to optimizeCutting2D', () => {
   const routeSource = fs.readFileSync(path.resolve('src/app/api/optimize/route.ts'), 'utf8');
 
   assert.match(routeSource, /import\s*\{\s*optimizeCutting2D\b/, 'Route must import optimizeCutting2D');
-  assert.match(routeSource, /optimizeCutting2D\s*\(\s*pieces as Piece\[\],\s*\[sheet as Sheet\]/, 'Route must call optimizeCutting2D with a sheet array');
+  // Task 2 (item 3): the route now supports multi-stock `sheets` alongside
+  // the legacy single `sheet`, so it must call optimizeCutting2D with a
+  // sheets array derived from `sheets ?? (sheet ? [sheet] : [])`, not a
+  // hardcoded `[sheet]` (which would throw if `sheet` were undefined).
+  assert.match(routeSource, /sheets\s*\?\?\s*\(\s*sheet\s*\?\s*\[sheet\]\s*:\s*\[\]\s*\)/, 'Route must safely fall back to `(sheet ? [sheet] : [])` when `sheets` is absent');
+  assert.match(routeSource, /optimizeCutting2D\s*\(\s*pieces as Piece\[\],\s*stockSheets as Sheet\[\]/, 'Route must call optimizeCutting2D with the resolved sheets array');
 });
