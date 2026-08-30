@@ -84,4 +84,27 @@ test.describe('Atelier Dashboard (/atelier)', () => {
   test('history link is present', async ({ page }) => {
     await expect(page.getByRole('link', { name: /historique/i }).first()).toBeVisible();
   });
+
+  test('zoom stays inside the plan viewport without hiding controls', async ({ page }) => {
+    await page.getByRole('button', { name: /optimiser/i }).click();
+    await expect(page.getByRole('button', { name: /panneau 1/i })).toBeVisible({ timeout: 15000 });
+
+    const zoomIn = page.getByRole('button', { name: /zoom avant/i });
+    await zoomIn.click();
+    await zoomIn.click();
+    await zoomIn.click();
+
+    const toolbar = page.getByTestId('cut-plan-toolbar');
+    const viewport = page.getByTestId('cut-plan-viewport');
+    await expect(toolbar).toBeVisible();
+    await expect(viewport).toBeVisible();
+    await expect(page.getByRole('button', { name: /exporter le rapport pdf/i })).toBeVisible();
+
+    const toolbarBox = await toolbar.boundingBox();
+    const viewportBox = await viewport.boundingBox();
+    expect(toolbarBox).not.toBeNull();
+    expect(viewportBox).not.toBeNull();
+    expect((toolbarBox?.y ?? 0) + (toolbarBox?.height ?? 0)).toBeLessThanOrEqual((viewportBox?.y ?? 0) + 1);
+    expect(await viewport.evaluate((element) => element.scrollHeight > element.clientHeight)).toBe(true);
+  });
 });

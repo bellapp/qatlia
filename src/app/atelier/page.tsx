@@ -726,8 +726,8 @@ export default function Dashboard() {
                 {/* 2D Visualizer */}
                 <div className="overflow-hidden rounded-2xl border border-studio-border/80">
                   {/* Tabs for sheets */}
-                  <div className="flex items-center justify-between px-4 py-2.5 bg-studio-panel/40 border-b border-studio-border/60">
-                    <div className="flex items-center gap-1">
+                  <div data-testid="cut-plan-toolbar" className="relative z-20 flex flex-wrap items-center justify-between gap-2 px-4 py-2.5 bg-studio-panel/40 border-b border-studio-border/60">
+                    <div className="flex min-w-0 flex-1 items-center gap-1 overflow-x-auto">
                       {Array.from({length: result.sheetsUsed}).map((_, i) => (
                         <button
                           key={i}
@@ -745,23 +745,26 @@ export default function Dashboard() {
                         </button>
                       ))}
                     </div>
-                    <div className="flex items-center gap-1.5 bg-studio-field rounded-lg border border-studio-border p-0.5">
-                      <button onClick={() => setZoomLevel(Math.max(0.5, zoomLevel - 0.25))} className="p-1 rounded-md hover:bg-studio-border transition-colors text-slate-600 dark:text-slate-400">
+                    <div className="flex shrink-0 items-center gap-1.5 bg-studio-field rounded-lg border border-studio-border p-0.5">
+                      <button aria-label="Zoom arrière" onClick={() => setZoomLevel(Math.max(0.5, zoomLevel - 0.25))} disabled={zoomLevel <= 0.5} className="p-1 rounded-md hover:bg-studio-border transition-colors text-slate-600 dark:text-slate-400 disabled:opacity-35 disabled:cursor-not-allowed">
                         <ZoomOut className="w-3.5 h-3.5" />
                       </button>
                       <span className="text-[10px] font-mono text-slate-600 dark:text-slate-400 tabular-nums px-1 w-10 text-center">{Math.round(zoomLevel*100)}%</span>
-                      <button onClick={() => setZoomLevel(Math.min(2.5, zoomLevel + 0.25))} className="p-1 rounded-md hover:bg-studio-border transition-colors text-slate-600 dark:text-slate-400">
+                      <button aria-label="Zoom avant" onClick={() => setZoomLevel(Math.min(2.5, zoomLevel + 0.25))} disabled={zoomLevel >= 2.5} className="p-1 rounded-md hover:bg-studio-border transition-colors text-slate-600 dark:text-slate-400 disabled:opacity-35 disabled:cursor-not-allowed">
                         <ZoomIn className="w-3.5 h-3.5" />
                       </button>
                     </div>
                   </div>
 
                   {/* SVG Canvas */}
-                  <div className={isDark ? 'p-5 bg-[#040812] flex items-center justify-center min-h-[420px]' : 'p-5 bg-[#F1F5F9] flex items-center justify-center min-h-[420px]'}>
-                    <div style={{ transform: `scale(${zoomLevel})`, transformOrigin: 'center', transition: 'transform 0.2s ease' }}>
+                  <div data-testid="cut-plan-viewport" className={`relative min-h-[420px] max-h-[70vh] overflow-auto overscroll-contain p-5 ${isDark ? 'bg-[#040812]' : 'bg-[#F1F5F9]'}`}>
+                    <div
+                      className="mx-auto transition-[width] duration-200 ease-out"
+                      style={{ width: `${zoomLevel * 100}%`, maxWidth: `${480 * zoomLevel}px` }}
+                    >
                       <svg
                         viewBox={`0 0 ${activeSheet.width} ${activeSheet.height}`}
-                        className="w-full max-w-[480px] aspect-[208/278] rounded-xl"
+                        className="block w-full aspect-[208/278] rounded-xl"
                         style={{ filter: 'drop-shadow(0 4px 6px rgba(0,0,0,0.4))' }}
                       >
                         <defs>
