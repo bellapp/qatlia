@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useLayoutEffect } from 'react';
+import React, { useState, useEffect, useLayoutEffect, useMemo } from 'react';
 import Link from 'next/link';
 import { createClient } from '@/lib/supabase/client';
 import {
@@ -35,6 +35,7 @@ import { PIECE_COLOR_PALETTE, getResolvedPieceColor } from '@/lib/pieces/catalog
 import { OptionsPanel } from '@/components/OptionsPanel';
 import { PiecesManager } from '@/components/PiecesManager';
 import { AuthModal } from '@/components/AuthModal';
+import { QuotationDialog } from '@/components/QuotationDialog';
 import { EmptyState } from '@/components/EmptyState';
 import { AccountMenu } from '@/components/AccountMenu';
 import { QatlIALogo } from '@/components/QatlIALogo';
@@ -45,6 +46,7 @@ import { LocaleSwitcher, useLocale } from '@/components/LocaleProvider';
 import type { TranslationKey } from '@/i18n';
 import { materialLabelKey, visionErrorKey } from '@/i18n/domain';
 import { writeLocalHistoryItem, type LocalHistoryItem } from '@/lib/history';
+import { deriveQuotationPanels, deriveQuotationPieces } from '@/lib/quotation-items';
 import { buildPdfPayload } from '@/lib/pdf-payload';
 import { buildPersistedProjectPayload } from '@/lib/projects/persistence-payload';
 import {
@@ -125,7 +127,15 @@ export default function Dashboard() {
   const [visionError, setVisionError] = useState<TranslationKey | null>(null);
   const [previewImage, setPreviewImage] = useState<string | null>(null);
   const [isAuthModalOpen, setIsAuthModalOpen] = useState<boolean>(false);
+  // Which action opened the (shared) auth modal, so its onSuccess handler
+  // resumes the right one instead of always re-triggering the PDF export.
+  const [pendingAuthAction, setPendingAuthAction] = useState<'pdf' | 'quotation' | null>(null);
   const [isDownloadingPdf, setIsDownloadingPdf] = useState<boolean>(false);
+  const [isQuotationDialogOpen, setIsQuotationDialogOpen] = useState<boolean>(false);
+  // The id /api/projects last confirmed saving, if any — the quotation
+  // dialog merges its metadata into that same project's options_json.
+  // Never client-guessed; only ever set from a successful save response.
+  const [lastSavedProjectId, setLastSavedProjectId] = useState<string | null>(null);
   const [showAdvancedOptions, setShowAdvancedOptions] = useState<boolean>(false);
   const [displayUnit, setDisplayUnit] = useState<DisplayUnit>(DEFAULT_DISPLAY_UNIT);
   // True while the restored/current project still owes its next save an
@@ -215,6 +225,20 @@ export default function Dashboard() {
     setDisplayUnit(readStoredDisplayUnit(window.localStorage));
 
     const savedProj = sessionStorage.getItem('qatlia_saved_project');
+    // Set alongside 'qatlia_saved_project' when a project is opened from
+    // history (see history/page.tsx's handleLoadProject) — without this,
+    // QuotationDialog only ever knew about the *last auto-saved* project
+    // (lastSavedProjectId below), never the one the artisan actually
+    // re-opened, so a quote generated right after opening a past project
+    // would silently merge into the wrong project's options_json.
+    // Re-validated here too (defense in depth against a stale/tampered
+    // sessionStorage value) — /api/export-quotation's `projectId` must be a
+    // genuine UUID or the whole quote request 400s.
+    const restoredProjectIdRaw = sessionStorage.getItem('qatlia_restored_project_id');
+    const restoredProjectId =
+      restoredProjectIdRaw && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(restoredProjectIdRaw)
+        ? restoredProjectIdRaw
+        : null;
     if (savedProj) {
       try {
         const parsed = JSON.parse(savedProj);
@@ -222,6 +246,7 @@ export default function Dashboard() {
         if (parsed.sheets) setSheets(parsed.sheets);
         if (Array.isArray(parsed.pieces)) setPieces(normalizePiecesWithColors(parsed.pieces));
         if (parsed.options) setOptions((prev) => ({ ...prev, ...parsed.options }));
+        if (restoredProjectId) setLastSavedProjectId(restoredProjectId);
         // Legacy saved projects carry no unit metadata at all; they predate
         // this feature and were always canonical cm. `resolveProjectUnitMetadata`
         // assumes cm in that case and flags it `migrated` so the next save
@@ -241,12 +266,16 @@ export default function Dashboard() {
         // the default state. Pushing the removal past the current
         // microtask/render lets every duplicate pass read the same
         // sessionStorage value before it disappears.
-        window.setTimeout(() => sessionStorage.removeItem('qatlia_saved_project'), 0);
+        window.setTimeout(() => {
+          sessionStorage.removeItem('qatlia_saved_project');
+          sessionStorage.removeItem('qatlia_restored_project_id');
+        }, 0);
       } catch (e) {
         console.error('Erreur restauration projet:', e);
         // Malformed JSON will never parse successfully, so don't leave it
         // sitting in sessionStorage forever — clear it right away.
         sessionStorage.removeItem('qatlia_saved_project');
+        sessionStorage.removeItem('qatlia_restored_project_id');
       }
     }
   }, []);
@@ -319,11 +348,18 @@ export default function Dashboard() {
         data: { user },
       } = await supabase.auth.getUser();
       if (!user) return;
-      await fetch('/api/projects', {
+      const res = await fetch('/api/projects', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
       });
+      if (res.ok) {
+        const data = await res.json().catch(() => null);
+        // The quotation dialog merges its metadata into *this* saved
+        // project's options_json (see /api/export-quotation) — only once
+        // the server confirms the save, never a client-guessed id.
+        if (data?.success && typeof data.projectId === 'string') setLastSavedProjectId(data.projectId);
+      }
     } catch (err) {
       console.error('Erreur auto-save projet:', err);
     }
@@ -528,6 +564,7 @@ export default function Dashboard() {
     const { data: { user } } = await supabase.auth.getUser();
 
     if (!user) {
+      setPendingAuthAction('pdf');
       setIsAuthModalOpen(true);
       return;
     }
@@ -575,6 +612,34 @@ export default function Dashboard() {
     usedArea: result.totalAreaUsed,
   } : null);
   const currentSheetPieces = currentSheet ? [...currentSheet.pieces].sort((a, b) => a.pieceNumber - b.pieceNumber) : [];
+
+  // Derived straight from the optimizer's own result (every sheet actually
+  // used, every piece actually placed) — never from a user-editable total —
+  // so the quotation's detail table can only ever show what the plan
+  // actually produced (Task 8 remediation — item 1). Tagged `{ ok }` results:
+  // a plan that genuinely aggregates to more distinct groups than the
+  // schema-bounded maximum is surfaced as a visible, localized error below
+  // rather than silently truncated (Task 8 remediation — re-review, item 5).
+  // `useMemo`, never a conditional hook, so this always runs on every render
+  // regardless of whether `result` is set yet.
+  const panelsResult = useMemo(
+    () => (result ? deriveQuotationPanels(result) : { ok: true as const, panels: [] }),
+    [result]
+  );
+  const piecesResult = useMemo(
+    () => (result ? deriveQuotationPieces(result) : { ok: true as const, pieces: [] }),
+    [result]
+  );
+  const quotationPanels = panelsResult.ok ? panelsResult.panels : [];
+  const quotationPieces = piecesResult.ok ? piecesResult.pieces : [];
+  // Visible, localized item-limit error — non-null disables quote generation
+  // in QuotationDialog rather than ever shipping a document silently missing
+  // panels/pieces.
+  const quotationItemLimitError: string | null = !panelsResult.ok
+    ? t('quotation.errors.tooManyPanelGroups', { count: panelsResult.distinctCount, max: panelsResult.max })
+    : !piecesResult.ok
+    ? t('quotation.errors.tooManyPieceGroups', { count: piecesResult.distinctCount, max: piecesResult.max })
+    : null;
 
   return (
     <div className="min-h-screen bg-studio-canvas text-slate-900 dark:text-slate-100 font-sans antialiased selection:bg-brand-500 selection:text-black">
@@ -1062,6 +1127,18 @@ export default function Dashboard() {
                     {isDownloadingPdf ? <RefreshCw className="w-4 h-4 animate-spin" /> : <FileText className="w-4 h-4" />}
                     {isDownloadingPdf ? t('atelier.exports.pdfGenerating') : t('atelier.exports.pdf')}
                   </button>
+                  {/* No costingInput (e.g. legacy 1D mode with no configured
+                      pricing) means there is nothing real to quote a client for. */}
+                  {result?.costingInput && (
+                    <button
+                      onClick={() => setIsQuotationDialogOpen(true)}
+                      aria-label={t('quotation.openButtonAria')}
+                      className="col-span-4 py-2.5 rounded-xl bg-indigo-500/10 hover:bg-indigo-500/20 border border-indigo-500/30 text-indigo-400 font-black text-xs flex items-center justify-center gap-2 transition-all"
+                    >
+                      <FileText className="w-3.5 h-3.5" />
+                      {t('quotation.openButton')}
+                    </button>
+                  )}
                 </div>
 
                 {/* Sheet Breakdown */}
@@ -1161,17 +1238,40 @@ export default function Dashboard() {
       <AuthModal
         isOpen={isAuthModalOpen}
         onClose={() => setIsAuthModalOpen(false)}
+        title={pendingAuthAction === 'quotation' ? t('quotation.title') : undefined}
+        subtitle={pendingAuthAction === 'quotation' ? t('quotation.authRequired') : undefined}
         onSuccess={() => {
           setIsAuthModalOpen(false);
           const supabase = createClient();
           supabase.auth.getUser().then(({ data: { user } }) => {
             if (user) {
               setUserEmail(user.email || null);
-              handleDownloadPdf();
+              if (pendingAuthAction === 'pdf') handleDownloadPdf();
+              // 'quotation': the dialog itself stays open with the artisan's
+              // filled-in fields intact — they just click "Generate" again.
             }
+            setPendingAuthAction(null);
           });
         }}
       />
+
+      {/* No costingInput (e.g. legacy 1D mode with no configured pricing) means
+          there is nothing real to quote — never fabricate a zero-cost basis. */}
+      {result?.costingInput && (
+        <QuotationDialog
+          isOpen={isQuotationDialogOpen}
+          onClose={() => setIsQuotationDialogOpen(false)}
+          onRequireAuth={() => {
+            setPendingAuthAction('quotation');
+            setIsAuthModalOpen(true);
+          }}
+          costingInput={result.costingInput}
+          panels={quotationPanels}
+          pieces={quotationPieces}
+          itemLimitError={quotationItemLimitError}
+          projectId={lastSavedProjectId}
+        />
+      )}
     </div>
   );
 }

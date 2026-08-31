@@ -92,7 +92,35 @@ export const OPTIONS_DEFAULTS: OptimizationOptions = {
 };
 
 export interface PlacedPiece {
-  pieceId?: string; pieceNumber: number; name?: string;
+  pieceId?: string; pieceNumber: number;
+  /**
+   * The internal *display* name used for on-plan labels (SVG, cut list):
+   * the artisan's own name when given, a numbered fallback ("Pièce N"/
+   * "Barre N") when not, and — for a 2D piece requested with quantity > 1 —
+   * a "× qty" suffix appended to every one of that piece's placed copies.
+   * Never the right field for a commercial document: use `baseName`/
+   * `isUnnamed` instead (see `deriveQuotationPieces` in
+   * src/lib/quotation-items.ts), which keep the artisan's clean, unsuffixed
+   * name (or its absence) separate from this display-only string.
+   */
+  name?: string;
+  /**
+   * The artisan's own typed name, trimmed — never a fallback and never the
+   * "× qty" suffix `name` above may carry. Absent when the piece was left
+   * unnamed (see `isUnnamed`).
+   *
+   * Optional at the type level (rather than required alongside `isUnnamed`)
+   * because a `PlacedPiece[]` restored from a project saved before this
+   * field existed (a "legacy result") carries neither this nor `isUnnamed`
+   * at all — `deriveQuotationPieces` falls back to stripping the known "×
+   * qty" suffix from `name` itself in that case.
+   */
+  baseName?: string;
+  /**
+   * True when the artisan left this piece's name blank. Absent (never
+   * `false`) only for a legacy result predating this field — see `baseName`.
+   */
+  isUnnamed?: boolean;
   originalHeight: number; originalWidth: number; height: number; width: number;
   x: number; y: number; rotated: boolean; sheetIndex: number; material?: MaterialType | null; color?: string;
   /** Which original request-level `pieces[]` entry this placed unit expands from (see `ExpandedPiece.originalIndex`). */
@@ -157,7 +185,12 @@ const UNPLACED_REASON_TEXT: Record<UnplacedReasonCode, string> = {
 };
 
 export interface ExpandedPiece extends Required<Pick<Piece, 'height' | 'width' | 'quantity' | 'material'>> {
-  originalIndex: number; id?: string; name?: string; originalHeight: number; originalWidth: number;
+  originalIndex: number; id?: string; name?: string;
+  /** See `PlacedPiece.baseName` — the artisan's own trimmed name, never a fallback/suffix. Undefined when `isUnnamed`. */
+  baseName?: string;
+  /** See `PlacedPiece.isUnnamed` — always a definite boolean here (never absent), since this is only ever produced fresh, never restored from a legacy record. */
+  isUnnamed: boolean;
+  originalHeight: number; originalWidth: number;
   rotatable: boolean; edges?: EdgeBandingConfig; color?: string;
   /** Set when a piece was never attempted for packing (e.g. no compatible stock). */
   unplacedReasonCode?: UnplacedReasonCode;
@@ -169,10 +202,16 @@ function expandPieces(pieces: Piece[], defaultMaterial: MaterialType, globalGrai
   const result: ExpandedPiece[] = [];
   pieces.forEach((p, i) => {
     const qty = Math.max(1, p.quantity || 1);
+    const baseName = p.name && p.name.trim() ? p.name.trim() : undefined;
+    const isUnnamed = baseName === undefined;
     for (let j = 0; j < qty; j++) {
       result.push({
         originalIndex: i, id: p.id ? `${p.id}_${j}` : `p${i}_${j}`,
-        name: qty > 1 ? `${p.name || `Pièce ${i + 1}`} ×${qty}` : p.name || `Pièce ${i + 1}`,
+        // Internal *display* name only (see PlacedPiece.name's doc comment)
+        // — the artisan's own clean name lives in `baseName` below.
+        name: qty > 1 ? `${baseName ?? `Pièce ${i + 1}`} ×${qty}` : baseName ?? `Pièce ${i + 1}`,
+        baseName,
+        isUnnamed,
         height: p.height, width: p.width, quantity: 1,
         material: (p.material || defaultMaterial) as MaterialType,
         originalHeight: p.height, originalWidth: p.width,
@@ -187,15 +226,20 @@ function expandPieces(pieces: Piece[], defaultMaterial: MaterialType, globalGrai
 
 // ─── 1D Linear Bar Optimization ───────────────────────────────────
 export interface BarResult {
-  barIndex: number; length: number; pieces: { name: string; length: number; x: number; color?: string }[];
+  barIndex: number; length: number;
+  pieces: { name: string; baseName?: string; isUnnamed: boolean; length: number; x: number; color?: string }[];
   usedLength: number; wasteRate: number;
 }
 
 function optimize1D(pieces: Piece[], stockLength: number, kerf: number): BarResult[] {
-  const items: { name: string; length: number; color?: string }[] = [];
+  const items: { name: string; baseName?: string; isUnnamed: boolean; length: number; color?: string }[] = [];
   pieces.forEach(p => {
+    const baseName = p.name && p.name.trim() ? p.name.trim() : undefined;
+    const isUnnamed = baseName === undefined;
     for (let j = 0; j < Math.max(1, p.quantity || 1); j++) {
-      items.push({ name: p.name || `Barre ${items.length + 1}`, length: Math.max(p.width, p.height), color: p.color });
+      // Internal *display* name only (see PlacedPiece.name's doc comment) —
+      // the artisan's own clean name lives in `baseName` below.
+      items.push({ name: baseName ?? `Barre ${items.length + 1}`, baseName, isUnnamed, length: Math.max(p.width, p.height), color: p.color });
     }
   });
   items.sort((a, b) => b.length - a.length); // Largest-first fit
@@ -227,7 +271,7 @@ export function optimizeCutting1D(pieces: Piece[], stockLength: number, kerf: nu
   const sheets: SheetResult[] = bars.map((b, i) => ({
     index: i, material: 'mdf' as MaterialType, width: stockLength, height: 1,
     pieces: b.pieces.map((p, j) => ({
-      pieceNumber: j + 1, name: p.name,
+      pieceNumber: j + 1, name: p.name, baseName: p.baseName, isUnnamed: p.isUnnamed,
       originalHeight: 1, originalWidth: p.length,
       height: 1, width: p.length, x: p.x, y: 0, rotated: false,
       sheetIndex: i, material: 'mdf' as MaterialType,
@@ -555,6 +599,8 @@ function packSheetWithStrategy(
       pieceId: item.id,
       pieceNumber: nextPieceNumber + pieces.length,
       name: item.name,
+      baseName: item.baseName,
+      isUnnamed: item.isUnnamed,
       originalHeight: item.originalHeight,
       originalWidth: item.originalWidth,
       height: placement.height,

@@ -1,4 +1,10 @@
+import { loadEnvConfig } from '@next/env';
 import { defineConfig, devices } from '@playwright/test';
+
+// Load .env.local (and friends) the same way `next dev`/`next build` do, so
+// the browser bundle's NEXT_PUBLIC_SUPABASE_URL and this config's derived
+// cookie key agree — Playwright itself never reads Next's env files.
+loadEnvConfig(process.cwd());
 
 export default defineConfig({
   testDir: './e2e',

@@ -147,6 +147,14 @@ test('the Vision limit is a documented, conservative constant', () => {
   assert.ok(VISION_RATE_LIMIT.windowMs >= 30_000, 'the window must be long enough to actually bound a burst');
 });
 
+test('the Quotation limit is a documented, conservative constant', () => {
+  const { QUOTATION_RATE_LIMIT } = loadTsModule('src/lib/rate-limit.ts');
+
+  assert.ok(Number.isInteger(QUOTATION_RATE_LIMIT.limit));
+  assert.ok(QUOTATION_RATE_LIMIT.limit > 0 && QUOTATION_RATE_LIMIT.limit <= 30, 'a per-user burst cap, not a free-for-all');
+  assert.ok(QUOTATION_RATE_LIMIT.windowMs >= 30_000, 'the window must be long enough to actually bound a burst');
+});
+
 test('the module states its instance-local limitation rather than implying a global quota', () => {
   const fs = require('node:fs');
   const path = require('node:path');

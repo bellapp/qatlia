@@ -185,35 +185,49 @@ interface CellTextStyles {
 }
 
 /**
- * Draws a single-line cell label at the exact position jspdf-autotable's own
- * (internal, not part of its public API) cell-text routine would use for the
- * given halign/valign — see `arabicSafeCellHooks` below for why this exists.
- * `text` is the raw logical string; shaping and bidi-reordering happen
- * inside `doc.text` itself (see `arabicBidiOptions`), so the halign
- * math below measures the *shaped* width (`doc.processArabic(text)`, a
- * pure, side-effect-free transform used only for this measurement — it is
- * never drawn) rather than the raw string's width, since letter-joining can
- * change a glyph's advance width. Every cell this is used for in this route
- * is a short label, never a wrapped multi-line paragraph, so this
- * intentionally only ports the single-line path of autoTable's routine.
+ * Draws every wrapped logical line of a cell label at the exact position
+ * jspdf-autotable's own (internal, not part of its public API) cell-text
+ * routine would use for the given halign/valign — see `arabicSafeCellHooks`
+ * below for why this exists, and for where `lines` comes from (autoTable's
+ * own already-wrapped `cell.text`, preserved before it gets blanked — never
+ * re-wrapped here with different metrics).
+ *
+ * Each element of `lines` is a raw logical string; shaping and
+ * bidi-reordering happen inside `doc.text` itself (see `arabicBidiOptions`),
+ * so the halign math below measures each line's own *shaped* width
+ * (`doc.processArabic(line)`, a pure, side-effect-free transform used only
+ * for this measurement — it is never drawn) rather than the raw string's
+ * width, since letter-joining can change a glyph's advance width, and two
+ * lines of the same cell can shape to different widths. `y` is always the
+ * position of the cell's *first* line (as `Cell.getTextPos()` returns it,
+ * regardless of how many lines the cell holds — see its own source); every
+ * subsequent line is stepped down by one `lineHeight`, and — for `valign`
+ * `middle`/`bottom` — the whole block is shifted up first by the combined
+ * height of every line, mirroring jspdf-autotable's own multi-line
+ * `autoTableText` helper. A single-element `lines` array reproduces the
+ * exact single-line geometry this function drew before it supported more
+ * than one line.
  */
-export function drawShapedCellText(doc: jsPDF, text: string, x: number, y: number, styles: CellTextStyles): void {
+export function drawShapedCellText(doc: jsPDF, lines: string[], x: number, y: number, styles: CellTextStyles): void {
   const PHYSICAL_LINE_HEIGHT = 1.15;
   const fontSize = doc.internal.scaleFactor === 0 ? 0 : doc.getFontSize() / doc.internal.scaleFactor;
   const lineHeight = fontSize * doc.getLineHeightFactor();
+  const lineCount = lines.length;
 
   let drawY = y + fontSize * (2 - PHYSICAL_LINE_HEIGHT);
-  if (styles.valign === 'middle') drawY -= lineHeight / 2;
-  else if (styles.valign === 'bottom') drawY -= lineHeight;
+  if (styles.valign === 'middle') drawY -= (lineCount / 2) * lineHeight;
+  else if (styles.valign === 'bottom') drawY -= lineCount * lineHeight;
 
-  let drawX = x;
-  if (styles.halign === 'center' || styles.halign === 'right') {
-    const alignSize = fontSize * (styles.halign === 'center' ? 0.5 : 1);
-    const shapedWidth = doc.getStringUnitWidth(doc.processArabic(text));
-    drawX -= shapedWidth * alignSize;
+  for (const line of lines) {
+    let drawX = x;
+    if (styles.halign === 'center' || styles.halign === 'right') {
+      const alignSize = fontSize * (styles.halign === 'center' ? 0.5 : 1);
+      const shapedWidth = doc.getStringUnitWidth(doc.processArabic(line));
+      drawX -= shapedWidth * alignSize;
+    }
+    doc.text(line, drawX, drawY, arabicBidiOptions);
+    drawY += lineHeight;
   }
-
-  doc.text(text, drawX, drawY, arabicBidiOptions);
 }
 
 /**
@@ -231,17 +245,35 @@ export function drawShapedCellText(doc: jsPDF, text: string, x: number, y: numbe
  * options as `{ willDrawCell: ..., didDrawCell: ... }` — intercept exactly
  * (and only) the cells whose raw content contains Arabic script:
  *  - `willDrawCell` fires after autoTable has already computed row
- *    heights/column widths from the cell's real text (so blanking it here
- *    cannot under-size the row), immediately before it draws the cell's own
- *    text. Setting `cell.text = []` makes autoTable's own draw call
- *    `doc.text([], ...)`, which jsPDF treats as a no-op (empty-array early
- *    return) — suppressing its own (wrongly-shaped, wrong-font) draw
- *    entirely, without ever touching the cell's *color* to hide it.
+ *    heights/column widths *and wrapped the cell's text to fit the column*
+ *    (`cell.text`, a `string[]` of one entry per wrapped logical line — see
+ *    jspdf-autotable's own `Cell` — so blanking it here cannot under-size
+ *    the row), immediately before it draws the cell's own text. Those
+ *    already-wrapped lines are saved (keyed by the `Cell` instance itself,
+ *    so a repeated header row — the *same* `Cell` object, redrawn once per
+ *    page by autoTable, not a fresh one per page — still preserves the
+ *    right lines for each page's own draw) before `cell.text = []` makes
+ *    autoTable's own draw call `doc.text([], ...)`, which jsPDF treats as a
+ *    no-op (empty-array early return) — suppressing its own (wrongly-shaped,
+ *    wrong-font) draw entirely, without ever touching the cell's *color* to
+ *    hide it. If `cell.text` is already empty here (defensively — should not
+ *    normally happen, see the next bullet), the raw string itself is used as
+ *    a single-line fallback rather than preserving nothing.
  *  - `didDrawCell` fires right after that (now-suppressed) draw. It draws
- *    the real label itself, in the correct font and shape/order, at the
- *    same position autoTable itself computed (`cell.getTextPos()`), in
- *    whatever ink color `cell.styles.textColor` already holds — the same
- *    color autoTable would have used, never overridden.
+ *    every one of the preserved wrapped lines itself, in the correct font
+ *    and shape/order, at the same position autoTable itself computed
+ *    (`cell.getTextPos()`), in whatever ink color `cell.styles.textColor`
+ *    already holds — the same color autoTable would have used, never
+ *    overridden. It then *restores* `cell.text` to those same preserved
+ *    lines (never leaves it blanked, and never deletes the map entry) so
+ *    that a repeated header row's `Cell` instance still holds its real
+ *    wrapped lines the next time `willDrawCell` runs for it on the
+ *    following page — without this restore, page 2's `willDrawCell` would
+ *    capture the `[]` this hook's own page-1 blank left behind, and page 2's
+ *    header would draw nothing at all. A cell whose lines were never
+ *    preserved, or were preserved as an empty array (both defensive-only —
+ *    should not happen given the two paragraphs above), falls back to the
+ *    cell's raw string as a single line.
  *
  * A cell with no Arabic content (almost every numeric/dimension cell, even
  * in an Arabic-locale export) is untouched by either hook — autoTable's own
@@ -251,21 +283,33 @@ export function arabicSafeCellHooks(
   doc: jsPDF,
   registration: FontRegistration
 ): Pick<UserOptions, 'willDrawCell' | 'didDrawCell'> {
+  // Bridges the two hooks for one specific draw of one specific cell — see
+  // the doc comment above. Scoped to this one `arabicSafeCellHooks` call
+  // (fresh per PDF render), not module-level state.
+  const preservedLines = new WeakMap<CellHookData['cell'], string[]>();
+
   return {
     willDrawCell(data: CellHookData): void {
       const raw = data.cell.raw;
-      if (typeof raw === 'string' && containsArabicScript(raw)) {
-        data.cell.text = [];
-      }
+      if (typeof raw !== 'string' || !containsArabicScript(raw)) return;
+      const wrapped = data.cell.text;
+      preservedLines.set(data.cell, wrapped.length > 0 ? [...wrapped] : [raw]);
+      data.cell.text = [];
     },
     didDrawCell(data: CellHookData): void {
       const raw = data.cell.raw;
       if (typeof raw !== 'string' || !containsArabicScript(raw)) return;
+      const stored = preservedLines.get(data.cell);
+      const lines = stored && stored.length > 0 ? stored : [raw];
       const pos = data.cell.getTextPos();
       const priorFont = registration.ok ? doc.getFont() : null;
       if (priorFont) doc.setFont(AMIRI_FONT_FAMILY, priorFont.fontStyle);
-      drawShapedCellText(doc, stripBidiControls(raw), pos.x, pos.y, data.cell.styles);
+      drawShapedCellText(doc, lines.map(stripBidiControls), pos.x, pos.y, data.cell.styles);
       if (priorFont) doc.setFont(priorFont.fontName, priorFont.fontStyle);
+      // Restore, rather than delete-and-leave-blank: see the didDrawCell
+      // bullet above — a repeated header Cell instance needs real lines
+      // here for its *next* page's willDrawCell to preserve.
+      data.cell.text = lines;
     },
   };
 }

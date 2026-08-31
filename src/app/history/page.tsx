@@ -54,6 +54,15 @@ interface ProjectHistoryItem {
  */
 const CANONICAL_UNIT: DisplayUnit = 'cm';
 
+/**
+ * A local-only history entry's `id` (see src/lib/history.ts's
+ * `writeLocalHistoryItem`, e.g. `optimize_1699999999999`) is never a real
+ * server project id — only a cloud-synced entry's id (a genuine Supabase
+ * UUID) is safe to hand to `/api/export-quotation` as `projectId`, which
+ * validates it as a UUID and would otherwise 400 the whole quote.
+ */
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 /** Materials an artisan can filter the list by, in the order they are offered. */
 const FILTERABLE_MATERIALS = ['mdf', 'aluminium', 'verre'] as const;
 
@@ -189,6 +198,13 @@ export default function HistoryPage() {
   const handleLoadProject = (project: ProjectHistoryItem) => {
     if (project.options_json) {
       sessionStorage.setItem('qatlia_saved_project', JSON.stringify(project.options_json));
+      // Read back by atelier/page.tsx's restore effect so QuotationDialog's
+      // `projectId` targets the project the artisan actually opened here,
+      // not only the most recent auto-save (Task 8 remediation — item 10).
+      // A locally-only history entry's id is never a real server UUID (see
+      // UUID_PATTERN's own doc comment) — nothing valid to restore there.
+      if (UUID_PATTERN.test(project.id)) sessionStorage.setItem('qatlia_restored_project_id', project.id);
+      else sessionStorage.removeItem('qatlia_restored_project_id');
       window.location.href = '/atelier';
     }
   };

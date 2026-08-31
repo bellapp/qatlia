@@ -634,6 +634,87 @@ export const fr = {
     switchToSignup: 'Pas de compte ? Créer un compte (+ {count} crédits)',
     backToAtelier: 'Retour à l’atelier',
   },
+  /**
+   * The client-quotation dialog (Task 8). This UI can run in all three app
+   * locales; the generated PDF *document* itself is only ever French or
+   * Arabic (see src/lib/quotation.ts's `QUOTATION_LOCALES` and
+   * src/lib/exports/quotation-catalog.ts) — `outputLocale` below is that
+   * document-language choice, independent of the UI locale showing this
+   * dialog.
+   */
+  quotation: {
+    openButton: 'Devis client',
+    openButtonAria: 'Générer un devis client au format PDF',
+    title: 'Devis client',
+    subtitle: 'Génère un devis PDF prêt à envoyer, à partir du chiffrage actuel du plan.',
+    authRequired: 'Connectez-vous pour générer un devis client.',
+    companySection: 'Votre entreprise',
+    clientSection: 'Client',
+    fields: {
+      companyName: 'Nom de l’entreprise',
+      companyAddress: 'Adresse',
+      companyPhone: 'Téléphone',
+      companyEmail: 'Email',
+      companyIce: 'ICE',
+      companyTaxId: 'IF',
+      clientName: 'Nom du client',
+      clientAddress: 'Adresse',
+      clientPhone: 'Téléphone',
+      clientEmail: 'Email',
+      quoteNumber: 'N° de devis',
+      issueDate: 'Date d’émission',
+      expiryDate: 'Validité jusqu’au',
+      /** Optional artisan-facing reference (e.g. a client's own order/PO number) — bounded, never required. */
+      projectReference: 'Référence projet',
+      notes: 'Notes',
+    },
+    delivery: {
+      label: 'Livraison',
+      amount: 'Montant (MAD)',
+    },
+    discount: {
+      label: 'Remise',
+      modeNone: 'Aucune',
+      modePercentage: 'Pourcentage',
+      modeFixed: 'Montant fixe',
+      value: 'Valeur',
+    },
+    vat: {
+      enable: 'Appliquer la TVA',
+      rate: 'Taux (%)',
+      disabledNote: 'Aucune TVA appliquée par défaut — cochez la case pour en ajouter une.',
+    },
+    outputLocale: {
+      label: 'Langue du document',
+      fr: 'Français',
+      ar: 'Arabe',
+    },
+    amountInWords: 'Indiquer le montant en toutes lettres',
+    logo: {
+      label: 'Logo (optionnel)',
+      hint: 'PNG ou JPEG, 500 Ko maximum.',
+      remove: 'Retirer le logo',
+      tooLarge: 'Ce fichier dépasse 500 Ko.',
+      badType: 'Seuls les fichiers PNG ou JPEG sont acceptés.',
+    },
+    submit: 'Générer le PDF',
+    generating: 'Génération…',
+    savedToProject: 'Devis enregistré sur le projet.',
+    notSaved: 'Devis généré (non enregistré sur un projet).',
+    errors: {
+      authRequired: 'Connectez-vous pour générer un devis.',
+      rateLimited: 'Trop de devis générés en peu de temps. Patientez un instant avant de réessayer.',
+      invalidLogo: 'Le logo est invalide (format ou taille non accepté).',
+      invalidInput: 'Certains champs du devis sont invalides. Vérifiez le formulaire.',
+      payloadTooLarge: 'Le devis est trop volumineux à envoyer. Raccourcissez les notes ou les détails.',
+      amountInWordsTooLarge: 'Le montant total est trop élevé pour être exprimé en toutes lettres.',
+      projectNotFound: 'Ce projet est introuvable.',
+      generic: 'La génération du devis a échoué. Réessayez.',
+      tooManyPanelGroups: 'Ce plan utilise {count} formats de panneaux distincts, plus que les {max} qu’un devis peut lister. Simplifiez le plan ou contactez le support.',
+      tooManyPieceGroups: 'Ce plan utilise {count} formats de pièces distincts, plus que les {max} qu’un devis peut lister. Simplifiez le plan ou contactez le support.',
+    },
+    closeAria: 'Fermer',
+  },
 };
 
 export type Catalog = typeof fr;

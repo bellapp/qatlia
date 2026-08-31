@@ -214,6 +214,283 @@ test('drawContentAwareText strips bidi control characters even from otherwise-La
   assert.equal(drawnText, '31/08/2026');
 });
 
+// ─── drawShapedCellText: multi-line geometry, single-line behavior unchanged ──
+
+function makeMeasurableDoc() {
+  // A real jsPDF instance so getFontSize/getLineHeightFactor/scaleFactor/
+  // getStringUnitWidth/processArabic behave exactly as in production —
+  // only doc.text is spied on, to record every draw call's arguments.
+  const doc = new jsPDF();
+  doc.setFontSize(10);
+  const draws = [];
+  const originalText = doc.text.bind(doc);
+  doc.text = (text, x, y, options) => {
+    draws.push({ text, x, y, options });
+    return originalText(text, x, y, options);
+  };
+  return { doc, draws };
+}
+
+test('drawShapedCellText with a single-line array reproduces the exact prior single-line geometry (left/top)', () => {
+  const { drawShapedCellText } = load();
+  const { doc, draws } = makeMeasurableDoc();
+  drawShapedCellText(doc, ['قطعة واحدة'], 50, 60, {});
+  assert.equal(draws.length, 1, 'a single line must draw exactly once');
+  assert.equal(draws[0].x, 50, 'left halign must never shift x');
+  const fontSize = doc.getFontSize() / doc.internal.scaleFactor;
+  assert.equal(draws[0].y, 60 + fontSize * (2 - 1.15));
+});
+
+test('drawShapedCellText with a single-line array reproduces the exact prior single-line geometry (center/middle)', () => {
+  const { drawShapedCellText } = load();
+  const { doc, draws } = makeMeasurableDoc();
+  const text = 'قطعة';
+  drawShapedCellText(doc, [text], 50, 60, { halign: 'center', valign: 'middle' });
+  assert.equal(draws.length, 1);
+  const fontSize = doc.getFontSize() / doc.internal.scaleFactor;
+  const lineHeight = fontSize * doc.getLineHeightFactor();
+  const shapedWidth = doc.getStringUnitWidth(doc.processArabic(text));
+  assert.equal(draws[0].x, 50 - shapedWidth * fontSize * 0.5);
+  assert.equal(draws[0].y, 60 + fontSize * (2 - 1.15) - lineHeight / 2);
+});
+
+test('drawShapedCellText draws every wrapped logical line, stepping y by one lineHeight per line', () => {
+  const { drawShapedCellText } = load();
+  const { doc, draws } = makeMeasurableDoc();
+  const lines = ['السطر الأول', 'السطر الثاني', 'السطر الثالث'];
+  drawShapedCellText(doc, lines, 50, 60, {});
+  assert.equal(draws.length, 3, 'every wrapped line must be drawn, not just the first');
+  assert.deepEqual(draws.map((d) => d.text), lines, 'lines must be drawn in order');
+  const fontSize = doc.getFontSize() / doc.internal.scaleFactor;
+  const lineHeight = fontSize * doc.getLineHeightFactor();
+  const firstY = 60 + fontSize * (2 - 1.15);
+  assert.equal(draws[0].y, firstY);
+  assert.equal(draws[1].y, firstY + lineHeight);
+  assert.equal(draws[2].y, firstY + 2 * lineHeight);
+  // Left halign: every line shares the same x — never shifted per-line.
+  assert.ok(draws.every((d) => d.x === 50));
+});
+
+test('drawShapedCellText right/center-aligns each wrapped line independently by its own shaped width, not the first line\'s width', () => {
+  const { drawShapedCellText } = load();
+  const { doc, draws } = makeMeasurableDoc();
+  const shortLine = 'قطعة';
+  const longLine = 'قطعة طويلة جدا جدا';
+  drawShapedCellText(doc, [shortLine, longLine], 100, 60, { halign: 'right' });
+  assert.equal(draws.length, 2);
+  const fontSize = doc.getFontSize() / doc.internal.scaleFactor;
+  const shortWidth = doc.getStringUnitWidth(doc.processArabic(shortLine));
+  const longWidth = doc.getStringUnitWidth(doc.processArabic(longLine));
+  assert.equal(draws[0].x, 100 - shortWidth * fontSize);
+  assert.equal(draws[1].x, 100 - longWidth * fontSize);
+  assert.notEqual(draws[0].x, draws[1].x, 'two differently-shaped lines must right-align to different x offsets');
+});
+
+test('drawShapedCellText shifts the whole multi-line block up for valign middle/bottom, using the true line count', () => {
+  const { drawShapedCellText } = load();
+  const { doc, draws } = makeMeasurableDoc();
+  const lines = ['أ', 'ب', 'ج'];
+  drawShapedCellText(doc, lines, 50, 60, { valign: 'bottom' });
+  const fontSize = doc.getFontSize() / doc.internal.scaleFactor;
+  const lineHeight = fontSize * doc.getLineHeightFactor();
+  const firstY = 60 + fontSize * (2 - 1.15) - lines.length * lineHeight;
+  const closeTo = (actual, expected) => assert.ok(Math.abs(actual - expected) < 1e-9, `expected ${actual} ~= ${expected}`);
+  closeTo(draws[0].y, firstY);
+  closeTo(draws[2].y, firstY + 2 * lineHeight);
+});
+
+test('drawShapedCellText passes arabicBidiOptions on every line, not just the first', () => {
+  const { drawShapedCellText, arabicBidiOptions } = load();
+  const { doc, draws } = makeMeasurableDoc();
+  drawShapedCellText(doc, ['أ', 'ب'], 50, 60, {});
+  for (const d of draws) assert.deepEqual(d.options, arabicBidiOptions);
+});
+
+// ─── arabicSafeCellHooks: multi-line cell.text preserved, redrawn, isolated ──
+
+function fakeCellHookData({ raw, text, styles = {}, textPos = { x: 12, y: 34 } }) {
+  return {
+    cell: {
+      raw,
+      text,
+      styles,
+      getTextPos: () => textPos,
+    },
+  };
+}
+
+test('arabicSafeCellHooks preserves autoTable\'s already-wrapped multi-line cell.text before blanking it, and redraws every line', async () => {
+  const { arabicSafeCellHooks, registerAmiriFont, AMIRI_FONT_FAMILY } = load();
+  const doc = new jsPDF();
+  const registration = await registerAmiriFont(doc);
+  const hooks = arabicSafeCellHooks(doc, registration);
+
+  const wrappedLines = ['هذا نص طويل جدا', 'يمتد على أكثر', 'من سطر واحد'];
+  const data = fakeCellHookData({ raw: wrappedLines.join(' '), text: [...wrappedLines] });
+
+  hooks.willDrawCell(data);
+  assert.deepEqual(data.cell.text, [], 'autoTable\'s own (wrong-font) draw must be suppressed');
+
+  const draws = [];
+  const fontsDuringDraw = [];
+  const originalText = doc.text.bind(doc);
+  doc.text = (text, x, y, options) => {
+    draws.push(text);
+    fontsDuringDraw.push(doc.getFont().fontName);
+    return originalText(text, x, y, options);
+  };
+
+  hooks.didDrawCell(data);
+  doc.text = originalText;
+
+  assert.equal(draws.length, wrappedLines.length, 'every preserved wrapped line must be redrawn, not just one');
+  assert.deepEqual(draws, wrappedLines, 'must redraw the exact preserved lines, not the joined raw string as one line');
+  assert.ok(
+    fontsDuringDraw.every((name) => name === AMIRI_FONT_FAMILY),
+    `every line must draw with the embedded Amiri font, got ${fontsDuringDraw}`
+  );
+  assert.equal(doc.getFont().fontName, 'helvetica', 'the prior font must be restored after drawing every line');
+});
+
+test('arabicSafeCellHooks keeps single-line cells drawing exactly once (unchanged behavior)', async () => {
+  const { arabicSafeCellHooks, registerAmiriFont } = load();
+  const doc = new jsPDF();
+  const registration = await registerAmiriFont(doc);
+  const hooks = arabicSafeCellHooks(doc, registration);
+
+  const data = fakeCellHookData({ raw: 'قطعة واحدة', text: ['قطعة واحدة'] });
+  hooks.willDrawCell(data);
+
+  const draws = [];
+  const originalText = doc.text.bind(doc);
+  doc.text = (text, x, y, options) => {
+    draws.push(text);
+    return originalText(text, x, y, options);
+  };
+  hooks.didDrawCell(data);
+  doc.text = originalText;
+
+  assert.deepEqual(draws, ['قطعة واحدة']);
+});
+
+test('arabicSafeCellHooks isolates preserved lines per cell instance — two Arabic cells drawn back-to-back never cross-contaminate', async () => {
+  const { arabicSafeCellHooks, registerAmiriFont } = load();
+  const doc = new jsPDF();
+  const registration = await registerAmiriFont(doc);
+  const hooks = arabicSafeCellHooks(doc, registration);
+
+  const cellA = fakeCellHookData({ raw: 'أ ب', text: ['أ', 'ب'] });
+  const cellB = fakeCellHookData({ raw: 'ج د هـ', text: ['ج', 'د', 'هـ'] });
+
+  hooks.willDrawCell(cellA);
+  hooks.willDrawCell(cellB);
+
+  const draws = [];
+  const originalText = doc.text.bind(doc);
+  doc.text = (text, x, y, options) => {
+    draws.push(text);
+    return originalText(text, x, y, options);
+  };
+  hooks.didDrawCell(cellA);
+  hooks.didDrawCell(cellB);
+  doc.text = originalText;
+
+  assert.deepEqual(draws, ['أ', 'ب', 'ج', 'د', 'هـ']);
+});
+
+test('arabicSafeCellHooks restores cell.text after didDrawCell, so a repeated header Cell instance redraws correctly across two will/did cycles (multi-page autoTable)', async () => {
+  const { arabicSafeCellHooks, registerAmiriFont } = load();
+  const doc = new jsPDF();
+  const registration = await registerAmiriFont(doc);
+  const hooks = arabicSafeCellHooks(doc, registration);
+
+  // autoTable repeats a header row by redrawing the *same* Cell instance on
+  // every page, not by creating a fresh one — this simulates exactly that:
+  // two will/did cycles on one `data` object, as if for pages 1 and 2.
+  const headerLines = ['التسمية'];
+  const data = fakeCellHookData({ raw: headerLines.join(' '), text: [...headerLines] });
+
+  const draws = [];
+  const originalText = doc.text.bind(doc);
+  doc.text = (text, x, y, options) => {
+    draws.push(text);
+    return originalText(text, x, y, options);
+  };
+
+  // Page 1.
+  hooks.willDrawCell(data);
+  assert.deepEqual(data.cell.text, [], 'must blank before autoTable\'s own (page 1) draw');
+  hooks.didDrawCell(data);
+  assert.deepEqual(
+    data.cell.text,
+    headerLines,
+    'must restore cell.text to the preserved lines after page 1\'s draw, not leave it blanked'
+  );
+
+  // Page 2 — same Cell instance, redrawn by autoTable for the repeated header.
+  hooks.willDrawCell(data);
+  assert.deepEqual(
+    data.cell.text,
+    [],
+    'must blank again before autoTable\'s own (page 2) draw, using the lines restored after page 1'
+  );
+  hooks.didDrawCell(data);
+  assert.deepEqual(data.cell.text, headerLines, 'must restore again after page 2\'s draw');
+
+  doc.text = originalText;
+  assert.deepEqual(
+    draws,
+    [...headerLines, ...headerLines],
+    'the header line must be redrawn identically on both pages, not blank on the second'
+  );
+});
+
+test('arabicSafeCellHooks falls back to the raw string when preserved lines would otherwise be empty', async () => {
+  const { arabicSafeCellHooks, registerAmiriFont } = load();
+  const doc = new jsPDF();
+  const registration = await registerAmiriFont(doc);
+  const hooks = arabicSafeCellHooks(doc, registration);
+
+  // A cell whose `cell.text` is already empty when willDrawCell runs
+  // (defensive-only case — see the doc comment) must still preserve
+  // something to redraw, rather than silently drawing nothing.
+  const data = fakeCellHookData({ raw: 'قطعة واحدة', text: [] });
+  hooks.willDrawCell(data);
+  assert.deepEqual(data.cell.text, [], 'must still blank cell.text for autoTable\'s own draw');
+
+  const draws = [];
+  const originalText = doc.text.bind(doc);
+  doc.text = (text, x, y, options) => {
+    draws.push(text);
+    return originalText(text, x, y, options);
+  };
+  hooks.didDrawCell(data);
+  doc.text = originalText;
+
+  assert.deepEqual(draws, ['قطعة واحدة'], 'must fall back to the raw string as a single line');
+  assert.deepEqual(data.cell.text, ['قطعة واحدة'], 'must restore cell.text to the same fallback line');
+});
+
+test('arabicSafeCellHooks leaves non-Arabic cells completely untouched by either hook', () => {
+  const { arabicSafeCellHooks, NOT_REGISTERED } = load();
+  const doc = new jsPDF();
+  const hooks = arabicSafeCellHooks(doc, NOT_REGISTERED);
+  const data = fakeCellHookData({ raw: 'Sous-total', text: ['Sous-total'] });
+
+  hooks.willDrawCell(data);
+  assert.deepEqual(data.cell.text, ['Sous-total'], 'a non-Arabic cell\'s text must never be blanked');
+
+  let drawCalled = false;
+  const originalText = doc.text.bind(doc);
+  doc.text = (...args) => {
+    drawCalled = true;
+    return originalText(...args);
+  };
+  hooks.didDrawCell(data);
+  doc.text = originalText;
+  assert.equal(drawCalled, false, 'didDrawCell must never draw for a non-Arabic cell');
+});
+
 // ─── Generating a real Arabic PDF ──────────────────────────────────────────
 
 test('a jsPDF document with the registered Amiri font and drawContentAwareText produces a real, non-trivial PDF embedding "Amiri"', async () => {

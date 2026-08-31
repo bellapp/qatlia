@@ -389,6 +389,138 @@ test('computeQuotationTotals: the quotation layer never recomputes material/edge
   assert.equal(totals.subtotal, breakdown.subtotal);
 });
 
+// ─── Quotation layer: delivery cost (Task 8 — client quotations) ─────────
+//
+// Delivery, like tax/discount, only ever applies in the quotation wrapper —
+// never inside computeCostBreakdown's material/edge/labor subtotal. It must
+// still be included in the pre-tax base that discount and tax are computed
+// against, deterministically, exactly like the subtotal always was.
+
+test('computeQuotationTotals: omitting deliveryCost defaults to 0 and behaves exactly as before', () => {
+  const { computeQuotationTotals } = loadCosting();
+  const totals = computeQuotationTotals({
+    costBreakdown: flatBreakdown(1000),
+    tax: { mode: 'percentage', ratePercent: 20 },
+    discount: { mode: 'percentage', value: 10 },
+  });
+  assert.equal(totals.deliveryCost, 0);
+  assert.equal(totals.discount, 100);
+  assert.equal(totals.tax, 180);
+  assert.equal(totals.total, 1080);
+});
+
+test('computeQuotationTotals: deliveryCost is added to the pre-tax base before discount and tax', () => {
+  const { computeQuotationTotals } = loadCosting();
+  const totals = computeQuotationTotals({
+    costBreakdown: flatBreakdown(1000),
+    tax: { mode: 'percentage', ratePercent: 20 },
+    discount: { mode: 'none' },
+    deliveryCost: 100,
+  });
+  // (1000 + 100) taxable base; 20% tax = 220; total = 1320.
+  assert.equal(totals.deliveryCost, 100);
+  assert.equal(totals.tax, 220);
+  assert.equal(totals.total, 1320);
+});
+
+test('computeQuotationTotals: a percentage discount applies to (subtotal + deliveryCost), not subtotal alone', () => {
+  const { computeQuotationTotals } = loadCosting();
+  const totals = computeQuotationTotals({
+    costBreakdown: flatBreakdown(1000),
+    tax: { mode: 'none' },
+    discount: { mode: 'percentage', value: 10 },
+    deliveryCost: 200,
+  });
+  // (1000 + 200) * 10% = 120 discount; total = 1080.
+  assert.equal(totals.discount, 120);
+  assert.equal(totals.total, 1080);
+});
+
+test('computeQuotationTotals: a fixed discount larger than subtotal+deliveryCost clamps to that base, never negative', () => {
+  const { computeQuotationTotals } = loadCosting();
+  const totals = computeQuotationTotals({
+    costBreakdown: flatBreakdown(100),
+    tax: { mode: 'none' },
+    discount: { mode: 'fixed', value: 500 },
+    deliveryCost: 50,
+  });
+  assert.equal(totals.discount, 150);
+  assert.equal(totals.total, 0);
+});
+
+test('computeQuotationTotals: rejects a negative deliveryCost instead of silently subtracting', () => {
+  const { computeQuotationTotals } = loadCosting();
+  assert.throws(() => computeQuotationTotals({
+    costBreakdown: flatBreakdown(1000),
+    tax: { mode: 'none' },
+    discount: { mode: 'none' },
+    deliveryCost: -1,
+  }), RangeError);
+});
+
+test('computeQuotationTotals: rejects a non-finite deliveryCost', () => {
+  const { computeQuotationTotals } = loadCosting();
+  assert.throws(() => computeQuotationTotals({
+    costBreakdown: flatBreakdown(1000),
+    tax: { mode: 'none' },
+    discount: { mode: 'none' },
+    deliveryCost: Infinity,
+  }), RangeError);
+});
+
+// ─── preTaxBase: the canonical (subtotal + deliveryCost) base, so callers
+// never recompute it independently (Task 8 remediation — item 4) ──────────
+
+test('computeQuotationTotals: exposes preTaxBase = subtotal + deliveryCost, before discount/tax', () => {
+  const { computeQuotationTotals } = loadCosting();
+  const totals = computeQuotationTotals({
+    costBreakdown: flatBreakdown(1000),
+    tax: { mode: 'percentage', ratePercent: 20 },
+    discount: { mode: 'percentage', value: 10 },
+    deliveryCost: 200,
+  });
+  assert.equal(totals.preTaxBase, 1200);
+});
+
+test('computeQuotationTotals: preTaxBase defaults to the bare subtotal when deliveryCost is omitted', () => {
+  const { computeQuotationTotals } = loadCosting();
+  const totals = computeQuotationTotals({
+    costBreakdown: flatBreakdown(1000),
+    tax: { mode: 'none' },
+    discount: { mode: 'none' },
+  });
+  assert.equal(totals.preTaxBase, 1000);
+});
+
+test('computeQuotationTotals: preTaxBase never itself reflects discount or tax', () => {
+  const { computeQuotationTotals } = loadCosting();
+  const totals = computeQuotationTotals({
+    costBreakdown: flatBreakdown(100),
+    tax: { mode: 'percentage', ratePercent: 20 },
+    discount: { mode: 'fixed', value: 500 },
+    deliveryCost: 50,
+  });
+  assert.equal(totals.preTaxBase, 150);
+  assert.equal(totals.discount, 150);
+  assert.equal(totals.tax, 0);
+});
+
+test('computeQuotationTotals: deliveryCost never changes the plan-level subtotal/material/edge/labor fields', () => {
+  const { computeQuotationTotals } = loadCosting();
+  const breakdown = flatBreakdown(777);
+  const totals = computeQuotationTotals({
+    costBreakdown: breakdown,
+    tax: { mode: 'none' },
+    discount: { mode: 'none' },
+    deliveryCost: 33,
+  });
+  assert.equal(totals.subtotal, breakdown.subtotal);
+  assert.equal(totals.materialCost, breakdown.materialCost);
+  assert.equal(totals.edgeCost, breakdown.edgeCost);
+  assert.equal(totals.laborCost, breakdown.laborCost);
+  assert.equal(totals.total, 810);
+});
+
 // ─── Cross-surface equivalence: optimizer, PDF, and quotation agree ──────
 
 test('cross-surface equivalence: optimizeCutting2D wires its cost fields through computeCostBreakdown, not an ad hoc formula', () => {

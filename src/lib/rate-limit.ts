@@ -56,6 +56,17 @@ export interface RateLimiter {
  */
 export const VISION_RATE_LIMIT = { limit: 10, windowMs: 60_000 } as const;
 
+/**
+ * The client-quotation PDF budget: 15 generations per minute per user.
+ *
+ * A quotation render is real work (jsPDF + autoTable + optionally the
+ * embedded Amiri font, plus a DB read/write when a projectId is supplied) but
+ * costs no credit — sized generously enough that an artisan iterating on a
+ * quote's discount/notes before sending it never sees a 429, while still
+ * stopping a scripted loop from hammering the renderer or the DB.
+ */
+export const QUOTATION_RATE_LIMIT = { limit: 15, windowMs: 60_000 } as const;
+
 export function createRateLimiter({ limit, windowMs, now = Date.now, maxKeys = 10_000 }: RateLimiterOptions): RateLimiter {
   if (!Number.isInteger(limit) || limit <= 0 || !Number.isFinite(windowMs) || windowMs <= 0) {
     throw new Error(`INVALID_RATE_LIMIT: limit=${String(limit)} windowMs=${String(windowMs)}`);

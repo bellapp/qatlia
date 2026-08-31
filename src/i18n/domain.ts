@@ -141,6 +141,29 @@ export function checkoutErrorKey(code: unknown): TranslationKey {
 }
 
 /**
+ * Customer-facing copy for each machine-readable code returned by
+ * `/api/export-quotation`. Same contract as the vision/checkout routes above:
+ * the payload keeps its stable code, and the workshop shows the artisan's
+ * own language instead of a raw code or an internal message.
+ */
+export const QUOTATION_ERROR_KEYS: Record<string, TranslationKey> = {
+  AUTH_REQUIRED: 'quotation.errors.authRequired',
+  INVALID_INPUT: 'quotation.errors.invalidInput',
+  PAYLOAD_TOO_LARGE: 'quotation.errors.payloadTooLarge',
+  RATE_LIMITED: 'quotation.errors.rateLimited',
+  LOGO_INVALID: 'quotation.errors.invalidLogo',
+  PROJECT_NOT_FOUND: 'quotation.errors.projectNotFound',
+  PROJECT_LOOKUP_FAILED: 'quotation.errors.generic',
+  QUOTATION_COMPUTATION_FAILED: 'quotation.errors.invalidInput',
+  AMOUNT_IN_WORDS_TOO_LARGE: 'quotation.errors.amountInWordsTooLarge',
+  QUOTATION_EXPORT_FAILED: 'quotation.errors.generic',
+};
+
+export function quotationErrorKey(code: unknown): TranslationKey {
+  return (typeof code === 'string' && QUOTATION_ERROR_KEYS[code]) || 'quotation.errors.generic';
+}
+
+/**
  * Wording for one credit pack. The figures are never here: the MAD price and
  * the monthly allowance stay in `src/lib/billing/catalog.ts` and are
  * interpolated as `{price}` / `{count}`, so a translation cannot change what is

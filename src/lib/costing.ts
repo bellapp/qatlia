@@ -229,14 +229,33 @@ export interface QuotationInput {
   costBreakdown: CostBreakdown;
   tax: QuotationTax;
   discount: QuotationDiscount;
+  /**
+   * Explicit MAD delivery/shipping fee, defaulting to 0 so every existing
+   * caller that never configured delivery sees no change. Like tax and
+   * discount, delivery only ever exists in this quotation wrapper — it is
+   * never added to `costBreakdown.subtotal` itself, and never rederives
+   * material/edge/labor.
+   */
+  deliveryCost?: number;
 }
 
 export interface QuotationTotals extends CostBreakdown {
-  /** MAD amount actually deducted (already resolved from percentage/fixed and clamped to the subtotal). */
+  /** The resolved (validated) MAD delivery fee this quotation was computed with. 0 when none was given. */
+  deliveryCost: number;
+  /**
+   * The canonical (subtotal + deliveryCost) base, before discount/tax —
+   * exactly what discount is computed against (see `resolveDiscountAmount`).
+   * Every caller that needs "subtotal including delivery" (e.g. a PDF's
+   * line-item table) must read this field rather than re-deriving
+   * `subtotal + deliveryCost` itself, so a quotation's displayed pre-tax
+   * base can never drift from what discount/tax were actually computed on.
+   */
+  preTaxBase: number;
+  /** MAD amount actually deducted (already resolved from percentage/fixed and clamped to subtotal + deliveryCost). */
   discount: number;
   /** MAD amount actually charged (already resolved from the taxable base). */
   tax: number;
-  /** subtotal - discount + tax. */
+  /** (subtotal + deliveryCost) - discount + tax. */
   total: number;
 }
 
@@ -277,26 +296,34 @@ function resolveTaxAmount(tax: QuotationTax, taxableBase: number): number {
 }
 
 /**
- * Applies tax/discount on top of an already-computed `CostBreakdown`. Never
- * recomputes material/edge/labor — those come from `computeCostBreakdown`
- * verbatim, which is what keeps a quotation's totals identical to the plan
- * screen and the PDF export it was generated from.
+ * Applies delivery/tax/discount on top of an already-computed
+ * `CostBreakdown`. Never recomputes material/edge/labor — those come from
+ * `computeCostBreakdown` verbatim, which is what keeps a quotation's totals
+ * identical to the plan screen and the PDF export it was generated from.
  *
- * Discount is applied to the subtotal first; tax is then charged on the
- * discounted (taxable) base. This matches standard invoicing practice and
- * is documented here rather than left implicit.
+ * `deliveryCost` (default 0) is folded into the pre-tax base *before*
+ * discount and tax are resolved — a delivery fee is part of what the client
+ * owes, so a percentage discount/VAT computed only on `subtotal` would
+ * quietly under- or over-charge relative to the amount actually invoiced.
+ * Discount is then applied to that (subtotal + delivery) base first; tax is
+ * charged on the discounted (taxable) base. This matches standard invoicing
+ * practice and is documented here rather than left implicit.
  */
 export function computeQuotationTotals(input: QuotationInput): QuotationTotals {
   const { costBreakdown, tax, discount } = input;
-  const { subtotal } = costBreakdown;
+  const deliveryCost = input.deliveryCost ?? 0;
+  assertFiniteNonNegative(deliveryCost, 'computeQuotationTotals', 'deliveryCost');
 
-  const discountAmount = resolveDiscountAmount(discount, subtotal);
-  const taxableBase = roundCurrency(subtotal - discountAmount);
+  const preTaxBase = roundCurrency(costBreakdown.subtotal + deliveryCost);
+  const discountAmount = resolveDiscountAmount(discount, preTaxBase);
+  const taxableBase = roundCurrency(preTaxBase - discountAmount);
   const taxAmount = resolveTaxAmount(tax, taxableBase);
   const total = roundCurrency(taxableBase + taxAmount);
 
   return {
     ...costBreakdown,
+    deliveryCost,
+    preTaxBase,
     discount: discountAmount,
     tax: taxAmount,
     total,
