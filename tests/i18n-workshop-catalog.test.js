@@ -54,6 +54,8 @@ const SHARED_TOKENS = new Set([
   'auth.emailPlaceholder',
   // Pure composition template: both halves are themselves translated.
   'pieces.import.summary',
+  // Industry abbreviation, printed the same on a Moroccan panel in any language.
+  'materials.badge.mdf',
 ]);
 
 /**
@@ -64,6 +66,7 @@ const SHARED_TOKENS = new Set([
 const IDENTICAL_IN_ENGLISH = new Set([
   ...SHARED_TOKENS,
   'materials.aluminium',
+  'materials.badge.aluminium',
   'atelier.cost.total',
   'atelier.cutOrder.rotation',
   'emptyState.step1',

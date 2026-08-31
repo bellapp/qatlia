@@ -133,6 +133,24 @@ export function formatNumber(locale: Locale, value: number, options?: Intl.Numbe
 }
 
 /**
+ * Locale-aware date/time formatting for customer-facing timestamps (a saved
+ * project, a credit movement).
+ *
+ * Arabic goes through `ar-MA-u-nu-latn` like every other figure, so a Moroccan
+ * artisan reads Western digits in an Arabic sentence. A timestamp that does not
+ * parse renders as an em dash rather than as "Invalid Date".
+ */
+export function formatDateTime(
+  locale: Locale,
+  value: string | number | Date,
+  options: Intl.DateTimeFormatOptions
+): string {
+  const date = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(date.getTime())) return '—';
+  return new Intl.DateTimeFormat(INTL_LOCALES[locale] ?? INTL_LOCALES[DEFAULT_LOCALE], options).format(date);
+}
+
+/**
  * Runs before the body paints so the document direction and language are right
  * on the first frame, including for a returning Arabic visitor. It reads only
  * the persisted preference and only accepts the three allowed codes, so nothing

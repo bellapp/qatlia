@@ -13,6 +13,7 @@
 import type { TranslationKey } from './index';
 import type { MaterialType, OptimizationPriority } from '@/lib/cutting/binpacking';
 import type { LaborPricing, StockPricing } from '@/lib/costing';
+import type { PackId } from '@/lib/billing/catalog';
 
 /** Display label for every material in `MATERIAL_LIBRARY`. */
 export const MATERIAL_LABEL_KEYS: Record<MaterialType, TranslationKey> = {
@@ -29,6 +30,27 @@ export const MATERIAL_LABEL_KEYS: Record<MaterialType, TranslationKey> = {
 /** MDF is the library's first entry, so an unknown value degrades to it rather than rendering raw. */
 export function materialLabelKey(material: string | null | undefined): TranslationKey {
   return MATERIAL_LABEL_KEYS[material as MaterialType] ?? MATERIAL_LABEL_KEYS.mdf;
+}
+
+/** Short form of the same labels, for the badges of the history cards. */
+export const MATERIAL_BADGE_KEYS: Record<MaterialType, TranslationKey> = {
+  mdf: 'materials.badge.mdf',
+  melamine: 'materials.badge.melamine',
+  chene: 'materials.badge.chene',
+  contreplaques: 'materials.badge.contreplaques',
+  'stratifié': 'materials.badge.stratifie',
+  medium: 'materials.badge.medium',
+  aluminium: 'materials.badge.aluminium',
+  verre: 'materials.badge.verre',
+};
+
+/**
+ * A saved project carries whatever material value was current when it was
+ * saved, so a legacy or unknown value degrades to MDF rather than rendering the
+ * raw payload string on the card.
+ */
+export function materialBadgeKey(material: string | null | undefined): TranslationKey {
+  return MATERIAL_BADGE_KEYS[material as MaterialType] ?? MATERIAL_BADGE_KEYS.mdf;
 }
 
 /** Display label for every value of `OPTIMIZATION_PRIORITY_VALUES`. */
@@ -98,4 +120,72 @@ export const VISION_ERROR_KEYS: Record<string, TranslationKey> = {
 /** A code this build does not know about degrades to the generic message, never to the raw code. */
 export function visionErrorKey(code: unknown): TranslationKey {
   return (typeof code === 'string' && VISION_ERROR_KEYS[code]) || 'atelier.visionError.generic';
+}
+
+/**
+ * Customer-facing copy for each machine-readable code returned by
+ * `/api/credits/checkout`. Same contract as the vision route: the payload keeps
+ * its stable codes (and its French message for non-browser callers), and the
+ * buyer reads their own language instead of Stripe's or Supabase's wording.
+ */
+export const CHECKOUT_ERROR_KEYS: Record<string, TranslationKey> = {
+  AUTH_REQUIRED: 'creditsPage.errors.authRequired',
+  INVALID_PACK_SELECTION: 'creditsPage.errors.invalidSelection',
+  PAYMENT_UNAVAILABLE: 'creditsPage.errors.unavailable',
+  PAYMENT_CONFIGURATION_ERROR: 'creditsPage.errors.unavailable',
+  CHECKOUT_FAILED: 'creditsPage.errors.generic',
+};
+
+export function checkoutErrorKey(code: unknown): TranslationKey {
+  return (typeof code === 'string' && CHECKOUT_ERROR_KEYS[code]) || 'creditsPage.errors.generic';
+}
+
+/**
+ * Wording for one credit pack. The figures are never here: the MAD price and
+ * the monthly allowance stay in `src/lib/billing/catalog.ts` and are
+ * interpolated as `{price}` / `{count}`, so a translation cannot change what is
+ * sold or what is charged.
+ */
+export interface CreditPackLabelKeys {
+  name: TranslationKey;
+  description: TranslationKey;
+  badge: TranslationKey;
+  /** Recurring packs only; `null` for the one-off packs, which state no renewal. */
+  renewalNote: TranslationKey | null;
+}
+
+export const CREDIT_PACK_LABEL_KEYS: Record<PackId, CreditPackLabelKeys> = {
+  starter: {
+    name: 'billing.packs.starter.name',
+    description: 'billing.packs.starter.description',
+    badge: 'billing.packs.starter.badge',
+    renewalNote: null,
+  },
+  standard: {
+    name: 'billing.packs.standard.name',
+    description: 'billing.packs.standard.description',
+    badge: 'billing.packs.standard.badge',
+    renewalNote: null,
+  },
+  pro: {
+    name: 'billing.packs.pro.name',
+    description: 'billing.packs.pro.description',
+    badge: 'billing.packs.pro.badge',
+    renewalNote: null,
+  },
+  atelier_max: {
+    name: 'billing.packs.atelierMax.name',
+    description: 'billing.packs.atelierMax.description',
+    badge: 'billing.packs.atelierMax.badge',
+    renewalNote: 'billing.packs.atelierMax.renewal',
+  },
+};
+
+/**
+ * A pack id that is no longer sold (or is not a pack id at all) degrades to the
+ * entry-level pack's copy rather than rendering a raw id. Resolving a retired id
+ * to the pack it became is the billing catalog's job (`normalizePackId`).
+ */
+export function creditPackLabelKeys(id: string | null | undefined): CreditPackLabelKeys {
+  return CREDIT_PACK_LABEL_KEYS[id as PackId] ?? CREDIT_PACK_LABEL_KEYS.starter;
 }

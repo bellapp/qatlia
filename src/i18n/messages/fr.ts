@@ -89,6 +89,7 @@ export const fr = {
     delete: 'Supprimer',
     yes: 'Oui',
     no: 'Non',
+    loading: 'Chargement…',
   },
   /**
    * Display labels for the `MaterialType` enum. The stable values (`mdf`,
@@ -104,6 +105,20 @@ export const fr = {
     medium: 'Médium (MDF Sup.)',
     aluminium: 'Aluminium',
     verre: 'Verre',
+    /**
+     * Short form for the badges of the history cards, where the full label does
+     * not fit. `mdf` stays the industry abbreviation in every locale.
+     */
+    badge: {
+      mdf: 'MDF',
+      melamine: 'Mélaminé',
+      chene: 'Chêne',
+      contreplaques: 'CTP',
+      stratifie: 'Stratifié',
+      medium: 'Médium',
+      aluminium: 'Alu',
+      verre: 'Verre',
+    },
   },
   atelier: {
     header: {
@@ -459,6 +474,160 @@ export const fr = {
     submitSignup: 'Créer le compte',
     switchToSignup: 'Créer un compte (+ {count} crédits)',
     switchToLogin: 'Déjà un compte ? Se connecter',
+  },
+  /**
+   * Wording for the packs of `src/lib/billing/catalog.ts`, keyed by the stable
+   * `PackId`. The catalog stays the single source of truth for the figures: the
+   * MAD price arrives as `{price}` and the monthly allowance as `{count}`, so a
+   * translation can never promise an amount the ledger will not honour.
+   */
+  billing: {
+    packs: {
+      starter: {
+        name: 'Pack Découverte',
+        description: 'Idéal pour tester ou pour 1 petit chantier',
+        badge: '{price} DH',
+      },
+      standard: {
+        name: 'Pack Artisan',
+        description: 'Le choix populaire des menuisiers actifs',
+        badge: 'Populaire ({price} DH)',
+      },
+      pro: {
+        name: 'Pack Atelier Pro',
+        description: 'Pour les ateliers à fort volume de débit',
+        badge: 'Économique ({price} DH)',
+      },
+      atelierMax: {
+        name: 'Abonnement Atelier Max',
+        description: '{count} analyses photo IA par mois, pour les ateliers à très fort volume',
+        badge: '{price} DH / mois',
+        renewal: '{count} crédits ajoutés à votre solde chaque mois',
+      },
+    },
+  },
+  creditsPage: {
+    back: 'Retour au Dashboard',
+    balanceUnknown: 'Solde indisponible',
+    balance: { one: 'Solde actuel : {count} crédit', many: 'Solde actuel : {count} crédits' },
+    eyebrow: 'Recharge de Crédits',
+    // `{price}` is the entry pack's MAD price and `{count}` its credits, both
+    // read from the billing catalog.
+    headline: '{price} = {count} analyses photo',
+    policy:
+      '1 crédit est débité uniquement lors d’une analyse photo réussie. L’optimisation du schéma et tous les exports (PDF, DXF, JSON, PNG, devis) sont gratuits et illimités.',
+    recommended: 'Recommandé',
+    /** Dirham symbol as printed on the cards; identical in every locale. */
+    currency: 'DH',
+    perMonth: '/mois',
+    // Rendered in two parts around {count} so the allowance stays bold.
+    packAnalyses: '{count} analyses photo',
+    packAnalysesMonthly: '{count} analyses photo par mois',
+    freePlans: 'Schémas de coupe illimités et gratuits',
+    freeExports: 'Exports PDF, DXF, JSON et PNG gratuits',
+    choose: 'Choisir ce pack',
+    chooseAria: 'Choisir le {pack}',
+    redirecting: 'Redirection vers le paiement…',
+    // Rendered around {provider} so the payment provider stays bold.
+    securePayment: 'Paiement sécurisé par {provider} — cartes Visa / Mastercard, débitées en dirhams ({currency})',
+    invoiceNote: 'Facture et reçu instantanés par email',
+    /**
+     * One entry per machine-readable code returned by /api/credits/checkout. The
+     * route keeps answering in French for non-browser callers; the customer sees
+     * their own language, and never the provider's own message.
+     */
+    errors: {
+      authRequired: 'Connectez-vous pour acheter des crédits.',
+      invalidSelection: 'Ce pack n’est plus disponible. Choisissez-en un autre.',
+      unavailable: 'Le paiement est momentanément indisponible. Réessayez plus tard.',
+      network: 'Erreur réseau. Vérifiez votre connexion et réessayez.',
+      generic: 'Le paiement n’a pas pu être lancé. Réessayez dans un instant.',
+    },
+  },
+  creditsSuccess: {
+    title: 'Paiement reçu',
+    body: 'Votre paiement a été reçu. Votre solde sera mis à jour dès confirmation du paiement.',
+    balance: 'Solde de crédits mis à jour',
+    demoTitle: 'Mode démonstration',
+    demoBody:
+      'Aucun paiement n’a été effectué et aucun crédit n’a été ajouté : le paiement n’est pas configuré sur cet environnement.',
+    demoBalance: 'Solde inchangé',
+    back: 'Retourner au Débit de Panneaux',
+  },
+  historyPage: {
+    backToAtelier: 'Atelier',
+    eyebrow: 'Atelier',
+    heading: 'Vos débits',
+    subtitle: 'Rouvrir un plan, relancer le calepinage ou réexporter le PDF.',
+    refresh: 'Actualiser',
+    loadingAria: 'Chargement de l’historique',
+    filterPlaceholder: 'Filtrer par nom ou dimension...',
+    filterAria: 'Filtrer les débits',
+    materialFilterAria: 'Filtrer par matériau',
+    allMaterials: 'Tous matériaux',
+    resultCount: { one: '{count} résultat', many: '{count} résultats' },
+    stats: {
+      panel: 'Panneau',
+      pieces: 'Pièces',
+      waste: 'Chute',
+    },
+    // Canonical panel size. `{unit}` is the SI symbol, not prose.
+    sheetSize: '{height} × {width} {unit}',
+    piecesValue: '{count} pcs',
+    sheetsUsed: { one: '{count} feuille', many: '{count} feuilles' },
+    open: 'Ouvrir',
+    openAria: 'Ouvrir le débit {name}',
+    /** What the artisan is told when the cloud history is not the source shown. */
+    sync: {
+      localOnly: 'Plans enregistrés sur cet appareil. La sync cloud se fera dès que la base atelier sera prête.',
+      cloudDisabled: 'Historique cloud pas encore activé — vos débits de cet appareil s’affichent ci-dessous.',
+      cloudUnavailable: 'Historique cloud indisponible — affichage local.',
+      offline: 'Impossible de joindre le serveur — historique local affiché.',
+    },
+  },
+  accountPage: {
+    eyebrow: 'Compte',
+    title: 'Votre espace artisan',
+    topUp: 'Recharger',
+    creditsRemaining: 'crédits restants',
+    ledgerAria: 'Mouvements de crédits',
+    noMovements:
+      'Aucun mouvement pour l’instant. Un crédit est débité uniquement lors d’une analyse photo réussie ; l’optimisation et les exports sont gratuits.',
+    /** Shown only for a ledger row saved without its own description. */
+    txDebit: 'Analyse photo IA',
+    txCredit: 'Achat de crédits',
+    googleNote: 'Si vous vous connectez uniquement via Google, un mot de passe n’est pas obligatoire.',
+    newPassword: 'Nouveau mot de passe',
+    confirmPassword: 'Confirmer',
+    confirmPasswordAria: 'Confirmer le nouveau mot de passe',
+    saving: 'Enregistrement…',
+    submit: 'Mettre à jour le mot de passe',
+    passwordUpdated: 'Mot de passe mis à jour.',
+    errors: {
+      tooShort: '{min} caractères minimum.',
+      mismatch: 'Les mots de passe ne correspondent pas.',
+      generic: 'La mise à jour du mot de passe a échoué. Réessayez.',
+    },
+  },
+  loginPage: {
+    brandTagline: 'Atelier de calepinage',
+    eyebrow: 'Compte artisan',
+    asideTitle: 'Vos plans de coupe, synchronisés.',
+    asideBody:
+      'Historique des débits, crédits Vision IA, export PDF industriel. Un compte, tous vos ateliers.',
+    perkCredits: '{count} crédits offerts à l’inscription',
+    perkHistory: 'Historique de chaque plan généré',
+    perkSecurity: 'Connexion Google ou email sécurisée',
+    asideFooter: 'QatlIA Pro · Maroc · MAD',
+    titleSignup: 'Créer un compte',
+    subtitleLogin: 'Retrouvez vos débits et crédits.',
+    subtitleSignup: '{count} crédits offerts pour lancer vos premiers scans.',
+    /** Sample workshop name; a name, so it is localized like the copy around it. */
+    namePlaceholder: 'Menuiserie Atlas',
+    submitLogin: 'Se connecter',
+    signupPending: 'Compte créé. Vérifiez votre email, puis reconnectez-vous.',
+    switchToSignup: 'Pas de compte ? Créer un compte (+ {count} crédits)',
+    backToAtelier: 'Retour à l’atelier',
   },
 };
 

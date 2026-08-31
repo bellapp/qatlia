@@ -16,6 +16,9 @@ import { readLocalHistory, type LocalHistoryItem } from '@/lib/history';
 import { AccountMenu } from '@/components/AccountMenu';
 import { QatlIALogo } from '@/components/QatlIALogo';
 import { EmptyState } from '@/components/EmptyState';
+import { LocaleSwitcher, useLocale } from '@/components/LocaleProvider';
+import { materialBadgeKey, materialLabelKey } from '@/i18n/domain';
+import { formatDateTime, type TranslationKey } from '@/i18n';
 import type { DisplayUnit } from '@/lib/units';
 
 interface ProjectHistoryItem {
@@ -41,6 +44,39 @@ interface ProjectHistoryItem {
     migratedFromLegacyUnit?: boolean;
   };
 }
+
+/**
+ * The stored panel dimensions are canonical domain values (see src/lib/units.ts),
+ * so the card states them in the canonical unit whatever display unit the
+ * artisan was working in when the plan was saved. Being geometry, they are not
+ * routed through the locale number formatter either: a panel reads the same in
+ * every language.
+ */
+const CANONICAL_UNIT: DisplayUnit = 'cm';
+
+/** Materials an artisan can filter the list by, in the order they are offered. */
+const FILTERABLE_MATERIALS = ['mdf', 'aluminium', 'verre'] as const;
+
+/**
+ * Card badge tone per material. Only the three materials that have ever had
+ * their own colour are listed; everything else keeps the default tone, and the
+ * label itself comes from `materialBadgeKey`.
+ */
+const MATERIAL_BADGE_TONES: Record<string, string> = {
+  aluminium: 'bg-slate-500/20 text-slate-700 dark:text-slate-300 border-slate-500/30',
+  verre: 'bg-sky-500/20 text-sky-300 border-sky-500/30',
+  contreplaques: 'bg-brand-600/10 text-brand-400 border-brand-500/20',
+};
+
+const DEFAULT_BADGE_TONE = 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30';
+
+const CARD_DATE_OPTIONS: Intl.DateTimeFormatOptions = {
+  day: 'numeric',
+  month: 'short',
+  year: 'numeric',
+  hour: '2-digit',
+  minute: '2-digit',
+};
 
 function mergeHistory(cloud: ProjectHistoryItem[], local: LocalHistoryItem[]): ProjectHistoryItem[] {
   const mappedLocal: ProjectHistoryItem[] = local.map((p) => ({
@@ -82,12 +118,15 @@ function SkeletonCard() {
 }
 
 export default function HistoryPage() {
+  const { t, tn, n, locale } = useLocale();
   const [projects, setProjects] = useState<ProjectHistoryItem[]>([]);
   const [filtered, setFiltered] = useState<ProjectHistoryItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [userEmail, setUserEmail] = useState<string | null>(null);
   const [userCredits, setUserCredits] = useState<number | null>(null);
-  const [syncNote, setSyncNote] = useState<string | null>(null);
+  // The note is held as a key, not as rendered copy, so a language switch
+  // re-renders it instead of leaving the previous locale on screen.
+  const [syncNote, setSyncNote] = useState<TranslationKey | null>(null);
   const [filterText, setFilterText] = useState('');
   const [materialFilter, setMaterialFilter] = useState('');
 
@@ -111,13 +150,15 @@ export default function HistoryPage() {
         if (data.success && Array.isArray(data.projects)) {
           setProjects(mergeHistory(data.projects, local));
           if (data.projects.length === 0 && local.length > 0) {
-            setSyncNote('Plans enregistrés sur cet appareil. La sync cloud se fera dès que la base atelier sera prête.');
+            setSyncNote('historyPage.sync.localOnly');
           }
         } else {
           setProjects(mergeHistory([], local));
+          // The upstream message is only ever read to tell the two cases
+          // apart; it is never rendered.
           const raw = String(data.message || '');
           const missingTable = /schema cache|could not find the table|public\.projects/i.test(raw);
-          setSyncNote(missingTable ? 'Historique cloud pas encore activé — vos débits de cet appareil s\'affichent ci-dessous.' : 'Historique cloud indisponible — affichage local.');
+          setSyncNote(missingTable ? 'historyPage.sync.cloudDisabled' : 'historyPage.sync.cloudUnavailable');
         }
       } else {
         setUserEmail(null);
@@ -125,7 +166,7 @@ export default function HistoryPage() {
       }
     } catch {
       setProjects(mergeHistory([], local));
-      setSyncNote('Impossible de joindre le serveur — historique local affiché.');
+      setSyncNote('historyPage.sync.offline');
     } finally {
       setLoading(false);
     }
@@ -153,12 +194,13 @@ export default function HistoryPage() {
   };
 
   const getMaterialBadge = (mat?: string) => {
-    switch (mat?.toLowerCase()) {
-      case 'aluminium': return <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-slate-500/20 text-slate-700 dark:text-slate-300 border border-slate-500/30">Alu</span>;
-      case 'verre': return <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-sky-500/20 text-sky-300 border border-sky-500/30">Verre</span>;
-      case 'contreplaques': return <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-brand-600/10 text-brand-400 border border-brand-500/20">CTP</span>;
-      default: return <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">MDF</span>;
-    }
+    const material = mat?.toLowerCase();
+    const tone = (material && MATERIAL_BADGE_TONES[material]) || DEFAULT_BADGE_TONE;
+    return (
+      <span className={`text-[10px] font-bold px-2 py-0.5 rounded border ${tone}`}>
+        {t(materialBadgeKey(material))}
+      </span>
+    );
   };
 
   return (
@@ -167,20 +209,25 @@ export default function HistoryPage() {
         <div className="max-w-6xl mx-auto flex items-center justify-between px-4 sm:px-8 h-16">
           <div className="flex items-center gap-3">
             <Link href="/atelier" className="flex items-center gap-2 px-3 py-2 rounded-xl bg-studio-panel hover:bg-studio-field text-slate-700 dark:text-slate-300 text-xs font-semibold border border-studio-border transition-all">
-              <ArrowLeft className="w-4 h-4" /><span>Atelier</span>
+              <ArrowLeft className="w-4 h-4 rtl:-scale-x-100" aria-hidden="true" /><span>{t('historyPage.backToAtelier')}</span>
             </Link>
             <div className="flex items-center gap-2">
               <div className="text-brand-400"><QatlIALogo size="sm" /></div>
-              <h1 className="font-display font-extrabold text-base text-slate-900 dark:text-white tracking-tight">Historique</h1>
+              <h1 className="font-display font-extrabold text-base text-slate-900 dark:text-white tracking-tight">{t('atelier.header.history')}</h1>
             </div>
           </div>
           <div className="flex items-center gap-2">
-            <Link href="/credits" className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-brand-500/10 border border-brand-500/25 text-brand-400 hover:bg-brand-500/15 text-xs font-semibold transition-all">
-              <Zap className="w-3.5 h-3.5 fill-brand-400 text-brand-400" />
-              <span className="font-mono font-bold">{userCredits ?? '—'}</span>
+            <LocaleSwitcher />
+            <Link
+              href="/credits"
+              aria-label={`${t('atelier.header.creditsAria')}: ${userCredits === null ? '—' : n(userCredits)}`}
+              className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-brand-500/10 border border-brand-500/25 text-brand-400 hover:bg-brand-500/15 text-xs font-semibold transition-all"
+            >
+              <Zap className="w-3.5 h-3.5 fill-brand-400 text-brand-400" aria-hidden="true" />
+              <span dir="ltr" className="font-mono font-bold">{userCredits === null ? '—' : n(userCredits)}</span>
             </Link>
             {userEmail ? (<AccountMenu email={userEmail} />) : (
-              <Link href="/auth/login?redirect=/history" className="px-4 py-2 rounded-xl bg-white dark:bg-studio-field text-slate-950 font-bold text-xs hover:bg-slate-100 transition-all">Connexion</Link>
+              <Link href="/auth/login?redirect=/history" className="px-4 py-2 rounded-xl bg-white dark:bg-studio-field text-slate-950 font-bold text-xs hover:bg-slate-100 transition-all">{t('nav.login')}</Link>
             )}
           </div>
         </div>
@@ -189,18 +236,18 @@ export default function HistoryPage() {
       <main className="max-w-6xl mx-auto px-4 sm:px-8 mt-8 space-y-6">
         <div className="flex flex-wrap items-end justify-between gap-4">
           <div>
-            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-brand-400/80">Atelier</p>
-            <h2 className="text-2xl font-black text-slate-900 dark:text-white mt-1">Vos débits</h2>
-            <p className="text-sm text-slate-600 dark:text-slate-400 mt-1">Rouvrir un plan, relancer le calepinage ou réexporter le PDF.</p>
+            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-brand-400/80">{t('historyPage.eyebrow')}</p>
+            <h2 className="text-2xl font-black text-slate-900 dark:text-white mt-1">{t('historyPage.heading')}</h2>
+            <p className="text-sm text-slate-600 dark:text-slate-400 mt-1">{t('historyPage.subtitle')}</p>
           </div>
           <button onClick={fetchHistory} className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-studio-panel hover:bg-studio-field text-slate-700 dark:text-slate-300 text-xs font-semibold border border-studio-border transition-all">
-            <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} /> Actualiser
+            <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} aria-hidden="true" /> {t('historyPage.refresh')}
           </button>
         </div>
 
         {syncNote && (
           <div className="flex items-center gap-2 px-3.5 py-2.5 rounded-xl bg-brand-500/10 border border-brand-500/20 text-brand-300 text-xs">
-            <CloudOff className="w-4 h-4 shrink-0" />{syncNote}
+            <CloudOff className="w-4 h-4 shrink-0" aria-hidden="true" />{t(syncNote)}
           </div>
         )}
 
@@ -208,24 +255,25 @@ export default function HistoryPage() {
         {projects.length > 0 && (
           <div className="flex items-center gap-2">
             <div className="relative flex-1 max-w-xs">
-              <Search className="w-3.5 h-3.5 text-slate-500 dark:text-slate-400 absolute left-2.5 top-2.5" />
-              <input type="text" placeholder="Filtrer par nom ou dimension..." value={filterText}
+              <Search className="w-3.5 h-3.5 text-slate-500 dark:text-slate-400 absolute start-2.5 top-2.5" aria-hidden="true" />
+              <input type="text" placeholder={t('historyPage.filterPlaceholder')} aria-label={t('historyPage.filterAria')} value={filterText}
                 onChange={e => setFilterText(e.target.value)}
-                className="w-full pl-7 pr-2 py-1.5 rounded-lg bg-studio-field/60 border border-studio-border/80 text-slate-800 dark:text-slate-200 text-xs outline-none focus:border-brand-500/50" />
+                className="w-full ps-7 pe-2 py-1.5 rounded-lg bg-studio-field/60 border border-studio-border/80 text-slate-800 dark:text-slate-200 text-xs outline-none focus:border-brand-500/50" />
             </div>
             <select value={materialFilter} onChange={e => setMaterialFilter(e.target.value)}
+              aria-label={t('historyPage.materialFilterAria')}
               className="px-2.5 py-1.5 rounded-lg bg-studio-field/60 border border-studio-border/80 text-slate-700 dark:text-slate-300 text-xs outline-none focus:border-brand-500/50">
-              <option value="">Tous matériaux</option>
-              <option value="mdf">MDF</option>
-              <option value="aluminium">Aluminium</option>
-              <option value="verre">Verre</option>
+              <option value="">{t('historyPage.allMaterials')}</option>
+              {FILTERABLE_MATERIALS.map((material) => (
+                <option key={material} value={material}>{t(materialLabelKey(material))}</option>
+              ))}
             </select>
-            <span className="text-[10px] font-mono text-slate-500 dark:text-slate-400 ml-auto">{filtered.length} résultat{filtered.length !== 1 ? 's' : ''}</span>
+            <span className="text-[10px] font-mono text-slate-500 dark:text-slate-400 ms-auto">{tn('historyPage.resultCount', filtered.length)}</span>
           </div>
         )}
 
         {loading ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div role="status" aria-label={t('historyPage.loadingAria')} className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {[1,2,3,4].map(i => <SkeletonCard key={i} />)}
           </div>
         ) : projects.length === 0 ? (
@@ -245,21 +293,21 @@ export default function HistoryPage() {
                   <div className="space-y-2">
                     <div className="flex items-center justify-between gap-2">
                       <span className="text-[11px] font-mono text-slate-600 dark:text-slate-400 flex items-center gap-1">
-                        <Calendar className="w-3.5 h-3.5" />
-                        {new Date(proj.created_at).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                        <Calendar className="w-3.5 h-3.5" aria-hidden="true" />
+                        {formatDateTime(locale, proj.created_at, CARD_DATE_OPTIONS)}
                       </span>
                       {getMaterialBadge(proj.material)}
                     </div>
                     <h3 className="text-base font-black text-slate-900 dark:text-white truncate">{proj.name}</h3>
                     <div className="grid grid-cols-3 gap-2 pt-2 border-t border-studio-border text-xs font-mono">
-                      <div className="p-2 rounded-lg bg-studio-canvas"><span className="text-[10px] text-slate-500 dark:text-slate-400 block">Panneau</span><span className="font-bold text-slate-900 dark:text-white">{proj.sheet_height} × {proj.sheet_width} cm</span></div>
-                      <div className="p-2 rounded-lg bg-studio-canvas"><span className="text-[10px] text-slate-500 dark:text-slate-400 block">Pièces</span><span className="font-bold text-brand-400">{pieceCount} pcs</span></div>
-                      <div className="p-2 rounded-lg bg-studio-canvas"><span className="text-[10px] text-slate-500 dark:text-slate-400 block">Chute</span><span className="font-bold text-emerald-400">{wasteRate > 0 ? `${wasteRate}%` : '—'}</span></div>
+                      <div className="p-2 rounded-lg bg-studio-canvas"><span className="text-[10px] text-slate-500 dark:text-slate-400 block">{t('historyPage.stats.panel')}</span><span dir="ltr" className="font-bold text-slate-900 dark:text-white">{t('historyPage.sheetSize', { height: proj.sheet_height, width: proj.sheet_width, unit: CANONICAL_UNIT })}</span></div>
+                      <div className="p-2 rounded-lg bg-studio-canvas"><span className="text-[10px] text-slate-500 dark:text-slate-400 block">{t('historyPage.stats.pieces')}</span><span className="font-bold text-brand-400">{t('historyPage.piecesValue', { count: n(pieceCount) })}</span></div>
+                      <div className="p-2 rounded-lg bg-studio-canvas"><span className="text-[10px] text-slate-500 dark:text-slate-400 block">{t('historyPage.stats.waste')}</span><span dir="ltr" className="font-bold text-emerald-400">{wasteRate > 0 ? `${wasteRate}%` : '—'}</span></div>
                     </div>
                   </div>
                   <div className="flex items-center justify-between gap-2 pt-1">
-                    <span className="text-[11px] font-mono font-bold text-slate-600 dark:text-slate-400">{sheetsUsed} feuille(s)</span>
-                    <button onClick={() => handleLoadProject(proj)} className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-brand-500 hover:bg-brand-400 text-slate-950 font-black text-xs transition-all group-hover:shadow-lg group-hover:shadow-brand-500/20">Ouvrir<ArrowRight className="w-3.5 h-3.5" /></button>
+                    <span className="text-[11px] font-mono font-bold text-slate-600 dark:text-slate-400">{tn('historyPage.sheetsUsed', sheetsUsed)}</span>
+                    <button onClick={() => handleLoadProject(proj)} aria-label={t('historyPage.openAria', { name: proj.name })} className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-brand-500 hover:bg-brand-400 text-slate-950 font-black text-xs transition-all group-hover:shadow-lg group-hover:shadow-brand-500/20">{t('historyPage.open')}<ArrowRight className="w-3.5 h-3.5 rtl:-scale-x-100" aria-hidden="true" /></button>
                   </div>
                 </div>
               );
