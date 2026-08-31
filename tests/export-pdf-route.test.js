@@ -115,6 +115,58 @@ test('with displayUnit "mm", the same 600cm sheet is labeled 6000.0 while the ma
   assert.equal(areaCm[1], areaMm[1], 'the underlying area/cost math must be unaffected by displayUnit');
 });
 
+// ─── locale: server-validated, independent of displayUnit ──────────────────
+// The artisan's current UI locale (fr|en|ar) travels with the export request
+// so the PDF renders in their language. It must be validated server-side like
+// every other field here — a legacy client that never sends it must still get
+// a valid French PDF rather than a 400 or an undefined catalog lookup.
+
+test('ExportSchema accepts locale "fr", "en" or "ar", defaulting to "fr"', () => {
+  const { ExportSchema } = loadTsModule('src/lib/exports/pdf-schema.ts');
+
+  const withFr = ExportSchema.safeParse(baseBody({ locale: 'fr' }));
+  const withEn = ExportSchema.safeParse(baseBody({ locale: 'en' }));
+  const withAr = ExportSchema.safeParse(baseBody({ locale: 'ar' }));
+  const withDefault = ExportSchema.safeParse(baseBody());
+
+  assert.equal(withFr.success, true);
+  assert.equal(withFr.data.locale, 'fr');
+  assert.equal(withEn.success, true);
+  assert.equal(withEn.data.locale, 'en');
+  assert.equal(withAr.success, true);
+  assert.equal(withAr.data.locale, 'ar');
+  assert.equal(withDefault.success, true);
+  assert.equal(withDefault.data.locale, 'fr', 'locale must default to fr when a legacy client omits it');
+});
+
+test('ExportSchema rejects an unrecognized locale instead of silently accepting it', () => {
+  const { ExportSchema } = loadTsModule('src/lib/exports/pdf-schema.ts');
+  const parsed = ExportSchema.safeParse(baseBody({ locale: 'de' }));
+  assert.equal(parsed.success, false);
+});
+
+test('ExportSchema locale stays independent of displayUnit: mixing ar + mm is valid', () => {
+  const { ExportSchema } = loadTsModule('src/lib/exports/pdf-schema.ts');
+  const parsed = ExportSchema.safeParse(baseBody({ locale: 'ar', displayUnit: 'mm' }));
+  assert.equal(parsed.success, true);
+  assert.equal(parsed.data.locale, 'ar');
+  assert.equal(parsed.data.displayUnit, 'mm');
+});
+
+test('ExportSchema accepts every locale the app-wide i18n catalog supports, and nothing else', () => {
+  const { LOCALES } = loadTsModule('src/i18n/index.ts');
+  const { ExportSchema } = loadTsModule('src/lib/exports/pdf-schema.ts');
+
+  for (const locale of LOCALES) {
+    assert.equal(ExportSchema.safeParse(baseBody({ locale })).success, true, `locale "${locale}" must be accepted`);
+  }
+  assert.equal(
+    ExportSchema.safeParse(baseBody({ locale: 'not-a-real-locale' })).success,
+    false,
+    'a locale outside the app-wide set must be rejected'
+  );
+});
+
 test('PDF route source contains no sheet.width/isMm magnitude heuristic', () => {
   const fs = require('node:fs');
   const path = require('node:path');

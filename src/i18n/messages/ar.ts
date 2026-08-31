@@ -205,6 +205,7 @@ export const ar: Catalog = {
       dxfAria: 'تحميل المخطط بصيغة DXF للتحكم الرقمي',
       pdfGenerating: 'جارٍ الإنشاء…',
       pdf: 'تصدير تقرير PDF',
+      pdfDefaultProjectName: 'مخطط قطع QatlIA',
     },
     cutOrder: {
       title: 'ترتيب القطع',

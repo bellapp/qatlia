@@ -91,7 +91,12 @@ export async function POST(req: Request) {
       },
     });
   } catch (error: unknown) {
-    const message = error instanceof Error ? error.message : 'Erreur génération DXF';
-    return NextResponse.json({ error: 'DXF_EXPORT_FAILED', message }, { status: 500 });
+    // Matching /api/export-pdf's own fallback: the detail (which can carry a
+    // stack trace or other internal information) is logged server-side only,
+    // never returned to the caller -- only the stable, machine-readable
+    // error code crosses the response boundary (see the equivalent comment
+    // in src/app/api/export-pdf/route.ts).
+    console.error('DXF_EXPORT_FAILED:', error);
+    return NextResponse.json({ error: 'DXF_EXPORT_FAILED' }, { status: 500 });
   }
 }

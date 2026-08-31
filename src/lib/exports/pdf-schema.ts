@@ -1,4 +1,11 @@
 import { z } from 'zod';
+import type { Locale } from '@/i18n';
+
+// `satisfies readonly Locale[]` keeps this tuple checked against the
+// app-wide locale set at compile time: adding or renaming a locale in
+// src/i18n without updating this literal is a type error, not a silent
+// runtime drift (z.enum needs a literal tuple, not LOCALES' widened array type).
+const PDF_LOCALES = ['fr', 'en', 'ar'] as const satisfies readonly Locale[];
 
 // ─── Shared numeric bounds ──────────────────────────────────────────────
 // This route receives its `result` back over the network from a client that
@@ -107,6 +114,13 @@ export const ExportSchema = z.object({
    * feeds back into any area/cost/linear-cut calculation.
    */
   displayUnit: z.enum(['cm', 'mm']).default('cm'),
+  /**
+   * The atelier's current UI locale. Independent of `displayUnit`: it only
+   * selects which catalog (src/i18n) the PDF's labels are rendered from.
+   * Legacy clients that never send it get a French PDF, matching the app's
+   * default locale (see DEFAULT_LOCALE in src/i18n).
+   */
+  locale: z.enum(PDF_LOCALES).default('fr'),
   sheet: z.object({
     width: geometryValue(),
     height: geometryValue(),

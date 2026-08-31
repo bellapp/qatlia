@@ -68,7 +68,7 @@ test('buildPdfPayload preserves the entire result object deeply', () => {
   assert.deepEqual(payload.result, result);
 });
 
-test('buildPdfPayload copies sheet width/height/material from the active sheet', () => {
+test('buildPdfPayload copies sheet width/height, and top-level material, from the active sheet', () => {
   const { buildPdfPayload } = loadTsModule('src/lib/pdf-payload.ts');
   const sheet = activeSheet();
 
@@ -76,7 +76,13 @@ test('buildPdfPayload copies sheet width/height/material from the active sheet',
 
   assert.equal(payload.sheet.width, sheet.width);
   assert.equal(payload.sheet.height, sheet.height);
-  assert.equal(payload.sheet.material, sheet.material);
+  // `material` is top-level, matching ExportSchema's top-level `material`
+  // field (see pdf-schema.ts) and what route.ts actually reads -- nesting it
+  // under `sheet` (whose server-side schema object has no `material` field
+  // at all) meant every export silently fell back to the schema default
+  // ('MDF') regardless of what the artisan had selected.
+  assert.equal(payload.material, sheet.material);
+  assert.equal(payload.sheet.material, undefined, 'material must not also be duplicated under sheet');
 });
 
 test('buildPdfPayload falls back to "mdf" when the active sheet has no material', () => {
@@ -85,5 +91,55 @@ test('buildPdfPayload falls back to "mdf" when the active sheet has no material'
 
   const payload = buildPdfPayload('Projet Test', sheet, pieces(), optimizationResult());
 
-  assert.equal(payload.sheet.material, 'mdf');
+  assert.equal(payload.material, 'mdf');
+});
+
+test('buildPdfPayload carries a non-MDF material through unchanged', () => {
+  const { buildPdfPayload } = loadTsModule('src/lib/pdf-payload.ts');
+  const sheet = { ...activeSheet(), material: 'melamine' };
+
+  const payload = buildPdfPayload('Projet Test', sheet, pieces(), optimizationResult());
+
+  assert.equal(payload.material, 'melamine');
+});
+
+test('buildPdfPayload carries an artisan-typed Arabic material label through unchanged', () => {
+  const { buildPdfPayload } = loadTsModule('src/lib/pdf-payload.ts');
+  const sheet = { ...activeSheet(), material: 'خشب الزان' };
+
+  const payload = buildPdfPayload('Projet Test', sheet, pieces(), optimizationResult());
+
+  assert.equal(payload.material, 'خشب الزان');
+});
+
+// The PDF report must render in whatever language the artisan's own atelier is
+// currently set to (see useLocale() in src/components/LocaleProvider.tsx), so
+// buildPdfPayload carries that locale through to /api/export-pdf exactly like
+// it already carries displayUnit. A caller that omits it (a legacy call site,
+// or a stale client build) must still produce a valid, French payload rather
+// than an undefined field the server has to guess about.
+
+test('buildPdfPayload defaults locale to "fr" when the caller omits it', () => {
+  const { buildPdfPayload } = loadTsModule('src/lib/pdf-payload.ts');
+  const payload = buildPdfPayload('Projet Test', activeSheet(), pieces(), optimizationResult());
+  assert.equal(payload.locale, 'fr');
+});
+
+test('buildPdfPayload carries the artisan\'s current locale through unchanged', () => {
+  const { buildPdfPayload } = loadTsModule('src/lib/pdf-payload.ts');
+
+  const payloadEn = buildPdfPayload('Projet Test', activeSheet(), pieces(), optimizationResult(), 'cm', 'en');
+  const payloadAr = buildPdfPayload('Projet Test', activeSheet(), pieces(), optimizationResult(), 'cm', 'ar');
+
+  assert.equal(payloadEn.locale, 'en');
+  assert.equal(payloadAr.locale, 'ar');
+});
+
+test('buildPdfPayload keeps displayUnit and locale independent of each other', () => {
+  const { buildPdfPayload } = loadTsModule('src/lib/pdf-payload.ts');
+
+  const payload = buildPdfPayload('Projet Test', activeSheet(), pieces(), optimizationResult(), 'mm', 'ar');
+
+  assert.equal(payload.displayUnit, 'mm', 'the unit the artisan picked for dimensions must be untouched by locale');
+  assert.equal(payload.locale, 'ar');
 });

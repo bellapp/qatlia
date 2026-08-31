@@ -1,14 +1,26 @@
 import type { Piece, Sheet, OptimizationResult, MaterialType } from '@/lib/cutting/binpacking';
 import { DEFAULT_DISPLAY_UNIT, type DisplayUnit } from '@/lib/units';
+import { DEFAULT_LOCALE, type Locale } from '@/i18n';
 
 export interface PdfPayloadSheet {
   width: number;
   height: number;
-  material: MaterialType | string;
 }
 
 export interface PdfExportPayload {
   projectName: string;
+  /**
+   * The material actually selected for the active sheet, falling back to
+   * 'mdf' exactly like the atelier's own selector does (see activeSheet.material
+   * in src/app/atelier/page.tsx). This must be top-level, matching
+   * ExportSchema's top-level `material` field (see pdf-schema.ts) and what
+   * route.ts destructures and renders (`material.toUpperCase()`) — nesting it
+   * under `sheet` instead, as an earlier version of this payload did, meant
+   * the server-side schema (whose `sheet` object has no `material` field at
+   * all) silently ignored it and every export fell back to the schema's own
+   * default ('MDF'), regardless of what the artisan had actually selected.
+   */
+  material: MaterialType | string;
   sheet: PdfPayloadSheet;
   pieces: Piece[];
   result: OptimizationResult;
@@ -18,6 +30,13 @@ export interface PdfExportPayload {
    * tells /api/export-pdf which unit to use when labeling dimensions.
    */
   displayUnit: DisplayUnit;
+  /**
+   * The atelier's current UI locale (see useLocale() in
+   * src/components/LocaleProvider.tsx). Independent of `displayUnit`: it only
+   * tells /api/export-pdf which catalog to render labels from, never touches
+   * geometry, cost or any other computed figure.
+   */
+  locale: Locale;
 }
 
 /**
@@ -29,17 +48,19 @@ export function buildPdfPayload(
   activeSheet: Sheet,
   pieces: Piece[],
   result: OptimizationResult,
-  displayUnit: DisplayUnit = DEFAULT_DISPLAY_UNIT
+  displayUnit: DisplayUnit = DEFAULT_DISPLAY_UNIT,
+  locale: Locale = DEFAULT_LOCALE
 ): PdfExportPayload {
   return {
     projectName,
+    material: activeSheet.material || 'mdf',
     sheet: {
       width: activeSheet.width,
       height: activeSheet.height,
-      material: activeSheet.material || 'mdf',
     },
     pieces,
     result,
     displayUnit,
+    locale,
   };
 }

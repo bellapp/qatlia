@@ -204,6 +204,7 @@ export const en: Catalog = {
       dxfAria: 'Download the plan as DXF for CNC',
       pdfGenerating: 'Generating…',
       pdf: 'Export the PDF report',
+      pdfDefaultProjectName: 'QatlIA Cutting Plan',
     },
     cutOrder: {
       title: 'Cutting order',

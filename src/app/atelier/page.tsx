@@ -151,7 +151,7 @@ export default function Dashboard() {
   const activeSheet = sheets[0] || DEFAULT_SHEETS[0];
   const { theme } = useTheme();
   const isDark = theme === 'dark';
-  const { t, tn, n } = useLocale();
+  const { t, tn, n, locale } = useLocale();
 
   // Re-sync the free-typed drafts whenever the canonical sheet dimensions or
   // the display unit change from *outside* the draft itself (a cm↔mm toggle,
@@ -539,7 +539,9 @@ export default function Dashboard() {
       const res = await fetch('/api/export-pdf', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(buildPdfPayload('Plan Découpe QatlIA', activeSheet, pieces, result, displayUnit)),
+        body: JSON.stringify(
+          buildPdfPayload(t('atelier.exports.pdfDefaultProjectName'), activeSheet, pieces, result, displayUnit, locale)
+        ),
       });
 
       if (res.ok) {

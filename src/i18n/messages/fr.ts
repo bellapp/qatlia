@@ -228,6 +228,8 @@ export const fr = {
       dxfAria: 'Télécharger le plan au format DXF pour CNC',
       pdfGenerating: 'Génération…',
       pdf: 'Exporter le rapport PDF',
+      /** Default PDF project title when the artisan never named the project. */
+      pdfDefaultProjectName: 'Plan Découpe QatlIA',
     },
     cutOrder: {
       title: 'Ordre de coupe',
