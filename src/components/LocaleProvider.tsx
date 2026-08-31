@@ -9,10 +9,13 @@ import {
   LOCALE_LABELS,
   LOCALE_STORAGE_KEY,
   dirFor,
+  formatNumber,
   isLocale,
   translate,
+  translatePlural,
   type Direction,
   type Locale,
+  type PluralTranslationKey,
   type TranslationKey,
   type TranslationVars,
 } from '@/i18n';
@@ -23,6 +26,10 @@ interface LocaleContextValue {
   locale: Locale;
   setLocale: (locale: Locale) => void;
   t: (key: TranslationKey, vars?: TranslationVars) => string;
+  /** Plural-aware lookup: picks `<key>.one` or `<key>.many` for `count`. */
+  tn: (key: PluralTranslationKey, count: number, vars?: TranslationVars) => string;
+  /** Locale-aware figure formatting for amounts and counts (never for cm/mm geometry). */
+  n: (value: number, options?: Intl.NumberFormatOptions) => string;
   dir: Direction;
 }
 
@@ -30,6 +37,8 @@ const LocaleContext = createContext<LocaleContextValue>({
   locale: DEFAULT_LOCALE,
   setLocale: () => {},
   t: (key, vars) => translate(DEFAULT_LOCALE, key, vars),
+  tn: (key, count, vars) => translatePlural(DEFAULT_LOCALE, key, count, vars),
+  n: (value, options) => formatNumber(DEFAULT_LOCALE, value, options),
   dir: dirFor(DEFAULT_LOCALE),
 });
 
@@ -90,6 +99,9 @@ export function LocaleProvider({ children }: { children: React.ReactNode }) {
       locale,
       setLocale,
       t: (key: TranslationKey, vars?: TranslationVars) => translate(locale, key, vars),
+      tn: (key: PluralTranslationKey, count: number, vars?: TranslationVars) =>
+        translatePlural(locale, key, count, vars),
+      n: (value: number, options?: Intl.NumberFormatOptions) => formatNumber(locale, value, options),
       dir: dirFor(locale),
     }),
     [locale, setLocale]

@@ -49,8 +49,9 @@ test.describe('Atelier Dashboard (/atelier)', () => {
     if (inputCount >= 2) {
       await inputs.nth(0).fill('100');
       await inputs.nth(1).fill('50');
-      await page.locator('form button[type="submit"]').first().click();
+      await page.getByRole('button', { name: /ajouter la pièce/i }).click();
       await page.waitForTimeout(500);
+      await expect(page.getByRole('button', { name: /ajouter une pièce/i })).toBeVisible();
     }
     // Verify a new row appeared (or at least the form closed)
     const after = await page.locator('input[value*="Panneau"]').count();
@@ -168,7 +169,7 @@ test.describe('Atelier Dashboard (/atelier)', () => {
     await form.getByLabel(/l \(cm\)/i).fill('230');
     await form.getByLabel(/qté/i).fill('1');
     await form.getByLabel(/nom/i).fill('Test rotation');
-    await form.getByRole('button', { name: '+' }).click();
+    await form.getByRole('button', { name: /ajouter la pièce/i }).click();
 
     await page.getByRole('button', { name: /optimiser/i }).click();
     await expect(page.getByRole('heading', { name: /ordre de coupe/i })).toBeVisible({ timeout: 15000 });

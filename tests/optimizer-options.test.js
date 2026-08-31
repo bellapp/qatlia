@@ -418,10 +418,39 @@ test('OptionsPanel select renders exactly the four supported optimizationPriorit
   assert.match(source, /import\s*\{[^}]*OPTIMIZATION_PRIORITY_VALUES[^}]*\}\s*from\s*['"]@\/lib\/cutting\/binpacking['"]/, 'OptionsPanel must import OPTIMIZATION_PRIORITY_VALUES from the optimizer module');
   assert.match(source, /OPTIMIZATION_PRIORITY_VALUES\.map\(/, 'the priority <select> must render by mapping over OPTIMIZATION_PRIORITY_VALUES');
 
-  // Any label lookup table keyed by priority must cover exactly the same set,
-  // so it cannot omit a value or carry a stale/extra one.
-  const labelsBlock = source.match(/Record<OptimizationPriority,\s*string>\s*=\s*\{([^}]*)\}/);
-  assert.ok(labelsBlock, 'expected an exhaustive Record<OptimizationPriority, string> label lookup');
-  const labelKeys = [...labelsBlock[1].matchAll(/^\s*([a-zA-Z_]+):/gm)].map((m) => m[1]);
-  assert.deepEqual(new Set(labelKeys), new Set(OPTIMIZATION_PRIORITY_VALUES), 'the label lookup keys must match the supported optimizationPriority values exactly');
+  // Since localization, the goal labels are no longer French literals inside
+  // the component: the panel renders them through the shared
+  // `OPTIMIZATION_PRIORITY_LABEL_KEYS` map in `src/i18n/domain.ts`. Assert on
+  // that map (loaded, not regex-scraped) rather than on an inline Record, so
+  // the check follows the labels to where they actually live.
+  assert.match(
+    source,
+    /import\s*\{[^}]*OPTIMIZATION_PRIORITY_LABEL_KEYS[^}]*\}\s*from\s*['"]@\/i18n\/domain['"]/s,
+    'OptionsPanel must take its goal labels from the shared @/i18n/domain map'
+  );
+  assert.match(
+    source,
+    /OPTIMIZATION_PRIORITY_LABEL_KEYS\[/,
+    'the priority <option> must look its label up in OPTIMIZATION_PRIORITY_LABEL_KEYS'
+  );
+
+  // The lookup must cover exactly the supported set, so it cannot omit a value
+  // or carry a stale/extra one, and every entry must resolve to real copy in
+  // every locale instead of leaking a raw key or a raw payload value.
+  const { OPTIMIZATION_PRIORITY_LABEL_KEYS } = loadTsModule('src/i18n/domain.ts');
+  const { LOCALES, translate } = loadTsModule('src/i18n/index.ts');
+
+  assert.deepEqual(
+    new Set(Object.keys(OPTIMIZATION_PRIORITY_LABEL_KEYS)),
+    new Set(OPTIMIZATION_PRIORITY_VALUES),
+    'the label lookup keys must match the supported optimizationPriority values exactly'
+  );
+  for (const value of OPTIMIZATION_PRIORITY_VALUES) {
+    const key = OPTIMIZATION_PRIORITY_LABEL_KEYS[value];
+    for (const locale of LOCALES) {
+      const label = translate(locale, key);
+      assert.notEqual(label, key, `${locale} has no label for optimization goal "${value}"`);
+      assert.notEqual(label, value, `${locale} renders the raw payload value for goal "${value}"`);
+    }
+  }
 });

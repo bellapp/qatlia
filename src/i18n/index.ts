@@ -33,6 +33,28 @@ type LeafPaths<T> = {
 
 export type TranslationVars = Record<string, string | number>;
 
+/**
+ * Every catalog group that carries a `one`/`many` pair, e.g.
+ * `atelier.cutOrder.count`. Derived from the catalog itself, so a plural group
+ * can only be referenced once both forms exist in French.
+ */
+type PluralBase<T> = T extends `${infer Base}.one` ? Base : never;
+export type PluralTranslationKey = PluralBase<TranslationKey>;
+
+export type PluralForm = 'one' | 'many';
+
+/**
+ * BCP-47 tags used for number formatting. Moroccan Arabic is pinned to the
+ * Latin numbering system (`-u-nu-latn`): Morocco writes figures with Western
+ * digits, and a dimension or a MAD amount must read identically to the cm/mm
+ * values the optimizer works with, whatever ICU data the browser ships.
+ */
+export const INTL_LOCALES: Record<Locale, string> = {
+  fr: 'fr-FR',
+  en: 'en',
+  ar: 'ar-MA-u-nu-latn',
+};
+
 export function isLocale(value: unknown): value is Locale {
   return typeof value === 'string' && (LOCALES as readonly string[]).includes(value);
 }
@@ -68,6 +90,46 @@ export function translate(locale: Locale, key: string, vars?: TranslationVars): 
     ?? lookup(catalogs[DEFAULT_LOCALE], key)
     ?? key;
   return interpolate(template, vars);
+}
+
+/**
+ * Which of the two catalog forms a count selects.
+ *
+ * French keeps zero singular ("0 ligne ignorée"), English and Arabic do not.
+ * Arabic's full CLDR rules distinguish zero/one/two/few/many; the workshop copy
+ * is written so a one/other split reads correctly (the plural forms use the
+ * counted-noun singular Arabic pairs with numbers, e.g. "3 قطع"), which keeps
+ * the catalog reviewable by a translator instead of hiding six variants.
+ */
+export function pluralForm(locale: Locale, count: number): PluralForm {
+  const n = Math.abs(count);
+  if (locale === 'fr') return n > 1 ? 'many' : 'one';
+  return n === 1 ? 'one' : 'many';
+}
+
+/**
+ * Resolves a plural group (`<base>.one` / `<base>.many`) for `count`, with the
+ * count itself always available to the template as `{count}`.
+ */
+export function translatePlural(
+  locale: Locale,
+  base: string,
+  count: number,
+  vars?: TranslationVars
+): string {
+  return translate(locale, `${base}.${pluralForm(locale, count)}`, { count, ...vars });
+}
+
+/**
+ * Locale-aware figure formatting for customer-facing amounts and counts.
+ *
+ * Canonical geometry is never routed through here: cut-plan coordinates and
+ * cm/mm dimension inputs stay in the fixed `toFixed(1)` form (see
+ * src/lib/units.ts) so a plan reads the same in every locale.
+ */
+export function formatNumber(locale: Locale, value: number, options?: Intl.NumberFormatOptions): string {
+  if (!Number.isFinite(value)) return '—';
+  return new Intl.NumberFormat(INTL_LOCALES[locale] ?? INTL_LOCALES[DEFAULT_LOCALE], options).format(value);
 }
 
 /**

@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { ChevronDown, KeyRound, LogOut, Receipt, User } from 'lucide-react';
+import { useLocale } from '@/components/LocaleProvider';
 
 interface AccountMenuProps {
   email: string;
@@ -14,6 +15,7 @@ export function AccountMenu({ email }: AccountMenuProps) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   const router = useRouter();
+  const { t } = useLocale();
 
   useEffect(() => {
     const onClick = (e: MouseEvent) => {
@@ -37,8 +39,9 @@ export function AccountMenu({ email }: AccountMenuProps) {
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className="flex items-center gap-2 pl-1.5 pr-2 py-1.5 rounded-xl bg-studio-panel hover:bg-studio-field border border-studio-border transition-all"
+        className="flex items-center gap-2 ps-1.5 pe-2 py-1.5 rounded-xl bg-studio-panel hover:bg-studio-field border border-studio-border transition-all"
         aria-expanded={open}
+        aria-label={t('account.menuAria', { email })}
       >
         <span className="w-7 h-7 rounded-lg bg-brand-500/15 text-brand-400 text-xs font-black flex items-center justify-center">
           {initial}
@@ -48,9 +51,9 @@ export function AccountMenu({ email }: AccountMenuProps) {
       </button>
 
       {open && (
-        <div className="absolute right-0 mt-2 w-56 rounded-2xl bg-studio-panel border border-studio-border shadow-2xl shadow-black/40 py-1.5 z-50 animate-in fade-in slide-in-from-top-2 duration-150">
+        <div className="absolute end-0 mt-2 w-56 rounded-2xl bg-studio-panel border border-studio-border shadow-2xl shadow-black/40 py-1.5 z-50 animate-in fade-in slide-in-from-top-2 duration-150">
           <div className="px-3 py-2 border-b border-studio-border">
-            <p className="text-[10px] uppercase tracking-wider text-slate-500 dark:text-slate-400 font-semibold">Compte atelier</p>
+            <p className="text-[10px] uppercase tracking-wider text-slate-500 dark:text-slate-400 font-semibold">{t('account.sectionTitle')}</p>
             <p className="text-xs text-slate-800 dark:text-slate-200 truncate mt-0.5">{email}</p>
           </div>
           <Link
@@ -59,7 +62,7 @@ export function AccountMenu({ email }: AccountMenuProps) {
             className="flex items-center gap-2 px-3 py-2 text-xs text-slate-700 dark:text-slate-300 hover:bg-studio-field/60 transition-colors"
           >
             <User className="w-3.5 h-3.5 text-brand-400" />
-            Mon compte
+            {t('account.myAccount')}
           </Link>
           <Link
             href="/account#credits"
@@ -67,7 +70,7 @@ export function AccountMenu({ email }: AccountMenuProps) {
             className="flex items-center gap-2 px-3 py-2 text-xs text-slate-700 dark:text-slate-300 hover:bg-studio-field/60 transition-colors"
           >
             <Receipt className="w-3.5 h-3.5 text-brand-400" />
-            Usage des crédits
+            {t('account.creditsUsage')}
           </Link>
           <Link
             href="/account#password"
@@ -75,7 +78,7 @@ export function AccountMenu({ email }: AccountMenuProps) {
             className="flex items-center gap-2 px-3 py-2 text-xs text-slate-700 dark:text-slate-300 hover:bg-studio-field/60 transition-colors"
           >
             <KeyRound className="w-3.5 h-3.5 text-brand-400" />
-            Changer le mot de passe
+            {t('account.changePassword')}
           </Link>
           <button
             type="button"
@@ -83,7 +86,7 @@ export function AccountMenu({ email }: AccountMenuProps) {
             className="w-full flex items-center gap-2 px-3 py-2 text-xs text-rose-300 hover:bg-rose-500/10 transition-colors"
           >
             <LogOut className="w-3.5 h-3.5" />
-            Déconnexion
+            {t('account.logout')}
           </button>
         </div>
       )}

@@ -41,7 +41,9 @@ import { QatlIALogo } from '@/components/QatlIALogo';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { useTheme } from '@/components/ThemeProvider';
 import { OnboardingTour } from '@/components/OnboardingTour';
-import { LocaleSwitcher } from '@/components/LocaleProvider';
+import { LocaleSwitcher, useLocale } from '@/components/LocaleProvider';
+import type { TranslationKey } from '@/i18n';
+import { materialLabelKey, visionErrorKey } from '@/i18n/domain';
 import { writeLocalHistoryItem, type LocalHistoryItem } from '@/lib/history';
 import { buildPdfPayload } from '@/lib/pdf-payload';
 import { buildPersistedProjectPayload } from '@/lib/projects/persistence-payload';
@@ -58,6 +60,13 @@ import {
 const DEFAULT_SHEETS: Sheet[] = [
   { id: 's0', height: 278, width: 208, kerf: 0.3, margin: 1.0, grainDirection: false, material: 'mdf', quantity: 1, label: 'Panneau standard 278×208' },
 ];
+
+/**
+ * The stock materials offered in the workshop's quick selector. These are the
+ * stable `MaterialType` payload values — the optimizer, `/api/optimize` and every
+ * saved project carry them verbatim; only their labels come from the catalog.
+ */
+const STOCK_MATERIAL_VALUES: readonly MaterialType[] = ['mdf', 'aluminium', 'verre', 'contreplaques'];
 
 /**
  * Vision extraction returns raw, unverified numbers from a model response.
@@ -110,7 +119,10 @@ export default function Dashboard() {
   // hardcoded placeholder the customer could mistake for their actual solde.
   const [userCredits, setUserCredits] = useState<number | null>(null);
   const [userEmail, setUserEmail] = useState<string | null>(null);
-  const [visionError, setVisionError] = useState<string | null>(null);
+  // The failure is held as a catalog key, not as rendered prose: the server
+  // answers with a machine-readable code, and holding the key means an artisan
+  // who switches language after a failed scan sees the message follow them.
+  const [visionError, setVisionError] = useState<TranslationKey | null>(null);
   const [previewImage, setPreviewImage] = useState<string | null>(null);
   const [isAuthModalOpen, setIsAuthModalOpen] = useState<boolean>(false);
   const [isDownloadingPdf, setIsDownloadingPdf] = useState<boolean>(false);
@@ -139,6 +151,7 @@ export default function Dashboard() {
   const activeSheet = sheets[0] || DEFAULT_SHEETS[0];
   const { theme } = useTheme();
   const isDark = theme === 'dark';
+  const { t, tn, n } = useLocale();
 
   // Re-sync the free-typed drafts whenever the canonical sheet dimensions or
   // the display unit change from *outside* the draft itself (a cm↔mm toggle,
@@ -260,7 +273,14 @@ export default function Dashboard() {
     // or a prior save already carried that historical origin forward.
     const persistedMigratedFromLegacyUnit = pendingUnitMigration || migratedFromLegacyUnit;
     const payload = buildPersistedProjectPayload({
-      name: `${cutMode === '1d' ? 'Barres' : 'Débit'} ${(activeSheet.material || 'MDF').toUpperCase()} — ${pieces.reduce((s, p) => s + (p.quantity || 1), 0)} pcs`,
+      // `{material}` stays the stable payload value upper-cased (MDF, VERRE, …)
+      // rather than a translated label, so a project keeps the same identity in
+      // history whatever language it was saved in; only the wording around it
+      // follows the artisan's locale.
+      name: t(cutMode === '1d' ? 'atelier.project.nameBars' : 'atelier.project.nameSheets', {
+        material: (activeSheet.material || 'mdf').toUpperCase(),
+        count: pieces.reduce((s, p) => s + (p.quantity || 1), 0),
+      }),
       sheets,
       sheet: activeSheet,
       pieces,
@@ -388,10 +408,13 @@ export default function Dashboard() {
         } else {
           if (res.status === 401) setIsAuthModalOpen(true);
           if (typeof data.creditsRemaining === 'number') setUserCredits(data.creditsRemaining);
-          setVisionError(data.message || 'Aucune mesure détectée dans l\'image.');
+          // The route's own `message` stays French for non-browser callers; the
+          // workshop renders the artisan's language from the `error` code, and a
+          // code this build does not know degrades to the generic message.
+          setVisionError(visionErrorKey(data.error));
         }
       } catch (err) {
-        setVisionError('Erreur réseau lors de l\'analyse de l\'image.');
+        setVisionError('atelier.visionError.network');
         console.error(err);
       } finally {
         setIsProcessingVision(false);
@@ -568,18 +591,20 @@ export default function Dashboard() {
                   PRO
                 </span>
               </div>
-              <p className="text-[11px] text-slate-600 dark:text-slate-400 hidden sm:block -mt-0.5">Atelier de découpe &amp; calepinage</p>
+              <p className="text-[11px] text-slate-600 dark:text-slate-400 hidden sm:block -mt-0.5">{t('atelier.header.tagline')}</p>
             </div>
           </div>
 
-          <div dir="ltr" role="group" aria-label="Actions de coupe" className="flex min-w-0 items-center gap-2 overflow-x-auto overscroll-x-contain">
-            {/* Mode Toggle: 2D / 1D */}
-            <div className="flex items-center p-0.5 rounded-lg bg-studio-field border border-studio-border">
-              <button type="button" onClick={() => setCutMode('2d')} aria-pressed={cutMode === '2d'}
+          <div role="group" aria-label={t('atelier.header.actionsAria')} className="flex min-w-0 items-center gap-2 overflow-x-auto overscroll-x-contain">
+            {/* Mode Toggle: 2D / 1D — the two labels are domain notation, not
+                prose, so the pair keeps its LTR order in every locale; only the
+                tooltip that explains them is translated. */}
+            <div dir="ltr" className="flex items-center p-0.5 rounded-lg bg-studio-field border border-studio-border">
+              <button type="button" onClick={() => setCutMode('2d')} aria-pressed={cutMode === '2d'} title={t('atelier.header.cutMode2dAria')}
                 className={`px-2.5 py-1 rounded-md text-[10px] font-bold transition-all ${cutMode === '2d' ? 'bg-brand-500 text-slate-950' : 'text-slate-500 hover:text-slate-300'}`}>
                 2D
               </button>
-              <button type="button" onClick={() => setCutMode('1d')} aria-pressed={cutMode === '1d'}
+              <button type="button" onClick={() => setCutMode('1d')} aria-pressed={cutMode === '1d'} title={t('atelier.header.cutMode1dAria')}
                 className={`px-2.5 py-1 rounded-md text-[10px] font-bold transition-all ${cutMode === '1d' ? 'bg-brand-500 text-slate-950' : 'text-slate-500 hover:text-slate-300'}`}>
                 1D
               </button>
@@ -587,10 +612,11 @@ export default function Dashboard() {
 
             <Link
               href="/history"
+              aria-label={t('atelier.header.history')}
               className="group relative flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-medium text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:text-white hover:bg-studio-panel transition-all"
             >
               <History className="w-4 h-4 text-slate-600 dark:text-slate-400 group-hover:text-brand-400 transition-colors" />
-              <span className="hidden sm:inline">Historique</span>
+              <span className="hidden sm:inline">{t('atelier.header.history')}</span>
             </Link>
 
             <LocaleSwitcher />
@@ -598,6 +624,7 @@ export default function Dashboard() {
             <ThemeToggle />
             <Link
               href="/credits"
+              aria-label={t('atelier.header.creditsAria')}
               className="group relative flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-brand-500/10 border border-brand-500/25 text-brand-400 hover:bg-brand-500/15 hover:border-brand-500/40 text-xs font-semibold transition-all"
             >
               <span className="relative flex h-2 w-2">
@@ -605,8 +632,8 @@ export default function Dashboard() {
                 <span className="relative inline-flex rounded-full h-2 w-2 bg-brand-400" />
               </span>
               <Zap className="w-3.5 h-3.5 fill-brand-400 text-brand-400" />
-              <span className="font-mono font-bold">{userCredits ?? '—'}</span>
-              <span className="text-[10px] opacity-80 hidden sm:inline">crédits</span>
+              <span className="font-mono font-bold" dir="ltr">{userCredits === null ? '—' : n(userCredits)}</span>
+              <span className="text-[10px] opacity-80 hidden sm:inline">{t('atelier.header.credits')}</span>
             </Link>
 
             {userEmail ? (
@@ -614,9 +641,9 @@ export default function Dashboard() {
             ) : (
               <Link
                 href="/auth/login"
-                className="px-4 py-2 rounded-xl bg-white dark:bg-studio-field hover:bg-slate-100 text-slate-950 font-bold text-xs transition-all shadow-sm hover:shadow-md"
+                className="px-4 py-2 rounded-xl bg-white dark:bg-studio-field hover:bg-slate-100 text-slate-950 font-bold text-xs whitespace-nowrap transition-all shadow-sm hover:shadow-md"
               >
-                Connexion
+                {t('nav.login')}
               </Link>
             )}
           </div>
@@ -641,11 +668,11 @@ export default function Dashboard() {
                     <Camera className="w-5 h-5 text-sky-400" />
                   </span>
                   <div>
-                    <p className="text-sm font-bold text-slate-800 dark:text-slate-200 group-hover:text-slate-900 dark:text-white transition-colors">Appareil photo</p>
-                    <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-tight">Scanner une fiche de débit papier</p>
+                    <p className="text-sm font-bold text-slate-800 dark:text-slate-200 group-hover:text-slate-900 dark:text-white transition-colors">{t('atelier.scan.cameraTitle')}</p>
+                    <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-tight">{t('atelier.scan.cameraDesc')}</p>
                   </div>
                 </div>
-                <span className="self-start px-2 py-0.5 rounded-md bg-sky-500/10 text-sky-400 text-[10px] font-bold font-mono border border-sky-500/20">📷 Scan IA</span>
+                <span className="self-start px-2 py-0.5 rounded-md bg-sky-500/10 text-sky-400 text-[10px] font-bold font-mono border border-sky-500/20">{t('atelier.scan.cameraBadge')}</span>
               </label>
 
               {/* Upload File Card */}
@@ -657,8 +684,8 @@ export default function Dashboard() {
                     <ImageIcon className="w-5 h-5 text-brand-400" />
                   </span>
                   <div>
-                    <p className="text-sm font-bold text-slate-800 dark:text-slate-200 group-hover:text-slate-900 dark:text-white transition-colors">Importer un fichier</p>
-                    <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-tight">Photo, scan ou capture d&apos;écran</p>
+                    <p className="text-sm font-bold text-slate-800 dark:text-slate-200 group-hover:text-slate-900 dark:text-white transition-colors">{t('atelier.scan.uploadTitle')}</p>
+                    <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-tight">{t('atelier.scan.uploadDesc')}</p>
                   </div>
                 </div>
                 <span className="self-start px-2 py-0.5 rounded-md bg-brand-500/10 text-brand-400 text-[10px] font-bold font-mono border border-brand-500/20">JPG PNG WebP</span>
@@ -669,7 +696,7 @@ export default function Dashboard() {
             <div className="flex items-center justify-center -mt-1">
               <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-gradient-to-r from-sky-500/10 via-brand-500/10 to-sky-500/10 border border-brand-500/20 text-[11px] font-semibold text-brand-400">
                 <span className="w-1.5 h-1.5 rounded-full bg-brand-400 animate-pulse" />
-                Vision IA · Extraction automatique
+                {t('atelier.scan.visionBadge')}
               </span>
             </div>
 
@@ -677,10 +704,10 @@ export default function Dashboard() {
             {previewImage && (
               <div className="flex items-center gap-3 p-3 rounded-2xl bg-emerald-500/10 border border-emerald-500/20">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={previewImage} alt="Scan preview" className="w-12 h-12 object-cover rounded-xl border border-emerald-500/30 shadow-sm" />
+                <img src={previewImage} alt={t('atelier.scan.previewAlt')} className="w-12 h-12 object-cover rounded-xl border border-emerald-500/30 shadow-sm" />
                 <div className="text-xs">
-                  <span className="text-emerald-400 font-bold block">Fiche analysée</span>
-                  <span className="text-[11px] text-emerald-300/70 font-mono">{pieces.length} cotes extraites</span>
+                  <span className="text-emerald-400 font-bold block">{t('atelier.scan.analyzedTitle')}</span>
+                  <span className="text-[11px] text-emerald-300/70 font-mono">{tn('atelier.scan.analyzedCount', pieces.length)}</span>
                 </div>
               </div>
             )}
@@ -690,16 +717,16 @@ export default function Dashboard() {
               <div className="flex items-center gap-3 p-3.5 rounded-2xl bg-sky-500/10 border border-sky-500/20 animate-pulse">
                 <RefreshCw className="w-4 h-4 animate-spin text-sky-400 shrink-0" />
                 <div className="text-xs">
-                  <span className="text-sky-300 font-bold block">Analyse en cours…</span>
-                  <span className="text-[11px] text-sky-400/60">Extraction des dimensions et quantités</span>
+                  <span className="text-sky-300 font-bold block">{t('atelier.scan.processingTitle')}</span>
+                  <span className="text-[11px] text-sky-400/60">{t('atelier.scan.processingDesc')}</span>
                 </div>
               </div>
             )}
 
             {visionError && (
-              <div className="flex items-center gap-3 p-3 rounded-2xl bg-rose-500/10 border border-rose-500/20">
+              <div role="alert" className="flex items-center gap-3 p-3 rounded-2xl bg-rose-500/10 border border-rose-500/20">
                 <AlertTriangle className="w-4 h-4 text-rose-400 shrink-0" />
-                <span className="text-xs text-rose-300 font-medium">{visionError}</span>
+                <span className="text-xs text-rose-300 font-medium">{t(visionError)}</span>
               </div>
             )}
 
@@ -711,11 +738,11 @@ export default function Dashboard() {
                     <Layers className="w-4 h-4 text-brand-400" />
                   </span>
                   <div>
-                    <h2 className="text-xs font-bold text-slate-900 dark:text-white tracking-wide">{cutMode === '1d' ? 'Barre en stock' : 'Panneau brut en stock'}</h2>
-                    <p className="text-[10px] text-slate-500 dark:text-slate-400">{cutMode === '1d' ? 'Longueur de la barre' : 'Dimensions du panneau'}</p>
+                    <h2 className="text-xs font-bold text-slate-900 dark:text-white tracking-wide">{t(cutMode === '1d' ? 'atelier.stock.titleBar' : 'atelier.stock.titleSheet')}</h2>
+                    <p className="text-[10px] text-slate-500 dark:text-slate-400">{t(cutMode === '1d' ? 'atelier.stock.subtitleBar' : 'atelier.stock.subtitleSheet')}</p>
                   </div>
                 </div>
-                <div role="group" aria-label="Unité d'affichage du projet" className="flex items-center p-0.5 rounded-lg bg-studio-field border border-studio-border">
+                <div role="group" aria-label={t('atelier.stock.unitGroupAria')} className="flex items-center p-0.5 rounded-lg bg-studio-field border border-studio-border">
                   {(['cm', 'mm'] as const).map((unit) => (
                     <button
                       key={unit}
@@ -733,44 +760,46 @@ export default function Dashboard() {
 
               <div className={cutMode === '1d' ? 'p-4 grid grid-cols-2 gap-3' : 'p-4 grid grid-cols-3 gap-3'}>
                 {cutMode === '1d' ? null : <div className="space-y-1">
-                  <label className="text-[10px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">Hauteur (Y) — {displayUnit}</label>
+                  <label className="text-[10px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">{t('atelier.stock.heightLabel', { unit: displayUnit })}</label>
                   <input
                     type="number"
                     step="0.1"
+                    dir="ltr"
                     data-testid="sheet-height-input"
-                    aria-label={`Hauteur ${displayUnit}`}
+                    aria-label={t('atelier.stock.heightAria', { unit: displayUnit })}
                     value={sheetHeightDraft}
                     onChange={(e) => setSheetHeightDraft(e.target.value)}
                     onBlur={(e) => commitSheetDimension('height', e.target.value)}
                     onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur(); }}
-                    className="w-full px-3 py-2 rounded-xl bg-studio-field border border-studio-border text-slate-900 dark:text-slate-100 font-mono font-bold text-right outline-none focus:border-brand-500/50 focus:ring-1 focus:ring-brand-500/20 transition-all"
+                    className="w-full px-3 py-2 rounded-xl bg-studio-field border border-studio-border text-slate-900 dark:text-slate-100 font-mono font-bold text-end outline-none focus:border-brand-500/50 focus:ring-1 focus:ring-brand-500/20 transition-all"
                   />
                 </div>}
                 <div className="space-y-1">
-                  <label className="text-[10px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">{cutMode === '1d' ? `Longueur (${displayUnit})` : `Largeur (X) — ${displayUnit}`}</label>
+                  <label className="text-[10px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">{t(cutMode === '1d' ? 'atelier.stock.lengthLabel' : 'atelier.stock.widthLabel', { unit: displayUnit })}</label>
                   <input
                     type="number"
                     step="0.1"
+                    dir="ltr"
                     data-testid="sheet-width-input"
-                    aria-label={cutMode === '1d' ? `Longueur ${displayUnit}` : `Largeur ${displayUnit}`}
+                    aria-label={t(cutMode === '1d' ? 'atelier.stock.lengthAria' : 'atelier.stock.widthAria', { unit: displayUnit })}
                     value={sheetWidthDraft}
                     onChange={(e) => setSheetWidthDraft(e.target.value)}
                     onBlur={(e) => commitSheetDimension('width', e.target.value)}
                     onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur(); }}
-                    className="w-full px-3 py-2 rounded-xl bg-studio-field border border-studio-border text-slate-900 dark:text-slate-100 font-mono font-bold text-right outline-none focus:border-brand-500/50 focus:ring-1 focus:ring-brand-500/20 transition-all"
+                    className="w-full px-3 py-2 rounded-xl bg-studio-field border border-studio-border text-slate-900 dark:text-slate-100 font-mono font-bold text-end outline-none focus:border-brand-500/50 focus:ring-1 focus:ring-brand-500/20 transition-all"
                   />
                 </div>
                 <div className="space-y-1">
-                  <label className="text-[10px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">Matériau</label>
+                  <label className="text-[10px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">{t('atelier.stock.materialLabel')}</label>
                   <select
                     value={activeSheet.material || 'mdf'}
+                    aria-label={t('atelier.stock.materialAria')}
                     onChange={(e) => { setSheets([{ ...activeSheet, material: e.target.value as MaterialType }]); }}
                     className="w-full px-3 py-2 rounded-xl bg-studio-field border border-studio-border text-slate-800 dark:text-slate-200 text-xs outline-none focus:border-brand-500/50 focus:ring-1 focus:ring-brand-500/20 transition-all"
                   >
-                    <option value="mdf">MDF / Bois</option>
-                    <option value="aluminium">Aluminium</option>
-                    <option value="verre">Verre</option>
-                    <option value="contreplaques">Contreplaqué</option>
+                    {STOCK_MATERIAL_VALUES.map((material) => (
+                      <option key={material} value={material}>{t(materialLabelKey(material))}</option>
+                    ))}
                   </select>
                 </div>
               </div>
@@ -799,7 +828,7 @@ export default function Dashboard() {
               >
                 <div className="flex items-center gap-2">
                   <SlidersHorizontal className="w-3.5 h-3.5 text-brand-400" />
-                  <span>Réglages de coupe avancés</span>
+                  <span>{t('atelier.advanced.toggle')}</span>
                 </div>
                 <span className={`transition-transform duration-200 ${showAdvancedOptions ? 'rotate-180' : ''}`}>
                   <ChevronDown className="w-4 h-4" />
@@ -826,12 +855,12 @@ export default function Dashboard() {
               {isOptimizing ? (
                 <>
                   <RefreshCw className="w-4 h-4 animate-spin" />
-                  <span>Calcul du calepinage…</span>
+                  <span>{t('atelier.optimize.running')}</span>
                 </>
               ) : (
                 <>
                   <Scissors className="w-4 h-4" />
-                  <span>Optimiser le plan de coupe</span>
+                  <span>{t('atelier.optimize.cta')}</span>
                 </>
               )}
             </button>
@@ -847,15 +876,18 @@ export default function Dashboard() {
                     breakdown below and rendered in the PDF export. No estimated
                     "savings" claim is shown here. */}
                 <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-emerald-950/60 via-studio-panel/80 to-studio-panel border border-emerald-500/20 p-5">
-                  <div className="absolute top-0 right-0 w-48 h-48 bg-emerald-500/5 rounded-full blur-3xl -translate-y-1/2 translate-x-1/4 pointer-events-none" />
+                  <div className="absolute top-0 end-0 w-48 h-48 bg-emerald-500/5 rounded-full blur-3xl -translate-y-1/2 pointer-events-none" />
                   <div className="relative flex flex-wrap items-center justify-between gap-4">
                     <div>
-                      <p className="text-[10px] font-bold uppercase tracking-[0.15em] text-emerald-400 mb-1">Coût total estimé</p>
-                      <p className="text-3xl font-black text-slate-900 dark:text-white tracking-tight">
-                        {result.costBreakdown?.subtotal.toLocaleString('fr-FR') ?? '—'} <span className="text-emerald-400">MAD</span>
+                      <p className="text-[10px] font-bold uppercase tracking-[0.15em] text-emerald-400 mb-1">{t('atelier.cost.bannerLabel')}</p>
+                      <p className="text-3xl font-black text-slate-900 dark:text-white tracking-tight" dir="ltr">
+                        {result.costBreakdown ? n(result.costBreakdown.subtotal) : '—'} <span className="text-emerald-400">{t('atelier.cost.currency')}</span>
                       </p>
                       <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1">
-                        {result.totalLinearCutMeters || 0} m linéaires de coupe · {result.sheetsUsed} panneau{result.sheetsUsed > 1 ? 'x' : ''}
+                        {t('atelier.cost.bannerMeta', {
+                          meters: n(result.totalLinearCutMeters || 0),
+                          sheets: tn('atelier.cost.sheetsCount', result.sheetsUsed),
+                        })}
                       </p>
                     </div>
                     <div className="shrink-0 w-14 h-14 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center">
@@ -867,26 +899,26 @@ export default function Dashboard() {
                 {/* Performance Metrics Grid */}
                 <div className="grid grid-cols-4 gap-2">
                   <div className="p-3.5 rounded-xl bg-studio-panel/60 border border-studio-border/80 flex flex-col items-center text-center gap-1">
-                    <span className="text-[9px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Feuilles</span>
-                    <span className="text-2xl font-black font-mono text-slate-900 dark:text-white tabular-nums">{result.sheetsUsed}</span>
-                    <span className="text-[9px] text-slate-600 truncate">
+                    <span className="text-[9px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">{t('atelier.metrics.sheets')}</span>
+                    <span className="text-2xl font-black font-mono text-slate-900 dark:text-white tabular-nums" dir="ltr">{result.sheetsUsed}</span>
+                    <span className="text-[9px] text-slate-600 truncate" dir="ltr">
                       {formatDisplayValue(activeSheet.height, displayUnit)}×{formatDisplayValue(activeSheet.width, displayUnit)} {displayUnit}
                     </span>
                   </div>
                   <div className="p-3.5 rounded-xl bg-studio-panel/60 border border-studio-border/80 flex flex-col items-center text-center gap-1">
-                    <span className="text-[9px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Utile</span>
-                    <span className="text-2xl font-black font-mono text-emerald-400 tabular-nums">{(100 - result.wastePercentage).toFixed(0)}%</span>
-                    <span className="text-[9px] text-emerald-500/60">surface</span>
+                    <span className="text-[9px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">{t('atelier.metrics.usable')}</span>
+                    <span className="text-2xl font-black font-mono text-emerald-400 tabular-nums" dir="ltr">{(100 - result.wastePercentage).toFixed(0)}%</span>
+                    <span className="text-[9px] text-emerald-500/60">{t('atelier.metrics.usableSub')}</span>
                   </div>
                   <div className="p-3.5 rounded-xl bg-studio-panel/60 border border-studio-border/80 flex flex-col items-center text-center gap-1">
-                    <span className="text-[9px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Chute</span>
-                    <span className="text-2xl font-black font-mono text-brand-400 tabular-nums">{result.wastePercentage.toFixed(0)}%</span>
-                    <span className="text-[9px] text-brand-500/60">résiduelle</span>
+                    <span className="text-[9px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">{t('atelier.metrics.waste')}</span>
+                    <span className="text-2xl font-black font-mono text-brand-400 tabular-nums" dir="ltr">{result.wastePercentage.toFixed(0)}%</span>
+                    <span className="text-[9px] text-brand-500/60">{t('atelier.metrics.wasteSub')}</span>
                   </div>
                   <div className="p-3.5 rounded-xl bg-studio-panel/60 border border-studio-border/80 flex flex-col items-center text-center gap-1">
-                    <span className="text-[9px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Pièces</span>
-                    <span className="text-2xl font-black font-mono text-sky-400 tabular-nums">{result.placedPieces.length}</span>
-                    <span className="text-[9px] text-sky-400/60">placées</span>
+                    <span className="text-[9px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">{t('atelier.metrics.pieces')}</span>
+                    <span className="text-2xl font-black font-mono text-sky-400 tabular-nums" dir="ltr">{result.placedPieces.length}</span>
+                    <span className="text-[9px] text-sky-400/60">{t('atelier.metrics.piecesSub')}</span>
                   </div>
                 </div>
 
@@ -905,26 +937,30 @@ export default function Dashboard() {
                               : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:text-slate-300'
                           }`}
                         >
-                          Panneau {i+1}
-                          <span className="ml-1.5 text-[10px] text-slate-600 font-mono">
+                          {t('atelier.plan.sheetTab', { index: i + 1 })}
+                          <span className="ms-1.5 text-[10px] text-slate-600 font-mono" dir="ltr">
                             {result.sheets[i]?.wasteRate?.toFixed(0)}%
                           </span>
                         </button>
                       ))}
                     </div>
-                    <div className="flex shrink-0 items-center gap-1.5 bg-studio-field rounded-lg border border-studio-border p-0.5">
-                      <button aria-label="Zoom arrière" onClick={() => setZoomLevel(Math.max(0.5, zoomLevel - 0.25))} disabled={zoomLevel <= 0.5} className="p-1 rounded-md hover:bg-studio-border transition-colors text-slate-600 dark:text-slate-400 disabled:opacity-35 disabled:cursor-not-allowed">
+                    {/* The zoom pair reads out/in like the plan it drives, so it
+                        keeps the plan's LTR order in every locale. */}
+                    <div dir="ltr" className="flex shrink-0 items-center gap-1.5 bg-studio-field rounded-lg border border-studio-border p-0.5">
+                      <button aria-label={t('atelier.plan.zoomOut')} onClick={() => setZoomLevel(Math.max(0.5, zoomLevel - 0.25))} disabled={zoomLevel <= 0.5} className="p-1 rounded-md hover:bg-studio-border transition-colors text-slate-600 dark:text-slate-400 disabled:opacity-35 disabled:cursor-not-allowed">
                         <ZoomOut className="w-3.5 h-3.5" />
                       </button>
-                      <span className="text-[10px] font-mono text-slate-600 dark:text-slate-400 tabular-nums px-1 w-10 text-center">{Math.round(zoomLevel*100)}%</span>
-                      <button aria-label="Zoom avant" onClick={() => setZoomLevel(Math.min(2.5, zoomLevel + 0.25))} disabled={zoomLevel >= 2.5} className="p-1 rounded-md hover:bg-studio-border transition-colors text-slate-600 dark:text-slate-400 disabled:opacity-35 disabled:cursor-not-allowed">
+                      <span title={t('atelier.plan.zoomLevelAria')} className="text-[10px] font-mono text-slate-600 dark:text-slate-400 tabular-nums px-1 w-10 text-center">{Math.round(zoomLevel*100)}%</span>
+                      <button aria-label={t('atelier.plan.zoomIn')} onClick={() => setZoomLevel(Math.min(2.5, zoomLevel + 0.25))} disabled={zoomLevel >= 2.5} className="p-1 rounded-md hover:bg-studio-border transition-colors text-slate-600 dark:text-slate-400 disabled:opacity-35 disabled:cursor-not-allowed">
                         <ZoomIn className="w-3.5 h-3.5" />
                       </button>
                     </div>
                   </div>
 
-                  {/* SVG Canvas */}
-                  <div data-testid="cut-plan-viewport" className={`relative min-h-[420px] max-h-[70vh] overflow-auto overscroll-contain p-5 ${isDark ? 'bg-[#040812]' : 'bg-[#F1F5F9]'}`}>
+                  {/* SVG Canvas — the plan is geometry, not prose: its origin is
+                      the sheet's top-left corner and its labels are cm/mm
+                      figures, so it stays LTR even when the workshop is RTL. */}
+                  <div dir="ltr" data-testid="cut-plan-viewport" className={`relative min-h-[420px] max-h-[70vh] overflow-auto overscroll-contain p-5 ${isDark ? 'bg-[#040812]' : 'bg-[#F1F5F9]'}`}>
                     <div
                       className="mx-auto transition-[width] duration-200 ease-out"
                       style={{ width: `${zoomLevel * 100}%`, maxWidth: `${480 * zoomLevel}px` }}
@@ -1005,21 +1041,24 @@ export default function Dashboard() {
 
                 {/* Export Actions */}
                 <div className="grid grid-cols-4 gap-1.5">
-                  <button onClick={handleDownloadJson} className="py-2.5 rounded-xl bg-studio-panel/60 border border-studio-border hover:border-studio-border-hover text-slate-700 dark:text-slate-300 font-bold text-[10px] flex items-center justify-center gap-1.5 transition-all">
+                  {/* The three file-format labels are the formats themselves, so
+                      they stay verbatim; the accessible name carries the
+                      translated sentence. */}
+                  <button onClick={handleDownloadJson} aria-label={t('atelier.exports.jsonAria')} className="py-2.5 rounded-xl bg-studio-panel/60 border border-studio-border hover:border-studio-border-hover text-slate-700 dark:text-slate-300 font-bold text-[10px] flex items-center justify-center gap-1.5 transition-all">
                     <FileCode2 className="w-3.5 h-3.5 text-emerald-400" />
-                    JSON
+                    {t('atelier.exports.json')}
                   </button>
-                  <button onClick={handleDownloadPng} className="py-2.5 rounded-xl bg-studio-panel/60 border border-studio-border hover:border-studio-border-hover text-slate-700 dark:text-slate-300 font-bold text-[10px] flex items-center justify-center gap-1.5 transition-all">
+                  <button onClick={handleDownloadPng} aria-label={t('atelier.exports.pngAria')} className="py-2.5 rounded-xl bg-studio-panel/60 border border-studio-border hover:border-studio-border-hover text-slate-700 dark:text-slate-300 font-bold text-[10px] flex items-center justify-center gap-1.5 transition-all">
                     <FileCode2 className="w-3.5 h-3.5 text-purple-400" />
-                    PNG
+                    {t('atelier.exports.png')}
                   </button>
-                  <button onClick={handleDownloadDxf} className="py-2.5 rounded-xl bg-studio-panel/60 border border-studio-border hover:border-studio-border-hover text-slate-700 dark:text-slate-300 font-bold text-[10px] flex items-center justify-center gap-1.5 transition-all">
+                  <button onClick={handleDownloadDxf} aria-label={t('atelier.exports.dxfAria')} className="py-2.5 rounded-xl bg-studio-panel/60 border border-studio-border hover:border-studio-border-hover text-slate-700 dark:text-slate-300 font-bold text-[10px] flex items-center justify-center gap-1.5 transition-all">
                     <FileCode2 className="w-3.5 h-3.5 text-sky-400" />
-                    DXF
+                    {t('atelier.exports.dxf')}
                   </button>
                   <button onClick={handleDownloadPdf} disabled={isDownloadingPdf} className="col-span-4 mt-1 py-3 rounded-xl bg-brand-500 hover:bg-brand-400 text-slate-950 font-black text-xs flex items-center justify-center gap-2 shadow-lg shadow-brand-500/20 transition-all disabled:opacity-40">
                     {isDownloadingPdf ? <RefreshCw className="w-4 h-4 animate-spin" /> : <FileText className="w-4 h-4" />}
-                    {isDownloadingPdf ? 'Génération…' : 'Exporter le rapport PDF'}
+                    {isDownloadingPdf ? t('atelier.exports.pdfGenerating') : t('atelier.exports.pdf')}
                   </button>
                 </div>
 
@@ -1028,24 +1067,24 @@ export default function Dashboard() {
                   <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1.35fr)_minmax(0,0.85fr)] gap-2.5">
                     <section className="p-3.5 rounded-xl bg-studio-panel/50 border border-studio-border/70">
                       <div className="flex items-center justify-between gap-2 mb-2.5">
-                        <h3 className="text-sm font-bold text-slate-900 dark:text-white">Ordre de coupe</h3>
-                        <span className="text-[10px] font-mono text-slate-500 dark:text-slate-400">{currentSheetPieces.length} pièces</span>
+                        <h3 className="text-sm font-bold text-slate-900 dark:text-white">{t('atelier.cutOrder.title')}</h3>
+                        <span className="text-[10px] font-mono text-slate-500 dark:text-slate-400">{tn('atelier.cutOrder.count', currentSheetPieces.length)}</span>
                       </div>
                       <div className="overflow-x-auto">
-                        <table aria-label="Ordre de coupe" className="min-w-full text-left text-[11px]">
+                        <table aria-label={t('atelier.cutOrder.title')} className="min-w-full text-start text-[11px]">
                           <thead>
                             <tr className="border-b border-studio-border/70 text-[10px] uppercase tracking-wider text-slate-500 dark:text-slate-400">
-                              <th scope="col" className="py-2 pr-3 font-bold">#</th>
-                              <th scope="col" className="py-2 pr-3 font-bold">Pièce</th>
-                              <th scope="col" className="py-2 pr-3 font-bold">H × L ({displayUnit})</th>
-                              <th scope="col" className="py-2 font-bold">Rotation</th>
+                              <th scope="col" className="py-2 pe-3 font-bold">{t('atelier.cutOrder.number')}</th>
+                              <th scope="col" className="py-2 pe-3 font-bold">{t('atelier.cutOrder.piece')}</th>
+                              <th scope="col" className="py-2 pe-3 font-bold">{t('atelier.cutOrder.dimensions', { unit: displayUnit })}</th>
+                              <th scope="col" className="py-2 font-bold">{t('atelier.cutOrder.rotation')}</th>
                             </tr>
                           </thead>
                           <tbody>
                             {currentSheetPieces.map((piece) => (
                               <tr key={piece.pieceNumber} className="border-b border-studio-border/40 last:border-b-0">
-                                <td className="py-2 pr-3 font-mono font-bold text-brand-400">{piece.pieceNumber}</td>
-                                <td className="py-2 pr-3">
+                                <td className="py-2 pe-3 font-mono font-bold text-brand-400" dir="ltr">{piece.pieceNumber}</td>
+                                <td className="py-2 pe-3">
                                   <div className="flex items-center gap-2 min-w-0">
                                     <span
                                       aria-hidden="true"
@@ -1055,10 +1094,10 @@ export default function Dashboard() {
                                     <span className="truncate text-slate-700 dark:text-slate-300">{piece.name}</span>
                                   </div>
                                 </td>
-                                <td className="py-2 pr-3 font-mono text-slate-600 dark:text-slate-300 tabular-nums">
+                                <td className="py-2 pe-3 font-mono text-slate-600 dark:text-slate-300 tabular-nums" dir="ltr">
                                   {formatDisplayValue(piece.height, displayUnit)} × {formatDisplayValue(piece.width, displayUnit)} {displayUnit}
                                 </td>
-                                <td className="py-2 text-slate-600 dark:text-slate-300">{piece.rotated ? 'Oui (90°)' : 'Non'}</td>
+                                <td className="py-2 text-slate-600 dark:text-slate-300">{t(piece.rotated ? 'atelier.cutOrder.rotated' : 'atelier.cutOrder.notRotated')}</td>
                               </tr>
                             ))}
                           </tbody>
@@ -1066,13 +1105,13 @@ export default function Dashboard() {
                       </div>
                     </section>
                     <div data-testid="offcuts-list" className="p-3.5 rounded-xl bg-studio-panel/50 border border-studio-border/70">
-                      <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-2.5">Chutes ({currentSheet.offcuts?.length||0})</p>
+                      <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-2.5">{t('atelier.offcuts.title', { count: currentSheet.offcuts?.length || 0 })}</p>
                       <div className="space-y-1 max-h-[180px] overflow-y-auto">
                         {(currentSheet.offcuts||[]).map((off, i) => {
                           return (
                             <div key={off.id} data-testid="offcut-list-item" data-offcut-id={off.id} data-offcut-width={off.width} data-offcut-height={off.height} className="flex items-center justify-between py-1 px-1.5 rounded-md hover:bg-studio-field/40 text-[11px] transition-colors gap-1">
-                              <span className="text-slate-500 dark:text-slate-400 font-mono text-[10px] truncate">Chute #{i+1}</span>
-                              <span className="font-mono font-bold text-brand-400 text-[10px] tabular-nums">
+                              <span className="text-slate-500 dark:text-slate-400 font-mono text-[10px] truncate">{t('atelier.offcuts.item', { index: i + 1 })}</span>
+                              <span className="font-mono font-bold text-brand-400 text-[10px] tabular-nums" dir="ltr">
                                 {formatDisplayValue(off.height, displayUnit)}×{formatDisplayValue(off.width, displayUnit)} {displayUnit}
                               </span>
                             </div>
@@ -1088,23 +1127,23 @@ export default function Dashboard() {
                     never recomputes them. */}
                 {result && (
                   <div className="p-3.5 rounded-xl bg-studio-panel/50 border border-studio-border/70 space-y-2">
-                    <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Estimation du coût</p>
+                    <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">{t('atelier.cost.breakdownTitle')}</p>
                     <div className="grid grid-cols-4 gap-2 text-xs">
                       <div className="p-2 rounded-lg bg-studio-canvas/50 text-center">
-                        <span className="text-[9px] text-slate-500 block uppercase">Panneaux</span>
-                        <span className="font-mono font-black text-white">{result.costBreakdown?.materialCost ?? 0} MAD</span>
+                        <span className="text-[9px] text-slate-500 block uppercase">{t('atelier.cost.panels')}</span>
+                        <span className="font-mono font-black text-white" dir="ltr">{t('atelier.cost.amount', { value: n(result.costBreakdown?.materialCost ?? 0) })}</span>
                       </div>
                       <div className="p-2 rounded-lg bg-studio-canvas/50 text-center">
-                        <span className="text-[9px] text-slate-500 block uppercase">Chants</span>
-                        <span className="font-mono font-black text-white">{result.costBreakdown?.edgeCost ?? 0} MAD</span>
+                        <span className="text-[9px] text-slate-500 block uppercase">{t('atelier.cost.edges')}</span>
+                        <span className="font-mono font-black text-white" dir="ltr">{t('atelier.cost.amount', { value: n(result.costBreakdown?.edgeCost ?? 0) })}</span>
                       </div>
                       <div className="p-2 rounded-lg bg-studio-canvas/50 text-center">
-                        <span className="text-[9px] text-slate-500 block uppercase">Main d&apos;œuvre</span>
-                        <span className="font-mono font-black text-white">{result.costBreakdown?.laborCost ?? 0} MAD</span>
+                        <span className="text-[9px] text-slate-500 block uppercase">{t('atelier.cost.labor')}</span>
+                        <span className="font-mono font-black text-white" dir="ltr">{t('atelier.cost.amount', { value: n(result.costBreakdown?.laborCost ?? 0) })}</span>
                       </div>
                       <div className="p-2 rounded-lg bg-studio-canvas/50 text-center">
-                        <span className="text-[9px] text-slate-500 block uppercase">Total</span>
-                        <span className="font-mono font-black text-brand-400">{result.costBreakdown?.subtotal ?? 0} MAD</span>
+                        <span className="text-[9px] text-slate-500 block uppercase">{t('atelier.cost.total')}</span>
+                        <span className="font-mono font-black text-brand-400" dir="ltr">{t('atelier.cost.amount', { value: n(result.costBreakdown?.subtotal ?? 0) })}</span>
                       </div>
                     </div>
                   </div>
