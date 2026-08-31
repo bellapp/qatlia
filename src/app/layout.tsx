@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Inter, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
 import { ClientShell } from "@/components/ClientShell";
+import { DEFAULT_LOCALE, dirFor, localeInitScript } from "@/i18n";
 
 const inter = Inter({ subsets: ["latin"], variable: "--font-inter", display: "swap" });
 const jetbrainsMono = JetBrains_Mono({ subsets: ["latin"], variable: "--font-mono", display: "swap" });
@@ -17,8 +18,15 @@ export const viewport: Viewport = { themeColor: "#F5A623" };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="fr" className={`${inter.variable} ${jetbrainsMono.variable}`} suppressHydrationWarning>
+    <html
+      lang={DEFAULT_LOCALE}
+      dir={dirFor(DEFAULT_LOCALE)}
+      className={`${inter.variable} ${jetbrainsMono.variable}`}
+      suppressHydrationWarning
+    >
       <body className="min-h-screen bg-studio-canvas text-slate-700 dark:text-slate-100 font-body antialiased selection:bg-brand-500 selection:text-black">
+        {/* Corrects lang/dir from the persisted preference before the page paints. */}
+        <script dangerouslySetInnerHTML={{ __html: localeInitScript }} />
         <ClientShell>{children}</ClientShell>
       </body>
     </html>

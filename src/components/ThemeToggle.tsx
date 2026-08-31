@@ -3,9 +3,12 @@
 import React from 'react';
 import { Sun, Moon } from 'lucide-react';
 import { useTheme } from '@/components/ThemeProvider';
+import { useLocale } from '@/components/LocaleProvider';
 
 export function ThemeToggle({ className = '' }: { className?: string }) {
   const { theme, toggle } = useTheme();
+  const { t } = useLocale();
+  const label = theme === 'dark' ? t('nav.lightMode') : t('nav.darkMode');
 
   return (
     <button
@@ -16,8 +19,8 @@ export function ThemeToggle({ className = '' }: { className?: string }) {
           ? 'bg-studio-field border-studio-border text-brand-400 hover:bg-studio-border'
           : 'bg-studio-field border-studio-border text-brand-500 hover:bg-studio-border-hover'
       } ${className}`}
-      aria-label={theme === 'dark' ? 'Mode clair' : 'Mode sombre'}
-      title={theme === 'dark' ? 'Mode clair' : 'Mode sombre'}
+      aria-label={label}
+      title={label}
     >
       {theme === 'dark' ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
     </button>

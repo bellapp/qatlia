@@ -9,6 +9,9 @@ export default defineConfig({
   reporter: 'list',
   use: {
     baseURL: 'http://localhost:3002',
+    // Pinned so the French default is asserted against a deterministic browser
+    // locale rather than whatever the host machine happens to be set to.
+    locale: 'fr-FR',
     trace: 'off',
   },
   webServer: {
