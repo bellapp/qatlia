@@ -38,7 +38,7 @@ export default function LandingPage() {
             <span className="font-display font-extrabold text-lg tracking-tight text-slate-900 dark:text-white">QatlIA</span>
           </Link>
           <div className="flex items-center gap-3">
-            <Link href="/auth/login" className="text-sm font-medium text-slate-600 dark:text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-slate-900 dark:text-white transition-colors">
+            <Link href="/auth/login" className="text-sm font-medium text-slate-600 hover:text-slate-900 dark:text-slate-300 dark:hover:text-white transition-colors">
               {t('nav.login')}
             </Link>
             <LocaleSwitcher />

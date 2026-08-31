@@ -6,7 +6,6 @@ import {
   DEFAULT_LOCALE,
   LOCALES,
   LOCALE_COOKIE_NAME,
-  LOCALE_LABELS,
   LOCALE_STORAGE_KEY,
   dirFor,
   formatNumber,
@@ -114,25 +113,32 @@ export function LocaleProvider({ children }: { children: React.ReactNode }) {
 export function LocaleSwitcher({ className = '' }: { className?: string }) {
   const { locale, setLocale, t } = useLocale();
   return (
-    <div role="group" aria-label={t('nav.languageAria')} className={`flex items-center gap-0.5 ${className}`}>
-      <Globe className="w-3.5 h-3.5 text-slate-500 dark:text-slate-400 me-1" aria-hidden="true" />
-      {LOCALES.map((candidate) => (
-        <button
-          key={candidate}
-          type="button"
-          lang={candidate}
-          aria-pressed={locale === candidate}
-          title={t('nav.languageOptionAria', { language: t(`language.${candidate}`) })}
-          onClick={() => setLocale(candidate)}
-          className={`px-1.5 py-0.5 rounded text-[10px] font-bold transition-all ${
-            locale === candidate
-              ? 'bg-brand-500 text-slate-950'
-              : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-300'
-          }`}
-        >
-          {LOCALE_LABELS[candidate]}
-        </button>
-      ))}
+    <div role="group" aria-label={t('nav.languageAria')} className={`relative inline-flex items-center ${className}`}>
+      <Globe className="w-3.5 h-3.5 text-slate-500 dark:text-slate-400 pointer-events-none absolute start-2 z-10" aria-hidden="true" />
+      <select
+        aria-label={t('nav.languageAria')}
+        value={locale}
+        onChange={(event) => {
+          const next = isLocale(event.target.value) ? event.target.value : DEFAULT_LOCALE;
+          setLocale(next);
+        }}
+        className="appearance-none bg-transparent border border-slate-300 dark:border-studio-border hover:border-slate-400 dark:hover:border-studio-border-hover rounded-lg py-1 ps-7 pe-6 text-xs font-bold text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-brand-500/50 cursor-pointer transition-colors"
+      >
+        {LOCALES.map((candidate) => (
+          <option key={candidate} value={candidate} lang={candidate}>
+            {t(`language.${candidate}`)}
+          </option>
+        ))}
+      </select>
+      {/* Chevron (native select arrow is hidden by appearance-none) */}
+      <svg
+        className="w-3 h-3 text-slate-500 dark:text-slate-400 pointer-events-none absolute end-2"
+        viewBox="0 0 20 20"
+        fill="currentColor"
+        aria-hidden="true"
+      >
+        <path fillRule="evenodd" d="M5.23 7.21a.75.75 0 0 1 1.06.02L10 11.168l3.71-3.938a.75.75 0 1 1 1.08 1.04l-4.25 4.5a.75.75 0 0 1-1.08 0l-4.25-4.5a.75.75 0 0 1 .02-1.06Z" clipRule="evenodd" />
+      </svg>
     </div>
   );
 }
