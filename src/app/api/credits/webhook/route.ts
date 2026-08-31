@@ -1,55 +1,78 @@
 import { NextResponse } from 'next/server';
-import Stripe from 'stripe';
 import { createClient } from '@supabase/supabase-js';
+import { getStripe } from '@/lib/billing/stripe-client';
+import { getSupabaseAdminConfig, getWebhookSecret, isStripeConfigured } from '@/lib/billing/config';
+import { resolveGrant } from '@/lib/billing/grant';
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || 'sk_test_placeholder', {
-  apiVersion: '2026-07-29.dahlia',
-});
+export const dynamic = 'force-dynamic';
 
 export async function POST(req: Request) {
-  const sig = req.headers.get('stripe-signature');
-  const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
+  const signature = req.headers.get('stripe-signature');
+  const webhookSecret = getWebhookSecret();
 
-  if (!sig || !webhookSecret) {
-    return NextResponse.json({ error: 'Missing signature or webhook secret' }, { status: 400 });
+  if (!signature || !webhookSecret || !isStripeConfigured()) {
+    return NextResponse.json({ error: 'WEBHOOK_NOT_CONFIGURED' }, { status: 400 });
   }
 
   const rawBody = await req.text();
 
-  let event: Stripe.Event;
+  let event;
   try {
-    event = stripe.webhooks.constructEvent(rawBody, sig, webhookSecret);
+    const stripe = getStripe(process.env.STRIPE_SECRET_KEY as string);
+    event = stripe.webhooks.constructEvent(rawBody, signature, webhookSecret);
   } catch (err: unknown) {
-    const msg = err instanceof Error ? err.message : 'Unknown error';
-    console.error('Webhook signature verification failed:', msg);
-    return NextResponse.json({ error: 'Invalid signature' }, { status: 400 });
+    console.error('Webhook signature verification failed:', err instanceof Error ? err.message : 'unknown');
+    return NextResponse.json({ error: 'INVALID_SIGNATURE' }, { status: 400 });
   }
 
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  const resolved = resolveGrant(event as unknown as Parameters<typeof resolveGrant>[0]);
 
-  if (supabaseUrl && serviceRoleKey && !serviceRoleKey.includes('placeholder')) {
-    const supabaseAdmin = createClient(supabaseUrl, serviceRoleKey);
-
-    if (event.type === 'checkout.session.completed') {
-      const session = event.data.object as Stripe.Checkout.Session;
-      const { userId, packId, credits } = session.metadata || {};
-
-      if (userId && credits) {
-        const { error } = await supabaseAdmin.rpc('add_credits', {
-          p_user_id: userId,
-          p_credits: parseInt(credits, 10),
-          p_stripe_payment_id: session.payment_intent as string,
-          p_pack_id: packId || 'custom',
-        });
-
-        if (error) {
-          console.error('Erreur Supabase add_credits:', error);
-          return NextResponse.json({ error: 'DB_ERROR' }, { status: 500 });
-        }
-      }
+  // A completed payment that cannot be mapped to a grant must fail delivery so
+  // Stripe retries and the operator can investigate. Only events we deliberately
+  // do not credit are acknowledged without a grant.
+  if (!resolved.ok) {
+    if (resolved.retryable) {
+      console.error('Paid Stripe event could not be resolved:', resolved.reason);
+      return NextResponse.json(
+        { error: 'GRANT_RESOLUTION_FAILED', reason: resolved.reason },
+        { status: 500 }
+      );
     }
+    return NextResponse.json({ received: true, granted: false, reason: resolved.reason });
   }
 
-  return NextResponse.json({ received: true });
+  const adminConfig = getSupabaseAdminConfig();
+  if (!adminConfig) {
+    // Configuration problem, not a payload problem: let Stripe retry.
+    console.error('Webhook received a grant but Supabase admin is not configured');
+    return NextResponse.json({ error: 'DB_NOT_CONFIGURED' }, { status: 500 });
+  }
+
+  const supabaseAdmin = createClient(adminConfig.url, adminConfig.serviceRoleKey);
+  const { grant } = resolved;
+
+  // add_credits is idempotent: credit_transactions.stripe_payment_id carries a
+  // unique index, so a redelivered event is a no-op.
+  const { data, error } = await supabaseAdmin.rpc('add_credits', {
+    p_user_id: grant.userId,
+    p_credits: grant.credits,
+    p_stripe_payment_id: grant.idempotencyKey,
+    p_pack_id: grant.packId,
+  });
+
+  if (error) {
+    console.error('add_credits failed:', error.message);
+    return NextResponse.json({ error: 'DB_ERROR' }, { status: 500 });
+  }
+
+  const grantResult = (data || {}) as { success?: boolean; duplicate?: boolean; error?: string };
+  if (grantResult.success !== true) {
+    console.error('add_credits rejected grant:', grantResult.error || 'unknown');
+    return NextResponse.json(
+      { error: 'GRANT_FAILED', reason: grantResult.error || 'UNKNOWN_GRANT_FAILURE' },
+      { status: 500 }
+    );
+  }
+
+  return NextResponse.json({ received: true, granted: true, duplicate: grantResult.duplicate === true });
 }

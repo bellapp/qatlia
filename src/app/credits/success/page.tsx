@@ -1,10 +1,17 @@
 'use client';
 
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { CheckCircle2, ArrowRight, Zap } from 'lucide-react';
 
 export default function CreditsSuccessPage() {
+  // The demo checkout link (development only, when Stripe is unconfigured)
+  // grants nothing, so it must never claim a successful recharge.
+  const [isDemo, setIsDemo] = useState(false);
+  useEffect(() => {
+    setIsDemo(new URLSearchParams(window.location.search).get('demo') === 'true');
+  }, []);
+
   return (
     <div className="min-h-screen bg-studio-panel text-[#E2E8F0] font-sans antialiased flex items-center justify-center p-6">
       <div className="max-w-md w-full p-8 rounded-3xl bg-studio-panel/80 border border-emerald-500/40 text-center space-y-6 shadow-2xl backdrop-blur-md">
@@ -13,15 +20,19 @@ export default function CreditsSuccessPage() {
         </div>
 
         <div className="space-y-2">
-          <h1 className="text-2xl font-black text-slate-900 dark:text-white">Recharge Réussie !</h1>
+          <h1 className="text-2xl font-black text-slate-900 dark:text-white">
+            {isDemo ? 'Mode démonstration' : 'Paiement reçu'}
+          </h1>
           <p className="text-sm text-slate-600 dark:text-slate-400">
-            Vos crédits d&apos;analyse IA ont été ajoutés à votre compte. Vous pouvez maintenant analyser vos photos de découpe.
+            {isDemo
+              ? 'Aucun paiement n’a été effectué et aucun crédit n’a été ajouté : le paiement n’est pas configuré sur cet environnement.'
+              : 'Votre paiement a été reçu. Votre solde sera mis à jour dès confirmation du paiement.'}
           </p>
         </div>
 
         <div className="p-4 rounded-2xl bg-studio-panel border border-studio-border flex items-center justify-center gap-2 text-brand-400 font-bold text-sm">
           <Zap className="w-4 h-4 text-[#F5A623]" />
-          <span>Solde de crédits mis à jour</span>
+          <span>{isDemo ? 'Solde inchangé' : 'Solde de crédits mis à jour'}</span>
         </div>
 
         <Link

@@ -1,132 +1,33 @@
 -- ============================================================
--- SCRIPT COMPLET À EXÉCUTER DANS LE SQL EDITOR DE SUPABASE
+-- 005_credit_policy.sql
+-- P0 Task 5 — align the credit ledger with the published policy:
+--   * exactly one credit per successful Vision analysis, debited atomically;
+--   * exports (PDF/DXF/JSON/PNG/quotation) and optimization are free;
+--   * Stripe grants are idempotent on a unique payment id.
+--
+-- Defensive and idempotent: safe to re-run, and safe on a database where
+-- migrations 001-004 were applied in any partial combination.
 -- ============================================================
 
--- 1. Extension UUID
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
--- 2. Table profiles
-CREATE TABLE IF NOT EXISTS public.profiles (
-  id            UUID REFERENCES auth.users(id) ON DELETE CASCADE PRIMARY KEY,
-  email         TEXT NOT NULL,
-  full_name     TEXT,
-  locale        TEXT DEFAULT 'fr',
-  credits       INTEGER NOT NULL DEFAULT 5,
-  created_at    TIMESTAMPTZ DEFAULT NOW(),
-  updated_at    TIMESTAMPTZ DEFAULT NOW()
-);
+-- ------------------------------------------------------------
+-- 1. Reconcile credit_transactions
+--    Migration 003 wrote (user_id, amount, reason) while the app wrote
+--    (type, balance_after, description). Ensure every column exists.
+-- ------------------------------------------------------------
 
--- 3. Table projects
-CREATE TABLE IF NOT EXISTS public.projects (
-  id            UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
-  user_id       UUID REFERENCES auth.users(id) ON DELETE CASCADE NOT NULL,
-  name          TEXT NOT NULL,
-  material      TEXT NOT NULL,
-  sheet_width   DECIMAL(8,2) NOT NULL,
-  sheet_height  DECIMAL(8,2) NOT NULL,
-  kerf          DECIMAL(4,2) DEFAULT 0.3,
-  grain_direction BOOLEAN DEFAULT FALSE,
-  status        TEXT DEFAULT 'optimized',
-  options_json  JSONB,
-  created_at    TIMESTAMPTZ DEFAULT NOW(),
-  updated_at    TIMESTAMPTZ DEFAULT NOW()
-);
-
-ALTER TABLE public.projects ADD COLUMN IF NOT EXISTS options_json JSONB;
-
--- 4. Table pieces
-CREATE TABLE IF NOT EXISTS public.pieces (
-  id            UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
-  project_id    UUID REFERENCES public.projects(id) ON DELETE CASCADE NOT NULL,
-  label         TEXT,
-  width         DECIMAL(8,2) NOT NULL,
-  height        DECIMAL(8,2) NOT NULL,
-  quantity      INTEGER NOT NULL DEFAULT 1,
-  material      TEXT,
-  rotatable     BOOLEAN DEFAULT TRUE,
-  sort_order    INTEGER DEFAULT 0,
-  created_at    TIMESTAMPTZ DEFAULT NOW()
-);
-
--- 5. Table cut_results
-CREATE TABLE IF NOT EXISTS public.cut_results (
-  id              UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
-  project_id      UUID REFERENCES public.projects(id) ON DELETE CASCADE NOT NULL,
-  sheets_used     INTEGER NOT NULL,
-  waste_percentage DECIMAL(5,2),
-  total_area_used DECIMAL(10,2),
-  layout_data     JSONB NOT NULL,
-  svg_data        TEXT,
-  created_at      TIMESTAMPTZ DEFAULT NOW()
-);
-
--- 6. Table credit_transactions
 CREATE TABLE IF NOT EXISTS public.credit_transactions (
-  id              UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
-  user_id         UUID REFERENCES auth.users(id) ON DELETE CASCADE NOT NULL,
-  type            TEXT DEFAULT 'usage',
-  amount          INTEGER NOT NULL,
-  balance_after   INTEGER DEFAULT 0,
-  description     TEXT,
-  reason          TEXT,
-  stripe_payment_id TEXT,
-  youcan_payment_id TEXT,
-  created_at      TIMESTAMPTZ DEFAULT NOW()
+  id                UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
+  user_id           UUID REFERENCES auth.users(id) ON DELETE CASCADE NOT NULL,
+  amount            INTEGER NOT NULL,
+  created_at        TIMESTAMPTZ DEFAULT NOW()
 );
 
--- 7. Activer RLS
-ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.projects ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.pieces ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.cut_results ENABLE ROW LEVEL SECURITY;
+-- A table this migration may have just created starts with RLS *off*, which
+-- would expose every user's ledger through PostgREST. Section 6 sets the
+-- policies; enabling it here keeps the table closed in the interim.
 ALTER TABLE public.credit_transactions ENABLE ROW LEVEL SECURITY;
-
--- 8. Policies RLS
---    Les politiques des tables de crédits sont définies en section 12 : elles
---    sont en lecture seule, contrairement aux FOR ALL historiques.
-DROP POLICY IF EXISTS "Users can manage own projects" ON public.projects;
-CREATE POLICY "Users can manage own projects"
-  ON public.projects FOR ALL USING (auth.uid() = user_id);
-
-DROP POLICY IF EXISTS "Users can manage own pieces" ON public.pieces;
-CREATE POLICY "Users can manage own pieces"
-  ON public.pieces FOR ALL USING (
-    auth.uid() = (SELECT user_id FROM public.projects WHERE id = project_id)
-  );
-
-DROP POLICY IF EXISTS "Users can view own results" ON public.cut_results;
-CREATE POLICY "Users can view own results"
-  ON public.cut_results FOR ALL USING (
-    auth.uid() = (SELECT user_id FROM public.projects WHERE id = project_id)
-  );
-
--- 9. Trigger création de profil automatique sur Auth SignUp
-CREATE OR REPLACE FUNCTION public.handle_new_user()
-RETURNS TRIGGER AS $$
-BEGIN
-  INSERT INTO public.profiles (id, email, full_name, credits)
-  VALUES (new.id, new.email, COALESCE(new.raw_user_meta_data->>'full_name', split_part(new.email, '@', 1)), 5)
-  ON CONFLICT (id) DO NOTHING;
-  RETURN NEW;
-END;
-$$ LANGUAGE plpgsql SECURITY DEFINER
-SET search_path = public, pg_temp;
-
-DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
-CREATE TRIGGER on_auth_user_created
-  AFTER INSERT ON auth.users
-  FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();
-
--- 10. Insérer les profils pour les utilisateurs déjà créés
-INSERT INTO public.profiles (id, email, full_name, credits)
-SELECT id, email, COALESCE(raw_user_meta_data->>'full_name', split_part(email, '@', 1)), 5
-FROM auth.users
-ON CONFLICT (id) DO NOTHING;
-
--- ============================================================
--- 11. Politique de crédits (miroir de 005_credit_policy.sql)
---     1 crédit par analyse photo IA réussie. Optimisation et exports gratuits.
--- ============================================================
 
 ALTER TABLE public.credit_transactions ADD COLUMN IF NOT EXISTS type              TEXT DEFAULT 'usage';
 ALTER TABLE public.credit_transactions ADD COLUMN IF NOT EXISTS balance_after     INTEGER;
@@ -135,12 +36,18 @@ ALTER TABLE public.credit_transactions ADD COLUMN IF NOT EXISTS reason          
 ALTER TABLE public.credit_transactions ADD COLUMN IF NOT EXISTS stripe_payment_id TEXT;
 ALTER TABLE public.credit_transactions ADD COLUMN IF NOT EXISTS created_at        TIMESTAMPTZ DEFAULT NOW();
 
+-- The idempotency anchor for Stripe grants. Partial, so ordinary usage rows
+-- (stripe_payment_id IS NULL) are unaffected.
 CREATE UNIQUE INDEX IF NOT EXISTS uniq_credit_tx_stripe_payment_id
   ON public.credit_transactions (stripe_payment_id)
   WHERE stripe_payment_id IS NOT NULL;
 
 CREATE INDEX IF NOT EXISTS idx_credit_tx_user_id
   ON public.credit_transactions (user_id, created_at DESC);
+
+-- ------------------------------------------------------------
+-- 2. ensure_profile — backfill a missing profile, never touch the balance
+-- ------------------------------------------------------------
 
 CREATE OR REPLACE FUNCTION public.ensure_profile(
   p_user_id   UUID,
@@ -163,7 +70,8 @@ BEGIN
     5
   )
   ON CONFLICT (id) DO UPDATE
-    -- N'écrase jamais `credits` : le solde dépensé ne doit pas être réinitialisé.
+    -- Deliberately does NOT list `credits`: re-running this must never
+    -- reset a spent balance back to the signup default.
     SET email      = COALESCE(EXCLUDED.email, public.profiles.email),
         full_name  = COALESCE(public.profiles.full_name, EXCLUDED.full_name),
         updated_at = NOW()
@@ -172,6 +80,13 @@ BEGIN
   RETURN v_credits;
 END;
 $$;
+
+-- ------------------------------------------------------------
+-- 3. consume_credit — the only debit path
+--    Locks the profile row so two concurrent analyses cannot spend the same
+--    last credit. Returns a result object instead of raising, so an exhausted
+--    balance is an ordinary answer and not a rolled-back transaction.
+-- ------------------------------------------------------------
 
 CREATE OR REPLACE FUNCTION public.consume_credit(
   p_user_id UUID,
@@ -217,6 +132,14 @@ BEGIN
 END;
 $$;
 
+-- ------------------------------------------------------------
+-- 4. add_credits — idempotent Stripe grant
+--    The ledger insert is attempted first; if the unique stripe_payment_id
+--    already exists the event is a redelivery and the balance is left alone.
+-- ------------------------------------------------------------
+
+-- Drop the pre-existing 2-argument version so the 4-argument signature is
+-- unambiguous to PostgREST.
 DROP FUNCTION IF EXISTS public.add_credits(UUID, INT);
 
 CREATE OR REPLACE FUNCTION public.add_credits(
@@ -258,6 +181,7 @@ BEGIN
   RETURNING id INTO v_tx_id;
 
   IF v_tx_id IS NULL THEN
+    -- Already granted for this payment; a redelivered webhook is a no-op.
     RETURN jsonb_build_object('success', true, 'balance', v_current, 'duplicate', true);
   END IF;
 
@@ -271,6 +195,12 @@ BEGIN
 END;
 $$;
 
+-- ------------------------------------------------------------
+-- 5. Lock down execution
+--    Only the service role (and the owner) may move credits. `deduct_credit`
+--    from migration 003 is superseded by consume_credit.
+-- ------------------------------------------------------------
+
 REVOKE ALL ON FUNCTION public.consume_credit(UUID, INT, TEXT) FROM PUBLIC, anon, authenticated;
 REVOKE ALL ON FUNCTION public.add_credits(UUID, INT, TEXT, TEXT) FROM PUBLIC, anon, authenticated;
 REVOKE ALL ON FUNCTION public.ensure_profile(UUID, TEXT, TEXT) FROM PUBLIC, anon, authenticated;
@@ -281,68 +211,84 @@ GRANT EXECUTE ON FUNCTION public.ensure_profile(UUID, TEXT, TEXT) TO service_rol
 
 DROP FUNCTION IF EXISTS public.deduct_credit(UUID, INT);
 
--- ============================================================
--- 12. Verrouillage RLS + privilèges colonne (miroir de 005_credit_policy.sql)
+-- ------------------------------------------------------------
+-- 6. Row-level security and column privileges on the credit tables
 --
---     Une policy « FOR ALL USING (auth.uid() = id) » suffisait à laisser un
---     navigateur authentifié exécuter, avec la seule clé anon publique :
+--    Locking the functions down is not enough on its own. Migrations 001/004
+--    left behind
 --
---       update profiles set credits = 999999 where id = auth.uid();
---       insert into credit_transactions (user_id, amount, ...) values (...);
+--      CREATE POLICY ... ON public.profiles FOR ALL USING (auth.uid() = id);
+--      CREATE POLICY ... ON public.credit_transactions FOR ALL USING (...);
+--      GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public
+--        TO authenticated;
 --
---     Deux verrous indépendants ferment ces deux chemins :
---       * privilèges SQL : `credits` n'apparaît dans aucun GRANT client, donc
---         l'UPDATE est refusé avant même l'évaluation du RLS ;
---       * policies RLS : le client ne peut que lire ses propres lignes.
+--    which let any signed-in browser session send, with nothing but the public
+--    anon key:
 --
---     Les crédits ne bougent que via consume_credit/add_credits (SECURITY
---     DEFINER, exécutables par le seul service_role).
--- ============================================================
+--      update profiles set credits = 999999 where id = auth.uid();
+--      insert into credit_transactions (user_id, amount, ...) values (...);
+--
+--    Both are closed here by two independent locks, so neither is solely
+--    load-bearing:
+--
+--      * SQL privileges — `credits` appears in no GRANT to a client role, so
+--        the update is refused before RLS is even consulted;
+--      * RLS policies — clients get SELECT-own and nothing else.
+--
+--    Credits move only through consume_credit/add_credits above, which are
+--    SECURITY DEFINER and executable by service_role alone.
+-- ------------------------------------------------------------
 
 ALTER TABLE public.profiles            ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.credit_transactions ENABLE ROW LEVEL SECURITY;
 
+-- 6a. Remove the permissive legacy policies by name (001, 004 and the earlier
+--     FULL_DATABASE_SETUP all used FOR ALL).
 DROP POLICY IF EXISTS "Users can view own profile"          ON public.profiles;
 DROP POLICY IF EXISTS "Users can view and edit own profile" ON public.profiles;
 DROP POLICY IF EXISTS "Users can view own transactions"     ON public.credit_transactions;
 
+-- 6b. Reads only, and only of one's own rows.
 DROP POLICY IF EXISTS "profiles_select_own" ON public.profiles;
 CREATE POLICY "profiles_select_own"
   ON public.profiles FOR SELECT TO authenticated
   USING (auth.uid() = id);
 
--- L'app crée sa propre ligne de profil (upsert id/email/full_name). `credits`
--- n'étant pas dans le GRANT ci-dessous, l'insertion prend toujours la valeur
--- par défaut de la colonne.
+-- The app backfills its own profile row (src/app/api/projects/route.ts upserts
+-- id/email/full_name when the service-role key is absent). `credits` is not in
+-- the column grant below, so such an insert always takes the column default.
 DROP POLICY IF EXISTS "profiles_insert_own" ON public.profiles;
 CREATE POLICY "profiles_insert_own"
   ON public.profiles FOR INSERT TO authenticated
   WITH CHECK (auth.uid() = id);
 
--- WITH CHECK autant que USING : sans lui, un utilisateur pourrait déplacer sa
--- ligne vers l'id d'un autre compte.
+-- WITH CHECK as well as USING: without it a user could move their row onto
+-- another account's id.
 DROP POLICY IF EXISTS "profiles_update_own_details" ON public.profiles;
 CREATE POLICY "profiles_update_own_details"
   ON public.profiles FOR UPDATE TO authenticated
   USING (auth.uid() = id)
   WITH CHECK (auth.uid() = id);
 
--- Seule policy du grand livre : sans policy INSERT/UPDATE/DELETE, ces commandes
--- sont refusées à tout rôle client, quels que soient les privilèges.
+-- Deliberately the only policy on the ledger: with no INSERT/UPDATE/DELETE
+-- policy, those commands are denied for every client role regardless of grants.
 DROP POLICY IF EXISTS "credit_transactions_select_own" ON public.credit_transactions;
 CREATE POLICY "credit_transactions_select_own"
   ON public.credit_transactions FOR SELECT TO authenticated
   USING (auth.uid() = user_id);
 
+-- 6c. Column privileges. These run last so that a blanket grant inherited from
+--     migration 004 cannot survive them.
 REVOKE ALL ON public.profiles            FROM PUBLIC, anon, authenticated;
 REVOKE ALL ON public.credit_transactions FROM PUBLIC, anon, authenticated;
 
 GRANT SELECT ON public.profiles TO authenticated;
--- Champs libre-service uniquement : `credits`, `created_at` et `updated_at`
--- appartiennent au serveur et sont volontairement absents.
+-- Self-service fields only. `credits`, `created_at` and `updated_at` are
+-- server-owned and are absent on purpose.
 GRANT INSERT (id, email, full_name, locale) ON public.profiles TO authenticated;
 GRANT UPDATE (email, full_name, locale)     ON public.profiles TO authenticated;
 
+-- /api/credits/history renders the user's own rows; nothing more.
 GRANT SELECT ON public.credit_transactions TO authenticated;
 
 GRANT ALL ON public.profiles            TO service_role;

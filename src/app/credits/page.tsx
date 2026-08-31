@@ -1,53 +1,42 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Sparkles, Check, Zap, ArrowLeft, ShieldCheck, CreditCard } from 'lucide-react';
 import Link from 'next/link';
+import { createClient } from '@/lib/supabase/client';
+import { CREDIT_PACKS, PACK_IDS, formatMAD } from '@/lib/billing/catalog';
 
 export default function CreditsPage() {
   const [loadingPack, setLoadingPack] = useState<string | null>(null);
+  const [checkoutError, setCheckoutError] = useState<string | null>(null);
+  // null until the real balance is known — never a hardcoded placeholder.
+  const [credits, setCredits] = useState<number | null>(null);
 
-  const packs = [
-    {
-      id: 'starter',
-      name: 'Pack Découverte',
-      credits: 10,
-      priceMAD: 10,
-      desc: 'Idéal pour tester ou pour 1 petit chantier',
-      badge: '10 DH',
-      highlight: false,
-    },
-    {
-      id: 'standard',
-      name: 'Pack Artisan',
-      credits: 50,
-      priceMAD: 40,
-      desc: 'Le choix populaire des menuisiers actifs',
-      badge: 'Populaire (40 DH)',
-      highlight: true,
-    },
-    {
-      id: 'pro',
-      name: 'Pack Atelier Pro',
-      credits: 100,
-      priceMAD: 70,
-      desc: 'Pour les ateliers à fort volume de débit',
-      badge: 'Économique (70 DH)',
-      highlight: false,
-    },
-    {
-      id: 'unlimited',
-      name: 'Abonnement Illimité',
-      credits: 'Illimité',
-      priceMAD: 99,
-      desc: 'Analyses IA illimitées chaque mois',
-      badge: '99 DH / mois',
-      highlight: false,
-    },
-  ];
+  const packs = PACK_IDS.map((id) => CREDIT_PACKS[id]);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const supabase = createClient();
+        const {
+          data: { user },
+        } = await supabase.auth.getUser();
+        if (!user) return;
+        const { data: profile } = await supabase.from('profiles').select('credits').eq('id', user.id).single();
+        if (!cancelled && profile && typeof profile.credits === 'number') setCredits(profile.credits);
+      } catch {
+        /* balance stays unknown rather than being invented */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const handleCheckout = async (packId: string) => {
     setLoadingPack(packId);
+    setCheckoutError(null);
     try {
       const res = await fetch('/api/credits/checkout', {
         method: 'POST',
@@ -55,11 +44,17 @@ export default function CreditsPage() {
         body: JSON.stringify({ packId }),
       });
       const data = await res.json();
-      if (data.url) {
+      if (res.ok && data.url) {
         window.location.href = data.url;
+        return;
       }
-    } catch (e) {
-      console.error(e);
+      setCheckoutError(
+        res.status === 401
+          ? 'Connectez-vous pour acheter des crédits.'
+          : data.message || 'Le paiement est momentanément indisponible.'
+      );
+    } catch {
+      setCheckoutError('Erreur réseau. Vérifiez votre connexion et réessayez.');
     } finally {
       setLoadingPack(null);
     }
@@ -79,7 +74,7 @@ export default function CreditsPage() {
           </Link>
           <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-brand-500/10 border border-brand-500/30 text-brand-400 text-xs font-bold">
             <Zap className="w-3.5 h-3.5 text-[#F5A623]" />
-            <span>Solde actuel : 5 Crédits</span>
+            <span>{credits === null ? 'Solde indisponible' : `Solde actuel : ${credits} crédits`}</span>
           </div>
         </div>
 
@@ -89,12 +84,19 @@ export default function CreditsPage() {
             Recharge de Crédits
           </span>
           <h1 className="text-3xl md:text-4xl font-black text-slate-900 dark:text-white">
-            10 DH = 10 Analyses IA de Mesures
+            {formatMAD(CREDIT_PACKS.starter.priceMAD)} = {CREDIT_PACKS.starter.credits} analyses photo
           </h1>
           <p className="text-sm text-slate-600 dark:text-slate-400 max-w-xl mx-auto">
-            1 crédit est consommé uniquement lors d&apos;une analyse photo IA réussie. L&apos;optimisation du schéma et les exports sont 100% gratuits et illimités.
+            1 crédit est débité uniquement lors d&apos;une analyse photo réussie. L&apos;optimisation du schéma et
+            tous les exports (PDF, DXF, JSON, PNG, devis) sont gratuits et illimités.
           </p>
         </div>
+
+        {checkoutError && (
+          <p role="alert" className="text-center text-xs font-semibold text-red-500">
+            {checkoutError}
+          </p>
+        )}
 
         {/* Packs Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
@@ -120,23 +122,31 @@ export default function CreditsPage() {
                 <div className="flex items-baseline gap-1 my-3">
                   <span className="text-3xl font-black text-slate-900 dark:text-white">{p.priceMAD}</span>
                   <span className="text-sm font-bold text-slate-600 dark:text-slate-400">
-                    DH {p.id === 'unlimited' ? '/mois' : ''}
+                    DH {p.monthly ? '/mois' : ''}
                   </span>
                 </div>
-                <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed mb-6">{p.desc}</p>
+                <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed mb-6">{p.description}</p>
 
                 <div className="space-y-2.5 pt-4 border-t border-studio-border/60 text-xs">
                   <div className="flex items-center gap-2 text-slate-900 dark:text-white">
                     <Check className="w-4 h-4 text-emerald-400 shrink-0" />
-                    <span><strong>{p.credits}</strong> analyses photo IA</span>
+                    <span>
+                      <strong>{p.displayCredits}</strong> analyses photo{p.monthly ? ' par mois' : ''}
+                    </span>
+                  </div>
+                  {p.renewalNote && (
+                    <div className="flex items-center gap-2 text-[#CBD5E1]">
+                      <Check className="w-4 h-4 text-emerald-400 shrink-0" />
+                      <span>{p.renewalNote}</span>
+                    </div>
+                  )}
+                  <div className="flex items-center gap-2 text-[#CBD5E1]">
+                    <Check className="w-4 h-4 text-emerald-400 shrink-0" />
+                    <span>Schémas de coupe illimités et gratuits</span>
                   </div>
                   <div className="flex items-center gap-2 text-[#CBD5E1]">
                     <Check className="w-4 h-4 text-emerald-400 shrink-0" />
-                    <span>Schémas de coupe illimités</span>
-                  </div>
-                  <div className="flex items-center gap-2 text-[#CBD5E1]">
-                    <Check className="w-4 h-4 text-emerald-400 shrink-0" />
-                    <span>Export PDF & WhatsApp</span>
+                    <span>Exports PDF, DXF, JSON et PNG gratuits</span>
                   </div>
                 </div>
               </div>
@@ -167,7 +177,9 @@ export default function CreditsPage() {
         <div className="p-4 rounded-2xl bg-studio-panel/40 border border-studio-border flex flex-wrap items-center justify-between text-xs text-slate-600 dark:text-slate-400 gap-4">
           <div className="flex items-center gap-2">
             <ShieldCheck className="w-4 h-4 text-sky-400" />
-            <span>Paiement sécurisé par <strong>Stripe</strong> (Cartes bancaires Visa / Mastercard) et CMI / CashPlus</span>
+            <span>
+              Paiement sécurisé par <strong>Stripe</strong> — cartes Visa / Mastercard, débitées en dirhams (MAD)
+            </span>
           </div>
           <span className="text-[11px] text-[#64748B]">Facture et reçu instantanés par email</span>
         </div>

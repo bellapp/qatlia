@@ -1,73 +1,93 @@
 import { NextResponse } from 'next/server';
-import { stripe, CREDIT_PACKS, PackId } from '@/lib/stripe/config';
 import { z } from 'zod';
+import { createClient } from '@/lib/supabase/server';
+import { CREDIT_PACKS, PackId } from '@/lib/billing/catalog';
+import { buildCheckoutParams, resolveCheckoutOrigin } from '@/lib/billing/checkout-params';
+import { allowDemoCheckout, isStripeConfigured } from '@/lib/billing/config';
+import { getStripe } from '@/lib/billing/stripe-client';
 
+export const dynamic = 'force-dynamic';
+
+// The buyer is resolved from the Supabase session, never from the request body:
+// a client-supplied user id would let anyone credit an arbitrary account.
 const CheckoutSchema = z.object({
-  packId: z.enum(['starter', 'standard', 'pro', 'unlimited']),
-  userId: z.string().optional(),
-  userEmail: z.string().email().optional(),
+  packId: z.enum(['starter', 'standard', 'pro', 'atelier_max']),
 });
 
 export async function POST(req: Request) {
   try {
-    const body = await req.json();
-    const parsed = CheckoutSchema.safeParse(body);
+    const supabase = createClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
 
-    if (!parsed.success) {
+    if (!user) {
       return NextResponse.json(
-        { error: 'INVALID_PACK_SELECTION', details: parsed.error.format() },
-        { status: 400 }
+        { error: 'AUTH_REQUIRED', message: 'Connectez-vous pour acheter des crédits.' },
+        { status: 401 }
       );
     }
 
-    const { packId, userId, userEmail } = parsed.data;
-    const pack = CREDIT_PACKS[packId as PackId];
-    const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3001';
+    const body = await req.json().catch(() => null);
+    const parsed = CheckoutSchema.safeParse(body);
 
-    // Si Stripe n'est pas encore configuré avec une vraie clé secrète, on simule le lien de succès en dev
-    if (!process.env.STRIPE_SECRET_KEY || process.env.STRIPE_SECRET_KEY.includes('placeholder')) {
+    if (!parsed.success) {
+      return NextResponse.json({ error: 'INVALID_PACK_SELECTION' }, { status: 400 });
+    }
+
+    const pack = CREDIT_PACKS[parsed.data.packId as PackId];
+
+    if (!isStripeConfigured()) {
+      // Never mint a link that looks like a successful purchase in production.
+      if (!allowDemoCheckout()) {
+        return NextResponse.json(
+          {
+            error: 'PAYMENT_UNAVAILABLE',
+            message: 'Le paiement est momentanément indisponible. Réessayez plus tard.',
+          },
+          { status: 503 }
+        );
+      }
+      const demoOrigin = resolveCheckoutOrigin({
+        configured: process.env.NEXT_PUBLIC_APP_URL,
+        requestOrigin: req.headers.get('origin'),
+        production: process.env.NODE_ENV === 'production',
+      });
       return NextResponse.json({
         success: true,
         mode: 'demo',
-        url: `${appUrl}/credits/success?demo=true&pack=${packId}&credits=${pack.credits}`,
+        url: `${demoOrigin || 'http://localhost:3001'}/credits/success?demo=true&pack=${pack.id}`,
       });
     }
 
-    const session = await stripe.checkout.sessions.create({
-      mode: pack.monthly ? 'subscription' : 'payment',
-      payment_method_types: ['card'],
-      line_items: [
-        {
-          price_data: {
-            currency: 'eur',
-            product_data: {
-              name: `QatlIA — ${pack.name}`,
-              description: `${pack.credits} crédits d'analyse IA de découpe`,
-            },
-            unit_amount: Math.round(pack.priceEUR * 100),
-            recurring: pack.monthly ? { interval: 'month' } : undefined,
-          },
-          quantity: 1,
-        },
-      ],
-      success_url: `${appUrl}/credits/success?session_id={CHECKOUT_SESSION_ID}&pack=${packId}`,
-      cancel_url: `${appUrl}/credits`,
-      metadata: {
-        userId: userId || 'anonymous',
-        packId: packId,
-        credits: pack.credits.toString(),
-      },
-      customer_email: userEmail,
+    const origin = resolveCheckoutOrigin({
+      configured: process.env.NEXT_PUBLIC_APP_URL,
+      requestOrigin: req.headers.get('origin'),
+      production: process.env.NODE_ENV === 'production',
+    });
+    if (!origin) {
+      return NextResponse.json({ error: 'PAYMENT_CONFIGURATION_ERROR' }, { status: 503 });
+    }
+
+    const params = buildCheckoutParams({
+      pack,
+      userId: user.id,
+      userEmail: user.email,
+      origin,
     });
 
-    return NextResponse.json({
-      success: true,
-      url: session.url,
-    });
+    const stripe = getStripe(process.env.STRIPE_SECRET_KEY as string);
+    // The pure builder produces exactly the Stripe shape; the cast only bridges
+    // the SDK's deeply-literal parameter types.
+    const session = await stripe.checkout.sessions.create(
+      params as unknown as Parameters<typeof stripe.checkout.sessions.create>[0]
+    );
+
+    return NextResponse.json({ success: true, url: session.url });
   } catch (error: unknown) {
-    const message = error instanceof Error ? error.message : 'Erreur lors de la création du paiement';
+    console.error('Checkout error:', error);
     return NextResponse.json(
-      { error: 'CHECKOUT_FAILED', message },
+      { error: 'CHECKOUT_FAILED', message: 'Impossible de créer le paiement.' },
       { status: 500 }
     );
   }

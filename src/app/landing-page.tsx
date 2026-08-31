@@ -71,7 +71,8 @@ export default function LandingPage() {
           </div>
 
           <p className="mt-4 text-[11px] text-slate-600">
-            5 crédits gratuits à l&apos;inscription · Sans carte bancaire
+            5 crédits d&apos;analyse photo offerts à l&apos;inscription · Optimisation et exports gratuits · Sans carte
+            bancaire
           </p>
         </div>
       </section>
@@ -171,7 +172,8 @@ export default function LandingPage() {
           <div className="relative space-y-5">
             <h2 className="text-2xl sm:text-3xl font-black text-slate-900 dark:text-white">Prêt à optimiser votre atelier ?</h2>
             <p className="text-slate-600 dark:text-slate-400 text-sm max-w-lg mx-auto">
-              Commencez gratuitement avec 5 crédits. Pas de carte bancaire, pas d&apos;engagement.
+              Commencez gratuitement avec 5 crédits d&apos;analyse photo. L&apos;optimisation et les exports restent
+              gratuits. Pas de carte bancaire, pas d&apos;engagement.
             </p>
             <Link
               href="/atelier"

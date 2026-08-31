@@ -106,7 +106,9 @@ export default function Dashboard() {
   const [isProcessingVision, setIsProcessingVision] = useState(false);
   const [activeSheetIndex, setActiveSheetIndex] = useState(0);
   const [zoomLevel, setZoomLevel] = useState(1);
-  const [userCredits, setUserCredits] = useState<number>(5);
+  // null until the signed-in artisan's real balance is loaded — never a
+  // hardcoded placeholder the customer could mistake for their actual solde.
+  const [userCredits, setUserCredits] = useState<number | null>(null);
   const [userEmail, setUserEmail] = useState<string | null>(null);
   const [visionError, setVisionError] = useState<string | null>(null);
   const [previewImage, setPreviewImage] = useState<string | null>(null);
@@ -179,9 +181,9 @@ export default function Dashboard() {
               .select('credits')
               .eq('id', user.id)
               .single();
-            if (profile) setUserCredits(profile.credits);
+            if (profile && typeof profile.credits === 'number') setUserCredits(profile.credits);
           } catch {
-            /* table profiles pas encore créée — crédits en local */
+            /* profil indisponible — le solde reste inconnu plutôt qu'inventé */
           }
         }
       } catch (err) {
@@ -380,7 +382,12 @@ export default function Dashboard() {
             };
           });
           setPieces(normalizePiecesWithColors(newPieces));
+          // The server is the only authority on the balance; it is echoed back
+          // only when a credit was actually debited.
+          if (typeof data.creditsRemaining === 'number') setUserCredits(data.creditsRemaining);
         } else {
+          if (res.status === 401) setIsAuthModalOpen(true);
+          if (typeof data.creditsRemaining === 'number') setUserCredits(data.creditsRemaining);
           setVisionError(data.message || 'Aucune mesure détectée dans l\'image.');
         }
       } catch (err) {
@@ -504,38 +511,8 @@ export default function Dashboard() {
 
     setIsDownloadingPdf(true);
     try {
-      // 1. Déduire 1 crédit si configuré
-      try {
-        const consumeRes = await fetch('/api/credits/consume', {
-          method: 'POST',
-        });
-        const consumeData = await consumeRes.json();
-        if (consumeData.creditsRemaining !== undefined) {
-          setUserCredits(consumeData.creditsRemaining);
-          try {
-            const key = 'qatlia_credit_tx_v1';
-            const prev = JSON.parse(localStorage.getItem(key) || '[]');
-            const next = [
-              {
-                id: `tx_${Date.now()}`,
-                type: 'usage',
-                amount: -1,
-                balance_after: consumeData.creditsRemaining,
-                description: 'Export rapport PDF',
-                created_at: new Date().toISOString(),
-              },
-              ...(Array.isArray(prev) ? prev : []),
-            ].slice(0, 50);
-            localStorage.setItem(key, JSON.stringify(next));
-          } catch {
-            /* ignore */
-          }
-        }
-      } catch (e) {
-        console.warn('Crédit consume warning:', e);
-      }
-
-      // 2. Générer le PDF
+      // Exports are free: only a successful photo analysis costs a credit
+      // (see src/lib/billing/policy.ts). No debit happens here.
       const res = await fetch('/api/export-pdf', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -628,7 +605,7 @@ export default function Dashboard() {
                 <span className="relative inline-flex rounded-full h-2 w-2 bg-brand-400" />
               </span>
               <Zap className="w-3.5 h-3.5 fill-brand-400 text-brand-400" />
-              <span className="font-mono font-bold">{userCredits}</span>
+              <span className="font-mono font-bold">{userCredits ?? '—'}</span>
               <span className="text-[10px] opacity-80 hidden sm:inline">crédits</span>
             </Link>
 

@@ -17,12 +17,11 @@ interface Tx {
   created_at: string;
 }
 
-const LOCAL_TX_KEY = 'qatlia_credit_tx_v1';
-
 export default function AccountPage() {
   const router = useRouter();
   const [email, setEmail] = useState<string | null>(null);
-  const [credits, setCredits] = useState(5);
+  // null until the real balance is read from the profile.
+  const [credits, setCredits] = useState<number | null>(null);
   const [password, setPassword] = useState('');
   const [confirm, setConfirm] = useState('');
   const [pwdMsg, setPwdMsg] = useState<string | null>(null);
@@ -41,20 +40,17 @@ export default function AccountPage() {
         return;
       }
       setEmail(user.email || null);
-      try { const { data: p } = await supabase.from('profiles').select('credits').eq('id', user.id).single(); if (p) setCredits(p.credits); } catch {/* noop */}
+      try { const { data: p } = await supabase.from('profiles').select('credits').eq('id', user.id).single(); if (p && typeof p.credits === 'number') setCredits(p.credits); } catch {/* solde inconnu plutôt qu'inventé */}
 
+      // The server ledger is the only source of movements. The former
+      // localStorage fallback replayed client-invented "Export PDF" debits that
+      // never existed in the database.
       try {
         const res = await fetch('/api/credits/history');
         const data = await res.json();
-        if (Array.isArray(data.transactions) && data.transactions.length) {
-          setTxs(data.transactions);
-        } else {
-          const local = JSON.parse(localStorage.getItem(LOCAL_TX_KEY) || '[]');
-          setTxs(Array.isArray(local) ? local : []);
-        }
+        setTxs(Array.isArray(data.transactions) ? data.transactions : []);
       } catch {
-        const local = JSON.parse(localStorage.getItem(LOCAL_TX_KEY) || '[]');
-        setTxs(Array.isArray(local) ? local : []);
+        setTxs([]);
       }
     }
     load();
@@ -108,7 +104,7 @@ export default function AccountPage() {
           <div className="flex items-center gap-2">
             <Link href="/credits" className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-brand-500/10 border border-brand-500/25 text-brand-400 hover:bg-brand-500/15 text-xs font-semibold transition-all">
               <Zap className="w-3.5 h-3.5 fill-brand-400 text-brand-400" />
-              <span className="font-mono font-bold">{credits}</span>
+              <span className="font-mono font-bold">{credits ?? '—'}</span>
             </Link>
             {email && <AccountMenu email={email} />}
           </div>
@@ -133,17 +129,17 @@ export default function AccountPage() {
             </Link>
           </div>
           <div className="flex items-end gap-3">
-            <p className="text-3xl font-black font-mono text-slate-900 dark:text-white">{credits}</p>
+            <p className="text-3xl font-black font-mono text-slate-900 dark:text-white">{credits ?? '—'}</p>
             <p className="text-xs text-slate-600 dark:text-slate-400 pb-1">crédits restants</p>
           </div>
           {txs.length === 0 ? (
-            <p className="text-xs text-slate-500 dark:text-slate-400">Aucun mouvement pour l’instant. Un crédit est débité à chaque export PDF.</p>
+            <p className="text-xs text-slate-500 dark:text-slate-400">Aucun mouvement pour l’instant. Un crédit est débité uniquement lors d’une analyse photo réussie ; l’optimisation et les exports sont gratuits.</p>
           ) : (
             <ul className="divide-y divide-slate-800">
               {txs.map((tx) => (
                 <li key={tx.id} className="py-2.5 flex items-center justify-between gap-3 text-xs">
                   <div>
-                    <p className="text-slate-800 dark:text-slate-200 font-medium">{tx.description || (tx.amount < 0 ? 'Export PDF' : 'Crédit')}</p>
+                    <p className="text-slate-800 dark:text-slate-200 font-medium">{tx.description || (tx.amount < 0 ? 'Analyse photo IA' : 'Achat de crédits')}</p>
                     <p className="text-slate-500 dark:text-slate-400 font-mono mt-0.5">
                       {new Date(tx.created_at).toLocaleString('fr-FR', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
                     </p>

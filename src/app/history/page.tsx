@@ -86,7 +86,7 @@ export default function HistoryPage() {
   const [filtered, setFiltered] = useState<ProjectHistoryItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [userEmail, setUserEmail] = useState<string | null>(null);
-  const [userCredits, setUserCredits] = useState<number>(5);
+  const [userCredits, setUserCredits] = useState<number | null>(null);
   const [syncNote, setSyncNote] = useState<string | null>(null);
   const [filterText, setFilterText] = useState('');
   const [materialFilter, setMaterialFilter] = useState('');
@@ -100,7 +100,12 @@ export default function HistoryPage() {
       const { data: { user } } = await supabase.auth.getUser();
       if (user) {
         setUserEmail(user.email || null);
-        try { const { data: p } = await supabase.from('profiles').select('credits').eq('id', user.id).single(); if (p) setUserCredits(p.credits); } catch {/* noop */}
+        try {
+          const { data: p } = await supabase.from('profiles').select('credits').eq('id', user.id).single();
+          setUserCredits(typeof p?.credits === 'number' ? p.credits : null);
+        } catch {
+          setUserCredits(null);
+        }
         const res = await fetch('/api/projects');
         const data = await res.json();
         if (data.success && Array.isArray(data.projects)) {
@@ -172,7 +177,7 @@ export default function HistoryPage() {
           <div className="flex items-center gap-2">
             <Link href="/credits" className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-brand-500/10 border border-brand-500/25 text-brand-400 hover:bg-brand-500/15 text-xs font-semibold transition-all">
               <Zap className="w-3.5 h-3.5 fill-brand-400 text-brand-400" />
-              <span className="font-mono font-bold">{userCredits}</span>
+              <span className="font-mono font-bold">{userCredits ?? '—'}</span>
             </Link>
             {userEmail ? (<AccountMenu email={userEmail} />) : (
               <Link href="/auth/login?redirect=/history" className="px-4 py-2 rounded-xl bg-white dark:bg-studio-field text-slate-950 font-bold text-xs hover:bg-slate-100 transition-all">Connexion</Link>
