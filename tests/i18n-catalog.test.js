@@ -97,9 +97,9 @@ test('translate substitutes every occurrence of a {var} placeholder', () => {
 
 test('translate leaves a placeholder intact when no value is supplied for it', () => {
   const { translate } = loadI18n();
-  // The hero subtitle is deliberately rendered in two parts around {waste} so
-  // the figure can stay bold, which only works if t() keeps the token.
-  assert.ok(translate('fr', 'hero.subtitle').includes('{waste}'));
+  // A caller that forgets a variable must get a visible, greppable token back
+  // rather than an empty gap in the sentence.
+  assert.ok(translate('fr', 'hero.note').includes('{count}'));
 });
 
 test('an unknown key falls back to the French value rather than leaking the key', () => {

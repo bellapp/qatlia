@@ -20,17 +20,16 @@ export const en: Catalog = {
     titleLead: 'Optimize your panels',
     titleHighlight: 'in seconds',
     subtitle:
-      'Cut your offcuts by up to {waste}. Scan your cut lists, optimize the nesting, export a shop-floor PDF plan.',
-    wasteFigure: '75%',
+      'Scan your cut lists, optimize the nesting, export a shop-floor PDF plan. The waste rate you see is the one measured on your own plan.',
     ctaPrimary: 'Try it free',
     ctaSecondary: 'I already have an account',
     note: '{count} free photo-analysis credits when you sign up · Optimization and exports are free · No credit card',
   },
   stats: {
-    waste: { value: '75', unit: '%', label: 'Less waste on your panels' },
-    surface: { value: '90', unit: '%', label: 'Usable area optimized on average' },
-    time: { value: '2', unit: 'min', label: 'To generate a complete plan' },
-    credits: { value: '5', unit: 'credits', label: 'Free when you sign up' },
+    waste: { title: 'Measured waste', label: 'The waste rate comes from your plan, not from a promised average.' },
+    surface: { title: 'Computed usable area', label: 'Derived from the pieces actually placed on your panels.' },
+    time: { title: 'A plan in seconds', label: 'From cut list to cutting plan, with no waiting.' },
+    credits: { title: '{count} free credits', label: 'Photo analyses granted when you sign up.' },
   },
   features: {
     eyebrow: 'Features',

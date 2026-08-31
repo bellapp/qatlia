@@ -3,86 +3,24 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const { loadTsModule } = require('./helpers/load-ts-module');
+const {
+  buildOptimizerInput,
+  expandedPieceCount,
+  loadBenchmarkFixture,
+  sourceRowCount,
+} = require('./helpers/benchmark-fixtures');
 
-const DATASET_1_CSV_PATH = '/home/ubuntu/.hermes/cache/documents/doc_a22afcceb50c_qatlia_pieces_1787493030653.csv';
-const SHEET_208_X_278 = {
-  width: 208,
-  height: 278,
-  kerf: 0.3,
-  margin: 1,
-  grainDirection: false,
-  material: 'mdf',
-  quantity: 1,
-};
-const OPTIONS_208_X_278 = {
-  kerfWidth: 3,
-  showLabels: true,
-  singleSheetOnly: false,
-  considerMaterial: false,
-  edgeBanding: false,
-  grainDirection: false,
-  optimizationPriority: 'linear_guillotine',
-};
-
-function parseCsvPieceLine(line, index) {
-  const columns = line.match(/(".*?"|[^",]+)(?=\s*,|\s*$)/g);
-  assert.ok(columns && columns.length >= 4, `Invalid CSV row ${index + 2}: ${line}`);
-
-  return {
-    id: `csv_${index}`,
-    name: (columns[4] || '').replace(/^"|"$/g, '') || `Pièce ${index + 1}`,
-    height: Number(columns[1]),
-    width: Number(columns[2]),
-    quantity: Number(columns[3]),
-    material: 'mdf',
-    rotatable: true,
-  };
-}
-
-function loadDataset1FromCsv() {
-  try {
-    const raw = fs.readFileSync(DATASET_1_CSV_PATH, 'utf8').trim();
-    const lines = raw.split(/\r?\n/).filter(Boolean);
-    assert.ok(lines.length > 1, `Expected CSV data rows in ${DATASET_1_CSV_PATH}`);
-
-    return lines.slice(1).map(parseCsvPieceLine);
-  } catch (error) {
-    if (!error || typeof error !== 'object' || !('code' in error) || error.code !== 'EACCES') {
-      throw error;
-    }
-
-    const savedRuns = JSON.parse(fs.readFileSync(path.resolve('saved_runs/test_runs.json'), 'utf8'));
-    const benchmarkRun = savedRuns.find((run) => run.id === 'run_01_somfy_notes_mdf');
-
-    assert.ok(benchmarkRun, 'Expected the 135-piece benchmark fallback fixture in saved_runs/test_runs.json');
-    return benchmarkRun.input.pieces.map((piece) => ({
-      ...piece,
-      material: piece.material || 'mdf',
-      rotatable: piece.rotatable !== false,
-    }));
-  }
-}
-
+// Benchmark input comes from the immutable fixtures checked in under
+// `tests/fixtures/benchmarks/` — never from a machine-local file — so this
+// suite reproduces identically on any clone. Fixture provenance, byte
+// stability and canonical-parameter checks live in
+// `tests/benchmark-fixtures.test.js`.
 function loadDataset1BenchmarkInput() {
-  return {
-    pieces: loadDataset1FromCsv(),
-    sheet: { ...SHEET_208_X_278 },
-    options: { ...OPTIONS_208_X_278 },
-  };
+  return loadBenchmarkFixture('standard-135');
 }
 
 function loadDataset2BenchmarkInput() {
-  return {
-    pieces: [
-      { id: 'd2_1', name: 'Pièce 1', height: 230, width: 120, quantity: 2, material: 'mdf', rotatable: true },
-      { id: 'd2_2', name: 'Pièce 2', height: 118, width: 48, quantity: 1, material: 'mdf', rotatable: true },
-      { id: 'd2_3', name: 'Pièce 3', height: 41.8, width: 38, quantity: 7, material: 'mdf', rotatable: true },
-      { id: 'd2_4', name: 'Pièce 4', height: 53.1, width: 48, quantity: 4, material: 'mdf', rotatable: true },
-      { id: 'd2_5', name: 'Pièce 5', height: 51.3, width: 48, quantity: 2, material: 'mdf', rotatable: true },
-    ],
-    sheet: { ...SHEET_208_X_278 },
-    options: { ...OPTIONS_208_X_278 },
-  };
+  return loadBenchmarkFixture('standard-16');
 }
 
 function rectanglesOverlap(a, b, epsilon = 1e-9) {
@@ -105,16 +43,22 @@ function assertOptimizationInvariants(result, sheet, expectedExpandedCount) {
   assert.equal(new Set(unplacedIds).size, unplacedIds.length, 'Unplaced piece IDs must be unique');
   assert.equal(new Set(allIds).size, expectedExpandedCount, 'Placed and unplaced IDs must partition the expanded pieces');
 
+  // Matches the runner's own margin-band check in `auditPlan`
+  // (scripts/benchmark-optimizer.mjs) and the methodology documented in
+  // docs/optimizer-benchmark.md: a piece flush with the raw sheet edge is
+  // inside the sheet but inside the forbidden margin band, so the bound is
+  // the margin, not 0/width/height.
+  const margin = Math.max(0, sheet.margin || 0);
   const seenPieceNumbers = new Set();
   for (const placed of result.placedPieces) {
     assert.ok(Number.isInteger(placed.pieceNumber) && placed.pieceNumber > 0, `Piece ${placed.pieceId} must have a positive integer piece number`);
     assert.equal(seenPieceNumbers.has(placed.pieceNumber), false, `Piece number ${placed.pieceNumber} must be unique`);
     seenPieceNumbers.add(placed.pieceNumber);
 
-    assert.ok(placed.x >= 0, `Piece ${placed.pieceId} must stay within the sheet on X`);
-    assert.ok(placed.y >= 0, `Piece ${placed.pieceId} must stay within the sheet on Y`);
-    assert.ok(placed.x + placed.width <= sheet.width + 1e-9, `Piece ${placed.pieceId} exceeds sheet width`);
-    assert.ok(placed.y + placed.height <= sheet.height + 1e-9, `Piece ${placed.pieceId} exceeds sheet height`);
+    assert.ok(placed.x >= margin - 1e-9, `Piece ${placed.pieceId} must stay outside the sheet's left margin`);
+    assert.ok(placed.y >= margin - 1e-9, `Piece ${placed.pieceId} must stay outside the sheet's top margin`);
+    assert.ok(placed.x + placed.width <= sheet.width - margin + 1e-9, `Piece ${placed.pieceId} exceeds sheet width margin`);
+    assert.ok(placed.y + placed.height <= sheet.height - margin + 1e-9, `Piece ${placed.pieceId} exceeds sheet height margin`);
   }
 
   for (const currentSheet of result.sheets) {
@@ -160,9 +104,10 @@ function assertOptimizationInvariants(result, sheet, expectedExpandedCount) {
 
 function runBenchmark(benchmarkInput, overrideOptions = {}) {
   const { optimizeCutting2D } = loadTsModule('src/lib/cutting/binpacking.ts');
-  const expectedExpandedCount = benchmarkInput.pieces.reduce((sum, piece) => sum + (piece.quantity || 1), 0);
-  const mergedOptions = { ...benchmarkInput.options, ...overrideOptions };
-  const result = optimizeCutting2D(benchmarkInput.pieces, [{ ...benchmarkInput.sheet }], mergedOptions);
+  const input = buildOptimizerInput(benchmarkInput);
+  const expectedExpandedCount = expandedPieceCount(benchmarkInput);
+  const mergedOptions = { ...input.options, ...overrideOptions };
+  const result = optimizeCutting2D(input.pieces, input.sheets, mergedOptions);
 
   return { result, expectedExpandedCount, mergedOptions };
 }
@@ -171,6 +116,7 @@ test('2D optimizer preserves placement invariants on dataset 1 with the 208x278 
   const benchmarkInput = loadDataset1BenchmarkInput();
   const { result, expectedExpandedCount } = runBenchmark(benchmarkInput);
 
+  assert.equal(sourceRowCount(benchmarkInput), 21, 'Dataset 1 must carry the 21 source rows');
   assert.equal(expectedExpandedCount, 135, 'Dataset 1 must expand to 135 pieces');
   assert.ok(result.sheetsUsed > 1, 'Unlimited multi-sheet mode should allocate more than one sheet for dataset 1');
   assertOptimizationInvariants(result, benchmarkInput.sheet, expectedExpandedCount);
@@ -189,6 +135,7 @@ test('dataset 1 benchmark packs all pieces within 4 sheets or better', () => {
   const benchmarkInput = loadDataset1BenchmarkInput();
   const { result, expectedExpandedCount } = runBenchmark(benchmarkInput);
 
+  assert.equal(benchmarkInput.thresholds.maxSheets, 4, 'Dataset 1 publishes a 4-sheet ceiling');
   assert.equal(result.unplacedPieces.length, 0, 'Dataset 1 should place every expanded piece');
   assert.equal(result.placedPieces.length, expectedExpandedCount, 'Dataset 1 should place all expanded pieces');
   assert.ok(result.sheetsUsed <= 4, `Dataset 1 should use at most 4 sheets, received ${result.sheetsUsed}`);
@@ -199,7 +146,9 @@ test('dataset 2 benchmark packs all pieces within 2 sheets or better', () => {
   const benchmarkInput = loadDataset2BenchmarkInput();
   const { result, expectedExpandedCount } = runBenchmark(benchmarkInput);
 
+  assert.equal(sourceRowCount(benchmarkInput), 5, 'Dataset 2 must carry the 5 source rows');
   assert.equal(expectedExpandedCount, 16, 'Dataset 2 must expand to 16 pieces');
+  assert.equal(benchmarkInput.thresholds.maxSheets, 2, 'Dataset 2 publishes a 2-sheet ceiling');
   assert.equal(result.unplacedPieces.length, 0, 'Dataset 2 should place every expanded piece');
   assert.equal(result.placedPieces.length, expectedExpandedCount, 'Dataset 2 should place all expanded pieces');
   assert.ok(result.sheetsUsed <= 2, `Dataset 2 should use at most 2 sheets, received ${result.sheetsUsed}`);

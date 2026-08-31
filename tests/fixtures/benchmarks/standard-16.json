@@ -1,0 +1,43 @@
+{
+  "id": "standard-16",
+  "version": "1.0.0",
+  "label": "Small furniture MDF cut list — 5 rows, 16 pieces",
+  "source": {
+    "origin": "tests/optimizer-regression.test.js@3dcde31:loadDataset2BenchmarkInput",
+    "capturedAt": "2026-08-30T17:31:00Z",
+    "note": "Rows lifted verbatim from the hard-coded dataset 2 helper that lived in the optimizer regression suite before Task 6 moved benchmark input into checked-in fixtures. Sheet and options are unchanged from that helper and are the canonical benchmark parameters."
+  },
+  "sheet": {
+    "height": 278,
+    "width": 208,
+    "kerf": 0.3,
+    "margin": 1,
+    "grainDirection": false,
+    "material": "mdf",
+    "quantity": 1
+  },
+  "options": {
+    "kerfWidth": 3,
+    "showLabels": true,
+    "singleSheetOnly": false,
+    "considerMaterial": false,
+    "edgeBanding": false,
+    "grainDirection": false,
+    "optimizationPriority": "linear_guillotine"
+  },
+  "expected": {
+    "sourceRows": 5,
+    "expandedPieces": 16
+  },
+  "thresholds": {
+    "maxSheets": 2,
+    "maxUnplaced": 0
+  },
+  "pieces": [
+    { "id": "d2_1", "name": "Pièce 1", "height": 230, "width": 120, "quantity": 2, "material": "mdf", "rotatable": true },
+    { "id": "d2_2", "name": "Pièce 2", "height": 118, "width": 48, "quantity": 1, "material": "mdf", "rotatable": true },
+    { "id": "d2_3", "name": "Pièce 3", "height": 41.8, "width": 38, "quantity": 7, "material": "mdf", "rotatable": true },
+    { "id": "d2_4", "name": "Pièce 4", "height": 53.1, "width": 48, "quantity": 4, "material": "mdf", "rotatable": true },
+    { "id": "d2_5", "name": "Pièce 5", "height": 51.3, "width": 48, "quantity": 2, "material": "mdf", "rotatable": true }
+  ]
+}

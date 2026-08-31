@@ -28,10 +28,6 @@ const STEPS = [
 export default function LandingPage() {
   const { t } = useLocale();
 
-  // The waste figure stays bold, so the subtitle is rendered around its
-  // placeholder instead of being interpolated into a flat string.
-  const [subtitleBefore, subtitleAfter = ''] = t('hero.subtitle').split('{waste}');
-
   return (
     <div className="min-h-screen bg-studio-canvas text-slate-900 dark:text-slate-100 font-sans antialiased overflow-x-hidden">
       {/* Navigation */}
@@ -73,9 +69,7 @@ export default function LandingPage() {
           </h1>
 
           <p className="mt-6 text-base sm:text-lg text-slate-600 dark:text-slate-400 max-w-2xl mx-auto leading-relaxed">
-            {subtitleBefore}
-            <strong className="text-slate-900 dark:text-white">{t('hero.wasteFigure')}</strong>
-            {subtitleAfter}
+            {t('hero.subtitle')}
           </p>
 
           <div className="mt-10 flex flex-col sm:flex-row items-center justify-center gap-4">
@@ -106,8 +100,12 @@ export default function LandingPage() {
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
           {STATS.map((stat) => (
             <div key={stat} className="p-4 rounded-2xl bg-studio-panel/50 border border-studio-border/70 text-center">
-              <p className="text-2xl sm:text-3xl font-black text-slate-900 dark:text-white font-mono tracking-tight">
-                {t(`stats.${stat}.value`)} <span className="text-brand-400 text-lg">{t(`stats.${stat}.unit`)}</span>
+              {/* Non-numeric wording by design: the only figure left here is the
+                  credit grant, which the sign-up flow really applies. Measured
+                  optimizer numbers live in docs/optimizer-benchmark.md, which is
+                  not a web route, so no link is offered rather than a broken one. */}
+              <p className="text-base sm:text-lg font-black text-slate-900 dark:text-white tracking-tight">
+                {t(`stats.${stat}.title`, { count: FREE_VISION_CREDITS })}
               </p>
               <p className="text-[10px] sm:text-[11px] text-slate-500 dark:text-slate-400 mt-1.5 leading-tight">
                 {t(`stats.${stat}.label`)}

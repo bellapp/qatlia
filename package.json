@@ -9,6 +9,7 @@
     "lint": "next lint",
     "test:node": "node --test tests/*.test.js",
     "test:optimizer": "node --test tests/optimizer-regression.test.js",
+    "benchmark:optimizer": "node scripts/benchmark-optimizer.mjs",
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui"
   },

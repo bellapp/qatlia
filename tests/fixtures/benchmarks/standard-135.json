@@ -1,0 +1,59 @@
+{
+  "id": "standard-135",
+  "version": "1.0.0",
+  "label": "Handwritten kitchen/dressing MDF cut list — 21 rows, 135 pieces",
+  "source": {
+    "origin": "saved_runs/test_runs.json#run_01_somfy_notes_mdf",
+    "capturedAt": "2026-08-23T14:30:00Z",
+    "note": "Piece rows are copied verbatim from the saved run, which was itself extracted from a scanned handwritten 21-line measurement sheet. The sheet and options below are the canonical benchmark parameters and deliberately differ from the parameters that saved run was originally executed with (280x207 cm, grain locked), so every published fixture is measured under one identical configuration."
+  },
+  "sheet": {
+    "height": 278,
+    "width": 208,
+    "kerf": 0.3,
+    "margin": 1,
+    "grainDirection": false,
+    "material": "mdf",
+    "quantity": 1
+  },
+  "options": {
+    "kerfWidth": 3,
+    "showLabels": true,
+    "singleSheetOnly": false,
+    "considerMaterial": false,
+    "edgeBanding": false,
+    "grainDirection": false,
+    "optimizationPriority": "linear_guillotine"
+  },
+  "expected": {
+    "sourceRows": 21,
+    "expandedPieces": 135
+  },
+  "thresholds": {
+    "maxSheets": 4,
+    "maxUnplaced": 0
+  },
+  "pieces": [
+    { "id": "ext_0", "name": "Pièce 1", "width": 237, "height": 56, "quantity": 1, "material": "mdf", "rotatable": true },
+    { "id": "ext_1", "name": "Pièce 2", "width": 237, "height": 32, "quantity": 1, "material": "mdf", "rotatable": true },
+    { "id": "ext_2", "name": "Pièce 3", "width": 52, "height": 30, "quantity": 16, "material": "mdf", "rotatable": true },
+    { "id": "ext_3", "name": "Pièce 4", "width": 90, "height": 55, "quantity": 1, "material": "mdf", "rotatable": true },
+    { "id": "ext_4", "name": "Pièce 5", "width": 45, "height": 55, "quantity": 1, "material": "mdf", "rotatable": true },
+    { "id": "ext_5", "name": "Pièce 6", "width": 165, "height": 55, "quantity": 1, "material": "mdf", "rotatable": true },
+    { "id": "ext_6", "name": "Pièce 7", "width": 88, "height": 88, "quantity": 1, "material": "mdf", "rotatable": true },
+    { "id": "ext_7", "name": "Pièce 8", "width": 50.4, "height": 58.8, "quantity": 5, "material": "mdf", "rotatable": true },
+    { "id": "ext_8", "name": "Pièce 9", "width": 47.5, "height": 58.8, "quantity": 5, "material": "mdf", "rotatable": true },
+    { "id": "ext_9", "name": "Pièce 10", "width": 61.4, "height": 58.8, "quantity": 2, "material": "mdf", "rotatable": true },
+    { "id": "ext_10", "name": "Pièce 11", "width": 40, "height": 90, "quantity": 6, "material": "mdf", "rotatable": true },
+    { "id": "ext_11", "name": "Pièce 12", "width": 35, "height": 20, "quantity": 24, "material": "mdf", "rotatable": true },
+    { "id": "ext_12", "name": "Pièce 13", "width": 45, "height": 16, "quantity": 24, "material": "mdf", "rotatable": true },
+    { "id": "ext_13", "name": "Pièce 14", "width": 31.2, "height": 14, "quantity": 24, "material": "mdf", "rotatable": true },
+    { "id": "ext_14", "name": "Pièce 15", "width": 61, "height": 12, "quantity": 2, "material": "mdf", "rotatable": true },
+    { "id": "ext_15", "name": "Pièce 16", "width": 45, "height": 10, "quantity": 4, "material": "mdf", "rotatable": true },
+    { "id": "ext_16", "name": "Pièce 17", "width": 56, "height": 8, "quantity": 4, "material": "mdf", "rotatable": true },
+    { "id": "ext_17", "name": "Pièce 18", "width": 72, "height": 20, "quantity": 4, "material": "mdf", "rotatable": true },
+    { "id": "ext_18", "name": "Pièce 19", "width": 45, "height": 14, "quantity": 4, "material": "mdf", "rotatable": true },
+    { "id": "ext_19", "name": "Pièce 20", "width": 67.9, "height": 12, "quantity": 4, "material": "mdf", "rotatable": true },
+    { "id": "ext_20", "name": "Pièce 21", "width": 72.5, "height": 49.5, "quantity": 1, "material": "mdf", "rotatable": true }
+  ]
+}

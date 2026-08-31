@@ -23,19 +23,22 @@ export const fr = {
     badge: 'Optimisation de découpe pour menuisiers',
     titleLead: 'Optimisez vos panneaux',
     titleHighlight: 'en quelques secondes',
-    // Rendered in two parts around {waste} so the figure stays bold.
+    // No promised waste percentage: QatlIA reports the chute rate it actually
+    // measured on the artisan's own plan, and never a fleet-wide average it
+    // has no measurement for.
     subtitle:
-      'Réduisez vos chutes jusqu’à {waste}. Scannez vos fiches de débit, optimisez le placement, exportez votre plan en PDF industriel.',
-    wasteFigure: '75 %',
+      'Scannez vos fiches de débit, optimisez le placement, exportez votre plan en PDF industriel. Le taux de chute affiché est celui calculé sur votre plan.',
     ctaPrimary: 'Essayer gratuitement',
     ctaSecondary: 'J’ai déjà un compte',
     note: '{count} crédits d’analyse photo offerts à l’inscription · Optimisation et exports gratuits · Sans carte bancaire',
   },
+  // Each tile states something the product can actually demonstrate. Only the
+  // credit count is a figure, and it is the one the sign-up flow really grants.
   stats: {
-    waste: { value: '75', unit: '%', label: 'Moins de chutes sur vos panneaux' },
-    surface: { value: '90', unit: '%', label: 'Surface utile optimisée en moyenne' },
-    time: { value: '2', unit: 'min', label: 'Pour générer un plan complet' },
-    credits: { value: '5', unit: 'crédits', label: 'Offerts à l’inscription' },
+    waste: { title: 'Chutes mesurées', label: 'Le taux de chute vient de votre plan, pas d’une moyenne annoncée.' },
+    surface: { title: 'Surface utile calculée', label: 'Calculée à partir des pièces réellement placées sur vos panneaux.' },
+    time: { title: 'Plan en quelques secondes', label: 'De la liste de pièces au plan de coupe, sans attente.' },
+    credits: { title: '{count} crédits offerts', label: 'Analyses photo offertes à l’inscription.' },
   },
   features: {
     eyebrow: 'Fonctionnalités',

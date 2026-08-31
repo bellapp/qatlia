@@ -20,18 +20,17 @@ export const ar: Catalog = {
     titleLead: 'حسِّن ألواحك',
     titleHighlight: 'في ثوانٍ معدودة',
     subtitle:
-      'قلّل الهدر حتى {waste}. صوّر قوائم القياسات، حسِّن ترتيب القطع، وصدّر مخطط القطع بصيغة PDF جاهزة للورشة.',
-    // Morocco writes numbers with Western digits, not Eastern Arabic ones.
-    wasteFigure: '75%',
+      'صوّر قوائم القياسات، حسِّن ترتيب القطع، وصدّر مخطط القطع بصيغة PDF جاهزة للورشة. نسبة الهدر المعروضة محسوبة على مخططك أنت.',
     ctaPrimary: 'جرّب مجاناً',
     ctaSecondary: 'لديّ حساب بالفعل',
     note: '{count} أرصدة لتحليل الصور مجاناً عند التسجيل · التحسين والتصدير مجانيان · بدون بطاقة بنكية',
   },
+  // Morocco writes numbers with Western digits, not Eastern Arabic ones.
   stats: {
-    waste: { value: '75', unit: '%', label: 'هدر أقل في ألواحك' },
-    surface: { value: '90', unit: '%', label: 'مساحة مستغلة محسّنة في المتوسط' },
-    time: { value: '2', unit: 'دقيقة', label: 'لإنشاء مخطط كامل' },
-    credits: { value: '5', unit: 'أرصدة', label: 'مجاناً عند التسجيل' },
+    waste: { title: 'هدر محسوب', label: 'نسبة الهدر تأتي من مخططك، لا من متوسط موعود.' },
+    surface: { title: 'مساحة مستغلة محسوبة', label: 'محسوبة انطلاقاً من القطع الموضوعة فعلاً على ألواحك.' },
+    time: { title: 'مخطط في ثوانٍ', label: 'من قائمة القطع إلى مخطط القطع، بدون انتظار.' },
+    credits: { title: '{count} أرصدة مجانية', label: 'تحليلات صور تُمنح عند التسجيل.' },
   },
   features: {
     eyebrow: 'الميزات',
@@ -50,7 +49,7 @@ export const ar: Catalog = {
     },
     waste: {
       title: 'تقليل البواقي',
-      desc: 'اطّلع على نسبة الهدر والمساحة المستغلة. خسارة أقل تعني ربحاً أكبر.',
+      desc: 'اطّلع على نسبة الهدر والمساحة المستغلة. خسارة أقل تعني هامشاً أكبر.',
     },
   },
   steps: {
