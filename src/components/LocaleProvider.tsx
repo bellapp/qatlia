@@ -122,7 +122,8 @@ export function LocaleSwitcher({ className = '' }: { className?: string }) {
           const next = isLocale(event.target.value) ? event.target.value : DEFAULT_LOCALE;
           setLocale(next);
         }}
-        className="appearance-none bg-transparent border border-slate-300 dark:border-studio-border hover:border-slate-400 dark:hover:border-studio-border-hover rounded-lg py-1 ps-7 pe-6 text-xs font-bold text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-brand-500/50 cursor-pointer transition-colors"
+        style={{ colorScheme: 'light dark' }}
+        className="appearance-none bg-transparent border border-slate-300 dark:border-studio-border hover:border-slate-400 dark:hover:border-studio-border-hover rounded-lg py-1 ps-7 pe-6 text-xs font-bold text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-brand-500/50 cursor-pointer transition-colors [&>option]:bg-white [&>option]:text-slate-900 dark:[&>option]:bg-slate-900 dark:[&>option]:text-slate-100"
       >
         {LOCALES.map((candidate) => (
           <option key={candidate} value={candidate} lang={candidate}>
