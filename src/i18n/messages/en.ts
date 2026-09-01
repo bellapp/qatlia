@@ -201,9 +201,11 @@ export const en: Catalog = {
       zoomLevelAria: 'Zoom level',
     },
     exports: {
+      csv: 'CSV',
       json: 'JSON',
       png: 'PNG',
       dxf: 'DXF',
+      csvAria: 'Download the piece measurements as CSV (Excel)',
       jsonAria: 'Download the plan as JSON',
       pngAria: 'Download the plan as PNG',
       dxfAria: 'Download the plan as DXF for CNC',

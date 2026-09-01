@@ -225,9 +225,11 @@ export const fr = {
       zoomLevelAria: 'Niveau de zoom',
     },
     exports: {
+      csv: 'CSV',
       json: 'JSON',
       png: 'PNG',
       dxf: 'DXF',
+      csvAria: 'Télécharger les mesures des pièces au format CSV (Excel)',
       jsonAria: 'Télécharger le plan au format JSON',
       pngAria: 'Télécharger le plan au format PNG',
       dxfAria: 'Télécharger le plan au format DXF pour CNC',

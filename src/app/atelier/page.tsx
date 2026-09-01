@@ -16,6 +16,7 @@ import {
   SlidersHorizontal,
   ChevronDown,
   FileCode2,
+  FileSpreadsheet,
   FileText,
   TrendingUp,
   Scissors,
@@ -491,6 +492,43 @@ export default function Dashboard() {
     a.href = URL.createObjectURL(blob);
     a.download = `qatlia_plan_${Date.now()}.json`;
     document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  };
+
+  const handleDownloadCsv = () => {
+    if (!result) return;
+    // Measurements CSV: one row per piece from the cut list, dimensions in
+    // canonical cm (same convention as the JSON export). Client-side like
+    // the JSON/PNG exports — no API route, no auth, exports stay free.
+    const header = ['#', 'name', 'quantity', 'height_cm', 'width_cm', 'material', 'rotatable'];
+    const rows = pieces.map((piece, index) => [
+      String(index + 1),
+      piece.name ?? '',
+      String(piece.quantity),
+      String(piece.height),
+      String(piece.width),
+      piece.material ?? '',
+      piece.rotatable === false ? '0' : '1',
+    ]);
+    const csv = [header, ...rows]
+      .map((row) =>
+        row
+          .map((cell) => {
+            // RFC 4180: quote fields containing separator, quote, or newline
+            const needsQuotes = /[",\n\r]/.test(cell);
+            const escaped = cell.replace(/"/g, '""');
+            return needsQuotes ? `"${escaped}"` : cell;
+          })
+          .join(','),
+      )
+      .join('\r\n');
+    // UTF-8 BOM so Excel opens accents and Arabic names correctly.
+    const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `qatlia_pieces_${Date.now()}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
   };
 
   const handleDownloadPng = async () => {
@@ -1107,10 +1145,14 @@ export default function Dashboard() {
                 </div>
 
                 {/* Export Actions */}
-                <div className="grid grid-cols-4 gap-1.5">
-                  {/* The three file-format labels are the formats themselves, so
+                <div className="grid grid-cols-5 gap-1.5">
+                  {/* The file-format labels are the formats themselves, so
                       they stay verbatim; the accessible name carries the
                       translated sentence. */}
+                  <button onClick={handleDownloadCsv} aria-label={t('atelier.exports.csvAria')} className="py-2.5 rounded-xl bg-studio-panel/60 border border-studio-border hover:border-studio-border-hover text-slate-700 dark:text-slate-300 font-bold text-[10px] flex items-center justify-center gap-1.5 transition-all">
+                    <FileSpreadsheet className="w-3.5 h-3.5 text-amber-400" />
+                    {t('atelier.exports.csv')}
+                  </button>
                   <button onClick={handleDownloadJson} aria-label={t('atelier.exports.jsonAria')} className="py-2.5 rounded-xl bg-studio-panel/60 border border-studio-border hover:border-studio-border-hover text-slate-700 dark:text-slate-300 font-bold text-[10px] flex items-center justify-center gap-1.5 transition-all">
                     <FileCode2 className="w-3.5 h-3.5 text-emerald-400" />
                     {t('atelier.exports.json')}

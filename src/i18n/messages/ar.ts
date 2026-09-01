@@ -202,9 +202,11 @@ export const ar: Catalog = {
       zoomLevelAria: 'مستوى التكبير',
     },
     exports: {
+      csv: 'CSV',
       json: 'JSON',
       png: 'PNG',
       dxf: 'DXF',
+      csvAria: 'تحميل قياسات القطع بصيغة CSV (إكسل)',
       jsonAria: 'تحميل المخطط بصيغة JSON',
       pngAria: 'تحميل المخطط بصيغة PNG',
       dxfAria: 'تحميل المخطط بصيغة DXF للتحكم الرقمي',
