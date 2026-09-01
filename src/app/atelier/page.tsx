@@ -1029,8 +1029,9 @@ export default function Dashboard() {
 
                 {/* 2D Visualizer */}
                 <div className="overflow-hidden rounded-2xl border border-studio-border/80">
-                  {/* Tabs for sheets */}
-                  <div data-testid="cut-plan-toolbar" className="relative z-20 flex flex-wrap items-center justify-between gap-2 px-4 py-2.5 bg-studio-panel/40 border-b border-studio-border/60">
+                  {/* Tabs for sheets — opaque toolbar: the plan scrolls under it
+                      when zoomed, translucency made that read as an overlap bug */}
+                  <div data-testid="cut-plan-toolbar" className="relative z-20 flex flex-wrap items-center justify-between gap-2 px-4 py-2.5 bg-studio-panel border-b border-studio-border/60">
                     <div className="flex min-w-0 flex-1 items-center gap-1 overflow-x-auto">
                       {Array.from({length: result.sheetsUsed}).map((_, i) => (
                         <button
@@ -1065,16 +1066,27 @@ export default function Dashboard() {
                   {/* SVG Canvas — the plan is geometry, not prose: its origin is
                       the sheet's top-left corner and its labels are cm/mm
                       figures, so it stays LTR even when the workshop is RTL. */}
-                  <div dir="ltr" data-testid="cut-plan-viewport" className={`relative min-h-[420px] max-h-[70vh] overflow-auto overscroll-contain p-5 ${isDark ? 'bg-[#040812]' : 'bg-[#F1F5F9]'}`}>
+                  <div dir="ltr" data-testid="cut-plan-viewport" className={`relative min-h-[420px] max-h-[70vh] overflow-auto overscroll-contain p-5 flex ${isDark ? 'bg-[#040812]' : 'bg-[#F1F5F9]'}`}>
+                    {/* m-auto (not justify-center): when the zoomed plan is wider
+                        than the viewport, auto margins clamp to 0 and BOTH edges
+                        stay reachable by scrolling — centered overflow via
+                        justify-center would clip the left edge under the padding
+                        and visually slide the plan under the toolbar. */}
                     <div
-                      className="mx-auto transition-[width] duration-200 ease-out"
-                      style={{ width: `${zoomLevel * 100}%`, maxWidth: `${480 * zoomLevel}px` }}
+                      className="m-auto transition-[width,max-width] duration-200 ease-out"
+                      style={{
+                        width: `${Math.round(560 * zoomLevel)}px`,
+                        maxWidth: zoomLevel <= 1 ? '100%' : undefined,
+                      }}
                     >
                       <svg
                         data-testid="cut-plan-svg"
                         viewBox={`0 0 ${activeSheet.width} ${activeSheet.height}`}
-                        className="block w-full aspect-[208/278] rounded-xl"
-                        style={{ filter: 'drop-shadow(0 4px 6px rgba(0,0,0,0.4))' }}
+                        className="block w-full rounded-xl"
+                        style={{
+                          aspectRatio: `${activeSheet.width} / ${activeSheet.height}`,
+                          filter: 'drop-shadow(0 4px 6px rgba(0,0,0,0.4))',
+                        }}
                       >
                         <defs>
                           <linearGradient id="sheetBgL" x1="0" y1="0" x2="1" y2="1">
