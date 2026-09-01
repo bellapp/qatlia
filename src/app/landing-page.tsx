@@ -72,6 +72,12 @@ export default function LandingPage() {
             {t('hero.subtitle')}
           </p>
 
+          {/* Slogan 1: gain in two beats, second beat highlighted in brand color */}
+          <p className="mt-7 text-lg sm:text-2xl font-black tracking-tight text-slate-800 dark:text-slate-200">
+            {t('hero.taglineGain')}{' '}
+            <span className="text-brand-500 dark:text-brand-400">{t('hero.taglineSave')}</span>
+          </p>
+
           <div className="mt-10 flex flex-col sm:flex-row items-center justify-center gap-4">
             <Link
               href="/atelier"
@@ -93,6 +99,23 @@ export default function LandingPage() {
             {t('hero.note', { count: FREE_VISION_CREDITS })}
           </p>
         </div>
+      </section>
+
+      {/* Slogan 2 band: three action beats, oversized typographic treatment.
+          Only the final word carries the brand color — works identically for
+          FR / EN / AR without relying on sentence punctuation. */}
+      <section className="border-y border-studio-border/60 bg-studio-panel/40 py-10 px-6 sm:px-10">
+        {(() => {
+          const slogan = t('hero.actionSlogan');
+          const words = slogan.split(' ');
+          const last = words.pop() ?? '';
+          return (
+            <p className="max-w-5xl mx-auto text-center text-2xl sm:text-4xl lg:text-5xl font-black tracking-tight text-slate-900 dark:text-white leading-tight">
+              {words.join(' ')}{' '}
+              <span className="text-brand-500 dark:text-brand-400">{last}</span>
+            </p>
+          );
+        })()}
       </section>
 
       {/* Stats */}

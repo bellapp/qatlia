@@ -23,6 +23,11 @@ export const fr = {
     badge: 'Optimisation de découpe pour menuisiers',
     titleLead: 'Optimisez vos panneaux',
     titleHighlight: 'en quelques secondes',
+    // Slogan 1 (client copy): gain framed in two beats, second beat highlighted.
+    taglineGain: 'Plus de panneaux rentabilisés,',
+    taglineSave: 'moins de bois gaspillé',
+    // Slogan 2 (client copy): three action beats, rendered as a standalone band.
+    actionSlogan: 'Mesurez. Prenez la photo. Économisez',
     // No promised waste percentage: QatlIA reports the chute rate it actually
     // measured on the artisan's own plan, and never a fleet-wide average it
     // has no measurement for.

@@ -19,6 +19,11 @@ export const ar: Catalog = {
     badge: 'تحسين القطع للنجارين',
     titleLead: 'حسِّن ألواحك',
     titleHighlight: 'في ثوانٍ معدودة',
+    // Slogan 1 (client copy): gain framed in two beats, second beat highlighted.
+    taglineGain: 'استغل البانو كامل،',
+    taglineSave: 'ونقّص ضياع الخشب',
+    // Slogan 2 (client copy): three action beats, rendered as a standalone band.
+    actionSlogan: 'قِس، صوّر، ووفّر',
     subtitle:
       'صوّر قوائم القياسات، حسِّن ترتيب القطع، وصدّر مخطط القطع بصيغة PDF جاهزة للورشة. نسبة الهدر المعروضة محسوبة على مخططك أنت.',
     ctaPrimary: 'جرّب مجاناً',

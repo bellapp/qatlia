@@ -19,6 +19,11 @@ export const en: Catalog = {
     badge: 'Cutting optimization for woodworkers',
     titleLead: 'Optimize your panels',
     titleHighlight: 'in seconds',
+    // Slogan 1 (client copy): gain framed in two beats, second beat highlighted.
+    taglineGain: 'More panels maximized,',
+    taglineSave: 'less wood wasted',
+    // Slogan 2 (client copy): three action beats, rendered as a standalone band.
+    actionSlogan: 'Measure. Snap. Save',
     subtitle:
       'Scan your cut lists, optimize the nesting, export a shop-floor PDF plan. The waste rate you see is the one measured on your own plan.',
     ctaPrimary: 'Try it free',
