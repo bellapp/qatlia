@@ -10,7 +10,7 @@ interface ThemeContextValue {
 }
 
 const ThemeContext = createContext<ThemeContextValue>({
-  theme: 'dark',
+  theme: 'light',
   toggle: () => {},
 });
 
@@ -19,7 +19,9 @@ export function useTheme() {
 }
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
-  const [theme, setTheme] = useState<Theme>('dark');
+  // Light is the default: a first-visit artisan lands on the clear workshop
+  // look. Dark stays one toggle away and is remembered once chosen.
+  const [theme, setTheme] = useState<Theme>('light');
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
@@ -27,10 +29,8 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     const stored = localStorage.getItem('qatlia-theme') as Theme | null;
     if (stored === 'light' || stored === 'dark') {
       setTheme(stored);
-      document.documentElement.classList.toggle('dark', stored === 'dark');
-    } else {
-      document.documentElement.classList.add('dark');
     }
+    document.documentElement.classList.toggle('dark', stored === 'dark');
   }, []);
 
   const toggle = () => {

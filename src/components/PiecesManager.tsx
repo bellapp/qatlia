@@ -9,6 +9,7 @@ import {
   CheckSquare,
   Square,
   Library,
+  ArrowLeftRight,
 } from 'lucide-react';
 import { Piece, MaterialType, EdgeBandingConfig, MATERIAL_LIBRARY, EDGEBANDING_PRESETS } from '@/lib/cutting/binpacking';
 import { parsePiecesImport } from '@/lib/pieces/import-parser';
@@ -245,6 +246,25 @@ export const PiecesManager: React.FC<PiecesManagerProps> = ({
           index,
         });
       }
+      return nextPiece;
+    });
+    onUpdatePieces(updated);
+  };
+
+  /** Swaps height and width for one piece (canonical cm; color stays stable). */
+  const handleSwapDimensions = (id: string) => {
+    const updated = pieces.map((piece, index) => {
+      if (piece.id !== id) return piece;
+      const nextPiece = { ...piece, height: piece.width, width: piece.height } as Piece;
+      nextPiece.color = getResolvedPieceColor({
+        color: nextPiece.color,
+        id: nextPiece.id,
+        name: nextPiece.name,
+        height: nextPiece.height,
+        width: nextPiece.width,
+        quantity: nextPiece.quantity,
+        index,
+      });
       return nextPiece;
     });
     onUpdatePieces(updated);
@@ -648,6 +668,18 @@ export const PiecesManager: React.FC<PiecesManagerProps> = ({
                         </button>
                       );
                     })}
+                    {/* Swap H<->W for this piece; the icon is the accessible
+                        name's symbol, the title carries the translated wording. */}
+                    <button
+                      type="button"
+                      onClick={() => handleSwapDimensions(piece.id || '')}
+                      disabled={disabled}
+                      className="w-5 h-5 rounded bg-studio-field/60 text-slate-600 dark:text-slate-400 hover:bg-brand-400 hover:text-slate-950 transition-all flex items-center justify-center disabled:opacity-40"
+                      title={t('pieces.row.swapTitle')}
+                      aria-label={t('pieces.row.swapAria', { name: piece.name || String(index + 1) })}
+                    >
+                      <ArrowLeftRight className="w-3 h-3" />
+                    </button>
                   </div>
 
                   <div className="col-span-3 sm:col-span-1 flex items-center justify-end gap-1">

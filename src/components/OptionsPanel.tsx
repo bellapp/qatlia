@@ -40,7 +40,7 @@ function Switch({
           <Icon className="w-3.5 h-3.5" />
         </span>
         <span className="flex-1 min-w-0">
-          <span className={`block text-[11px] font-semibold ${checked ? 'text-white' : 'text-slate-300'}`}>{label}</span>
+          <span className={`block text-[11px] font-semibold ${checked ? 'text-slate-900 dark:text-white' : 'text-slate-500 dark:text-slate-300'}`}>{label}</span>
           <span className="block text-[10px] text-slate-500 mt-0.5 leading-tight">{description}</span>
         </span>
         {/* The knob track is a control, not text: it keeps its physical
@@ -87,7 +87,7 @@ export const OptionsPanel: React.FC<OptionsPanelProps> = ({ options, onChange, d
               <span className="w-7 h-7 rounded-lg bg-brand-500/10 border border-brand-500/20 flex items-center justify-center">
                 <Scissors className="w-3.5 h-3.5 text-brand-400" />
               </span>
-              <div><span className="block text-[11px] font-semibold text-white">{t('options.kerf.title')}</span>
+              <div><span className="block text-[11px] font-semibold text-slate-900 dark:text-white">{t('options.kerf.title')}</span>
                 <span className="block text-[10px] text-slate-500">{t('options.kerf.desc')}</span></div>
             </div>
             {/* The kerf figure and its SI unit read left-to-right in every locale. */}
@@ -139,7 +139,7 @@ export const OptionsPanel: React.FC<OptionsPanelProps> = ({ options, onChange, d
             <span className="w-7 h-7 rounded-lg bg-brand-500/10 border border-brand-500/20 flex items-center justify-center">
               <Coins className="w-3.5 h-3.5 text-brand-400" />
             </span>
-            <span className="block text-[11px] font-semibold text-white">{t('options.pricing.title')}</span>
+            <span className="block text-[11px] font-semibold text-slate-900 dark:text-white">{t('options.pricing.title')}</span>
           </div>
 
           <div className="space-y-1.5">
