@@ -11,6 +11,13 @@ export const metadata: Metadata = {
   title: "QatlIA Pro — Optimisation de Découpe & Débit IA",
   description: "Solution professionnelle d'optimisation de découpe de panneaux pour menuisiers et artisans.",
   manifest: "/manifest.json",
+  icons: {
+    icon: [
+      { url: "/icon.svg", type: "image/svg+xml" },
+      { url: "/favicon.png", type: "image/png", sizes: "32x32" },
+    ],
+    apple: "/apple-touch-icon.png",
+  },
   appleWebApp: { capable: true, title: "QatlIA", statusBarStyle: "black-translucent" },
 };
 

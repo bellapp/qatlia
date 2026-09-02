@@ -100,7 +100,7 @@ export default function AccountPage() {
   const handleLogout = async () => {
     const supabase = createClient();
     await supabase.auth.signOut();
-    router.push('/atelier');
+    router.push('/');
     router.refresh();
   };
 

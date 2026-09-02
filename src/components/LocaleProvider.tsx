@@ -6,6 +6,7 @@ import {
   DEFAULT_LOCALE,
   LOCALES,
   LOCALE_COOKIE_NAME,
+  LOCALE_FLAGS,
   LOCALE_STORAGE_KEY,
   dirFor,
   formatNumber,
@@ -123,14 +124,19 @@ export function LocaleSwitcher({ className = '' }: { className?: string }) {
           setLocale(next);
         }}
         style={{ colorScheme: 'light dark' }}
-        className="appearance-none bg-transparent border border-slate-300 dark:border-studio-border hover:border-slate-400 dark:hover:border-studio-border-hover rounded-lg py-1 ps-7 pe-6 text-xs font-bold text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-brand-500/50 cursor-pointer transition-colors [&>option]:bg-white [&>option]:text-slate-900 dark:[&>option]:bg-slate-900 dark:[&>option]:text-slate-100"
+        className="appearance-none bg-transparent border border-slate-300 dark:border-studio-border hover:border-slate-400 dark:hover:border-studio-border-hover rounded-lg py-1 ps-14 pe-6 text-xs font-bold text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-brand-500/50 cursor-pointer transition-colors [&>option]:bg-white [&>option]:text-slate-900 dark:[&>option]:bg-slate-900 dark:[&>option]:text-slate-100"
       >
         {LOCALES.map((candidate) => (
           <option key={candidate} value={candidate} lang={candidate}>
-            {t(`language.${candidate}`)}
+            {LOCALE_FLAGS[candidate]} {t(`language.${candidate}`)}
           </option>
         ))}
       </select>
+      {/* Selected flag rendered over the control (emoji flags don't render
+          inside the closed select on Windows). Positioned over left padding. */}
+      <span className="pointer-events-none absolute start-6 z-10 text-xs leading-none" aria-hidden="true">
+        {LOCALE_FLAGS[locale]}
+      </span>
       {/* Chevron (native select arrow is hidden by appearance-none) */}
       <svg
         className="w-3 h-3 text-slate-500 dark:text-slate-400 pointer-events-none absolute end-2"
