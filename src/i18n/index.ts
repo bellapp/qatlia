@@ -17,9 +17,6 @@ export const LOCALE_COOKIE_NAME = 'qatlia-locale';
 
 export const LOCALE_LABELS: Record<Locale, string> = { fr: 'FR', en: 'EN', ar: 'AR' };
 
-/** Country flag shown next to each language in the switcher (emoji, no assets). */
-export const LOCALE_FLAGS: Record<Locale, string> = { fr: '🇫🇷', en: '🇬🇧', ar: '🇲🇦' };
-
 /**
  * `catalogs` is deliberately mutable-typed rather than `as const`: French sets
  * the shape via `Catalog`, and `en`/`ar` are annotated with it, so key parity is

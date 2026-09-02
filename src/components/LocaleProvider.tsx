@@ -1,12 +1,10 @@
 'use client';
 
 import React, { createContext, useCallback, useContext, useEffect, useLayoutEffect, useMemo, useState } from 'react';
-import { Globe } from 'lucide-react';
 import {
   DEFAULT_LOCALE,
   LOCALES,
   LOCALE_COOKIE_NAME,
-  LOCALE_FLAGS,
   LOCALE_STORAGE_KEY,
   dirFor,
   formatNumber,
@@ -111,11 +109,62 @@ export function LocaleProvider({ children }: { children: React.ReactNode }) {
   return <LocaleContext.Provider value={value}>{children}</LocaleContext.Provider>;
 }
 
+/** Inline SVG country flags — emoji flags render as letter pairs (FR/GB/MA)
+ *  on Windows Chrome, so real vector flags are the only cross-platform option. */
+function LocaleFlag({ locale, className = '' }: { locale: Locale; className?: string }) {
+  if (locale === 'fr') {
+    return (
+      <svg viewBox="0 0 3 2" className={className} aria-hidden="true">
+        <rect width="1" height="2" fill="#0055A4" />
+        <rect x="1" width="1" height="2" fill="#FFFFFF" />
+        <rect x="2" width="1" height="2" fill="#EF4135" />
+      </svg>
+    );
+  }
+  if (locale === 'en') {
+    return (
+      <svg viewBox="0 0 60 30" className={className} aria-hidden="true">
+        <clipPath id="uk-clip">
+          <rect width="60" height="30" rx="3" />
+        </clipPath>
+        <g clipPath="url(#uk-clip)">
+          <rect width="60" height="30" fill="#012169" />
+          <path d="M0,0 60,30 M60,0 0,30" stroke="#FFFFFF" strokeWidth="6" />
+          <path d="M0,0 60,30 M60,0 0,30" stroke="#C8102E" strokeWidth="3.6" />
+          <path d="M30,0 V30 M0,15 H60" stroke="#FFFFFF" strokeWidth="10" />
+          <path d="M30,0 V30 M0,15 H60" stroke="#C8102E" strokeWidth="6" />
+        </g>
+      </svg>
+    );
+  }
+  // Morocco: red field with green pentagram
+  return (
+    <svg viewBox="0 0 60 42" className={className} aria-hidden="true">
+      <rect width="60" height="42" rx="4" fill="#C1272D" />
+      <path
+        d="M30 12 L32.35 20.45 L26 15.55 L34 15.55 L27.65 20.45 Z"
+        fill="none"
+        stroke="#006233"
+        strokeWidth="1.6"
+        strokeLinejoin="miter"
+      />
+      <path
+        d="M30 12 L33.6 24.4 L23.4 17.2 L36.6 17.2 L26.4 24.4 Z"
+        fill="none"
+        stroke="#006233"
+        strokeWidth="1.6"
+        strokeLinejoin="miter"
+        strokeDasharray="0"
+      />
+    </svg>
+  );
+}
+
 export function LocaleSwitcher({ className = '' }: { className?: string }) {
   const { locale, setLocale, t } = useLocale();
   return (
     <div role="group" aria-label={t('nav.languageAria')} className={`relative inline-flex items-center ${className}`}>
-      <Globe className="w-3.5 h-3.5 text-slate-500 dark:text-slate-400 pointer-events-none absolute start-2 z-10" aria-hidden="true" />
+      <LocaleFlag locale={locale} className="w-5 h-3.5 rounded-[2px] pointer-events-none absolute start-2 z-10 shadow-sm" />
       <select
         aria-label={t('nav.languageAria')}
         value={locale}
@@ -124,19 +173,14 @@ export function LocaleSwitcher({ className = '' }: { className?: string }) {
           setLocale(next);
         }}
         style={{ colorScheme: 'light dark' }}
-        className="appearance-none bg-transparent border border-slate-300 dark:border-studio-border hover:border-slate-400 dark:hover:border-studio-border-hover rounded-lg py-1 ps-14 pe-6 text-xs font-bold text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-brand-500/50 cursor-pointer transition-colors [&>option]:bg-white [&>option]:text-slate-900 dark:[&>option]:bg-slate-900 dark:[&>option]:text-slate-100"
+        className="appearance-none bg-transparent border border-slate-300 dark:border-studio-border hover:border-slate-400 dark:hover:border-studio-border-hover rounded-lg py-1 ps-9 pe-6 text-xs font-bold text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-brand-500/50 cursor-pointer transition-colors [&>option]:bg-white [&>option]:text-slate-900 dark:[&>option]:bg-slate-900 dark:[&>option]:text-slate-100"
       >
         {LOCALES.map((candidate) => (
           <option key={candidate} value={candidate} lang={candidate}>
-            {LOCALE_FLAGS[candidate]} {t(`language.${candidate}`)}
+            {t(`language.${candidate}`)}
           </option>
         ))}
       </select>
-      {/* Selected flag rendered over the control (emoji flags don't render
-          inside the closed select on Windows). Positioned over left padding. */}
-      <span className="pointer-events-none absolute start-6 z-10 text-xs leading-none" aria-hidden="true">
-        {LOCALE_FLAGS[locale]}
-      </span>
       {/* Chevron (native select arrow is hidden by appearance-none) */}
       <svg
         className="w-3 h-3 text-slate-500 dark:text-slate-400 pointer-events-none absolute end-2"
