@@ -108,7 +108,8 @@ export const OptionsPanel: React.FC<OptionsPanelProps> = ({ options, onChange, d
           <select disabled={disabled} value={options.optimizationPriority}
             aria-label={t('options.priority.aria')}
             onChange={(e) => updateField('optimizationPriority', e.target.value as OptimizationOptions['optimizationPriority'])}
-            className="flex-1 px-3 py-2 rounded-xl bg-studio-field border border-studio-border text-slate-200 text-xs outline-none focus:border-brand-500/50 disabled:opacity-50">
+            style={{ colorScheme: 'light dark' }}
+            className="flex-1 px-3 py-2 rounded-xl bg-studio-field border border-studio-border text-slate-700 dark:text-slate-200 text-xs outline-none focus:border-brand-500/50 disabled:opacity-50 [&>option]:bg-white [&>option]:text-slate-900 dark:[&>option]:bg-slate-900 dark:[&>option]:text-slate-100">
             {/* The option values are the stable optimizer goals; only their labels are localized. */}
             {OPTIMIZATION_PRIORITY_VALUES.map((value) => (
               <option key={value} value={value}>{t(OPTIMIZATION_PRIORITY_LABEL_KEYS[value])}</option>
@@ -149,7 +150,8 @@ export const OptionsPanel: React.FC<OptionsPanelProps> = ({ options, onChange, d
               <select disabled={disabled} value={laborPricing.mode}
                 aria-label={t('options.pricing.laborModeAria')}
                 onChange={(e) => updateLaborPricing({ mode: e.target.value as LaborPricing['mode'], value: laborPricing.value })}
-                className="px-2 py-1.5 rounded-lg bg-studio-field border border-studio-border text-slate-200 text-[11px] outline-none disabled:opacity-50">
+                style={{ colorScheme: 'light dark' }}
+                className="px-2 py-1.5 rounded-lg bg-studio-field border border-studio-border text-slate-700 dark:text-slate-200 text-[11px] outline-none disabled:opacity-50 [&>option]:bg-white [&>option]:text-slate-900 dark:[&>option]:bg-slate-900 dark:[&>option]:text-slate-100">
                 <option value="fixed">{t(LABOR_PRICING_MODE_KEYS.fixed)}</option>
                 <option value="per_meter">{t(LABOR_PRICING_MODE_KEYS.per_meter)}</option>
               </select>
@@ -173,7 +175,8 @@ export const OptionsPanel: React.FC<OptionsPanelProps> = ({ options, onChange, d
                 <select disabled={disabled} value={stockOverride.mode}
                   aria-label={t('options.pricing.stockModeAria')}
                   onChange={(e) => updateStockOverride({ mode: e.target.value as StockPricing['mode'], value: stockOverride.value })}
-                  className="px-2 py-1.5 rounded-lg bg-studio-field border border-studio-border text-slate-200 text-[11px] outline-none disabled:opacity-50">
+                  style={{ colorScheme: 'light dark' }}
+                  className="px-2 py-1.5 rounded-lg bg-studio-field border border-studio-border text-slate-700 dark:text-slate-200 text-[11px] outline-none disabled:opacity-50 [&>option]:bg-white [&>option]:text-slate-900 dark:[&>option]:bg-slate-900 dark:[&>option]:text-slate-100">
                   <option value="per_m2">{t(STOCK_PRICING_MODE_KEYS.per_m2)}</option>
                   <option value="per_sheet">{t(STOCK_PRICING_MODE_KEYS.per_sheet)}</option>
                 </select>

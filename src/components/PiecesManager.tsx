@@ -473,7 +473,7 @@ export const PiecesManager: React.FC<PiecesManagerProps> = ({
                     value={importUnit}
                     onChange={(event) => setImportUnit(event.target.value as DisplayUnit)}
                     aria-label={t('pieces.import.unitLabel')}
-                    className="px-2 py-1 rounded-lg bg-studio-field border border-studio-border text-[11px] font-semibold text-slate-800 dark:text-slate-200 outline-none focus:border-brand-500/40"
+                    className="px-2 py-1 rounded-lg bg-studio-field border border-studio-border text-[11px] font-semibold text-slate-800 dark:text-slate-200 outline-none focus:border-brand-500/40 [&>option]:bg-white [&>option]:text-slate-900 dark:[&>option]:bg-slate-900 dark:[&>option]:text-slate-100"
                   >
                     {/* cm/mm are the canonical unit values, never translated. */}
                     <option value="cm">cm</option>
@@ -522,7 +522,7 @@ export const PiecesManager: React.FC<PiecesManagerProps> = ({
                     id="pieces-template-select"
                     value={selectedTemplate}
                     onChange={(event) => setSelectedTemplate(event.target.value as TemplateName)}
-                    className="flex-1 rounded-lg border border-studio-border bg-studio-field/70 px-3 py-2 text-xs text-slate-800 dark:text-slate-100 outline-none focus:border-brand-500/40"
+                    className="flex-1 rounded-lg border border-studio-border bg-studio-field/70 px-3 py-2 text-xs text-slate-800 dark:text-slate-100 outline-none focus:border-brand-500/40 [&>option]:bg-white [&>option]:text-slate-900 dark:[&>option]:bg-slate-900 dark:[&>option]:text-slate-100"
                   >
                     {/* The option value is the stable template name; only the piece-count suffix is localized. */}
                     {FURNITURE_TEMPLATES.map((template) => (
@@ -845,7 +845,7 @@ export const PiecesManager: React.FC<PiecesManagerProps> = ({
                   value={newEdgeColor}
                   onChange={(event) => setNewEdgeColor(event.target.value)}
                   aria-label={t('pieces.edgeBanding.selectAria')}
-                  className="px-2 py-0.5 rounded-md bg-studio-field border border-studio-border text-[10px] text-slate-800 dark:text-slate-200 outline-none"
+                  className="px-2 py-0.5 rounded-md bg-studio-field border border-studio-border text-[10px] text-slate-800 dark:text-slate-200 outline-none [&>option]:bg-white [&>option]:text-slate-900 dark:[&>option]:bg-slate-900 dark:[&>option]:text-slate-100"
                 >
                   {EDGEBANDING_PRESETS.map((preset) => (
                     <option key={preset.id} value={preset.id}>

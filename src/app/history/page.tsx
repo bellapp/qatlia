@@ -278,7 +278,7 @@ export default function HistoryPage() {
             </div>
             <select value={materialFilter} onChange={e => setMaterialFilter(e.target.value)}
               aria-label={t('historyPage.materialFilterAria')}
-              className="px-2.5 py-1.5 rounded-lg bg-studio-field/60 border border-studio-border/80 text-slate-700 dark:text-slate-300 text-xs outline-none focus:border-brand-500/50">
+              className="px-2.5 py-1.5 rounded-lg bg-studio-field/60 border border-studio-border/80 text-slate-700 dark:text-slate-300 text-xs outline-none focus:border-brand-500/50 [&>option]:bg-white [&>option]:text-slate-900 dark:[&>option]:bg-slate-900 dark:[&>option]:text-slate-100">
               <option value="">{t('historyPage.allMaterials')}</option>
               {FILTERABLE_MATERIALS.map((material) => (
                 <option key={material} value={material}>{t(materialLabelKey(material))}</option>
