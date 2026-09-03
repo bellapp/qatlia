@@ -55,6 +55,41 @@ function extractJson(text: string): { pieces?: Array<{ name?: string; width: num
     } catch {}
   }
 
+  // Truncated generation (finish_reason "length"): close the dangling JSON so
+  // complete rows already written are salvageable instead of discarding the
+  // whole analysis. The tail is cut back to the last complete piece object.
+  if (cleaned.includes('"pieces"')) {
+    const start = cleaned.indexOf('{');
+    if (start !== -1) {
+      const tail = cleaned.slice(start);
+      // Keep only fully-written piece objects: from the opening piece brace to
+      // the last complete `}` that closes one (followed by optional comma/space).
+      const piecesStart = tail.indexOf('[', tail.indexOf('"pieces"'));
+      if (piecesStart !== -1) {
+        const inner = tail.slice(piecesStart + 1);
+        let lastComplete = -1;
+        let depth = 0;
+        for (let i = 0; i < inner.length; i++) {
+          const ch = inner[i];
+          if (ch === '{') depth++;
+          else if (ch === '}') {
+            depth--;
+            if (depth === 0) lastComplete = i;
+          }
+        }
+        if (lastComplete > 0) {
+          const salvage = tail.slice(0, piecesStart + 1) + inner.slice(0, lastComplete + 1) + ']}';
+          try {
+            const parsed = JSON.parse(salvage);
+            if (parsed && Array.isArray(parsed.pieces) && parsed.pieces.length > 0) {
+              return parsed;
+            }
+          } catch {}
+        }
+      }
+    }
+  }
+
   return null;
 }
 
@@ -283,7 +318,11 @@ Règles impératives :
       },
       body: JSON.stringify({
         model,
-        max_tokens: 2000,
+        // Large cut lists (30+ rows) need room: each row is ~50 output tokens,
+        // and vision models may spend hidden reasoning tokens first. 8000
+        // covers a full A4 cut list without the truncation that used to yield
+        // an unusable unterminated JSON (reported as "no readable measures").
+        max_tokens: 8000,
         response_format: { type: 'json_object' },
         messages: [
           { role: 'system', content: systemPrompt },
