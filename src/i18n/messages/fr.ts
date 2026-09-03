@@ -271,6 +271,9 @@ export const fr = {
     templates: 'Modèles',
     deselectAll: 'Désél.',
     selectAll: 'Tout',
+    swapAll: 'Permuter tout',
+    swapAllTitle: 'Permuter hauteur ↔ largeur de toutes les pièces (ou de la sélection)',
+    swapAllAria: 'Permuter hauteur et largeur de toutes les pièces',
     deleteSelectedAria: 'Supprimer la sélection',
     exportCsv: 'Exporter en CSV',
     // Column names of the exported file. Only the header row is localized: the

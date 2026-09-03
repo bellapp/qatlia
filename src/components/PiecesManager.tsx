@@ -270,6 +270,27 @@ export const PiecesManager: React.FC<PiecesManagerProps> = ({
     onUpdatePieces(updated);
   };
 
+  /** Swaps height and width for every piece at once (or only the selected
+      ones when a selection is active — "tout" follows the current view). */
+  const handleSwapAll = () => {
+    const hasSelection = selectedIds.size > 0;
+    const updated = pieces.map((piece, index) => {
+      if (hasSelection && !selectedIds.has(piece.id || '')) return piece;
+      const nextPiece = { ...piece, height: piece.width, width: piece.height } as Piece;
+      nextPiece.color = getResolvedPieceColor({
+        color: nextPiece.color,
+        id: nextPiece.id,
+        name: nextPiece.name,
+        height: nextPiece.height,
+        width: nextPiece.width,
+        quantity: nextPiece.quantity,
+        index,
+      });
+      return nextPiece;
+    });
+    onUpdatePieces(updated);
+  };
+
   const handleToggleEdge = (id: string, side: 'left' | 'right' | 'top' | 'bottom') => {
     const updated = pieces.map((piece) => {
       if (piece.id !== id) return piece;
@@ -395,6 +416,19 @@ export const PiecesManager: React.FC<PiecesManagerProps> = ({
             {selectedIds.size === filteredList.length && filteredList.length > 0
               ? t('pieces.deselectAll')
               : t('pieces.selectAll')}
+          </button>
+
+          {/* Swap H<->W for all pieces at once (or the selection when active). */}
+          <button
+            type="button"
+            onClick={handleSwapAll}
+            disabled={pieces.length === 0}
+            className="px-2 py-1 rounded-lg bg-studio-panel hover:bg-studio-field text-slate-600 dark:text-slate-400 text-[10px] font-semibold border border-studio-border transition-all flex items-center gap-1 disabled:opacity-30"
+            title={t('pieces.swapAllTitle')}
+            aria-label={t('pieces.swapAllAria')}
+          >
+            <ArrowLeftRight className="w-3 h-3" aria-hidden="true" />
+            {t('pieces.swapAll')}
           </button>
 
           <button
