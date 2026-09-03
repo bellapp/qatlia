@@ -49,10 +49,23 @@ export interface Piece {
   id?: string; name?: string; height: number; width: number; quantity: number;
   material?: MaterialType | null; grainDirection?: boolean; edges?: EdgeBandingConfig;
   preCut?: { height?: number; width?: number }; rotatable?: boolean; color?: string;
+  /**
+   * Wood grain (ramage) handling for this piece:
+   * - 'none'  — no grain constraint (may rotate freely)
+   * - 'vertical'   — grain lines run along the piece's height axis
+   * - 'horizontal' — grain lines run along the piece's width axis
+   * A constrained piece may only be placed with its grain axis parallel to the
+   * sheet's grain direction (sheet.height = vertical grain by convention).
+   */
+  grain?: 'none' | 'vertical' | 'horizontal';
 }
 export interface Sheet {
   id?: string; height: number; width: number; kerf: number; margin?: number;
   grainDirection?: boolean; material?: MaterialType; quantity?: number; label?: string;
+  /** True when this stock panel has visible grain (ramage) the placed pieces must respect. */
+  hasGrain?: boolean;
+  /** Direction of the panel's grain: 'vertical' = along height, 'horizontal' = along width. */
+  grainOrientation?: 'vertical' | 'horizontal';
 }
 // Single source of truth for supported optimization goals, shared by the API
 // schema (enum validation) and the options UI (rendered choices), so neither
@@ -127,6 +140,12 @@ export interface PlacedPiece {
   originalIndex?: number;
   /** Copied verbatim from the source piece — see `computeCostBreakdown`'s edge cost, which sums this per *placed* unit rather than per requested quantity. */
   edges?: EdgeBandingConfig;
+  /**
+   * Wood grain (ramage) of this placed unit, carried from the source piece.
+   * 'vertical' means grain runs along the as-placed height; the SVG renderer
+   * draws parallel grain lines along that axis. Undefined = no grain shown.
+   */
+  grain?: 'vertical' | 'horizontal';
 }
 export interface Offcut { id: string; x: number; y: number; width: number; height: number; sheetIndex: number; areaM2: number; isReusable: boolean; }
 /**
@@ -193,6 +212,8 @@ export interface ExpandedPiece extends Required<Pick<Piece, 'height' | 'width' |
   isUnnamed: boolean;
   originalHeight: number; originalWidth: number;
   rotatable: boolean; edges?: EdgeBandingConfig; color?: string;
+  /** Wood grain constraint carried from the source piece (undefined = none). */
+  grain?: 'vertical' | 'horizontal';
   /** Set when a piece was never attempted for packing (e.g. no compatible stock). */
   unplacedReasonCode?: UnplacedReasonCode;
   /** Customer-safe, human-readable explanation of `unplacedReasonCode`. */
@@ -216,9 +237,14 @@ function expandPieces(pieces: Piece[], defaultMaterial: MaterialType, globalGrai
         height: p.height, width: p.width, quantity: 1,
         material: (p.material || defaultMaterial) as MaterialType,
         originalHeight: p.height, originalWidth: p.width,
-        rotatable: p.rotatable !== false && !(p.grainDirection || globalGrain),
+        // A grain-constrained piece (ramage) may never rotate: its grain axis
+        // must stay parallel to the sheet's grain, so orientation is fixed.
+        rotatable: p.rotatable !== false
+          && !(p.grainDirection || globalGrain)
+          && !(p.grain && p.grain !== 'none'),
         edges: p.edges,
         color: p.color,
+        grain: p.grain && p.grain !== 'none' ? p.grain : undefined,
       });
     }
   });
@@ -614,6 +640,10 @@ function packSheetWithStrategy(
       color: item.color,
       originalIndex: item.originalIndex,
       edges: item.edges,
+      // As-placed grain axis: a 'vertical' grain piece stays vertical (never
+      // rotated), a 'horizontal' one stays horizontal. Rotation is blocked at
+      // expandPieces, so the source axis always equals the placed axis.
+      grain: item.grain,
     });
     usedArea += placement.width * placement.height;
   }

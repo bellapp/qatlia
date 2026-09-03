@@ -973,6 +973,36 @@ export default function Dashboard() {
                 </div>
               </div>
 
+              {/* Grain (ramage): declare the panel as grained and its grain
+                  direction; constrained pieces then follow it. */}
+              <div className="flex flex-wrap items-center gap-3 px-4 pb-3 -mt-1">
+                <label className="flex items-center gap-2 cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    checked={!!activeSheet.hasGrain}
+                    onChange={(e) => setSheets([{ ...activeSheet, hasGrain: e.target.checked }])}
+                    aria-label={t('atelier.stock.grainToggleAria')}
+                    className="rounded text-brand-500 bg-studio-field border-studio-border-hover w-3.5 h-3.5"
+                  />
+                  <span className="text-[11px] font-semibold text-slate-700 dark:text-slate-200">{t('atelier.stock.grainToggle')}</span>
+                </label>
+                {activeSheet.hasGrain && (
+                  <div role="group" aria-label={t('atelier.stock.grainOrientationAria')} className="flex items-center p-0.5 rounded-lg bg-studio-field border border-studio-border">
+                    {(['vertical', 'horizontal'] as const).map((dir) => (
+                      <button
+                        key={dir}
+                        type="button"
+                        onClick={() => setSheets([{ ...activeSheet, grainOrientation: dir }])}
+                        aria-pressed={activeSheet.grainOrientation === dir}
+                        className={`px-2.5 py-1 rounded-md text-[10px] font-bold transition-all ${activeSheet.grainOrientation === dir ? 'bg-brand-500 text-slate-950' : 'text-slate-500 hover:text-slate-300'}`}
+                      >
+                        {t(`atelier.stock.grain${dir === 'vertical' ? 'Vertical' : 'Horizontal'}`)}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+
               {/* Panel presets: pick a stock size, name it, save or delete it */}
               <div className="flex flex-wrap items-center gap-2 px-4 pb-2 -mt-1">
                 <div className="relative flex-1 min-w-[180px]">
@@ -1314,7 +1344,29 @@ export default function Dashboard() {
                           <pattern id="hatchD" patternUnits="userSpaceOnUse" width="8" height="8" patternTransform="rotate(45)">
                             <line x1="0" y1="0" x2="0" y2="8" stroke="#1A2744" strokeWidth="0.5" opacity="0.7"/>
                           </pattern>
+                          {/* Wood grain (ramage) textures: soft wavy strokes along the
+                              grain axis, one per theme. Pieces reference these by
+                              axis via grainV / grainH. */}
+                          <pattern id="grainV" patternUnits="userSpaceOnUse" width="6" height="14">
+                            <path d="M1 0 Q4 3.5 1 7 T1 14" fill="none" stroke={isDark ? '#8A6A3B' : '#C9A464'} strokeWidth="0.45" opacity="0.55" />
+                            <path d="M4 0 Q7 3.5 4 7 T4 14" fill="none" stroke={isDark ? '#6E5228' : '#B08A4F'} strokeWidth="0.35" opacity="0.4" />
+                          </pattern>
+                          <pattern id="grainH" patternUnits="userSpaceOnUse" width="14" height="6">
+                            <path d="M0 1 Q3.5 4 7 1 T14 1" fill="none" stroke={isDark ? '#8A6A3B' : '#C9A464'} strokeWidth="0.45" opacity="0.55" />
+                            <path d="M0 4 Q3.5 7 7 4 T14 4" fill="none" stroke={isDark ? '#6E5228' : '#B08A4F'} strokeWidth="0.35" opacity="0.4" />
+                          </pattern>
                         </defs>
+
+                        {/* Panel grain: wavy background lines over the sheet when
+                            the stock panel is declared grained (ramage). */}
+                        {activeSheet.hasGrain && (
+                          <rect
+                            data-testid="sheet-grain-overlay"
+                            x="0" y="0" width={activeSheet.width} height={activeSheet.height}
+                            fill={activeSheet.grainOrientation === 'horizontal' ? 'url(#grainH)' : 'url(#grainV)'}
+                            pointerEvents="none"
+                          />
+                        )}
 
                         <rect x="0" y="0" width={activeSheet.width} height={activeSheet.height}
                           fill={isDark ? 'url(#sheetBgD)' : 'url(#sheetBgL)'}
@@ -1351,6 +1403,23 @@ export default function Dashboard() {
                               </defs>
                               <rect x={p.x} y={p.y} width={p.width} height={p.height} fill={`url(#${gradId})`}
                                 stroke={isDark ? '#050A14' : '#334155'} strokeWidth={Math.max(0.4, (options.kerfWidth||3)/10)} rx="0.3" />
+                              {/* Piece grain lines (ramage): drawn along the
+                                  piece's grain axis so the artisan can check the
+                                  veining direction at a glance. */}
+                              {p.grain && p.width >= 6 && p.height >= 6 && (
+                                <g data-testid="piece-grain-lines" pointerEvents="none" opacity="0.7">
+                                  {p.grain === 'vertical'
+                                    ? Array.from({ length: Math.max(2, Math.floor(p.width / 7)) }, (_, gi) => {
+                                        const gx = p.x + ((gi + 1) * p.width) / (Math.max(2, Math.floor(p.width / 7)) + 1);
+                                        return <path key={gi} d={`M${gx} ${p.y + 0.8} Q${gx + 0.9} ${p.y + p.height / 2} ${gx} ${p.y + p.height - 0.8}`} fill="none" stroke={isDark ? '#E8D5B5' : '#7A5C2E'} strokeWidth="0.3" />;
+                                      })
+                                    : Array.from({ length: Math.max(2, Math.floor(p.height / 7)) }, (_, gi) => {
+                                        const gy = p.y + ((gi + 1) * p.height) / (Math.max(2, Math.floor(p.height / 7)) + 1);
+                                        return <path key={gi} d={`M${p.x + 0.8} ${gy} Q${p.x + p.width / 2} ${gy + 0.9} ${p.x + p.width - 0.8} ${gy}`} fill="none" stroke={isDark ? '#E8D5B5' : '#7A5C2E'} strokeWidth="0.3" />;
+                                      })
+                                  }
+                                </g>
+                              )}
                               {options.showLabels && (<>
                                 <text x={p.x+p.width/2} y={p.y+p.height/2-(minSide>=20?3:0)} textAnchor="middle" dominantBaseline="central"
                                   fill={isDark ? '#050A14' : '#1E293B'} fontSize={Math.min(5.5,Math.max(2.5,minSide/12))}

@@ -10,6 +10,9 @@ import {
   Square,
   Library,
   ArrowLeftRight,
+  MoveVertical,
+  MoveHorizontal,
+  Waves,
 } from 'lucide-react';
 import { Piece, MaterialType, EdgeBandingConfig, MATERIAL_LIBRARY, EDGEBANDING_PRESETS } from '@/lib/cutting/binpacking';
 import { parsePiecesImport } from '@/lib/pieces/import-parser';
@@ -291,6 +294,25 @@ export const PiecesManager: React.FC<PiecesManagerProps> = ({
         index,
       });
       return nextPiece;
+    });
+    onUpdatePieces(updated);
+  };
+
+  /** Cycles a piece's grain (ramage) constraint: none -> vertical -> horizontal
+   *  -> none. Locks orientation while constrained so the packer cannot rotate
+   *  the grain away from the sheet direction. */
+  const handleCycleGrain = (id: string) => {
+    const next = (current?: string): 'none' | 'vertical' | 'horizontal' =>
+      current === 'vertical' ? 'horizontal' : current === 'horizontal' ? 'none' : 'vertical';
+    const updated = pieces.map((piece) => {
+      if (piece.id !== id) return piece;
+      const grain = next(piece.grain);
+      return {
+        ...piece,
+        grain,
+        // Keep the chosen orientation fixed while a grain constraint is active.
+        grainDirection: grain !== 'none' ? true : piece.grainDirection,
+      } as Piece;
     });
     onUpdatePieces(updated);
   };
@@ -717,6 +739,28 @@ export const PiecesManager: React.FC<PiecesManagerProps> = ({
                       aria-label={t('pieces.row.swapAria', { name: piece.name || String(index + 1) })}
                     >
                       <ArrowLeftRight className="w-3 h-3" />
+                    </button>
+                    {/* Grain (ramage) toggle: icon glyph varies by state; the
+                        accessible name carries the localized wording. */}
+                    <button
+                      type="button"
+                      onClick={() => handleCycleGrain(piece.id || '')}
+                      disabled={disabled}
+                      className={`w-5 h-5 rounded transition-all flex items-center justify-center disabled:opacity-40 ${
+                        (piece.grain ?? 'none') !== 'none'
+                          ? 'bg-amber-600/80 text-white shadow-sm'
+                          : 'bg-studio-field/60 text-slate-600 dark:text-slate-400 hover:bg-studio-border'
+                      }`}
+                      title={t(`pieces.row.grainTitle.${piece.grain === 'vertical' ? 'vertical' : piece.grain === 'horizontal' ? 'horizontal' : 'none'}`)}
+                      aria-label={t('pieces.row.grainAria', { name: piece.name || String(index + 1) })}
+                    >
+                      {piece.grain === 'vertical' ? (
+                        <MoveVertical className="w-3 h-3" />
+                      ) : piece.grain === 'horizontal' ? (
+                        <MoveHorizontal className="w-3 h-3" />
+                      ) : (
+                        <Waves className="w-3 h-3" />
+                      )}
                     </button>
                   </div>
 
