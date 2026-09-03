@@ -30,26 +30,26 @@ export default function LandingPage() {
 
   return (
     <div className="min-h-screen bg-studio-canvas text-slate-900 dark:text-slate-100 font-sans antialiased overflow-x-hidden">
-      {/* Navigation */}
+      {/* Navigation — wraps to two tidy rows on narrow screens instead of
+          clipping: nothing is ever cut off-canvas. */}
       <header className="sticky top-0 z-50 border-b border-studio-border/50 bg-studio-canvas/70 backdrop-blur-2xl">
-        <div className="max-w-6xl mx-auto flex items-center justify-between gap-2 px-3 sm:px-10 h-16">
-          <Link href="/" className="flex items-center gap-2 shrink-0" aria-label={t('nav.brandAria')}>
+        <div className="max-w-6xl mx-auto flex flex-wrap items-center gap-x-2 gap-y-1.5 px-3 sm:px-10 py-2.5 sm:py-0 sm:h-16">
+          <Link href="/" className="flex items-center gap-2 shrink-0 mr-auto" aria-label={t('nav.brandAria')}>
             <div className="text-brand-400"><QatlIALogo size="md" /></div>
             <span className="font-display font-extrabold text-lg tracking-tight text-slate-900 dark:text-white">QatlIA</span>
           </Link>
-          <div className="flex items-center gap-2 sm:gap-3 min-w-0">
-            <Link href="/auth/login" className="hidden xs:inline sm:inline text-sm font-medium text-slate-600 hover:text-slate-900 dark:text-slate-300 dark:hover:text-white transition-colors whitespace-nowrap">
-              {t('nav.login')}
-            </Link>
-            <LocaleSwitcher />
-            <ThemeToggle />
-            <Link
-              href="/atelier"
-              className="px-3.5 sm:px-5 py-2.5 rounded-xl bg-brand-500 hover:bg-brand-400 text-slate-950 font-black text-xs sm:text-sm transition-all shadow-lg shadow-brand-500/20 active:scale-95 whitespace-nowrap shrink-0"
-            >
-              {t('nav.tryFree')}
-            </Link>
-          </div>
+          <Link href="/auth/login" className="text-xs sm:text-sm font-medium text-slate-600 hover:text-slate-900 dark:text-slate-300 dark:hover:text-white transition-colors whitespace-nowrap">
+            {t('nav.login')}
+          </Link>
+          <LocaleSwitcher />
+          <ThemeToggle className="hidden sm:inline-flex" />
+          <Link
+            href="/atelier"
+            className="ml-auto sm:ml-0 px-3.5 sm:px-5 py-2.5 rounded-xl bg-brand-500 hover:bg-brand-400 text-slate-950 font-black text-xs sm:text-sm transition-all shadow-lg shadow-brand-500/20 active:scale-95 whitespace-nowrap shrink-0"
+          >
+            <span className="sm:hidden">{t('nav.tryFreeShort')}</span>
+            <span className="hidden sm:inline">{t('nav.tryFree')}</span>
+          </Link>
         </div>
       </header>
 

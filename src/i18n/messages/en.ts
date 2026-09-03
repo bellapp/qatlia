@@ -5,6 +5,7 @@ export const en: Catalog = {
     brandAria: 'QatlIA — home',
     login: 'Sign in',
     tryFree: 'Try it free',
+    tryFreeShort: 'Try free',
     languageAria: 'Choose a language',
     languageOptionAria: 'View the site in {language}',
     lightMode: 'Light mode',

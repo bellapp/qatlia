@@ -5,6 +5,7 @@ export const ar: Catalog = {
     brandAria: 'QatlIA — الصفحة الرئيسية',
     login: 'تسجيل الدخول',
     tryFree: 'جرّب مجاناً',
+    tryFreeShort: 'جرّب',
     languageAria: 'اختر اللغة',
     languageOptionAria: 'عرض الموقع بـ{language}',
     lightMode: 'الوضع الفاتح',

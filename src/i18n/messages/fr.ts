@@ -9,6 +9,7 @@ export const fr = {
     brandAria: 'QatlIA — accueil',
     login: 'Connexion',
     tryFree: 'Essayer gratuitement',
+    tryFreeShort: 'Essayer',
     languageAria: 'Choisir la langue',
     languageOptionAria: 'Afficher le site en {language}',
     lightMode: 'Mode clair',
