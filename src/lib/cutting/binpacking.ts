@@ -171,7 +171,7 @@ export interface OptimizationResult {
 }
 
 /** Reason code for a piece left unplaced for a structural (non-geometric) reason. */
-export type UnplacedReasonCode = 'no_matching_stock' | 'single_sheet_material_limit';
+export type UnplacedReasonCode = 'no_matching_stock' | 'single_sheet_material_limit' | 'oversize';
 
 // Fixed, translated-safe sentences for each `UnplacedReasonCode`. These are
 // deliberately static strings — never built by interpolating the piece's raw
@@ -182,6 +182,7 @@ export type UnplacedReasonCode = 'no_matching_stock' | 'single_sheet_material_li
 const UNPLACED_REASON_TEXT: Record<UnplacedReasonCode, string> = {
   no_matching_stock: 'Aucun panneau en stock ne correspond au matériau de cette pièce.',
   single_sheet_material_limit: 'Cette pièce n\'a pas pu être incluse car une seule plaque est utilisée pour l\'ensemble de la commande, réservée à un autre matériau.',
+  oversize: 'Cette pièce est plus grande que le panneau en stock, même pivotée. Augmentez les dimensions du panneau.',
 };
 
 export interface ExpandedPiece extends Required<Pick<Piece, 'height' | 'width' | 'quantity' | 'material'>> {
@@ -790,6 +791,24 @@ function simulatePlanForStrategy(
       totalAreaUsed: plan.totalAreaUsed,
       totalAreaAvailable: plan.totalAreaAvailable,
     }, mergedOptions.optimizationPriority);
+  }
+
+  if (best) {
+    // Pieces still unplaced after the stock ran out get a structural reason:
+    // an item that cannot fit a single sheet in EITHER orientation is oversize
+    // (the artisan must resize stock or the piece); anything else simply ran
+    // out of stock. This drives the workshop's oversize alert.
+    const maxUsable = sheets.reduce((max, sheet) => {
+      const margin = Math.max(0, sheet.margin || 0);
+      return Math.max(max, Math.max(sheet.width - margin * 2, sheet.height - margin * 2));
+    }, 0);
+    for (const item of best.unplacedPieces) {
+      const fitsEitherWay = Math.min(item.width, item.height) <= maxUsable;
+      if (!fitsEitherWay) {
+        item.unplacedReasonCode = 'oversize';
+        item.unplacedReason = UNPLACED_REASON_TEXT.oversize;
+      }
+    }
   }
 
   return best || {

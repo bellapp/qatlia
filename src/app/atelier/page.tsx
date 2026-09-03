@@ -36,7 +36,7 @@ import {
   optimizeCutting2D,
 } from '@/lib/cutting/binpacking';
 import { PIECE_COLOR_PALETTE, getResolvedPieceColor } from '@/lib/pieces/catalog';
-import { BUILT_IN_PRESETS, loadSavedPresets, savePreset, deletePreset, type PanelPreset } from '@/lib/panel-presets';
+import { BUILT_IN_PRESETS, loadSavedPresets, savePreset, deletePreset, findDuplicatePreset, type PanelPreset } from '@/lib/panel-presets';
 import { OptionsPanel } from '@/components/OptionsPanel';
 import { PiecesManager } from '@/components/PiecesManager';
 import { AuthModal } from '@/components/AuthModal';
@@ -172,15 +172,58 @@ export default function Dashboard() {
 
   const allPresets = [...BUILT_IN_PRESETS, ...savedPresets];
 
-  /** Saves the current stock panel as a reusable preset (name auto-drafted). */
-  const handleSavePreset = () => {
-    const name = `${formatDisplayValue(activeSheet.height, displayUnit)}×${formatDisplayValue(activeSheet.width, displayUnit)} ${displayUnit}`;
-    const entry = savePreset({ name, height: activeSheet.height, width: activeSheet.width, material: activeSheet.material ?? undefined });
-    setSavedPresets(loadSavedPresets());
-    void entry;
+    const activeSheet = sheets[0] || DEFAULT_SHEETS[0];
+// Panel naming: the artisan can name a stock panel; without a name the
+  // dimensions stand in. The draft syncs when the panel itself changes.
+  const [panelNameDraft, setPanelNameDraft] = useState<string>('');
+  const [presetNameDraft, setPresetNameDraft] = useState<string>('');
+  const [presetFeedback, setPresetFeedback] = useState<{ tone: 'success' | 'warning'; text: string } | null>(null);
+
+  useEffect(() => {
+    setPanelNameDraft(activeSheet.label || '');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeSheet.id]);
+
+  /** Applies the typed name to the current stock panel (payload `label`). */
+  const commitPanelName = () => {
+    const name = panelNameDraft.trim();
+    // Two panels must not carry the same name: uniqueness guard.
+    const duplicate = sheets.some((s) => s.id !== activeSheet.id && (s.label || '') === name && name !== '');
+    if (duplicate) {
+      setPresetFeedback({ tone: 'warning', text: t('atelier.stock.nameDuplicate') });
+      return;
+    }
+    setSheets([{ ...activeSheet, label: name || undefined }]);
+    setPresetFeedback(null);
   };
 
-  const activeSheet = sheets[0] || DEFAULT_SHEETS[0];
+  /** Saves the current stock panel as a reusable named preset, rejecting
+   *  duplicates (same dimensions + material already saved). */
+  const handleSavePreset = () => {
+    const name = presetNameDraft.trim()
+      || `${formatDisplayValue(activeSheet.height, displayUnit)}×${formatDisplayValue(activeSheet.width, displayUnit)} ${displayUnit}`;
+    const duplicate = findDuplicatePreset(
+      { height: activeSheet.height, width: activeSheet.width, material: activeSheet.material ?? undefined },
+      savedPresets,
+    );
+    if (duplicate) {
+      setPresetFeedback({ tone: 'warning', text: t('atelier.stock.presetDuplicate', { name: duplicate.name }) });
+      return;
+    }
+    savePreset({ name, height: activeSheet.height, width: activeSheet.width, material: activeSheet.material ?? undefined });
+    setSavedPresets(loadSavedPresets());
+    setPresetNameDraft('');
+    setPresetFeedback({ tone: 'success', text: t('atelier.stock.presetSavedOk', { name }) });
+  };
+
+  /** Removes a saved panel preset from the workshop's list. */
+  const handleDeletePreset = (id: string) => {
+    deletePreset(id);
+    setSavedPresets(loadSavedPresets());
+    setPresetFeedback({ tone: 'success', text: t('atelier.stock.presetDeleted') });
+  };
+
+
   const { theme } = useTheme();
   const isDark = theme === 'dark';
   const { t, tn, n, locale } = useLocale();
@@ -930,8 +973,8 @@ export default function Dashboard() {
                 </div>
               </div>
 
-              {/* Panel presets: pick a stock size or save the current one */}
-              <div className="flex flex-wrap items-center gap-2 px-4 pb-4 -mt-1">
+              {/* Panel presets: pick a stock size, name it, save or delete it */}
+              <div className="flex flex-wrap items-center gap-2 px-4 pb-2 -mt-1">
                 <div className="relative flex-1 min-w-[180px]">
                   <PackageOpen className="w-3.5 h-3.5 text-slate-400 pointer-events-none absolute start-2.5 top-1/2 -translate-y-1/2 z-10" aria-hidden="true" />
                   <select
@@ -984,6 +1027,47 @@ export default function Dashboard() {
                 )}
               </div>
 
+              {/* Panel name + preset name: the panel's own identity and the
+                  name under which "Sauvegarder" stores it. */}
+              <div className="flex flex-wrap items-center gap-2 px-4 pb-2">
+                <div className="flex-1 min-w-[160px] space-y-1">
+                  <label htmlFor="panel-name-input" className="text-[9px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 block">
+                    {t('atelier.stock.panelNameLabel')}
+                  </label>
+                  <input
+                    id="panel-name-input"
+                    type="text"
+                    value={panelNameDraft}
+                    onChange={(e) => setPanelNameDraft(e.target.value)}
+                    onBlur={commitPanelName}
+                    onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur(); }}
+                    placeholder={t('atelier.stock.panelNamePlaceholder')}
+                    aria-label={t('atelier.stock.panelNameLabel')}
+                    className="w-full px-2.5 py-1.5 rounded-lg bg-studio-field border border-studio-border text-slate-800 dark:text-slate-200 text-xs outline-none focus:border-brand-500/50 focus:ring-1 focus:ring-brand-500/20 transition-all"
+                  />
+                </div>
+                <div className="flex-1 min-w-[160px] space-y-1">
+                  <label htmlFor="preset-name-input" className="text-[9px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 block">
+                    {t('atelier.stock.presetNameLabel')}
+                  </label>
+                  <input
+                    id="preset-name-input"
+                    type="text"
+                    value={presetNameDraft}
+                    onChange={(e) => setPresetNameDraft(e.target.value)}
+                    placeholder={t('atelier.stock.presetNamePlaceholder')}
+                    aria-label={t('atelier.stock.presetNameLabel')}
+                    className="w-full px-2.5 py-1.5 rounded-lg bg-studio-field border border-studio-border text-slate-800 dark:text-slate-200 text-xs outline-none focus:border-brand-500/50 focus:ring-1 focus:ring-brand-500/20 transition-all"
+                  />
+                </div>
+              </div>
+
+              {presetFeedback && (
+                <div role="status" className={`mx-4 mb-2 px-3 py-2 rounded-lg text-[11px] font-semibold ${presetFeedback.tone === 'success' ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-300' : 'bg-amber-500/10 text-amber-600 dark:text-amber-300'}`}>
+                  {presetFeedback.text}
+                </div>
+              )}
+
               {isPresetManageOpen && savedPresets.length > 0 && (
                 <div className="px-4 pb-4 space-y-1" data-testid="preset-manager">
                   {savedPresets.map((p) => (
@@ -994,7 +1078,7 @@ export default function Dashboard() {
                       </span>
                       <button
                         type="button"
-                        onClick={() => { deletePreset(p.id); setSavedPresets(loadSavedPresets()); }}
+                        onClick={() => handleDeletePreset(p.id)}
                         aria-label={t('atelier.stock.deletePresetAria')}
                         className="p-1 rounded-md text-slate-400 hover:text-rose-400 transition-colors"
                       >
@@ -1096,6 +1180,39 @@ export default function Dashboard() {
                     </div>
                   </div>
                 </div>
+
+                {/* Unplaced pieces alert — an oversize piece (larger than the
+                    stock panel even rotated) must be impossible to miss, and
+                    any other structural rejection is named too. */}
+                {result.unplacedPieces.length > 0 && (
+                  <div
+                    role="alert"
+                    data-testid="unplaced-alert"
+                    className={`p-3.5 rounded-xl border space-y-2 ${result.unplacedPieces.some((u) => u.unplacedReasonCode === 'oversize')
+                      ? 'bg-rose-500/10 border-rose-500/40'
+                      : 'bg-amber-500/10 border-amber-500/40'}`}
+                  >
+                    <div className="flex items-center gap-2">
+                      <AlertTriangle className={`w-4 h-4 shrink-0 ${result.unplacedPieces.some((u) => u.unplacedReasonCode === 'oversize') ? 'text-rose-400' : 'text-amber-400'}`} />
+                      <p className={`text-xs font-black ${result.unplacedPieces.some((u) => u.unplacedReasonCode === 'oversize') ? 'text-rose-400' : 'text-amber-400'}`}>
+                        {tn('atelier.unplaced.count', result.unplacedPieces.length)}
+                      </p>
+                    </div>
+                    <ul className="space-y-1">
+                      {result.unplacedPieces.slice(0, 8).map((u, i) => (
+                        <li key={u.id || i} className="text-[11px] text-slate-600 dark:text-slate-300 flex items-start gap-1.5">
+                          <span className="font-mono font-bold text-slate-500 shrink-0">{formatDisplayValue(u.height, displayUnit)}×{formatDisplayValue(u.width, displayUnit)}{displayUnit}</span>
+                          <span className="truncate">{u.baseName || t('atelier.unplaced.fallbackName', { index: u.originalIndex + 1 })} — {u.unplacedReason || t('atelier.unplaced.noStock')}</span>
+                        </li>
+                      ))}
+                      {result.unplacedPieces.length > 8 && (
+                        <li className="text-[11px] text-slate-500 font-semibold">
+                          {t('atelier.unplaced.more', { count: result.unplacedPieces.length - 8 })}
+                        </li>
+                      )}
+                    </ul>
+                  </div>
+                )}
 
                 {/* Performance Metrics Grid */}
                 <div className="grid grid-cols-4 gap-2">

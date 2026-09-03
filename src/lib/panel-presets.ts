@@ -62,6 +62,21 @@ export function savePreset(preset: Omit<PanelPreset, 'id' | 'builtIn'>): PanelPr
   return entry;
 }
 
+/** Same stock panel already saved? (dimensions + material, name ignored —
+ *  a renamed duplicate is still the same physical panel). */
+export function findDuplicatePreset(
+  preset: { height: number; width: number; material?: string },
+  saved: PanelPreset[],
+): PanelPreset | undefined {
+  const materialKey = (preset.material || 'mdf').toLowerCase();
+  return saved.find(
+    (p) =>
+      Math.abs(p.height - preset.height) < 1e-6 &&
+      Math.abs(p.width - preset.width) < 1e-6 &&
+      (p.material || 'mdf').toLowerCase() === materialKey,
+  );
+}
+
 export function deletePreset(id: string): void {
   const saved = loadSavedPresets().filter((p) => p.id !== id);
   window.localStorage.setItem(STORAGE_KEY, JSON.stringify(saved));

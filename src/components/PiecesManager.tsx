@@ -251,11 +251,14 @@ export const PiecesManager: React.FC<PiecesManagerProps> = ({
     onUpdatePieces(updated);
   };
 
-  /** Swaps height and width for one piece (canonical cm; color stays stable). */
+  /** Swaps height and width for one piece. Also locks the piece's orientation
+   *  (per-piece grain lock): the packer may rotate a rotatable piece back to
+   *  its fitter orientation, which made the swap look ignored. Swapping
+   *  expresses the intent to FIX the new orientation, so it must stick. */
   const handleSwapDimensions = (id: string) => {
     const updated = pieces.map((piece, index) => {
       if (piece.id !== id) return piece;
-      const nextPiece = { ...piece, height: piece.width, width: piece.height } as Piece;
+      const nextPiece = { ...piece, height: piece.width, width: piece.height, grainDirection: true } as Piece;
       nextPiece.color = getResolvedPieceColor({
         color: nextPiece.color,
         id: nextPiece.id,
@@ -271,12 +274,13 @@ export const PiecesManager: React.FC<PiecesManagerProps> = ({
   };
 
   /** Swaps height and width for every piece at once (or only the selected
-      ones when a selection is active — "tout" follows the current view). */
+      ones when a selection is active — "tout" follows the current view).
+      Orientation is locked the same way as the per-piece swap. */
   const handleSwapAll = () => {
     const hasSelection = selectedIds.size > 0;
     const updated = pieces.map((piece, index) => {
       if (hasSelection && !selectedIds.has(piece.id || '')) return piece;
-      const nextPiece = { ...piece, height: piece.width, width: piece.height } as Piece;
+      const nextPiece = { ...piece, height: piece.width, width: piece.height, grainDirection: true } as Piece;
       nextPiece.color = getResolvedPieceColor({
         color: nextPiece.color,
         id: nextPiece.id,
