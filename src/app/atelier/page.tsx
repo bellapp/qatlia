@@ -1357,8 +1357,14 @@ export default function Dashboard() {
                           </pattern>
                         </defs>
 
-                        {/* Panel grain: wavy background lines over the sheet when
-                            the stock panel is declared grained (ramage). */}
+                        <rect x="0" y="0" width={activeSheet.width} height={activeSheet.height}
+                          fill={isDark ? 'url(#sheetBgD)' : 'url(#sheetBgL)'}
+                          stroke={isDark ? '#4A5568' : '#94A3B8'} strokeWidth={isDark ? 1 : 1.5} rx="0.5" />
+
+                        {/* Panel grain (ramage): wavy lines OVER the sheet background,
+                            UNDER the pieces — shows the stock veining direction.
+                            Pieces without their own grain stay plain so the panel
+                            grain reads as the panel's, as on real MDF/plywood. */}
                         {activeSheet.hasGrain && (
                           <rect
                             data-testid="sheet-grain-overlay"
@@ -1367,10 +1373,6 @@ export default function Dashboard() {
                             pointerEvents="none"
                           />
                         )}
-
-                        <rect x="0" y="0" width={activeSheet.width} height={activeSheet.height}
-                          fill={isDark ? 'url(#sheetBgD)' : 'url(#sheetBgL)'}
-                          stroke={isDark ? '#4A5568' : '#94A3B8'} strokeWidth={isDark ? 1 : 1.5} rx="0.5" />
 
                         {result.offcuts && result.offcuts.filter(o => o.sheetIndex === activeSheetIndex).map((off) => {
                           const minSide = Math.min(off.width, off.height);
@@ -1403,23 +1405,6 @@ export default function Dashboard() {
                               </defs>
                               <rect x={p.x} y={p.y} width={p.width} height={p.height} fill={`url(#${gradId})`}
                                 stroke={isDark ? '#050A14' : '#334155'} strokeWidth={Math.max(0.4, (options.kerfWidth||3)/10)} rx="0.3" />
-                              {/* Piece grain lines (ramage): drawn along the
-                                  piece's grain axis so the artisan can check the
-                                  veining direction at a glance. */}
-                              {p.grain && p.width >= 6 && p.height >= 6 && (
-                                <g data-testid="piece-grain-lines" pointerEvents="none" opacity="0.7">
-                                  {p.grain === 'vertical'
-                                    ? Array.from({ length: Math.max(2, Math.floor(p.width / 7)) }, (_, gi) => {
-                                        const gx = p.x + ((gi + 1) * p.width) / (Math.max(2, Math.floor(p.width / 7)) + 1);
-                                        return <path key={gi} d={`M${gx} ${p.y + 0.8} Q${gx + 0.9} ${p.y + p.height / 2} ${gx} ${p.y + p.height - 0.8}`} fill="none" stroke={isDark ? '#E8D5B5' : '#7A5C2E'} strokeWidth="0.3" />;
-                                      })
-                                    : Array.from({ length: Math.max(2, Math.floor(p.height / 7)) }, (_, gi) => {
-                                        const gy = p.y + ((gi + 1) * p.height) / (Math.max(2, Math.floor(p.height / 7)) + 1);
-                                        return <path key={gi} d={`M${p.x + 0.8} ${gy} Q${p.x + p.width / 2} ${gy + 0.9} ${p.x + p.width - 0.8} ${gy}`} fill="none" stroke={isDark ? '#E8D5B5' : '#7A5C2E'} strokeWidth="0.3" />;
-                                      })
-                                  }
-                                </g>
-                              )}
                               {options.showLabels && (<>
                                 <text x={p.x+p.width/2} y={p.y+p.height/2-(minSide>=20?3:0)} textAnchor="middle" dominantBaseline="central"
                                   fill={isDark ? '#050A14' : '#1E293B'} fontSize={Math.min(5.5,Math.max(2.5,minSide/12))}

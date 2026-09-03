@@ -224,6 +224,12 @@ function expandPieces(pieces: Piece[], defaultMaterial: MaterialType, globalGrai
   const result: ExpandedPiece[] = [];
   pieces.forEach((p, i) => {
     const qty = Math.max(1, p.quantity || 1);
+    // Grain (ramage) alignment: the packer treats sheet grain as vertical
+    // (along sheet height). A 'horizontal'-grain piece is pre-rotated here
+    // (dims swapped) so its veining lands parallel to the sheet grain; a
+    // 'vertical' one already matches. Either way rotation stays locked.
+    const grainConstrained = p.grain === 'vertical' || p.grain === 'horizontal';
+    const dimsSwappedForGrain = p.grain === 'horizontal';
     const baseName = p.name && p.name.trim() ? p.name.trim() : undefined;
     const isUnnamed = baseName === undefined;
     for (let j = 0; j < qty; j++) {
@@ -234,17 +240,23 @@ function expandPieces(pieces: Piece[], defaultMaterial: MaterialType, globalGrai
         name: qty > 1 ? `${baseName ?? `Pièce ${i + 1}`} ×${qty}` : baseName ?? `Pièce ${i + 1}`,
         baseName,
         isUnnamed,
-        height: p.height, width: p.width, quantity: 1,
+        // Grain (ramage) alignment: the packer treats sheet grain as vertical
+        // (along sheet height). A piece whose grain axis is 'horizontal' is
+        // pre-rotated HERE (dims swapped) and rotation-locked, so its veining
+        // always lands parallel to the sheet grain.
+        height: dimsSwappedForGrain ? p.width : p.height,
+        width: dimsSwappedForGrain ? p.height : p.width,
+        quantity: 1,
         material: (p.material || defaultMaterial) as MaterialType,
         originalHeight: p.height, originalWidth: p.width,
-        // A grain-constrained piece (ramage) may never rotate: its grain axis
-        // must stay parallel to the sheet's grain, so orientation is fixed.
+        // A grain-constrained piece may never rotate: its grain axis must stay
+        // parallel to the sheet's grain, so orientation is fixed at expansion.
         rotatable: p.rotatable !== false
           && !(p.grainDirection || globalGrain)
-          && !(p.grain && p.grain !== 'none'),
+          && !grainConstrained,
         edges: p.edges,
         color: p.color,
-        grain: p.grain && p.grain !== 'none' ? p.grain : undefined,
+        grain: grainConstrained ? (p.grain as 'vertical' | 'horizontal') : undefined,
       });
     }
   });
