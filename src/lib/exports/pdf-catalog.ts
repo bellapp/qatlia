@@ -78,6 +78,7 @@ const fr = {
     costingUnavailable: 'Non disponible',
   },
   schema: {
+    grainDirectionLabel: 'Sens du ramage',
     uniqueSample: 'Exemplaire unique',
     multipleSamples: (count: number) => `À fabriquer en ${count} exemplaires`,
     header: (index: number, total: number, material: string, dims: string, samples: string) =>
@@ -141,6 +142,7 @@ const en: PdfCatalog = {
     costingUnavailable: 'Not available',
   },
   schema: {
+    grainDirectionLabel: 'Grain direction',
     uniqueSample: 'Single copy',
     multipleSamples: (count) => `To be produced in ${count} copies`,
     header: (index, total, material, dims, samples) => `${index}/${total} -- ${material} -- ${dims} -- ${samples}`,
@@ -201,6 +203,7 @@ const ar: PdfCatalog = {
     costingUnavailable: 'غير متوفر',
   },
   schema: {
+    grainDirectionLabel: 'اتجاه العروق',
     uniqueSample: 'نسخة واحدة',
     multipleSamples: (count) => `للتصنيع في ${count} نسخ`,
     header: (index, total, material, dims, samples) => `${index}/${total} -- ${material} -- ${dims} -- ${samples}`,

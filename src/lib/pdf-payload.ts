@@ -5,6 +5,9 @@ import { DEFAULT_LOCALE, type Locale } from '@/i18n';
 export interface PdfPayloadSheet {
   width: number;
   height: number;
+  /** Grain (ramage) fields passed through so the PDF can draw the veining as an option. */
+  hasGrain?: boolean;
+  grainOrientation?: 'vertical' | 'horizontal';
 }
 
 export interface PdfExportPayload {
@@ -57,6 +60,8 @@ export function buildPdfPayload(
     sheet: {
       width: activeSheet.width,
       height: activeSheet.height,
+      hasGrain: !!activeSheet.hasGrain,
+      grainOrientation: activeSheet.grainOrientation === 'horizontal' ? 'horizontal' : 'vertical',
     },
     pieces,
     result,

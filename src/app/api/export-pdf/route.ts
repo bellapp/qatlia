@@ -481,6 +481,55 @@ export async function POST(req: Request) {
       doc.setLineWidth(0.5);
       doc.rect(drawX, drawY, canvasW, canvasH, 'FD');
 
+      // 1b. Ramage du panneau (option): soft wood-vein strokes over the panel
+      // background, UNDER the pieces and offcuts. The veining direction comes
+      // from the artisan's own choice in the atelier.
+      if (sheet.hasGrain) {
+        doc.setDrawColor(180, 148, 96); // soft wood-tone, light enough not to fight the pieces
+        doc.setLineWidth(0.12);
+        if (sheet.grainOrientation === 'vertical') {
+          // Wavy strokes running along the panel height
+          const spacing = Math.max(1.2, Math.min(4, canvasW / 60));
+          for (let gx = drawX + spacing; gx < drawX + canvasW - spacing / 2; gx += spacing) {
+            for (let gy = drawY; gy < drawY + canvasH - 2; gy += 4) {
+              doc.line(gx, gy, gx + 0.35, gy + 2);
+              doc.line(gx + 0.35, gy + 2, gx, gy + 4);
+            }
+          }
+        } else {
+          const spacing = Math.max(1.2, Math.min(4, canvasH / 60));
+          for (let gy = drawY + spacing; gy < drawY + canvasH - spacing / 2; gy += spacing) {
+            for (let gx = drawX; gx < drawX + canvasW - 2; gx += 4) {
+              doc.line(gx, gy, gx + 2, gy + 0.35);
+              doc.line(gx + 2, gy + 0.35, gx + 4, gy);
+            }
+          }
+        }
+        // Grain direction arrow alongside the panel, with a localized label.
+        const arrowLen = Math.min(30, (sheet.grainOrientation === 'vertical' ? canvasH : canvasW) * 0.5);
+        const arrowX = drawX + canvasW + 4;
+        const arrowY = drawY + (sheet.grainOrientation === 'vertical' ? canvasH * 0.25 : canvasH + 6);
+        doc.setDrawColor(60, 60, 60);
+        doc.setLineWidth(0.4);
+        doc.line(arrowX, arrowY, arrowX + (sheet.grainOrientation === 'vertical' ? 0 : arrowLen), arrowY + (sheet.grainOrientation === 'vertical' ? arrowLen : 0));
+        // Arrowhead
+        if (sheet.grainOrientation === 'vertical') {
+          doc.line(arrowX, arrowY, arrowX - 1.2, arrowY + 2.2);
+          doc.line(arrowX, arrowY, arrowX + 1.2, arrowY + 2.2);
+        } else {
+          doc.line(arrowX, arrowY, arrowX + 2.2, arrowY - 1.2);
+          doc.line(arrowX, arrowY, arrowX + 2.2, arrowY + 1.2);
+        }
+        doc.setFont(BASE_FONT, 'normal');
+        doc.setFontSize(6.5);
+        doc.setTextColor(60, 60, 60);
+        if (sheet.grainOrientation === 'vertical') {
+          drawText(cat.schema.grainDirectionLabel, arrowX + 1.5, arrowY + arrowLen / 2, { align: 'center', angle: 90 });
+        } else {
+          drawText(cat.schema.grainDirectionLabel, arrowX + arrowLen / 2, arrowY + 3.5, { align: 'center' });
+        }
+      }
+
       // 2. Dessin des Chutes (Fond Gris #C8CCD1 avec Bordures Noires Nettes)
       pat.offcuts.forEach((off) => {
         const ox = drawX + off.x * scale;

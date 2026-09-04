@@ -127,6 +127,10 @@ export const ExportSchema = z.object({
     kerf: geometryValue().default(0.3),
     margin: geometryValue().default(0.0),
     grainDirection: z.boolean().default(false),
+    /** The stock panel shows wood grain (ramage); the PDF may draw it as an option. */
+    hasGrain: z.boolean().default(false),
+    /** Panel veining direction: along height ('vertical') or width ('horizontal'). */
+    grainOrientation: z.enum(['vertical', 'horizontal']).default('vertical'),
   }),
   result: z.object({
     sheetsUsed: z.number().int().min(0).max(MAX_SHEETS_USED),
