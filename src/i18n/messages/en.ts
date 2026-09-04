@@ -541,6 +541,7 @@ export const en: Catalog = {
       authRequired: 'Sign in to buy credits.',
       invalidSelection: 'This pack is no longer available. Please choose another one.',
       unavailable: 'Payment is temporarily unavailable. Please try again later.',
+      cardFallback: 'Card payment coming soon — a cash/transfer order has been created below.',
       network: 'Network error. Check your connection and try again.',
       generic: 'The payment could not be started. Try again in a moment.',
     },

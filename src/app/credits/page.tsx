@@ -54,6 +54,13 @@ export default function CreditsPage() {
         window.location.href = data.url;
         return;
       }
+      // Card payment not configured yet: the manual order IS the buying path
+      // today, so fall straight into it instead of a dead-end error.
+      if (data?.error === 'PAYMENT_UNAVAILABLE') {
+        setCheckoutError(t('creditsPage.errors.cardFallback'));
+        await handleManualOrder(packId);
+        return;
+      }
       // The route answers with a stable code; its own message is a server
       // string and is never shown to the buyer.
       setCheckoutError(t(checkoutErrorKey(data?.error)));

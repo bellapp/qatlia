@@ -603,6 +603,7 @@ export const fr = {
       authRequired: 'Connectez-vous pour acheter des crédits.',
       invalidSelection: 'Ce pack n’est plus disponible. Choisissez-en un autre.',
       unavailable: 'Le paiement est momentanément indisponible. Réessayez plus tard.',
+      cardFallback: 'Paiement par carte bientôt disponible — commande espèces/virement créée ci-dessous.',
       network: 'Erreur réseau. Vérifiez votre connexion et réessayez.',
       generic: 'Le paiement n’a pas pu être lancé. Réessayez dans un instant.',
     },
