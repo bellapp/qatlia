@@ -525,6 +525,18 @@ export const en: Catalog = {
     redirecting: 'Redirecting to payment…',
     securePayment: 'Payment secured by {provider} — Visa / Mastercard, charged in dirhams ({currency})',
     invoiceNote: 'Invoice and receipt emailed instantly',
+    manual: {
+      button: 'Pay cash / bank transfer',
+      dialogTitle: 'Order created — pay using this number',
+      orderNumberLabel: 'Order number (payment reference)',
+      step1: 'Pay {amount} MAD by bank transfer or in cash (CashPlus / Wafacash agency).',
+      step2: 'Use the order number above as the payment reference.',
+      step3: 'Your credits are added automatically once validated (usually within hours).',
+      keepReference: 'Save or screenshot this number: it is your payment proof.',
+      close: 'I saved my reference',
+      historyTitle: 'My payment orders',
+      status: { pending: 'Pending', granted: 'Credits added', refused: 'Refused' },
+    },
     errors: {
       authRequired: 'Sign in to buy credits.',
       invalidSelection: 'This pack is no longer available. Please choose another one.',

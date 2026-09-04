@@ -582,6 +582,18 @@ export const fr = {
     // Rendered around {provider} so the payment provider stays bold.
     securePayment: 'Paiement sécurisé par {provider} — cartes Visa / Mastercard, débitées en dirhams ({currency})',
     invoiceNote: 'Facture et reçu instantanés par email',
+    manual: {
+      button: 'Payer en espèces / virement',
+      dialogTitle: 'Commande créée — payez avec ce numéro',
+      orderNumberLabel: 'Numéro de commande (référence)',
+      step1: 'Payez {amount} MAD par virement bancaire ou en espèces (agence CashPlus / Wafacash).',
+      step2: 'Utilisez le numéro de commande ci-dessus comme référence du paiement.',
+      step3: 'Vos crédits sont ajoutés automatiquement dès validation (souvent sous quelques heures).',
+      keepReference: 'Notez ou capturez ce numéro : il est votre preuve de paiement.',
+      close: 'J’ai noté ma référence',
+      historyTitle: 'Mes commandes de paiement',
+      status: { pending: 'En attente', granted: 'Crédits ajoutés', refused: 'Refusée' },
+    },
     /**
      * One entry per machine-readable code returned by /api/credits/checkout. The
      * route keeps answering in French for non-browser callers; the customer sees
