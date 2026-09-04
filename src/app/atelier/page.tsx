@@ -823,8 +823,9 @@ export default function Dashboard() {
       <main className="max-w-7xl mx-auto px-4 sm:px-8 py-6">
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
           
-          {/* LEFT COLUMN: Controls & Input Studio (5 cols) */}
-          <div className="lg:col-span-5 space-y-4">
+          {/* LEFT COLUMN: Controls & Input Studio (4 cols — MIX gives the
+              visualizer the wider stage) */}
+          <div className="lg:col-span-4 space-y-4">
             
             {/* Quick Actions: Hero Cards */}
             <div className="grid grid-cols-2 gap-3">
@@ -1165,7 +1166,7 @@ export default function Dashboard() {
             <button
               onClick={handleRunOptimization}
               disabled={isOptimizing || pieces.length === 0}
-              className="w-full py-4 rounded-2xl bg-brand-500 hover:bg-brand-400 text-slate-950 font-black text-sm tracking-wider uppercase shadow-lg shadow-brand-500/25 transition-all flex items-center justify-center gap-2.5 disabled:opacity-30 disabled:shadow-none active:scale-[0.98]"
+              className="w-full py-4 rounded-2xl bg-brand-500 hover:bg-brand-400 text-slate-950 font-black text-sm tracking-[0.08em] uppercase shadow-xl shadow-brand-500/30 ring-1 ring-brand-600/40 transition-all flex items-center justify-center gap-2.5 disabled:opacity-30 disabled:shadow-none disabled:ring-0 active:scale-[0.98]"
             >
               {isOptimizing ? (
                 <>
@@ -1181,8 +1182,9 @@ export default function Dashboard() {
             </button>
           </div>
 
-          {/* RIGHT COLUMN: Visual Studio & Results (7 cols) */}
-          <div className="lg:col-span-7 space-y-4">
+          {/* RIGHT COLUMN: Visual Studio & Results (8 cols — the 2D plan is
+              the hero of the atelier) */}
+          <div className="lg:col-span-8 space-y-4">
             
             {result ? (
               <>
@@ -1190,23 +1192,24 @@ export default function Dashboard() {
                     (src/lib/costing.ts), the same figure shown in the cost
                     breakdown below and rendered in the PDF export. No estimated
                     "savings" claim is shown here. */}
-                <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-emerald-950/60 via-studio-panel/80 to-studio-panel border border-emerald-500/20 p-5">
-                  <div className="absolute top-0 end-0 w-48 h-48 bg-emerald-500/5 rounded-full blur-3xl -translate-y-1/2 pointer-events-none" />
+                {/* MIX: deep-navy summary banner, mono figure, amber currency */}
+                <div className="relative overflow-hidden rounded-2xl bg-[#0F172A] dark:bg-[#060B14] border border-[#1E3A5F] p-5">
+                  <div className="absolute top-0 end-0 w-48 h-48 bg-brand-500/10 rounded-full blur-3xl -translate-y-1/2 pointer-events-none" />
                   <div className="relative flex flex-wrap items-center justify-between gap-4">
                     <div>
-                      <p className="text-[10px] font-bold uppercase tracking-[0.15em] text-emerald-400 mb-1">{t('atelier.cost.bannerLabel')}</p>
-                      <p className="text-3xl font-black text-slate-900 dark:text-white tracking-tight" dir="ltr">
-                        {result.costBreakdown ? n(result.costBreakdown.subtotal) : '—'} <span className="text-emerald-400">{t('atelier.cost.currency')}</span>
+                      <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-brand-400 mb-1 font-mono">{t('atelier.cost.bannerLabel')}</p>
+                      <p className="text-3xl font-black font-mono text-white tracking-tight" dir="ltr">
+                        {result.costBreakdown ? n(result.costBreakdown.subtotal) : '—'} <span className="text-brand-400">{t('atelier.cost.currency')}</span>
                       </p>
-                      <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1">
+                      <p className="text-[11px] text-slate-400 mt-1">
                         {t('atelier.cost.bannerMeta', {
                           meters: n(result.totalLinearCutMeters || 0),
                           sheets: tn('atelier.cost.sheetsCount', result.sheetsUsed),
                         })}
                       </p>
                     </div>
-                    <div className="shrink-0 w-14 h-14 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center">
-                      <TrendingUp className="w-6 h-6 text-emerald-400" />
+                    <div className="shrink-0 w-14 h-14 rounded-2xl bg-brand-500/10 border border-brand-500/30 flex items-center justify-center">
+                      <TrendingUp className="w-6 h-6 text-brand-400" />
                     </div>
                   </div>
                 </div>
@@ -1244,9 +1247,10 @@ export default function Dashboard() {
                   </div>
                 )}
 
-                {/* Performance Metrics Grid */}
+                {/* Performance Metrics Grid — MIX: mono figures + amber top rule */}
                 <div className="grid grid-cols-4 gap-2">
-                  <div className="p-3.5 rounded-xl bg-studio-panel/60 border border-studio-border/80 flex flex-col items-center text-center gap-1">
+                  <div className="relative p-3.5 rounded-xl bg-studio-panel/60 border border-studio-border/80 flex flex-col items-center text-center gap-1 overflow-hidden">
+                    <span aria-hidden="true" className="absolute top-0 left-1/2 -translate-x-1/2 w-8 h-0.5 bg-brand-500/70 rounded-full" />
                     <span className="text-[9px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">{t('atelier.metrics.sheets')}</span>
                     <span className="text-2xl font-black font-mono text-slate-900 dark:text-white tabular-nums" dir="ltr">{result.sheetsUsed}</span>
                     <span className="text-[9px] text-slate-600 truncate" dir="ltr">
