@@ -53,7 +53,6 @@ export default function LandingPage() {
         </div>
       </header>
 
-      {/* Hero */}
       <section className="relative pt-24 pb-20 sm:pt-32 sm:pb-28 px-6 sm:px-10">
         <div className="absolute inset-0 bg-[radial-gradient(800px_circle_at_50%_-100px,rgba(245,166,35,0.08),transparent_70%)] pointer-events-none" />
         <div className="max-w-4xl mx-auto text-center relative">
@@ -62,10 +61,11 @@ export default function LandingPage() {
             {t('hero.badge')}
           </div>
 
-          <h1 className="text-4xl sm:text-5xl lg:text-6xl font-black tracking-tight text-slate-900 dark:text-white leading-[1.05]">
+          {/* MIX: tighter tracking + a blueprint rule under the highlight line */}
+          <h1 className="text-4xl sm:text-5xl lg:text-7xl font-black tracking-[-0.03em] text-slate-900 dark:text-white leading-[1.02]">
             {t('hero.titleLead')}
             <br />
-            <span className="text-brand-400">{t('hero.titleHighlight')}</span>
+            <span className="text-brand-400 underline decoration-brand-500/40 decoration-[3px] underline-offset-8">{t('hero.titleHighlight')}</span>
           </h1>
 
           <p className="mt-6 text-base sm:text-lg text-slate-600 dark:text-slate-400 max-w-2xl mx-auto leading-relaxed">
@@ -104,15 +104,23 @@ export default function LandingPage() {
       {/* Slogan 2 band: three action beats, oversized typographic treatment.
           Only the final word carries the brand color — works identically for
           FR / EN / AR without relying on sentence punctuation. */}
-      <section className="border-y border-studio-border/60 bg-studio-panel/40 py-10 px-6 sm:px-10">
+      {/* MIX: deep-navy band, saw-tooth top edge (industrial cue), white type */}
+      <section className="relative bg-[#0F172A] dark:bg-[#060B14] py-12 px-6 sm:px-10 overflow-hidden">
+        {/* Saw-tooth divider along the top — echoes the saw-blade logo */}
+        <svg aria-hidden="true" className="absolute top-0 left-0 w-full h-2 text-[#0F172A] dark:text-[#060B14]" preserveAspectRatio="none" viewBox="0 0 120 8">
+          <path d="M0 8 L6 0 L12 8 Z" fill="currentColor" />
+          {Array.from({ length: 9 }, (_, i) => (
+            <path key={i} d={`M${(i + 1) * 12} 8 L${(i + 1) * 12 + 6} 0 L${(i + 1) * 12 + 12} 8 Z`} fill="currentColor" transform={`translate(0,0)`} />
+          ))}
+        </svg>
         {(() => {
           const slogan = t('hero.actionSlogan');
           const words = slogan.split(' ');
           const last = words.pop() ?? '';
           return (
-            <p className="max-w-5xl mx-auto text-center text-2xl sm:text-4xl lg:text-5xl font-black tracking-tight text-slate-900 dark:text-white leading-tight">
+            <p className="max-w-5xl mx-auto text-center text-2xl sm:text-4xl lg:text-5xl font-black tracking-tight text-white leading-tight pt-2">
               {words.join(' ')}{' '}
-              <span className="text-brand-500 dark:text-brand-400">{last}</span>
+              <span className="text-brand-400">{last}</span>
             </p>
           );
         })()}
@@ -122,12 +130,14 @@ export default function LandingPage() {
       <section className="max-w-5xl mx-auto px-6 sm:px-10 pb-20">
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
           {STATS.map((stat) => (
-            <div key={stat} className="p-4 rounded-2xl bg-studio-panel/50 border border-studio-border/70 text-center">
+            <div key={stat} className="relative p-4 pt-5 rounded-2xl bg-studio-panel/50 border border-studio-border/70 text-center overflow-hidden">
+              {/* MIX: amber top rule — technical measurement cue */}
+              <span aria-hidden="true" className="absolute top-0 left-1/2 -translate-x-1/2 w-10 h-0.5 bg-brand-500/70 rounded-full" />
               {/* Non-numeric wording by design: the only figure left here is the
                   credit grant, which the sign-up flow really applies. Measured
                   optimizer numbers live in docs/optimizer-benchmark.md, which is
                   not a web route, so no link is offered rather than a broken one. */}
-              <p className="text-base sm:text-lg font-black text-slate-900 dark:text-white tracking-tight">
+              <p className="text-base sm:text-lg font-black text-slate-900 dark:text-white tracking-tight font-mono">
                 {t(`stats.${stat}.title`, { count: FREE_VISION_CREDITS })}
               </p>
               <p className="text-[10px] sm:text-[11px] text-slate-500 dark:text-slate-400 mt-1.5 leading-tight">
@@ -141,8 +151,14 @@ export default function LandingPage() {
       {/* Features */}
       <section className="max-w-6xl mx-auto px-6 sm:px-10 pb-24">
         <div className="text-center mb-12">
-          <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-brand-400/80 mb-3">{t('features.eyebrow')}</p>
-          <h2 className="text-3xl font-black text-slate-900 dark:text-white">{t('features.title')}</h2>
+          <p className="text-[11px] font-bold uppercase tracking-[0.25em] text-brand-400 mb-3 font-mono">{t('features.eyebrow')}</p>
+          <h2 className="text-3xl sm:text-4xl font-black tracking-[-0.02em] text-slate-900 dark:text-white">{t('features.title')}</h2>
+          {/* MIX: blueprint rule */}
+          <div aria-hidden="true" className="mx-auto mt-4 flex items-center justify-center gap-1.5">
+            <span className="h-px w-10 bg-studio-border" />
+            <span className="h-1.5 w-1.5 rounded-full bg-brand-500" />
+            <span className="h-px w-10 bg-studio-border" />
+          </div>
         </div>
 
         <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -161,8 +177,13 @@ export default function LandingPage() {
       {/* How it works */}
       <section className="max-w-4xl mx-auto px-6 sm:px-10 pb-24">
         <div className="text-center mb-10">
-          <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-brand-400/80 mb-3">{t('steps.eyebrow')}</p>
-          <h2 className="text-3xl font-black text-slate-900 dark:text-white">{t('steps.title')}</h2>
+          <p className="text-[11px] font-bold uppercase tracking-[0.25em] text-brand-400 mb-3 font-mono">{t('steps.eyebrow')}</p>
+          <h2 className="text-3xl sm:text-4xl font-black tracking-[-0.02em] text-slate-900 dark:text-white">{t('steps.title')}</h2>
+          <div aria-hidden="true" className="mx-auto mt-4 flex items-center justify-center gap-1.5">
+            <span className="h-px w-10 bg-studio-border" />
+            <span className="h-1.5 w-1.5 rounded-full bg-brand-500" />
+            <span className="h-px w-10 bg-studio-border" />
+          </div>
         </div>
 
         <div className="grid sm:grid-cols-3 gap-6">
@@ -180,11 +201,11 @@ export default function LandingPage() {
 
       {/* CTA Footer */}
       <section className="max-w-3xl mx-auto px-6 sm:px-10 pb-20 text-center">
-        <div className="p-10 sm:p-14 rounded-3xl bg-studio-panel/60 border border-studio-border/80 relative overflow-hidden">
-          <div className="absolute inset-0 bg-[radial-gradient(400px_circle_at_50%_50%,rgba(245,166,35,0.06),transparent_70%)] pointer-events-none" />
+        <div className="p-10 sm:p-14 rounded-3xl bg-[#0F172A] dark:bg-[#0B1424] border border-[#1E3A5F] relative overflow-hidden shadow-2xl shadow-brand-500/10">
+          <div className="absolute inset-0 bg-[radial-gradient(400px_circle_at_50%_50%,rgba(245,166,35,0.10),transparent_70%)] pointer-events-none" />
           <div className="relative space-y-5">
-            <h2 className="text-2xl sm:text-3xl font-black text-slate-900 dark:text-white">{t('finalCta.title')}</h2>
-            <p className="text-slate-600 dark:text-slate-400 text-sm max-w-lg mx-auto">
+            <h2 className="text-2xl sm:text-3xl font-black tracking-[-0.02em] text-white">{t('finalCta.title')}</h2>
+            <p className="text-slate-300 text-sm max-w-lg mx-auto">
               {t('finalCta.body', { count: FREE_VISION_CREDITS })}
             </p>
             <Link

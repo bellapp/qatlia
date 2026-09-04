@@ -6,8 +6,8 @@
 
 @layer base {
   :root {
-    /* Light mode */
-    --color-canvas: #F8FAFC;
+    /* Light mode — QatlIA MIX: brighter canvas, bolder amber usage */
+    --color-canvas: #FAFBFD;
     --color-panel: #FFFFFF;
     --color-field: #F1F5F9;
     --color-border: #E2E8F0;
