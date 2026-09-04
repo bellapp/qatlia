@@ -126,8 +126,7 @@ export default function LandingPage() {
         })()}
       </section>
 
-      {/* Stats */}
-      <section className="max-w-5xl mx-auto px-6 sm:px-10 pb-20">
+      <section className="max-w-5xl mx-auto px-6 sm:px-10 pt-14 pb-20">
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
           {STATS.map((stat) => (
             <div key={stat} className="relative p-4 pt-5 rounded-2xl bg-studio-panel/50 border border-studio-border/70 text-center overflow-hidden">
