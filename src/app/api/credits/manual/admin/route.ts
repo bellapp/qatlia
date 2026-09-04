@@ -52,7 +52,22 @@ export async function GET(req: Request) {
     console.error('admin manual-payments list failed:', error.message);
     return NextResponse.json({ error: 'DB_ERROR' }, { status: 500 });
   }
-  return NextResponse.json({ success: true, payments: data || [] });
+
+  // Resolve buyer emails: manual_payments only stores user_id, and the email
+  // lives in auth.users. Batch via the admin API, de-duplicated per user.
+  const payments = data || [];
+  const uniqueUserIds = Array.from(new Set(payments.map((p) => p.user_id).filter(Boolean)));
+  const emailByUserId = new Map<string, string>();
+  for (const userId of uniqueUserIds) {
+    const { data: userData } = await admin.auth.admin.getUserById(userId);
+    if (userData?.user?.email) emailByUserId.set(userId, userData.user.email);
+  }
+  const paymentsWithEmail = payments.map((p) => ({
+    ...p,
+    user_email: emailByUserId.get(p.user_id) || null,
+  }));
+
+  return NextResponse.json({ success: true, payments: paymentsWithEmail });
 }
 
 /** POST: grant or refuse a pending payment. Granting credits the same way the

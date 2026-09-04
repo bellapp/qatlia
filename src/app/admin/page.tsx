@@ -27,6 +27,7 @@ import Link from 'next/link';
 interface ManualOrder {
   order_number: string;
   user_id: string;
+  user_email?: string | null;
   pack_id: string;
   amount_mad: number;
   credits: number;
@@ -207,6 +208,7 @@ export default function AdminPage() {
     return (
       o.order_number.toLowerCase().includes(q) ||
       o.user_id.toLowerCase().includes(q) ||
+      (o.user_email || '').toLowerCase().includes(q) ||
       (o.payment_reference || '').toLowerCase().includes(q) ||
       o.pack_id.toLowerCase().includes(q)
     );
@@ -326,7 +328,7 @@ export default function AdminPage() {
               type="search"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="Rechercher (n° commande, user, référence…)"
+              placeholder="Rechercher (n° commande, email, référence…)"
               className="w-full ps-8 pe-3 py-1.5 rounded-lg bg-white/5 border border-white/10 text-xs text-slate-200 outline-none focus:border-amber-500/40 transition-colors"
             />
           </div>
@@ -387,7 +389,15 @@ export default function AdminPage() {
                     </span>
                   )}
                   <span className="col-span-2 md:col-span-4 truncate">
-                    User : <span className="font-mono text-slate-300">{o.user_id}</span>
+                    Client :{' '}
+                    {o.user_email ? (
+                      <>
+                        <strong className="text-slate-100">{o.user_email}</strong>{' '}
+                        <span className="font-mono text-[10px] text-slate-500">({o.user_id})</span>
+                      </>
+                    ) : (
+                      <span className="font-mono text-slate-300">{o.user_id}</span>
+                    )}
                   </span>
                   {o.payment_reference && (
                     <span className="col-span-2 md:col-span-4 truncate">
