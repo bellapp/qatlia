@@ -122,9 +122,21 @@ export const en: Catalog = {
       credits: 'credits',
       creditsAria: 'Photo-analysis credits left',
     },
+    sidebar: {
+      title: 'Controls',
+      navOptimization: 'Optimization',
+      navMaterials: 'Materials',
+      navQuotation: 'Costing & Quotes',
+      navCutSettings: 'Kerf & Edging',
+    },
     project: {
       nameBars: 'Bars {material} — {count} pcs',
       nameSheets: 'Cut list {material} — {count} pcs',
+      defaultTitle: 'Cutting project',
+      piecesCount: 'pieces',
+      lineCount: 'lines',
+      optimized: 'Optimization complete',
+      rerun: 'Re-run optimization',
     },
     scan: {
       cameraTitle: 'Camera',
@@ -216,6 +228,8 @@ export const en: Catalog = {
       wasteSub: 'Kerf {kerf} mm included',
       pieces: 'Pieces',
       piecesSub: 'placed',
+      efficiency: 'Efficiency',
+      cuts: 'Saw cuts',
     },
     unplaced: {
       count: { one: '{count} piece not placed', many: '{count} pieces not placed' },

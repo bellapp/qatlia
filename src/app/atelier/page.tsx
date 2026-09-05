@@ -23,8 +23,11 @@ import {
   Trash2,
   TrendingUp,
   Scissors,
-  Leaf,
   Boxes,
+  LayoutGrid,
+  Settings2,
+  ClipboardList,
+  CheckCircle2,
 } from 'lucide-react';
 import {
   Sheet,
@@ -781,17 +784,6 @@ export default function Dashboard() {
               </button>
             </div>
 
-            {/* Kerf chip (Stitch header pattern): the blade width is a technical
-                figure — mono, amber-tinted, always visible for machine setup. */}
-            <div
-              dir="ltr"
-              className="hidden md:flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-brand-400/10 border border-brand-500/25 text-brand-500 dark:text-brand-400 text-xs font-mono font-bold"
-              title={t('options.kerf.title')}
-            >
-              <span className="w-1.5 h-1.5 rounded-full bg-brand-400" aria-hidden="true" />
-              {t('options.kerf.chip', { value: n(options.kerfWidth, { maximumFractionDigits: 1 }) })}
-            </div>
-
             <Link
               href="/history"
               aria-label={t('atelier.header.history')}
@@ -833,9 +825,87 @@ export default function Dashboard() {
       </header>
 
       {/* Main Workspace Grid */}
-      <main className="max-w-7xl mx-auto px-4 sm:px-8 py-6">
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-          
+      <main className="max-w-[1500px] mx-auto px-4 sm:px-6 py-6">
+        <div className="flex flex-col lg:flex-row gap-6 items-start">
+
+          {/* Pilotage rail — desktop-only navigation to the sections below;
+              mobile keeps the top navbar as its only navigation (never hidden). */}
+          <aside className="hidden lg:flex sticky top-[57px] self-start flex-col w-56 shrink-0 h-[calc(100vh-57px)] border-e border-studio-border bg-studio-panel/40 px-3 py-4 space-y-1 overflow-y-auto">
+            <p className="text-[9px] font-bold uppercase tracking-[0.2em] text-slate-400 px-3 mb-2">{t('atelier.sidebar.title')}</p>
+
+            <a href="#plan-top" className="flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-bold bg-brand-400/10 text-brand-500 dark:text-brand-400">
+              <LayoutGrid className="w-4 h-4" />
+              {t('atelier.sidebar.navOptimization')}
+            </a>
+            <a href="#stock-card" className="flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-bold text-slate-600 dark:text-slate-300 hover:bg-studio-panel hover:text-slate-900 dark:hover:text-white transition-colors">
+              <PackageOpen className="w-4 h-4" />
+              {t('atelier.sidebar.navMaterials')}
+            </a>
+            <Link href="/history" className="flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-bold text-slate-600 dark:text-slate-300 hover:bg-studio-panel hover:text-slate-900 dark:hover:text-white transition-colors">
+              <History className="w-4 h-4" />
+              {t('atelier.header.history')}
+            </Link>
+            <button
+              type="button"
+              onClick={() => setIsQuotationDialogOpen(true)}
+              disabled={!result?.costingInput}
+              className="flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-bold text-slate-600 dark:text-slate-300 hover:bg-studio-panel hover:text-slate-900 dark:hover:text-white transition-colors disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-transparent"
+            >
+              <FileText className="w-4 h-4" />
+              {t('atelier.sidebar.navQuotation')}
+            </button>
+            <button
+              type="button"
+              onClick={() => setShowAdvancedOptions(!showAdvancedOptions)}
+              aria-expanded={showAdvancedOptions}
+              aria-controls="advanced-cutting-options"
+              className="flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-bold text-slate-600 dark:text-slate-300 hover:bg-studio-panel hover:text-slate-900 dark:hover:text-white transition-colors"
+            >
+              <Settings2 className="w-4 h-4" />
+              {t('atelier.sidebar.navCutSettings')}
+            </button>
+
+            <div className="mt-auto pt-4 border-t border-studio-border space-y-2">
+              <p className="font-mono text-[10px] text-slate-500" dir="ltr">
+                {formatDisplayValue(activeSheet.height, displayUnit)} × {formatDisplayValue(activeSheet.width, displayUnit)} {displayUnit}
+              </p>
+              {/* Kerf chip (Stitch header pattern): the blade width is a technical
+                  figure — mono, amber-tinted, always visible for machine setup. */}
+              <div
+                dir="ltr"
+                className="hidden md:flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-brand-400/10 border border-brand-500/25 text-brand-500 dark:text-brand-400 text-xs font-mono font-bold"
+                title={t('options.kerf.title')}
+              >
+                <span className="w-1.5 h-1.5 rounded-full bg-brand-400" aria-hidden="true" />
+                {t('options.kerf.chip', { value: n(options.kerfWidth, { maximumFractionDigits: 1 }) })}
+              </div>
+            </div>
+          </aside>
+
+          <div className="flex-1 min-w-0 w-full space-y-4">
+
+            {/* Project strip — always visible, independent of the result state. */}
+            <div className="flex flex-wrap items-center gap-2.5 px-4 py-3 rounded-2xl bg-studio-panel/60 border border-studio-border/80">
+              <span className="w-8 h-8 rounded-xl bg-brand-400/10 border border-brand-500/25 flex items-center justify-center">
+                <ClipboardList className="w-4 h-4 text-brand-500 dark:text-brand-400" />
+              </span>
+              <div className="min-w-0">
+                <p className="text-sm font-black text-slate-900 dark:text-white truncate">
+                  {activeSheet.label?.trim() ? activeSheet.label : t('atelier.project.defaultTitle')}
+                </p>
+                <p className="text-[10px] text-slate-500 font-mono" dir="ltr">
+                  {pieces.length} {t('atelier.project.piecesCount')} · {new Set(pieces.map((p) => p.name)).size} {t('atelier.project.lineCount')}
+                </p>
+              </div>
+              {result && (
+                <span className="ms-auto inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-600 dark:text-emerald-400 text-[10px] font-bold">
+                  <CheckCircle2 className="w-3 h-3" /> {t('atelier.project.optimized')}
+                </span>
+              )}
+            </div>
+
+            <div id="plan-top" className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+
           {/* LEFT COLUMN: Controls & Input Studio (4 cols — MIX gives the
               visualizer the wider stage) */}
           <div className="lg:col-span-4 space-y-4">
@@ -914,7 +984,7 @@ export default function Dashboard() {
             )}
 
             {/* Stock Panel Card */}
-            <div className="overflow-hidden rounded-2xl bg-studio-panel/60 border border-studio-border/90">
+            <div id="stock-card" className="overflow-hidden rounded-2xl bg-studio-panel/60 border border-studio-border/90">
               <div className="flex items-center justify-between px-4 py-3.5 border-b border-studio-border/80">
                 <div className="flex items-center gap-2.5">
                   <span className="w-8 h-8 rounded-lg bg-brand-400/10 border border-brand-500/20 flex items-center justify-center">
@@ -1260,63 +1330,6 @@ export default function Dashboard() {
                   </div>
                 )}
 
-                {/* Performance Metrics Grid — Stitch metric-card skeleton:
-                    label+icon row, baseline value+unit row, progress bar
-                    (usable/waste only) and a technical caption underneath.
-                    All figures come straight from `result`/`options` below. */}
-                <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-                  <div className="p-4 rounded-xl bg-studio-panel border border-studio-border/80 flex flex-col justify-between shadow-sm">
-                    <div className="flex items-center justify-between text-slate-500 dark:text-slate-400 mb-1">
-                      <span className="text-[11px] font-bold uppercase tracking-wider">{t('atelier.metrics.sheets')}</span>
-                      <Boxes className="w-4 h-4 text-sky-400" />
-                    </div>
-                    <div className="flex items-baseline gap-1.5">
-                      <span className="text-3xl font-black font-mono tracking-tight text-slate-900 dark:text-white tabular-nums" dir="ltr">{result.sheetsUsed}</span>
-                    </div>
-                    <span className="text-[10px] text-slate-500 dark:text-slate-500 mt-1.5 truncate" dir="ltr">
-                      {formatDisplayValue(activeSheet.height, displayUnit)}×{formatDisplayValue(activeSheet.width, displayUnit)} {displayUnit}
-                    </span>
-                  </div>
-                  <div className="p-4 rounded-xl bg-studio-panel border border-studio-border/80 flex flex-col justify-between shadow-sm">
-                    <div className="flex items-center justify-between text-slate-500 dark:text-slate-400 mb-1">
-                      <span className="text-[11px] font-bold uppercase tracking-wider">{t('atelier.metrics.usable')}</span>
-                      <Leaf className="w-4 h-4 text-emerald-400" />
-                    </div>
-                    <div className="flex items-baseline gap-1.5">
-                      <span className="text-3xl font-black font-mono tracking-tight text-emerald-500 dark:text-emerald-400 tabular-nums" dir="ltr">{(100 - result.wastePercentage).toFixed(0)}</span>
-                      <span className="text-xs font-mono font-bold text-emerald-500/80 dark:text-emerald-400/80">%</span>
-                    </div>
-                    <div className="mt-2 w-full h-1.5 rounded-full bg-studio-field overflow-hidden">
-                      <div className="h-full rounded-full bg-emerald-500" style={{ width: `${Math.max(0, Math.min(100, 100 - result.wastePercentage))}%` }} />
-                    </div>
-                    <span className="text-[10px] text-emerald-600/70 dark:text-emerald-500/60 mt-1.5">{t('atelier.metrics.usableSub', { value: n(result.totalAreaUsed / 10000, { maximumFractionDigits: 2 }) })}</span>
-                  </div>
-                  <div className="p-4 rounded-xl bg-studio-panel border border-studio-border/80 flex flex-col justify-between shadow-sm">
-                    <div className="flex items-center justify-between text-slate-500 dark:text-slate-400 mb-1">
-                      <span className="text-[11px] font-bold uppercase tracking-wider">{t('atelier.metrics.waste')}</span>
-                      <Trash2 className="w-4 h-4 text-brand-400" />
-                    </div>
-                    <div className="flex items-baseline gap-1.5">
-                      <span className="text-3xl font-black font-mono tracking-tight text-brand-500 dark:text-brand-400 tabular-nums" dir="ltr">{result.wastePercentage.toFixed(0)}</span>
-                      <span className="text-xs font-mono font-bold text-brand-500/80 dark:text-brand-400/80">%</span>
-                    </div>
-                    <div className="mt-2 w-full h-1.5 rounded-full bg-studio-field overflow-hidden">
-                      <div className="h-full rounded-full bg-brand-400" style={{ width: `${Math.max(0, Math.min(100, result.wastePercentage))}%` }} />
-                    </div>
-                    <span className="text-[10px] text-brand-600/70 dark:text-brand-500/60 mt-1.5">{t('atelier.metrics.wasteSub', { kerf: n(options.kerfWidth) })}</span>
-                  </div>
-                  <div className="p-4 rounded-xl bg-studio-panel border border-studio-border/80 flex flex-col justify-between shadow-sm">
-                    <div className="flex items-center justify-between text-slate-500 dark:text-slate-400 mb-1">
-                      <span className="text-[11px] font-bold uppercase tracking-wider">{t('atelier.metrics.pieces')}</span>
-                      <Scissors className="w-4 h-4 text-sky-400" />
-                    </div>
-                    <div className="flex items-baseline gap-1.5">
-                      <span className="text-3xl font-black font-mono tracking-tight text-sky-500 dark:text-sky-400 tabular-nums" dir="ltr">{result.placedPieces.length}</span>
-                    </div>
-                    <span className="text-[10px] text-sky-600/70 dark:text-sky-400/60 mt-1.5">{t('atelier.metrics.piecesSub')}</span>
-                  </div>
-                </div>
-
                 {/* 2D Visualizer — the hero of the workshop: framed blueprint
                     panel with a stronger shadow so it reads as the primary
                     instrument, not just another card. */}
@@ -1618,6 +1631,119 @@ export default function Dashboard() {
             ) : (
               <EmptyState type="ready" />
             )}
+          </div>
+            </div>
+
+            {/* Performance Metrics Row — Stitch metric-card skeleton with a
+                progress ring on the headline card. All figures come straight
+                from `result`/`options`; nothing here is a new computation. */}
+            {result && (() => {
+              // wastePercentage already carries binpacking.ts's own
+              // divide-by-zero guard, so the usable ("rendement") share
+              // reuses it rather than re-deriving totalAreaUsed/totalAreaAvailable.
+              const usablePct = Math.max(0, Math.min(100, Math.round(100 - result.wastePercentage)));
+              const wastePct = Math.max(0, Math.min(100, Math.round(result.wastePercentage)));
+              const ringCircumference = 2 * Math.PI * 20;
+              const totalCuts = result.sheets.reduce((sum, s) => sum + (s.cuts?.length || 0), 0);
+              return (
+                <>
+                  <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+                    {/* RENDEMENT — progress ring */}
+                    <div className="p-4 rounded-2xl bg-studio-panel border border-studio-border/80 shadow-sm flex flex-col gap-2">
+                      <div className="flex items-center justify-between text-slate-500 dark:text-slate-400">
+                        <span className="text-[10px] font-bold uppercase tracking-wider">{t('atelier.metrics.efficiency')}</span>
+                        <TrendingUp className="w-4 h-4" />
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <svg viewBox="0 0 48 48" className="w-12 h-12 -rotate-90 shrink-0">
+                          <circle cx="24" cy="24" r="20" fill="none" stroke="currentColor" className="text-studio-field" strokeWidth="5" />
+                          <circle
+                            cx="24" cy="24" r="20" fill="none" stroke="currentColor" className="text-emerald-500" strokeWidth="5" strokeLinecap="round"
+                            strokeDasharray={`${ringCircumference}`}
+                            strokeDashoffset={`${ringCircumference * (1 - usablePct / 100)}`}
+                          />
+                        </svg>
+                        <div>
+                          <p className="text-2xl font-black font-mono text-slate-900 dark:text-white tabular-nums" dir="ltr">{usablePct}%</p>
+                          <p className="text-[10px] text-slate-500">
+                            <span className="sr-only">{t('atelier.metrics.usable')} — </span>
+                            {t('atelier.metrics.usableSub', { value: n(result.totalAreaUsed / 10000, { maximumFractionDigits: 2 }) })}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* PERTE / CHUTE */}
+                    <div className="p-4 rounded-2xl bg-studio-panel border border-studio-border/80 shadow-sm flex flex-col gap-2">
+                      <div className="flex items-center justify-between text-slate-500 dark:text-slate-400">
+                        <span className="text-[10px] font-bold uppercase tracking-wider">{t('atelier.metrics.waste')}</span>
+                        <Trash2 className="w-4 h-4" />
+                      </div>
+                      <div>
+                        <p className="text-2xl font-black font-mono text-slate-900 dark:text-white tabular-nums" dir="ltr">{wastePct}%</p>
+                        <div className="mt-1.5 w-full h-1.5 rounded-full bg-studio-field overflow-hidden">
+                          <div className="h-full rounded-full bg-brand-400" style={{ width: `${wastePct}%` }} />
+                        </div>
+                        <p className="text-[10px] text-slate-500 mt-1.5">{t('atelier.metrics.wasteSub', { kerf: n(options.kerfWidth) })}</p>
+                      </div>
+                    </div>
+
+                    {/* COUPES SCIE */}
+                    <div className="p-4 rounded-2xl bg-studio-panel border border-studio-border/80 shadow-sm flex flex-col gap-2">
+                      <div className="flex items-center justify-between text-slate-500 dark:text-slate-400">
+                        <span className="text-[10px] font-bold uppercase tracking-wider">{t('atelier.metrics.cuts')}</span>
+                        <Scissors className="w-4 h-4" />
+                      </div>
+                      <div>
+                        <p className="text-2xl font-black font-mono text-slate-900 dark:text-white tabular-nums" dir="ltr">{totalCuts}</p>
+                        <p className="text-[10px] text-slate-500 mt-1.5">
+                          {t('atelier.cost.bannerMeta', {
+                            meters: n(result.totalLinearCutMeters || 0),
+                            sheets: tn('atelier.cost.sheetsCount', result.sheetsUsed),
+                          })}
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* PANNEAUX REQUIS */}
+                    <div className="p-4 rounded-2xl bg-studio-panel border border-studio-border/80 shadow-sm flex flex-col gap-2">
+                      <div className="flex items-center justify-between text-slate-500 dark:text-slate-400">
+                        <span className="text-[10px] font-bold uppercase tracking-wider">{t('atelier.metrics.sheets')}</span>
+                        <PackageOpen className="w-4 h-4" />
+                      </div>
+                      <div>
+                        <p className="text-2xl font-black font-mono text-slate-900 dark:text-white tabular-nums" dir="ltr">{result.sheetsUsed}</p>
+                        <p className="text-[10px] text-slate-500 mt-1.5">
+                          <span className="sr-only">{t('atelier.metrics.pieces')} — </span>
+                          {result.placedPieces.length} {t('atelier.metrics.piecesSub')}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Bottom action bar — the 5-button export row below stays
+                      untouched; these two are quick top-level shortcuts. */}
+                  <div className="flex flex-wrap items-center gap-2.5">
+                    <button
+                      onClick={handleRunOptimization}
+                      disabled={isOptimizing || pieces.length === 0}
+                      className="flex-1 min-w-[200px] py-3.5 rounded-xl bg-brand-400 hover:bg-brand-500 text-slate-950 font-bold text-sm flex items-center justify-center gap-2 disabled:opacity-30 transition-all"
+                    >
+                      <RefreshCw className={`w-4 h-4 ${isOptimizing ? 'animate-spin' : ''}`} />
+                      {t('atelier.project.rerun')}
+                    </button>
+                    <button
+                      onClick={handleDownloadPdf}
+                      disabled={isDownloadingPdf}
+                      className="flex-1 min-w-[200px] py-3.5 rounded-xl border border-studio-border hover:border-brand-500/40 bg-studio-panel text-slate-800 dark:text-white font-bold text-sm flex items-center justify-center gap-2 disabled:opacity-40 transition-all"
+                    >
+                      {isDownloadingPdf ? <RefreshCw className="w-4 h-4 animate-spin" /> : <FileText className="w-4 h-4" />}
+                      {isDownloadingPdf ? t('atelier.exports.pdfGenerating') : t('atelier.exports.pdf')}
+                    </button>
+                  </div>
+                </>
+              );
+            })()}
           </div>
         </div>
       </main>

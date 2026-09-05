@@ -140,6 +140,14 @@ export const fr = {
       credits: 'crédits',
       creditsAria: 'Crédits d’analyse photo restants',
     },
+    /** Desktop-only "Pilotage" rail — mobile keeps the top navbar instead. */
+    sidebar: {
+      title: 'Pilotage',
+      navOptimization: 'Optimisation',
+      navMaterials: 'Matériaux',
+      navQuotation: 'Chiffrage & Devis',
+      navCutSettings: 'Trait de scie & Chants',
+    },
     /**
      * Name given to the project saved after an optimization. `{material}` is the
      * stable `MaterialType` value upper-cased, not a translated label: it is what
@@ -148,6 +156,11 @@ export const fr = {
     project: {
       nameBars: 'Barres {material} — {count} pcs',
       nameSheets: 'Débit {material} — {count} pcs',
+      defaultTitle: 'Projet de débit',
+      piecesCount: 'pièces',
+      lineCount: 'lignes',
+      optimized: 'Optimisation réussie',
+      rerun: 'Relancer l’optimisation',
     },
     scan: {
       cameraTitle: 'Appareil photo',
@@ -240,6 +253,8 @@ export const fr = {
       wasteSub: 'Kerf {kerf} mm inclus',
       pieces: 'Pièces',
       piecesSub: 'placées',
+      efficiency: 'Rendement',
+      cuts: 'Coupes scie',
     },
     unplaced: {
       count: { one: '{count} pièce non placée', many: '{count} pièces non placées' },

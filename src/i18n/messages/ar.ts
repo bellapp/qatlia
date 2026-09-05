@@ -123,9 +123,21 @@ export const ar: Catalog = {
       credits: 'رصيد',
       creditsAria: 'الرصيد المتبقي لتحليل الصور',
     },
+    sidebar: {
+      title: 'التحكم',
+      navOptimization: 'التحسين',
+      navMaterials: 'المواد',
+      navQuotation: 'التسعير والعروض',
+      navCutSettings: 'خط القطع والحواف',
+    },
     project: {
       nameBars: 'قضبان {material} — {count} قطعة',
       nameSheets: 'قائمة قطع {material} — {count} قطعة',
+      defaultTitle: 'مشروع القطع',
+      piecesCount: 'قطعة',
+      lineCount: 'خطوط',
+      optimized: 'تم التحسين بنجاح',
+      rerun: 'إعادة التحسين',
     },
     scan: {
       cameraTitle: 'الكاميرا',
@@ -217,6 +229,8 @@ export const ar: Catalog = {
       wasteSub: 'خط القطع {kerf} مم شامل',
       pieces: 'القطع',
       piecesSub: 'موضوعة',
+      efficiency: 'الأداء',
+      cuts: 'قطعات المنشار',
     },
     unplaced: {
       count: { one: 'قطعة واحدة غير موضوعة', many: '{count} قطع غير موضوعة' },
