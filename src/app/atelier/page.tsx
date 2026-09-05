@@ -787,7 +787,7 @@ export default function Dashboard() {
             <Link
               href="/history"
               aria-label={t('atelier.header.history')}
-              className="group relative flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-medium text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:text-white hover:bg-studio-panel transition-all"
+              className="group relative flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-xs font-medium text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:text-white hover:bg-studio-panel transition-all"
             >
               <History className="w-4 h-4 text-slate-600 dark:text-slate-400 group-hover:text-brand-400 transition-colors" />
               <span className="hidden sm:inline">{t('atelier.header.history')}</span>
@@ -799,7 +799,7 @@ export default function Dashboard() {
             <Link
               href="/credits"
               aria-label={t('atelier.header.creditsAria')}
-              className="group relative flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-brand-400/10 border border-brand-500/25 text-brand-400 hover:bg-brand-500/15 hover:border-brand-500/40 text-xs font-semibold transition-all"
+              className="group relative flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-brand-400/10 border border-brand-500/25 text-brand-400 hover:bg-brand-500/15 hover:border-brand-500/40 text-xs font-semibold transition-all"
             >
               <span className="relative flex h-2 w-2">
                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-brand-400 opacity-60" />
@@ -815,7 +815,7 @@ export default function Dashboard() {
             ) : (
               <Link
                 href="/auth/login"
-                className="px-4 py-2 rounded-xl bg-white dark:bg-studio-field hover:bg-slate-100 text-slate-950 font-bold text-xs whitespace-nowrap transition-all shadow-sm hover:shadow-md"
+                className="px-4 py-2 rounded-lg bg-white dark:bg-studio-field hover:bg-slate-100 text-slate-950 font-bold text-xs whitespace-nowrap transition-all shadow-sm hover:shadow-md"
               >
                 {t('nav.login')}
               </Link>
@@ -833,15 +833,15 @@ export default function Dashboard() {
           <aside className="hidden lg:flex sticky top-[57px] self-start flex-col w-56 shrink-0 h-[calc(100vh-57px)] border-e border-studio-border bg-studio-panel/40 px-3 py-4 space-y-1 overflow-y-auto">
             <p className="text-[9px] font-bold uppercase tracking-[0.2em] text-slate-400 px-3 mb-2">{t('atelier.sidebar.title')}</p>
 
-            <a href="#plan-top" className="flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-bold bg-brand-400/10 text-brand-500 dark:text-brand-400">
+            <a href="#plan-top" className="flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-bold bg-brand-400/10 text-brand-500 dark:text-brand-400">
               <LayoutGrid className="w-4 h-4" />
               {t('atelier.sidebar.navOptimization')}
             </a>
-            <a href="#stock-card" className="flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-bold text-slate-600 dark:text-slate-300 hover:bg-studio-panel hover:text-slate-900 dark:hover:text-white transition-colors">
+            <a href="#stock-card" className="flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-bold text-slate-600 dark:text-slate-300 hover:bg-studio-panel hover:text-slate-900 dark:hover:text-white transition-colors">
               <PackageOpen className="w-4 h-4" />
               {t('atelier.sidebar.navMaterials')}
             </a>
-            <Link href="/history" className="flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-bold text-slate-600 dark:text-slate-300 hover:bg-studio-panel hover:text-slate-900 dark:hover:text-white transition-colors">
+            <Link href="/history" className="flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-bold text-slate-600 dark:text-slate-300 hover:bg-studio-panel hover:text-slate-900 dark:hover:text-white transition-colors">
               <History className="w-4 h-4" />
               {t('atelier.header.history')}
             </Link>
@@ -849,7 +849,7 @@ export default function Dashboard() {
               type="button"
               onClick={() => setIsQuotationDialogOpen(true)}
               disabled={!result?.costingInput}
-              className="flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-bold text-slate-600 dark:text-slate-300 hover:bg-studio-panel hover:text-slate-900 dark:hover:text-white transition-colors disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-transparent"
+              className="flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-bold text-slate-600 dark:text-slate-300 hover:bg-studio-panel hover:text-slate-900 dark:hover:text-white transition-colors disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-transparent"
             >
               <FileText className="w-4 h-4" />
               {t('atelier.sidebar.navQuotation')}
@@ -859,7 +859,7 @@ export default function Dashboard() {
               onClick={() => setShowAdvancedOptions(!showAdvancedOptions)}
               aria-expanded={showAdvancedOptions}
               aria-controls="advanced-cutting-options"
-              className="flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-bold text-slate-600 dark:text-slate-300 hover:bg-studio-panel hover:text-slate-900 dark:hover:text-white transition-colors"
+              className="flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-bold text-slate-600 dark:text-slate-300 hover:bg-studio-panel hover:text-slate-900 dark:hover:text-white transition-colors"
             >
               <Settings2 className="w-4 h-4" />
               {t('atelier.sidebar.navCutSettings')}
@@ -873,7 +873,7 @@ export default function Dashboard() {
                   figure — mono, amber-tinted, always visible for machine setup. */}
               <div
                 dir="ltr"
-                className="hidden md:flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-brand-400/10 border border-brand-500/25 text-brand-500 dark:text-brand-400 text-xs font-mono font-bold"
+                className="hidden md:flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-brand-400/10 border border-brand-500/25 text-brand-500 dark:text-brand-400 text-xs font-mono font-bold"
                 title={t('options.kerf.title')}
               >
                 <span className="w-1.5 h-1.5 rounded-full bg-brand-400" aria-hidden="true" />
@@ -885,8 +885,8 @@ export default function Dashboard() {
           <div className="flex-1 min-w-0 w-full space-y-4">
 
             {/* Project strip — always visible, independent of the result state. */}
-            <div className="flex flex-wrap items-center gap-2.5 px-4 py-3 rounded-2xl bg-studio-panel/60 border border-studio-border/80">
-              <span className="w-8 h-8 rounded-xl bg-brand-400/10 border border-brand-500/25 flex items-center justify-center">
+            <div className="flex flex-wrap items-center gap-2.5 px-4 py-3 rounded-xl bg-studio-panel border border-studio-border shadow-sm">
+              <span className="w-8 h-8 rounded-lg bg-brand-400/10 border border-brand-500/25 flex items-center justify-center">
                 <ClipboardList className="w-4 h-4 text-brand-500 dark:text-brand-400" />
               </span>
               <div className="min-w-0">
@@ -913,11 +913,11 @@ export default function Dashboard() {
             {/* Quick Actions: Hero Cards */}
             <div className="grid grid-cols-2 gap-3">
               {/* Take Photo Card */}
-              <label className="group relative flex flex-col gap-3 p-4 rounded-2xl bg-studio-panel/60 border border-studio-border hover:border-sky-500/40 hover:bg-studio-panel/80 cursor-pointer transition-all duration-200 overflow-hidden">
+              <label className="group relative flex flex-col gap-3 p-4 rounded-xl bg-studio-panel border border-studio-border shadow-sm hover:border-sky-500/40 hover:bg-studio-field cursor-pointer transition-all duration-200 overflow-hidden">
                 <input type="file" accept="image/*" capture="environment" className="hidden" onChange={handleImageUpload} disabled={isProcessingVision} />
                 <div className="absolute inset-0 bg-gradient-to-br from-sky-500/[0.06] to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
                 <div className="relative flex items-center gap-3">
-                  <span className="shrink-0 w-10 h-10 rounded-xl bg-sky-500/10 border border-sky-500/20 flex items-center justify-center group-hover:scale-105 group-hover:bg-sky-500/15 transition-all">
+                  <span className="shrink-0 w-10 h-10 rounded-lg bg-sky-500/10 border border-sky-500/20 flex items-center justify-center group-hover:scale-105 group-hover:bg-sky-500/15 transition-all">
                     <Camera className="w-5 h-5 text-sky-400" />
                   </span>
                   <div>
@@ -929,11 +929,11 @@ export default function Dashboard() {
               </label>
 
               {/* Upload File Card */}
-              <label className="group relative flex flex-col gap-3 p-4 rounded-2xl bg-studio-panel/60 border border-studio-border hover:border-brand-500/40 hover:bg-studio-panel/80 cursor-pointer transition-all duration-200 overflow-hidden">
+              <label className="group relative flex flex-col gap-3 p-4 rounded-xl bg-studio-panel border border-studio-border shadow-sm hover:border-brand-500/40 hover:bg-studio-field cursor-pointer transition-all duration-200 overflow-hidden">
                 <input type="file" accept="image/*" className="hidden" onChange={handleImageUpload} disabled={isProcessingVision} />
                 <div className="absolute inset-0 bg-gradient-to-br from-brand-500/[0.06] to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
                 <div className="relative flex items-center gap-3">
-                  <span className="shrink-0 w-10 h-10 rounded-xl bg-brand-400/10 border border-brand-500/20 flex items-center justify-center group-hover:scale-105 group-hover:bg-brand-500/15 transition-all">
+                  <span className="shrink-0 w-10 h-10 rounded-lg bg-brand-400/10 border border-brand-500/20 flex items-center justify-center group-hover:scale-105 group-hover:bg-brand-500/15 transition-all">
                     <ImageIcon className="w-5 h-5 text-brand-400" />
                   </span>
                   <div>
@@ -955,9 +955,9 @@ export default function Dashboard() {
 
             {/* Preview scan if present */}
             {previewImage && (
-              <div className="flex items-center gap-3 p-3 rounded-2xl bg-emerald-500/10 border border-emerald-500/20">
+              <div className="flex items-center gap-3 p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={previewImage} alt={t('atelier.scan.previewAlt')} className="w-12 h-12 object-cover rounded-xl border border-emerald-500/30 shadow-sm" />
+                <img src={previewImage} alt={t('atelier.scan.previewAlt')} className="w-12 h-12 object-cover rounded-lg border border-emerald-500/30 shadow-sm" />
                 <div className="text-xs">
                   <span className="text-emerald-400 font-bold block">{t('atelier.scan.analyzedTitle')}</span>
                   <span className="text-[11px] text-emerald-300/70 font-mono">{tn('atelier.scan.analyzedCount', pieces.length)}</span>
@@ -967,7 +967,7 @@ export default function Dashboard() {
 
             {/* Processing Banner */}
             {isProcessingVision && (
-              <div className="flex items-center gap-3 p-3.5 rounded-2xl bg-sky-500/10 border border-sky-500/20 animate-pulse">
+              <div className="flex items-center gap-3 p-3.5 rounded-xl bg-sky-500/10 border border-sky-500/20 animate-pulse">
                 <RefreshCw className="w-4 h-4 animate-spin text-sky-400 shrink-0" />
                 <div className="text-xs">
                   <span className="text-sky-300 font-bold block">{t('atelier.scan.processingTitle')}</span>
@@ -977,15 +977,15 @@ export default function Dashboard() {
             )}
 
             {visionError && (
-              <div role="alert" className="flex items-center gap-3 p-3 rounded-2xl bg-rose-500/10 border border-rose-500/20">
+              <div role="alert" className="flex items-center gap-3 p-3 rounded-xl bg-rose-500/10 border border-rose-500/20">
                 <AlertTriangle className="w-4 h-4 text-rose-400 shrink-0" />
                 <span className="text-xs text-rose-300 font-medium">{t(visionError)}</span>
               </div>
             )}
 
             {/* Stock Panel Card */}
-            <div id="stock-card" className="overflow-hidden rounded-2xl bg-studio-panel/60 border border-studio-border/90">
-              <div className="flex items-center justify-between px-4 py-3.5 border-b border-studio-border/80">
+            <div id="stock-card" className="overflow-hidden rounded-xl bg-studio-panel border border-studio-border shadow-sm">
+              <div className="flex items-center justify-between px-4 py-3.5 border-b border-studio-border">
                 <div className="flex items-center gap-2.5">
                   <span className="w-8 h-8 rounded-lg bg-brand-400/10 border border-brand-500/20 flex items-center justify-center">
                     <Layers className="w-4 h-4 text-brand-400" />
@@ -1012,7 +1012,7 @@ export default function Dashboard() {
               </div>
 
               <div className={cutMode === '1d' ? 'p-4 grid grid-cols-2 gap-3' : 'p-4 grid grid-cols-3 gap-3'}>
-                {cutMode === '1d' ? null : <div className="rounded-xl bg-studio-field/70 border border-studio-border px-3 py-2 space-y-0.5 focus-within:bg-studio-field focus-within:border-brand-500/50 focus-within:ring-1 focus-within:ring-brand-500/20 transition-all">
+                {cutMode === '1d' ? null : <div className="rounded-lg bg-studio-field border border-studio-border px-3 py-2 space-y-0.5 focus-within:border-brand-500/50 focus-within:ring-1 focus-within:ring-brand-500/20 transition-all">
                   <label className="text-[9px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">{t('atelier.stock.heightLabel', { unit: displayUnit })}</label>
                   <input
                     type="number"
@@ -1024,10 +1024,10 @@ export default function Dashboard() {
                     onChange={(e) => setSheetHeightDraft(e.target.value)}
                     onBlur={(e) => commitSheetDimension('height', e.target.value)}
                     onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur(); }}
-                    className="w-full bg-transparent text-slate-900 dark:text-slate-100 font-mono font-black text-lg tracking-tight text-end outline-none border-none p-0 focus:ring-0"
+                    className="w-full bg-transparent text-slate-900 dark:text-white font-mono font-black text-xl tracking-tight text-end outline-none border-none p-0 focus:ring-0"
                   />
                 </div>}
-                <div className="rounded-xl bg-studio-field/70 border border-studio-border px-3 py-2 space-y-0.5 focus-within:bg-studio-field focus-within:border-brand-500/50 focus-within:ring-1 focus-within:ring-brand-500/20 transition-all">
+                <div className="rounded-lg bg-studio-field border border-studio-border px-3 py-2 space-y-0.5 focus-within:border-brand-500/50 focus-within:ring-1 focus-within:ring-brand-500/20 transition-all">
                   <label className="text-[9px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">{t(cutMode === '1d' ? 'atelier.stock.lengthLabel' : 'atelier.stock.widthLabel', { unit: displayUnit })}</label>
                   <input
                     type="number"
@@ -1039,10 +1039,10 @@ export default function Dashboard() {
                     onChange={(e) => setSheetWidthDraft(e.target.value)}
                     onBlur={(e) => commitSheetDimension('width', e.target.value)}
                     onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur(); }}
-                    className="w-full bg-transparent text-slate-900 dark:text-slate-100 font-mono font-black text-lg tracking-tight text-end outline-none border-none p-0 focus:ring-0"
+                    className="w-full bg-transparent text-slate-900 dark:text-white font-mono font-black text-xl tracking-tight text-end outline-none border-none p-0 focus:ring-0"
                   />
                 </div>
-                <div className="rounded-xl bg-studio-field/70 border border-studio-border px-3 py-2 space-y-0.5">
+                <div className="rounded-lg bg-studio-field border border-studio-border px-3 py-2 space-y-0.5">
                   <label className="text-[9px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">{t('atelier.stock.materialLabel')}</label>
                   <select
                     value={activeSheet.material || 'mdf'}
@@ -1185,7 +1185,7 @@ export default function Dashboard() {
               {isPresetManageOpen && savedPresets.length > 0 && (
                 <div className="px-4 pb-4 space-y-1" data-testid="preset-manager">
                   {savedPresets.map((p) => (
-                    <div key={p.id} className="flex items-center justify-between px-3 py-2 rounded-lg bg-studio-field/60 border border-studio-border/60">
+                    <div key={p.id} className="flex items-center justify-between px-3 py-2 rounded-lg bg-studio-field border border-studio-border">
                       <span className="text-[11px] font-semibold text-slate-700 dark:text-slate-200">
                         {p.name}
                         <span className="ms-2 font-mono text-[10px] text-slate-500" dir="ltr">{formatDisplayValue(p.height, displayUnit)}×{formatDisplayValue(p.width, displayUnit)} {displayUnit}</span>
@@ -1205,7 +1205,7 @@ export default function Dashboard() {
             </div>
 
             {/* Pieces Manager Component */}
-            <div className="p-4 rounded-2xl bg-studio-panel/60 border border-studio-border/90 shadow-sm">
+            <div className="p-4 rounded-xl bg-studio-panel border border-studio-border shadow-sm">
               <PiecesManager
                 pieces={pieces}
                 onUpdatePieces={setPieces}
@@ -1217,7 +1217,7 @@ export default function Dashboard() {
             </div>
 
             {/* Collapsible Advanced Options */}
-            <div className="rounded-2xl overflow-hidden">
+            <div className="rounded-xl overflow-hidden">
               <button
                 type="button"
                 onClick={() => setShowAdvancedOptions(!showAdvancedOptions)}
@@ -1276,7 +1276,7 @@ export default function Dashboard() {
                     breakdown below and rendered in the PDF export. No estimated
                     "savings" claim is shown here. */}
                 {/* MIX: deep-navy summary banner, mono figure, amber currency */}
-                <div className="relative overflow-hidden rounded-2xl bg-[#0F172A] dark:bg-[#060B14] border border-[#1E3A5F] p-5">
+                <div className="relative overflow-hidden rounded-xl bg-[#0F172A] dark:bg-[#060B14] border border-[#1E3A5F] p-5 shadow-sm">
                   <div className="absolute top-0 end-0 w-48 h-48 bg-brand-400/10 rounded-full blur-3xl -translate-y-1/2 pointer-events-none" />
                   <div className="relative flex flex-wrap items-center justify-between gap-4">
                     <div>
@@ -1291,7 +1291,7 @@ export default function Dashboard() {
                         })}
                       </p>
                     </div>
-                    <div className="shrink-0 w-14 h-14 rounded-2xl bg-brand-400/10 border border-brand-500/30 flex items-center justify-center">
+                    <div className="shrink-0 w-14 h-14 rounded-xl bg-brand-400/10 border border-brand-500/30 flex items-center justify-center">
                       <TrendingUp className="w-6 h-6 text-brand-400" />
                     </div>
                   </div>
@@ -1333,7 +1333,7 @@ export default function Dashboard() {
                 {/* 2D Visualizer — the hero of the workshop: framed blueprint
                     panel with a stronger shadow so it reads as the primary
                     instrument, not just another card. */}
-                <div className="overflow-hidden rounded-2xl border border-studio-border/80 shadow-xl shadow-black/[0.06] dark:shadow-black/30">
+                <div className="overflow-hidden rounded-xl border border-studio-border shadow-xl shadow-black/[0.06] dark:shadow-black/30">
                   {/* Tabs for sheets — opaque toolbar: the plan scrolls under it
                       when zoomed, translucency made that read as an overlap bug */}
                   <div data-testid="cut-plan-toolbar" className="relative z-20 flex flex-wrap items-center gap-2 px-4 py-2.5 bg-studio-panel border-b border-studio-border/60">
@@ -1507,19 +1507,19 @@ export default function Dashboard() {
                   {/* The file-format labels are the formats themselves, so
                       they stay verbatim; the accessible name carries the
                       translated sentence. */}
-                  <button onClick={handleDownloadCsv} aria-label={t('atelier.exports.csvAria')} className="py-2.5 rounded-xl bg-studio-panel/60 border border-studio-border hover:border-studio-border-hover text-slate-700 dark:text-slate-300 font-bold text-[10px] flex items-center justify-center gap-1.5 transition-all">
+                  <button onClick={handleDownloadCsv} aria-label={t('atelier.exports.csvAria')} className="py-2.5 rounded-lg bg-studio-field border border-studio-border hover:border-brand-500/40 text-slate-700 dark:text-slate-200 font-bold text-[10px] flex items-center justify-center gap-1.5 transition-all">
                     <FileSpreadsheet className="w-3.5 h-3.5 text-amber-400" />
                     {t('atelier.exports.csv')}
                   </button>
-                  <button onClick={handleDownloadJson} aria-label={t('atelier.exports.jsonAria')} className="py-2.5 rounded-xl bg-studio-panel/60 border border-studio-border hover:border-studio-border-hover text-slate-700 dark:text-slate-300 font-bold text-[10px] flex items-center justify-center gap-1.5 transition-all">
+                  <button onClick={handleDownloadJson} aria-label={t('atelier.exports.jsonAria')} className="py-2.5 rounded-lg bg-studio-field border border-studio-border hover:border-brand-500/40 text-slate-700 dark:text-slate-200 font-bold text-[10px] flex items-center justify-center gap-1.5 transition-all">
                     <FileCode2 className="w-3.5 h-3.5 text-emerald-400" />
                     {t('atelier.exports.json')}
                   </button>
-                  <button onClick={handleDownloadPng} aria-label={t('atelier.exports.pngAria')} className="py-2.5 rounded-xl bg-studio-panel/60 border border-studio-border hover:border-studio-border-hover text-slate-700 dark:text-slate-300 font-bold text-[10px] flex items-center justify-center gap-1.5 transition-all">
+                  <button onClick={handleDownloadPng} aria-label={t('atelier.exports.pngAria')} className="py-2.5 rounded-lg bg-studio-field border border-studio-border hover:border-brand-500/40 text-slate-700 dark:text-slate-200 font-bold text-[10px] flex items-center justify-center gap-1.5 transition-all">
                     <FileCode2 className="w-3.5 h-3.5 text-purple-400" />
                     {t('atelier.exports.png')}
                   </button>
-                  <button onClick={handleDownloadDxf} aria-label={t('atelier.exports.dxfAria')} className="py-2.5 rounded-xl bg-studio-panel/60 border border-studio-border hover:border-studio-border-hover text-slate-700 dark:text-slate-300 font-bold text-[10px] flex items-center justify-center gap-1.5 transition-all">
+                  <button onClick={handleDownloadDxf} aria-label={t('atelier.exports.dxfAria')} className="py-2.5 rounded-lg bg-studio-field border border-studio-border hover:border-brand-500/40 text-slate-700 dark:text-slate-200 font-bold text-[10px] flex items-center justify-center gap-1.5 transition-all">
                     <FileCode2 className="w-3.5 h-3.5 text-sky-400" />
                     {t('atelier.exports.dxf')}
                   </button>
@@ -1544,7 +1544,7 @@ export default function Dashboard() {
                 {/* Sheet Breakdown */}
                 {currentSheet && (
                   <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1.35fr)_minmax(0,0.85fr)] gap-2.5">
-                    <section className="p-3.5 rounded-xl bg-studio-panel/50 border border-studio-border/70">
+                    <section className="p-3.5 rounded-xl bg-studio-panel border border-studio-border shadow-sm">
                       <div className="flex items-center justify-between gap-2 mb-2.5">
                         <h3 className="text-sm font-bold text-slate-900 dark:text-white">{t('atelier.cutOrder.title')}</h3>
                         <span className="text-[10px] font-mono text-slate-500 dark:text-slate-400">{tn('atelier.cutOrder.count', currentSheetPieces.length)}</span>
@@ -1573,7 +1573,7 @@ export default function Dashboard() {
                                     <span className="truncate text-slate-700 dark:text-slate-300">{piece.name}</span>
                                   </div>
                                 </td>
-                                <td className="py-2 pe-3 font-mono text-slate-600 dark:text-slate-300 tabular-nums" dir="ltr">
+                                <td className="py-2 pe-3 font-mono font-bold text-slate-900 dark:text-white tabular-nums" dir="ltr">
                                   {formatDisplayValue(piece.height, displayUnit)} × {formatDisplayValue(piece.width, displayUnit)} {displayUnit}
                                 </td>
                                 <td className="py-2 text-slate-600 dark:text-slate-300">{t(piece.rotated ? 'atelier.cutOrder.rotated' : 'atelier.cutOrder.notRotated')}</td>
@@ -1583,7 +1583,7 @@ export default function Dashboard() {
                         </table>
                       </div>
                     </section>
-                    <div data-testid="offcuts-list" className="p-3.5 rounded-xl bg-studio-panel/50 border border-studio-border/70">
+                    <div data-testid="offcuts-list" className="p-3.5 rounded-xl bg-studio-panel border border-studio-border shadow-sm">
                       <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-2.5">{t('atelier.offcuts.title', { count: currentSheet.offcuts?.length || 0 })}</p>
                       <div className="space-y-1 max-h-[180px] overflow-y-auto">
                         {(currentSheet.offcuts||[]).map((off, i) => {
@@ -1605,22 +1605,22 @@ export default function Dashboard() {
                     result.costBreakdown (src/lib/costing.ts); this panel
                     never recomputes them. */}
                 {result && (
-                  <div className="p-3.5 rounded-xl bg-studio-panel/50 border border-studio-border/70 space-y-2">
+                  <div className="p-3.5 rounded-xl bg-studio-panel border border-studio-border shadow-sm space-y-2">
                     <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">{t('atelier.cost.breakdownTitle')}</p>
                     <div className="grid grid-cols-4 gap-2 text-xs">
-                      <div className="p-2 rounded-lg bg-studio-canvas/50 text-center">
+                      <div className="p-2 rounded-lg bg-studio-field text-center">
                         <span className="text-[9px] text-slate-500 block uppercase">{t('atelier.cost.panels')}</span>
                         <span className="font-mono font-black text-slate-900 dark:text-white" dir="ltr">{t('atelier.cost.amount', { value: n(result.costBreakdown?.materialCost ?? 0) })}</span>
                       </div>
-                      <div className="p-2 rounded-lg bg-studio-canvas/50 text-center">
+                      <div className="p-2 rounded-lg bg-studio-field text-center">
                         <span className="text-[9px] text-slate-500 block uppercase">{t('atelier.cost.edges')}</span>
                         <span className="font-mono font-black text-slate-900 dark:text-white" dir="ltr">{t('atelier.cost.amount', { value: n(result.costBreakdown?.edgeCost ?? 0) })}</span>
                       </div>
-                      <div className="p-2 rounded-lg bg-studio-canvas/50 text-center">
+                      <div className="p-2 rounded-lg bg-studio-field text-center">
                         <span className="text-[9px] text-slate-500 block uppercase">{t('atelier.cost.labor')}</span>
                         <span className="font-mono font-black text-slate-900 dark:text-white" dir="ltr">{t('atelier.cost.amount', { value: n(result.costBreakdown?.laborCost ?? 0) })}</span>
                       </div>
-                      <div className="p-2 rounded-lg bg-studio-canvas/50 text-center">
+                      <div className="p-2 rounded-lg bg-studio-field text-center">
                         <span className="text-[9px] text-slate-500 block uppercase">{t('atelier.cost.total')}</span>
                         <span className="font-mono font-black text-brand-400" dir="ltr">{t('atelier.cost.amount', { value: n(result.costBreakdown?.subtotal ?? 0) })}</span>
                       </div>
@@ -1649,7 +1649,7 @@ export default function Dashboard() {
                 <>
                   <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
                     {/* RENDEMENT — progress ring */}
-                    <div className="p-4 rounded-2xl bg-studio-panel border border-studio-border/80 shadow-sm flex flex-col gap-2">
+                    <div className="p-4 rounded-xl bg-studio-panel border border-studio-border shadow-sm flex flex-col gap-2">
                       <div className="flex items-center justify-between text-slate-500 dark:text-slate-400">
                         <span className="text-[10px] font-bold uppercase tracking-wider">{t('atelier.metrics.efficiency')}</span>
                         <TrendingUp className="w-4 h-4" />
@@ -1664,8 +1664,8 @@ export default function Dashboard() {
                           />
                         </svg>
                         <div>
-                          <p className="text-2xl font-black font-mono text-slate-900 dark:text-white tabular-nums" dir="ltr">{usablePct}%</p>
-                          <p className="text-[10px] text-slate-500">
+                          <p className="text-3xl font-black font-mono text-slate-900 dark:text-white tabular-nums tracking-tight" dir="ltr">{usablePct}%</p>
+                          <p className="text-[10px] font-mono text-emerald-600 dark:text-emerald-400 font-semibold">
                             <span className="sr-only">{t('atelier.metrics.usable')} — </span>
                             {t('atelier.metrics.usableSub', { value: n(result.totalAreaUsed / 10000, { maximumFractionDigits: 2 }) })}
                           </p>
@@ -1674,29 +1674,29 @@ export default function Dashboard() {
                     </div>
 
                     {/* PERTE / CHUTE */}
-                    <div className="p-4 rounded-2xl bg-studio-panel border border-studio-border/80 shadow-sm flex flex-col gap-2">
+                    <div className="p-4 rounded-xl bg-studio-panel border border-studio-border shadow-sm flex flex-col gap-2">
                       <div className="flex items-center justify-between text-slate-500 dark:text-slate-400">
                         <span className="text-[10px] font-bold uppercase tracking-wider">{t('atelier.metrics.waste')}</span>
                         <Trash2 className="w-4 h-4" />
                       </div>
                       <div>
-                        <p className="text-2xl font-black font-mono text-slate-900 dark:text-white tabular-nums" dir="ltr">{wastePct}%</p>
+                        <p className="text-3xl font-black font-mono text-rose-600 dark:text-rose-400 tabular-nums tracking-tight" dir="ltr">{wastePct}%</p>
                         <div className="mt-1.5 w-full h-1.5 rounded-full bg-studio-field overflow-hidden">
-                          <div className="h-full rounded-full bg-brand-400" style={{ width: `${wastePct}%` }} />
+                          <div className="h-full rounded-full bg-rose-500" style={{ width: `${wastePct}%` }} />
                         </div>
-                        <p className="text-[10px] text-slate-500 mt-1.5">{t('atelier.metrics.wasteSub', { kerf: n(options.kerfWidth) })}</p>
+                        <p className="text-[10px] font-mono text-slate-500 dark:text-slate-400 mt-1.5">{t('atelier.metrics.wasteSub', { kerf: n(options.kerfWidth) })}</p>
                       </div>
                     </div>
 
                     {/* COUPES SCIE */}
-                    <div className="p-4 rounded-2xl bg-studio-panel border border-studio-border/80 shadow-sm flex flex-col gap-2">
+                    <div className="p-4 rounded-xl bg-studio-panel border border-studio-border shadow-sm flex flex-col gap-2">
                       <div className="flex items-center justify-between text-slate-500 dark:text-slate-400">
                         <span className="text-[10px] font-bold uppercase tracking-wider">{t('atelier.metrics.cuts')}</span>
                         <Scissors className="w-4 h-4" />
                       </div>
                       <div>
-                        <p className="text-2xl font-black font-mono text-slate-900 dark:text-white tabular-nums" dir="ltr">{totalCuts}</p>
-                        <p className="text-[10px] text-slate-500 mt-1.5">
+                        <p className="text-3xl font-black font-mono text-slate-900 dark:text-white tabular-nums tracking-tight" dir="ltr">{totalCuts}</p>
+                        <p className="text-[10px] font-mono text-brand-500 dark:text-brand-400 font-semibold mt-1.5">
                           {t('atelier.cost.bannerMeta', {
                             meters: n(result.totalLinearCutMeters || 0),
                             sheets: tn('atelier.cost.sheetsCount', result.sheetsUsed),
@@ -1706,14 +1706,14 @@ export default function Dashboard() {
                     </div>
 
                     {/* PANNEAUX REQUIS */}
-                    <div className="p-4 rounded-2xl bg-studio-panel border border-studio-border/80 shadow-sm flex flex-col gap-2">
+                    <div className="p-4 rounded-xl bg-studio-panel border border-studio-border shadow-sm flex flex-col gap-2">
                       <div className="flex items-center justify-between text-slate-500 dark:text-slate-400">
                         <span className="text-[10px] font-bold uppercase tracking-wider">{t('atelier.metrics.sheets')}</span>
                         <PackageOpen className="w-4 h-4" />
                       </div>
                       <div>
-                        <p className="text-2xl font-black font-mono text-slate-900 dark:text-white tabular-nums" dir="ltr">{result.sheetsUsed}</p>
-                        <p className="text-[10px] text-slate-500 mt-1.5">
+                        <p className="text-3xl font-black font-mono text-slate-900 dark:text-white tabular-nums tracking-tight" dir="ltr">{result.sheetsUsed}</p>
+                        <p className="text-[10px] font-mono text-slate-500 dark:text-slate-400 mt-1.5">
                           <span className="sr-only">{t('atelier.metrics.pieces')} — </span>
                           {result.placedPieces.length} {t('atelier.metrics.piecesSub')}
                         </p>

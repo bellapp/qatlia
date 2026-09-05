@@ -386,7 +386,7 @@ export const PiecesManager: React.FC<PiecesManagerProps> = ({
               aria-label={t('pieces.filterAria')}
               value={searchQuery}
               onChange={(event) => setSearchQuery(event.target.value)}
-              className="w-full ps-7 pe-2 py-1.5 rounded-lg bg-studio-field/60 border border-studio-border/80 text-slate-800 dark:text-slate-200 placeholder-slate-500 text-xs outline-none focus:border-brand-500/50 transition-colors"
+              className="w-full ps-7 pe-2 py-1.5 rounded-lg bg-studio-field border border-studio-border text-slate-800 dark:text-slate-200 placeholder-slate-500 text-xs outline-none focus:border-brand-500/50 transition-colors"
             />
           </div>
           <span className="hidden sm:inline text-[10px] font-mono text-slate-500 dark:text-slate-400 tabular-nums">
@@ -476,7 +476,7 @@ export const PiecesManager: React.FC<PiecesManagerProps> = ({
 
       {activePanel && (
         <div className="px-1 pb-2">
-          <div className="rounded-xl border border-studio-border/80 bg-studio-panel/50 p-3 space-y-3">
+          <div className="rounded-lg border border-studio-border bg-studio-field p-3 space-y-3">
             {activePanel === 'import' && (
               <>
                 <div className="space-y-1">
@@ -513,7 +513,7 @@ export const PiecesManager: React.FC<PiecesManagerProps> = ({
                   value={importText}
                   onChange={(event) => setImportText(event.target.value)}
                   placeholder={importPlaceholder}
-                  className="w-full rounded-xl border border-studio-border bg-studio-field/70 px-3 py-2 text-xs text-slate-800 dark:text-slate-100 outline-none focus:border-brand-500/40 resize-y"
+                  className="w-full rounded-lg border border-studio-border bg-studio-panel px-3 py-2 font-mono text-xs text-slate-900 dark:text-white outline-none focus:border-brand-500/40 resize-y"
                 />
                 <div className="flex flex-wrap items-center gap-2">
                   <button
@@ -548,7 +548,7 @@ export const PiecesManager: React.FC<PiecesManagerProps> = ({
                     id="pieces-template-select"
                     value={selectedTemplate}
                     onChange={(event) => setSelectedTemplate(event.target.value as TemplateName)}
-                    className="flex-1 rounded-lg border border-studio-border bg-studio-field/70 px-3 py-2 text-xs text-slate-800 dark:text-slate-100 outline-none focus:border-brand-500/40 [&>option]:bg-white [&>option]:text-slate-900 dark:[&>option]:bg-slate-900 dark:[&>option]:text-slate-100"
+                    className="flex-1 rounded-lg border border-studio-border bg-studio-panel px-3 py-2 text-xs text-slate-800 dark:text-slate-100 outline-none focus:border-brand-500/40 [&>option]:bg-white [&>option]:text-slate-900 dark:[&>option]:bg-slate-900 dark:[&>option]:text-slate-100"
                   >
                     {/* The option value is the stable template name; only the piece-count suffix is localized. */}
                     {FURNITURE_TEMPLATES.map((template) => (
@@ -587,7 +587,7 @@ export const PiecesManager: React.FC<PiecesManagerProps> = ({
         </div>
       )}
 
-      <div className="grid grid-cols-12 gap-1.5 px-3 py-2 text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 border-y border-studio-border/50">
+      <div className="grid grid-cols-12 gap-1.5 px-3 py-2 text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 border-b border-studio-border">
         <div className="col-span-1 ps-1">{t('pieces.columns.number')}</div>
         <div className="col-span-4 sm:col-span-4">{t('pieces.columns.piece')}</div>
         <div className="col-span-3 sm:col-span-3 text-end">{t('pieces.columns.dimensions', { unit: displayUnit })}</div>
@@ -604,7 +604,7 @@ export const PiecesManager: React.FC<PiecesManagerProps> = ({
             </p>
           </div>
         ) : (
-          <div className="divide-y divide-studio-border/40">
+          <div className="divide-y divide-studio-border/60">
             {filteredList.map((piece, index) => {
               const isSelected = selectedIds.has(piece.id || '');
               const isFocused = focusedRow === piece.id;
@@ -627,12 +627,8 @@ export const PiecesManager: React.FC<PiecesManagerProps> = ({
                   data-piece-name={piece.name}
                   onMouseEnter={() => setFocusedRow(piece.id || null)}
                   onMouseLeave={() => setFocusedRow(null)}
-                  className={`grid grid-cols-12 gap-1.5 items-center px-3 py-3 transition-all group ${
-                    isSelected
-                      ? 'bg-brand-400/10'
-                      : index % 2 === 0
-                        ? 'bg-studio-canvas/40 hover:bg-studio-panel/80'
-                        : 'bg-studio-panel/20 hover:bg-studio-panel/80'
+                  className={`grid grid-cols-12 gap-1.5 items-center px-3 py-2.5 transition-colors group ${
+                    isSelected ? 'bg-brand-400/10' : 'hover:bg-studio-field/60'
                   }`}
                 >
                   <div className="col-span-1 flex items-center gap-1">
@@ -658,7 +654,7 @@ export const PiecesManager: React.FC<PiecesManagerProps> = ({
                       type="text"
                       value={piece.name}
                       onChange={(event) => handleUpdate(piece.id || '', 'name', event.target.value)}
-                      className="w-full bg-transparent text-slate-800 dark:text-slate-200 font-medium text-[11px] outline-none focus:text-slate-900 dark:focus:text-white truncate placeholder-slate-600"
+                      className="w-full bg-transparent text-slate-900 dark:text-slate-100 font-medium text-xs outline-none focus:text-slate-900 dark:focus:text-white truncate placeholder-slate-500"
                       placeholder={t('pieces.row.namePlaceholder')}
                     />
                     {!isFocused && (
@@ -669,7 +665,7 @@ export const PiecesManager: React.FC<PiecesManagerProps> = ({
                     )}
                   </div>
 
-                  <div className="col-span-3 sm:col-span-3 flex items-center justify-end gap-0.5 font-mono text-[11px] tabular-nums">
+                  <div className="col-span-3 sm:col-span-3 flex items-center justify-end gap-0.5 font-mono text-xs tabular-nums">
                     <input
                       type="number"
                       step="0.1"
@@ -683,10 +679,10 @@ export const PiecesManager: React.FC<PiecesManagerProps> = ({
                         if (canonical === null || canonical <= 0) return;
                         handleUpdate(piece.id || '', 'height', canonical);
                       }}
-                      className="w-12 sm:w-14 text-end bg-transparent text-slate-900 dark:text-slate-100 font-bold outline-none border-b border-dashed border-slate-300 dark:border-slate-600 hover:border-brand-400 focus:border-brand-400 focus:bg-studio-field/60 focus:rounded px-1 py-0.5 -mx-1 tabular-nums cursor-text transition-colors"
+                      className="w-12 sm:w-14 text-end bg-transparent text-slate-900 dark:text-white font-bold outline-none border-b border-dashed border-transparent hover:border-brand-400 focus:border-brand-400 focus:bg-studio-field focus:rounded px-1 py-0.5 -mx-1 tabular-nums cursor-text transition-colors"
                       aria-label={t('pieces.row.heightAria', { unit: displayUnit })}
                     />
-                    <span className="text-slate-600">×</span>
+                    <span className="text-slate-400 dark:text-slate-500">×</span>
                     <input
                       type="number"
                       step="0.1"
@@ -696,7 +692,7 @@ export const PiecesManager: React.FC<PiecesManagerProps> = ({
                         if (canonical === null || canonical <= 0) return;
                         handleUpdate(piece.id || '', 'width', canonical);
                       }}
-                      className="w-12 sm:w-14 text-end bg-transparent text-slate-900 dark:text-slate-100 font-bold outline-none border-b border-dashed border-slate-300 dark:border-slate-600 hover:border-brand-400 focus:border-brand-400 focus:bg-studio-field/60 focus:rounded px-1 py-0.5 -mx-1 tabular-nums cursor-text transition-colors"
+                      className="w-12 sm:w-14 text-end bg-transparent text-slate-900 dark:text-white font-bold outline-none border-b border-dashed border-transparent hover:border-brand-400 focus:border-brand-400 focus:bg-studio-field focus:rounded px-1 py-0.5 -mx-1 tabular-nums cursor-text transition-colors"
                       aria-label={t('pieces.row.widthAria', { unit: displayUnit })}
                     />
                   </div>
@@ -707,7 +703,7 @@ export const PiecesManager: React.FC<PiecesManagerProps> = ({
                       min="1"
                       value={piece.quantity || 1}
                       onChange={(event) => handleUpdate(piece.id || '', 'quantity', parseInt(event.target.value, 10) || 1)}
-                      className="w-8 text-center bg-studio-field/80 border border-brand-500/30 rounded-md text-brand-400 font-mono font-black text-xs outline-none focus:border-brand-400 tabular-nums"
+                      className="w-6 h-6 text-center bg-brand-400 rounded text-slate-950 font-mono font-black text-[10px] leading-none outline-none border border-transparent focus:border-brand-600 focus:ring-1 focus:ring-brand-500/40 tabular-nums appearance-none [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
                       aria-label={t('pieces.row.quantityAria')}
                     />
                   </div>
@@ -721,10 +717,10 @@ export const PiecesManager: React.FC<PiecesManagerProps> = ({
                           key={side}
                           type="button"
                           onClick={() => handleToggleEdge(piece.id || '', side)}
-                          className={`w-5 h-5 rounded font-bold transition-all ${
+                          className={`w-5 h-5 rounded text-[10px] font-bold transition-colors ${
                             isEdgeActive
-                              ? 'bg-brand-400 text-slate-950 shadow-sm'
-                              : 'bg-studio-field/60 text-slate-600 hover:text-slate-600 dark:text-slate-400 hover:bg-studio-border'
+                              ? 'bg-brand-400 text-slate-950'
+                              : 'bg-studio-field text-slate-500 dark:text-slate-400 hover:bg-studio-border'
                           }`}
                           title={t('pieces.edge.title', { side: t(EDGE_SIDE_KEYS[side].label) })}
                         >
@@ -738,7 +734,7 @@ export const PiecesManager: React.FC<PiecesManagerProps> = ({
                       type="button"
                       onClick={() => handleSwapDimensions(piece.id || '')}
                       disabled={disabled}
-                      className="w-5 h-5 rounded bg-studio-field/60 text-slate-600 dark:text-slate-400 hover:bg-brand-400 hover:text-slate-950 transition-all flex items-center justify-center disabled:opacity-40"
+                      className="w-5 h-5 rounded bg-studio-field text-slate-500 dark:text-slate-400 hover:bg-brand-400 hover:text-slate-950 transition-colors flex items-center justify-center disabled:opacity-40"
                       title={t('pieces.row.swapTitle')}
                       aria-label={t('pieces.row.swapAria', { name: piece.name || String(index + 1) })}
                     >
@@ -750,10 +746,10 @@ export const PiecesManager: React.FC<PiecesManagerProps> = ({
                       type="button"
                       onClick={() => handleCycleGrain(piece.id || '')}
                       disabled={disabled}
-                      className={`w-5 h-5 rounded transition-all flex items-center justify-center disabled:opacity-40 ${
+                      className={`w-5 h-5 rounded transition-colors flex items-center justify-center disabled:opacity-40 ${
                         (piece.grain ?? 'none') !== 'none'
-                          ? 'bg-amber-600/80 text-white shadow-sm'
-                          : 'bg-studio-field/60 text-slate-600 dark:text-slate-400 hover:bg-studio-border'
+                          ? 'bg-amber-600 text-white'
+                          : 'bg-studio-field text-slate-500 dark:text-slate-400 hover:bg-studio-border'
                       }`}
                       title={t(`pieces.row.grainTitle.${piece.grain === 'vertical' ? 'vertical' : piece.grain === 'horizontal' ? 'horizontal' : 'none'}`)}
                       aria-label={t('pieces.row.grainAria', { name: piece.name || String(index + 1) })}
@@ -798,9 +794,9 @@ export const PiecesManager: React.FC<PiecesManagerProps> = ({
         )}
       </div>
 
-      <div className="pt-2 bg-studio-canvas">
+      <div className="pt-2">
         {activePanel === 'quick-add' ? (
-          <form onSubmit={handleAddPieceQuick} className="p-3 rounded-xl bg-studio-panel/80 border border-brand-500/30 backdrop-blur-sm shadow-lg animate-in slide-in-from-bottom-2 duration-150">
+          <form onSubmit={handleAddPieceQuick} className="p-3 rounded-xl bg-studio-field border border-brand-500/30 shadow-sm animate-in slide-in-from-bottom-2 duration-150">
             <div className="grid grid-cols-12 gap-2 items-end">
               <div className="col-span-3">
                 <label htmlFor="quick-piece-height" className="text-[9px] font-semibold uppercase text-slate-500 dark:text-slate-400 block mb-0.5">
