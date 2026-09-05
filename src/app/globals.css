@@ -6,8 +6,9 @@
 
 @layer base {
   :root {
-    /* Light mode — QatlIA MIX: brighter canvas, bolder amber usage */
-    --color-canvas: #FAFBFD;
+    /* Light mode — QatlIA MIX per Stitch DESIGN.md: pure white canvas,
+       near-white alt surfaces, amber hover #D9860F, amber tint #FEF3E2 */
+    --color-canvas: #FFFFFF;
     --color-panel: #FFFFFF;
     --color-field: #F1F5F9;
     --color-border: #E2E8F0;
@@ -21,7 +22,7 @@
     --border-main: #E2E8F0;
     --border-highlight: #CBD5E1;
     --accent-primary: #F5A623;
-    --accent-hover: #E09612;
+    --accent-hover: #D9860F;
     --accent-glow: rgba(245, 166, 35, 0.18);
   }
 

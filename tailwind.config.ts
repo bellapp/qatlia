@@ -24,10 +24,12 @@ const config: Config = {
           'border-hover': 'var(--color-border-hover)',
         },
         brand: {
-          300: '#FFD08C',
+          // QatlIA MIX per Stitch DESIGN.md: amber-500 #F5A623 is THE primary;
+          // hover #D9860F; tint #FEF3E2 for soft backgrounds.
+          300: '#FEF3E2',
           400: '#F5A623',
-          500: '#E09612',
-          600: '#C47F0A',
+          500: '#D9860F',
+          600: '#B8720C',
         },
       },
       fontFamily: {

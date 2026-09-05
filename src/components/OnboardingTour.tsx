@@ -74,7 +74,7 @@ export function OnboardingTour() {
   return (
     <button
       onClick={startTour}
-      className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-brand-500/10 border border-brand-500/20 text-brand-400 hover:bg-brand-500/20 text-[11px] font-semibold transition-all"
+      className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-brand-400/10 border border-brand-500/20 text-brand-400 hover:bg-brand-400/20 text-[11px] font-semibold transition-all"
       title={t('tour.buttonTitle')}
     >
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>

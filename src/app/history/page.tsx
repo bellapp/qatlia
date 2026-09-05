@@ -220,7 +220,7 @@ export default function HistoryPage() {
   };
 
   return (
-    <div className="min-h-screen bg-studio-canvas text-slate-900 dark:text-slate-100 font-sans antialiased selection:bg-brand-500 selection:text-black pb-16">
+    <div className="min-h-screen bg-studio-canvas text-slate-900 dark:text-slate-100 font-sans antialiased selection:bg-brand-400 selection:text-black pb-16">
       <header className="sticky top-0 z-40 border-b border-studio-border/70 bg-studio-canvas/70 backdrop-blur-2xl backdrop-saturate-150">
         <div className="max-w-6xl mx-auto flex items-center justify-between px-4 sm:px-8 h-16">
           <div className="flex items-center gap-3">
@@ -237,7 +237,7 @@ export default function HistoryPage() {
             <Link
               href="/credits"
               aria-label={`${t('atelier.header.creditsAria')}: ${userCredits === null ? '—' : n(userCredits)}`}
-              className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-brand-500/10 border border-brand-500/25 text-brand-400 hover:bg-brand-500/15 text-xs font-semibold transition-all"
+              className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-brand-400/10 border border-brand-500/25 text-brand-400 hover:bg-brand-500/15 text-xs font-semibold transition-all"
             >
               <Zap className="w-3.5 h-3.5 fill-brand-400 text-brand-400" aria-hidden="true" />
               <span dir="ltr" className="font-mono font-bold">{userCredits === null ? '—' : n(userCredits)}</span>
@@ -262,7 +262,7 @@ export default function HistoryPage() {
         </div>
 
         {syncNote && (
-          <div className="flex items-center gap-2 px-3.5 py-2.5 rounded-xl bg-brand-500/10 border border-brand-500/20 text-brand-300 text-xs">
+          <div className="flex items-center gap-2 px-3.5 py-2.5 rounded-xl bg-brand-400/10 border border-brand-500/20 text-brand-300 text-xs">
             <CloudOff className="w-4 h-4 shrink-0" aria-hidden="true" />{t(syncNote)}
           </div>
         )}
@@ -323,7 +323,7 @@ export default function HistoryPage() {
                   </div>
                   <div className="flex items-center justify-between gap-2 pt-1">
                     <span className="text-[11px] font-mono font-bold text-slate-600 dark:text-slate-400">{tn('historyPage.sheetsUsed', sheetsUsed)}</span>
-                    <button onClick={() => handleLoadProject(proj)} aria-label={t('historyPage.openAria', { name: proj.name })} className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-brand-500 hover:bg-brand-400 text-slate-950 font-black text-xs transition-all group-hover:shadow-lg group-hover:shadow-brand-500/20">{t('historyPage.open')}<ArrowRight className="w-3.5 h-3.5 rtl:-scale-x-100" aria-hidden="true" /></button>
+                    <button onClick={() => handleLoadProject(proj)} aria-label={t('historyPage.openAria', { name: proj.name })} className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-brand-400 hover:bg-brand-400 text-slate-950 font-black text-xs transition-all group-hover:shadow-lg group-hover:shadow-brand-500/20">{t('historyPage.open')}<ArrowRight className="w-3.5 h-3.5 rtl:-scale-x-100" aria-hidden="true" /></button>
                   </div>
                 </div>
               );

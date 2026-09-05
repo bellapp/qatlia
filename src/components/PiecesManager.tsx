@@ -402,7 +402,7 @@ export const PiecesManager: React.FC<PiecesManagerProps> = ({
             disabled={disabled}
             className={`flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-bold transition-colors ${
               activePanel === 'import'
-                ? 'bg-brand-500/10 text-brand-500 border border-brand-500/40'
+                ? 'bg-brand-400/10 text-brand-500 border border-brand-500/40'
                 : 'bg-studio-field hover:bg-studio-border text-slate-600 dark:text-slate-300'
             }`}
           >
@@ -415,7 +415,7 @@ export const PiecesManager: React.FC<PiecesManagerProps> = ({
             disabled={disabled}
             className={`flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-bold transition-colors ${
               activePanel === 'template'
-                ? 'bg-brand-500/10 text-brand-500 border border-brand-500/40'
+                ? 'bg-brand-400/10 text-brand-500 border border-brand-500/40'
                 : 'bg-studio-field hover:bg-studio-border text-slate-600 dark:text-slate-300'
             }`}
           >
@@ -520,7 +520,7 @@ export const PiecesManager: React.FC<PiecesManagerProps> = ({
                     type="button"
                     onClick={handleImportSubmit}
                     disabled={disabled}
-                    className="px-3 py-2 rounded-lg bg-brand-500 hover:bg-brand-400 text-slate-950 text-xs font-bold transition-all disabled:opacity-30"
+                    className="px-3 py-2 rounded-lg bg-brand-400 hover:bg-brand-400 text-slate-950 text-xs font-bold transition-all disabled:opacity-30"
                   >
                     {t('pieces.import.submit')}
                   </button>
@@ -561,7 +561,7 @@ export const PiecesManager: React.FC<PiecesManagerProps> = ({
                     type="button"
                     onClick={handleTemplateAppend}
                     disabled={disabled}
-                    className="px-3 py-2 rounded-lg bg-brand-500 hover:bg-brand-400 text-slate-950 text-xs font-bold transition-all disabled:opacity-30"
+                    className="px-3 py-2 rounded-lg bg-brand-400 hover:bg-brand-400 text-slate-950 text-xs font-bold transition-all disabled:opacity-30"
                   >
                     {t('common.add')}
                   </button>
@@ -629,7 +629,7 @@ export const PiecesManager: React.FC<PiecesManagerProps> = ({
                   onMouseLeave={() => setFocusedRow(null)}
                   className={`grid grid-cols-12 gap-1.5 items-center px-3 py-3 transition-all group ${
                     isSelected
-                      ? 'bg-brand-500/10'
+                      ? 'bg-brand-400/10'
                       : index % 2 === 0
                         ? 'bg-studio-canvas/40 hover:bg-studio-panel/80'
                         : 'bg-studio-panel/20 hover:bg-studio-panel/80'
@@ -865,7 +865,7 @@ export const PiecesManager: React.FC<PiecesManagerProps> = ({
                   disabled={disabled}
                   aria-label={t('pieces.quickAdd.submitAria')}
                   title={t('pieces.quickAdd.submitAria')}
-                  className="w-full py-1.5 rounded-lg bg-brand-500 hover:bg-brand-400 text-slate-950 font-black text-xs transition-all active:scale-95 cursor-pointer"
+                  className="w-full py-1.5 rounded-lg bg-brand-400 hover:bg-brand-400 text-slate-950 font-black text-xs transition-all active:scale-95 cursor-pointer"
                 >
                   {/* The glyph is a symbol, not copy; the accessible name carries the wording. */}
                   <span aria-hidden="true">+</span>

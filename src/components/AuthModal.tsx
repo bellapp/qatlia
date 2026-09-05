@@ -215,7 +215,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
           </p>
         </div>
 
-        <div className="flex items-center gap-2 p-2.5 rounded-xl bg-brand-500/10 border border-brand-500/20 text-brand-300 text-xs font-medium">
+        <div className="flex items-center gap-2 p-2.5 rounded-xl bg-brand-400/10 border border-brand-500/20 text-brand-300 text-xs font-medium">
           <Gift className="w-4 h-4 text-brand-400 shrink-0" />
           {t('auth.perk', { count: FREE_VISION_CREDITS })}
         </div>
@@ -294,7 +294,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
           <button
             type="submit"
             disabled={loading || oauthLoading}
-            className="w-full py-3 rounded-xl bg-brand-500 hover:bg-brand-400 text-slate-950 font-black text-sm flex items-center justify-center gap-2 disabled:opacity-50"
+            className="w-full py-3 rounded-xl bg-brand-400 hover:bg-brand-400 text-slate-950 font-black text-sm flex items-center justify-center gap-2 disabled:opacity-50"
           >
             {isLogin ? t('auth.submitLogin') : t('auth.submitSignup')}
             <ArrowRight className="w-4 h-4 rtl:-scale-x-100" aria-hidden="true" />

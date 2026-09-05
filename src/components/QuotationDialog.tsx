@@ -657,7 +657,7 @@ export const QuotationDialog: React.FC<QuotationDialogProps> = ({
                   onClick={() => setOutputLocale(loc)}
                   className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition-colors ${
                     outputLocale === loc
-                      ? 'bg-brand-500 border-brand-500 text-slate-950'
+                      ? 'bg-brand-400 border-brand-500 text-slate-950'
                       : 'bg-studio-field border-studio-border text-slate-600 dark:text-slate-300'
                   }`}
                 >
@@ -723,7 +723,7 @@ export const QuotationDialog: React.FC<QuotationDialogProps> = ({
           <button
             type="submit"
             disabled={submitting || !!itemLimitError}
-            className="w-full py-3 rounded-xl bg-brand-500 hover:bg-brand-400 text-slate-950 font-black text-sm flex items-center justify-center gap-2 disabled:opacity-50"
+            className="w-full py-3 rounded-xl bg-brand-400 hover:bg-brand-400 text-slate-950 font-black text-sm flex items-center justify-center gap-2 disabled:opacity-50"
           >
             {submitting ? <RefreshCw className="w-4 h-4 animate-spin" /> : <FileText className="w-4 h-4" />}
             {submitting ? t('quotation.generating') : t('quotation.submit')}

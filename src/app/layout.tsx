@@ -31,7 +31,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       className={`${inter.variable} ${jetbrainsMono.variable}`}
       suppressHydrationWarning
     >
-      <body className="min-h-screen bg-studio-canvas text-slate-700 dark:text-slate-100 font-body antialiased selection:bg-brand-500 selection:text-black">
+      <body className="min-h-screen bg-studio-canvas text-slate-700 dark:text-slate-100 font-body antialiased selection:bg-brand-400 selection:text-black">
         {/* Corrects lang/dir from the persisted preference before the page paints. */}
         <script dangerouslySetInnerHTML={{ __html: localeInitScript }} />
         <ClientShell>{children}</ClientShell>

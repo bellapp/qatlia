@@ -14,7 +14,7 @@ const STATS = ['waste', 'surface', 'time', 'credits'] as const;
 
 const FEATURES = [
   { key: 'scan', icon: Camera, color: 'text-sky-400 bg-sky-500/10 border-sky-500/20' },
-  { key: 'guillotine', icon: Scissors, color: 'text-brand-400 bg-brand-500/10 border-brand-500/20' },
+  { key: 'guillotine', icon: Scissors, color: 'text-brand-400 bg-brand-400/10 border-brand-500/20' },
   { key: 'report', icon: FileText, color: 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20' },
   { key: 'waste', icon: TrendingUp, color: 'text-purple-400 bg-purple-500/10 border-purple-500/20' },
 ] as const;
@@ -45,7 +45,7 @@ export default function LandingPage() {
           <ThemeToggle className="hidden sm:inline-flex" />
           <Link
             href="/atelier"
-            className="ml-auto sm:ml-0 px-3.5 sm:px-5 py-2.5 rounded-xl bg-brand-500 hover:bg-brand-400 text-slate-950 font-black text-xs sm:text-sm transition-all shadow-lg shadow-brand-500/20 active:scale-95 whitespace-nowrap shrink-0"
+            className="ml-auto sm:ml-0 px-3.5 sm:px-5 py-2.5 rounded-xl bg-brand-400 hover:bg-brand-400 text-slate-950 font-black text-xs sm:text-sm transition-all shadow-lg shadow-brand-500/20 active:scale-95 whitespace-nowrap shrink-0"
           >
             <span className="sm:hidden">{t('nav.tryFreeShort')}</span>
             <span className="hidden sm:inline">{t('nav.tryFree')}</span>
@@ -56,7 +56,7 @@ export default function LandingPage() {
       <section className="relative pt-24 pb-20 sm:pt-32 sm:pb-28 px-6 sm:px-10">
         <div className="absolute inset-0 bg-[radial-gradient(800px_circle_at_50%_-100px,rgba(245,166,35,0.08),transparent_70%)] pointer-events-none" />
         <div className="max-w-4xl mx-auto text-center relative">
-          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-brand-500/10 border border-brand-500/20 text-brand-400 text-xs font-semibold mb-6">
+          <div className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-[#FEF3E2] dark:bg-brand-400/10 border border-brand-500/30 text-amber-700 dark:text-brand-400 text-xs font-bold mb-6">
             <span className="w-1.5 h-1.5 rounded-full bg-brand-400 animate-pulse" />
             {t('hero.badge')}
           </div>
@@ -81,7 +81,7 @@ export default function LandingPage() {
           <div className="mt-10 flex flex-col sm:flex-row items-center justify-center gap-4">
             <Link
               href="/atelier"
-              className="group px-8 py-4 rounded-2xl bg-brand-500 hover:bg-brand-400 text-slate-950 font-black text-base transition-all shadow-xl shadow-brand-500/25 active:scale-[0.98] flex items-center gap-2.5"
+              className="group px-8 py-4 rounded-2xl bg-brand-400 hover:bg-brand-400 text-slate-950 font-black text-base transition-all shadow-xl shadow-brand-500/25 active:scale-[0.98] flex items-center gap-2.5"
             >
               <Scissors className="w-5 h-5" />
               {t('hero.ctaPrimary')}
@@ -178,7 +178,7 @@ export default function LandingPage() {
           {/* MIX: blueprint rule */}
           <div aria-hidden="true" className="mx-auto mt-4 flex items-center justify-center gap-1.5">
             <span className="h-px w-10 bg-studio-border" />
-            <span className="h-1.5 w-1.5 rounded-full bg-brand-500" />
+            <span className="h-1.5 w-1.5 rounded-full bg-brand-400" />
             <span className="h-px w-10 bg-studio-border" />
           </div>
         </div>
@@ -203,7 +203,7 @@ export default function LandingPage() {
           <h2 className="text-3xl sm:text-4xl font-black tracking-[-0.02em] text-slate-900 dark:text-white">{t('steps.title')}</h2>
           <div aria-hidden="true" className="mx-auto mt-4 flex items-center justify-center gap-1.5">
             <span className="h-px w-10 bg-studio-border" />
-            <span className="h-1.5 w-1.5 rounded-full bg-brand-500" />
+            <span className="h-1.5 w-1.5 rounded-full bg-brand-400" />
             <span className="h-px w-10 bg-studio-border" />
           </div>
         </div>
@@ -211,7 +211,7 @@ export default function LandingPage() {
         <div className="grid sm:grid-cols-3 gap-6">
           {STEPS.map((item) => (
             <div key={item.key} className="relative p-6 rounded-2xl bg-studio-panel/50 border border-studio-border/70 text-center space-y-3">
-              <span className="inline-flex w-10 h-10 rounded-xl bg-brand-500 text-slate-950 font-black text-lg items-center justify-center">
+              <span className="inline-flex w-10 h-10 rounded-xl bg-brand-400 text-slate-950 font-black text-lg items-center justify-center">
                 {item.number}
               </span>
               <h3 className="font-black text-slate-900 dark:text-white">{t(`steps.${item.key}.title`)}</h3>
@@ -232,7 +232,7 @@ export default function LandingPage() {
             </p>
             <Link
               href="/atelier"
-              className="inline-flex items-center gap-2.5 px-8 py-4 rounded-2xl bg-brand-500 hover:bg-brand-400 text-slate-950 font-black text-base transition-all shadow-xl shadow-brand-500/25 active:scale-[0.98]"
+              className="inline-flex items-center gap-2.5 px-8 py-4 rounded-2xl bg-brand-400 hover:bg-brand-400 text-slate-950 font-black text-base transition-all shadow-xl shadow-brand-500/25 active:scale-[0.98]"
             >
               <Scissors className="w-5 h-5" />
               {t('finalCta.button')}
@@ -243,12 +243,19 @@ export default function LandingPage() {
       </section>
 
       {/* Footer */}
-      <footer className="border-t border-studio-border/60 px-6 sm:px-10 py-8 text-center">
-        <div className="flex items-center justify-center gap-2 text-xs text-slate-600 mb-2">
-          <QatlIALogo size="sm" />
-          <span className="font-bold text-slate-500 dark:text-slate-400">{t('footer.brand')}</span>
+      {/* MIX footer: deep navy, centered brand like mix_2 (single-column kept:
+          the app has no sitemap pages to list yet — no invented links) */}
+      <footer className="bg-[#0F172A] dark:bg-[#060B14] px-6 sm:px-10 py-10 text-center">
+        <div className="flex items-center justify-center gap-2 text-sm mb-2">
+          <span className="text-brand-400"><QatlIALogo size="sm" /></span>
+          <span className="font-black text-white tracking-tight">{t('footer.brand')}</span>
         </div>
-        <p className="text-[10px] text-slate-600">{t('footer.tagline')}</p>
+        <p className="text-[11px] text-slate-400 max-w-md mx-auto leading-relaxed">{t('footer.tagline')}</p>
+        <div aria-hidden="true" className="mx-auto mt-6 flex items-center justify-center gap-1.5">
+          <span className="h-px w-10 bg-white/10" />
+          <span className="h-1 w-1 rounded-full bg-brand-500/60" />
+          <span className="h-px w-10 bg-white/10" />
+        </div>
       </footer>
     </div>
   );

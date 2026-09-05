@@ -142,7 +142,7 @@ export default function CreditsPage() {
             <div
               role="status"
               aria-label={`${t('atelier.header.creditsAria')}: ${credits === null ? '—' : n(credits)}`}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-brand-500/10 border border-brand-500/30 text-brand-400 text-xs font-bold"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-brand-400/10 border border-brand-500/30 text-brand-400 text-xs font-bold"
             >
               <Zap className="w-3.5 h-3.5 text-[#F5A623]" aria-hidden="true" />
               <span>
@@ -154,7 +154,7 @@ export default function CreditsPage() {
 
         {/* Title */}
         <div className="text-center space-y-2">
-          <span className="text-xs font-black uppercase tracking-widest text-[#F5A623] bg-brand-500/10 px-3 py-1 rounded-full border border-brand-500/20">
+          <span className="text-xs font-black uppercase tracking-widest text-[#F5A623] bg-brand-400/10 px-3 py-1 rounded-full border border-brand-500/20">
             {t('creditsPage.eyebrow')}
           </span>
           <h1 className="text-3xl md:text-4xl font-black text-slate-900 dark:text-white">

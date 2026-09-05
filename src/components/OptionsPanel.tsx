@@ -33,7 +33,7 @@ function Switch({
         type="button" disabled={disabled}
         onClick={() => onChange(!checked)}
         className={`w-full flex items-start gap-3 p-3 rounded-xl text-start transition-all border ${
-          checked ? 'bg-brand-500/10 border-brand-500/30' : 'bg-studio-panel/40 border-studio-border/60 hover:border-studio-border-hover/60'
+          checked ? 'bg-brand-400/10 border-brand-500/30' : 'bg-studio-panel/40 border-studio-border/60 hover:border-studio-border-hover/60'
         } disabled:opacity-50 cursor-pointer`}
       >
         <span className={`shrink-0 w-7 h-7 rounded-lg flex items-center justify-center transition-colors ${checked ? 'bg-brand-500/15 text-brand-400' : 'bg-studio-field text-slate-500'}`}>
@@ -45,7 +45,7 @@ function Switch({
         </span>
         {/* The knob track is a control, not text: it keeps its physical
             left-to-right travel so the "on" position stays on the same side. */}
-        <span dir="ltr" className={`shrink-0 relative inline-flex h-5 w-9 items-center rounded-full transition-colors duration-200 ${checked ? 'bg-brand-500' : 'bg-studio-border'}`}>
+        <span dir="ltr" className={`shrink-0 relative inline-flex h-5 w-9 items-center rounded-full transition-colors duration-200 ${checked ? 'bg-brand-400' : 'bg-studio-border'}`}>
           <span className="inline-block h-3.5 w-3.5 transform rounded-full bg-white shadow transition-transform duration-200" style={{ transform: checked ? 'translateX(18px)' : 'translateX(4px)' }} />
         </span>
       </button>
@@ -84,7 +84,7 @@ export const OptionsPanel: React.FC<OptionsPanelProps> = ({ options, onChange, d
         <div className="p-4 rounded-xl bg-studio-panel/50 border border-studio-border/70">
           <div className="flex items-center justify-between mb-3">
             <div className="flex items-center gap-2">
-              <span className="w-7 h-7 rounded-lg bg-brand-500/10 border border-brand-500/20 flex items-center justify-center">
+              <span className="w-7 h-7 rounded-lg bg-brand-400/10 border border-brand-500/20 flex items-center justify-center">
                 <Scissors className="w-3.5 h-3.5 text-brand-400" />
               </span>
               <div><span className="block text-[11px] font-semibold text-slate-900 dark:text-white">{t('options.kerf.title')}</span>
@@ -104,7 +104,7 @@ export const OptionsPanel: React.FC<OptionsPanelProps> = ({ options, onChange, d
       </Tooltip>
       <Tooltip text={t('options.priority.tooltip')}>
         <div className="flex items-center gap-3">
-          <span className="shrink-0 w-7 h-7 rounded-lg bg-brand-500/10 border border-brand-500/20 flex items-center justify-center"><Gauge className="w-3.5 h-3.5 text-brand-400" /></span>
+          <span className="shrink-0 w-7 h-7 rounded-lg bg-brand-400/10 border border-brand-500/20 flex items-center justify-center"><Gauge className="w-3.5 h-3.5 text-brand-400" /></span>
           <select disabled={disabled} value={options.optimizationPriority}
             aria-label={t('options.priority.aria')}
             onChange={(e) => updateField('optimizationPriority', e.target.value as OptimizationOptions['optimizationPriority'])}
@@ -137,7 +137,7 @@ export const OptionsPanel: React.FC<OptionsPanelProps> = ({ options, onChange, d
       <Tooltip text={t('options.pricing.tooltip')}>
         <div className="p-4 rounded-xl bg-studio-panel/50 border border-studio-border/70 space-y-3">
           <div className="flex items-center gap-2">
-            <span className="w-7 h-7 rounded-lg bg-brand-500/10 border border-brand-500/20 flex items-center justify-center">
+            <span className="w-7 h-7 rounded-lg bg-brand-400/10 border border-brand-500/20 flex items-center justify-center">
               <Coins className="w-3.5 h-3.5 text-brand-400" />
             </span>
             <span className="block text-[11px] font-semibold text-slate-900 dark:text-white">{t('options.pricing.title')}</span>

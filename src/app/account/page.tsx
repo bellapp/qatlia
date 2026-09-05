@@ -122,7 +122,7 @@ export default function AccountPage() {
             <Link
               href="/credits"
               aria-label={`${t('atelier.header.creditsAria')}: ${credits === null ? '—' : n(credits)}`}
-              className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-brand-500/10 border border-brand-500/25 text-brand-400 hover:bg-brand-500/15 text-xs font-semibold transition-all"
+              className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-brand-400/10 border border-brand-500/25 text-brand-400 hover:bg-brand-500/15 text-xs font-semibold transition-all"
             >
               <Zap className="w-3.5 h-3.5 fill-brand-400 text-brand-400" aria-hidden="true" />
               <span dir="ltr" className="font-mono font-bold">{credits === null ? '—' : n(credits)}</span>
@@ -211,7 +211,7 @@ export default function AccountPage() {
               type="submit"
               disabled={saving}
               aria-busy={saving}
-              className="sm:col-span-2 py-2.5 rounded-xl bg-brand-500 hover:bg-brand-400 text-slate-950 font-black text-xs disabled:opacity-50"
+              className="sm:col-span-2 py-2.5 rounded-xl bg-brand-400 hover:bg-brand-400 text-slate-950 font-black text-xs disabled:opacity-50"
             >
               {saving ? t('accountPage.saving') : t('accountPage.submit')}
             </button>

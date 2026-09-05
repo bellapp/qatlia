@@ -47,7 +47,7 @@ export function EmptyState({ type }: EmptyStateProps) {
 
   const steps = [
     { icon: Camera, tone: 'bg-sky-500/10 border-sky-500/20', iconTone: 'text-sky-400', title: t('emptyState.step1'), desc: t('emptyState.step1Desc') },
-    { icon: Scissors, tone: 'bg-brand-500/10 border-brand-500/20', iconTone: 'text-brand-400', title: t('emptyState.step2'), desc: t('emptyState.step2Desc') },
+    { icon: Scissors, tone: 'bg-brand-400/10 border-brand-500/20', iconTone: 'text-brand-400', title: t('emptyState.step2'), desc: t('emptyState.step2Desc') },
     { icon: FileText, tone: 'bg-emerald-500/10 border-emerald-500/20', iconTone: 'text-emerald-400', title: t('emptyState.step3'), desc: t('emptyState.step3Desc') },
   ];
 

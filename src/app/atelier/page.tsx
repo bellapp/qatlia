@@ -746,7 +746,7 @@ export default function Dashboard() {
     : null;
 
   return (
-    <div className="min-h-screen bg-studio-canvas text-slate-900 dark:text-slate-100 font-sans antialiased selection:bg-brand-500 selection:text-black">
+    <div className="min-h-screen bg-studio-canvas text-slate-900 dark:text-slate-100 font-sans antialiased selection:bg-brand-400 selection:text-black">
       {/* Top Navbar Studio */}
       <header className="sticky top-0 z-40 border-b border-studio-border/70 bg-studio-canvas/70 backdrop-blur-2xl backdrop-saturate-150">
         <div className="absolute inset-0 -z-10 bg-gradient-to-b from-brand-500/[0.04] to-transparent pointer-events-none" />
@@ -758,7 +758,7 @@ export default function Dashboard() {
             <div className="leading-tight">
               <div className="flex items-center gap-2">
                 <span className="font-display font-extrabold text-[17px] tracking-tight text-slate-900 dark:text-white">QatlIA</span>
-                <span className="text-[9px] font-mono font-bold px-1.5 py-0.5 rounded-md bg-brand-500/10 text-brand-400 border border-brand-500/20 tracking-wide">
+                <span className="text-[9px] font-mono font-bold px-1.5 py-0.5 rounded-md bg-brand-400/10 text-brand-400 border border-brand-500/20 tracking-wide">
                   PRO
                 </span>
               </div>
@@ -772,11 +772,11 @@ export default function Dashboard() {
                 tooltip that explains them is translated. */}
             <div dir="ltr" className="flex items-center p-0.5 rounded-lg bg-studio-field border border-studio-border">
               <button type="button" onClick={() => setCutMode('2d')} aria-pressed={cutMode === '2d'} title={t('atelier.header.cutMode2dAria')}
-                className={`px-2.5 py-1 rounded-md text-[10px] font-bold transition-all ${cutMode === '2d' ? 'bg-brand-500 text-slate-950' : 'text-slate-500 hover:text-slate-300'}`}>
+                className={`px-2.5 py-1 rounded-md text-[10px] font-bold transition-all ${cutMode === '2d' ? 'bg-brand-400 text-slate-950' : 'text-slate-500 hover:text-slate-300'}`}>
                 2D
               </button>
               <button type="button" onClick={() => setCutMode('1d')} aria-pressed={cutMode === '1d'} title={t('atelier.header.cutMode1dAria')}
-                className={`px-2.5 py-1 rounded-md text-[10px] font-bold transition-all ${cutMode === '1d' ? 'bg-brand-500 text-slate-950' : 'text-slate-500 hover:text-slate-300'}`}>
+                className={`px-2.5 py-1 rounded-md text-[10px] font-bold transition-all ${cutMode === '1d' ? 'bg-brand-400 text-slate-950' : 'text-slate-500 hover:text-slate-300'}`}>
                 1D
               </button>
             </div>
@@ -796,7 +796,7 @@ export default function Dashboard() {
             <Link
               href="/credits"
               aria-label={t('atelier.header.creditsAria')}
-              className="group relative flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-brand-500/10 border border-brand-500/25 text-brand-400 hover:bg-brand-500/15 hover:border-brand-500/40 text-xs font-semibold transition-all"
+              className="group relative flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-brand-400/10 border border-brand-500/25 text-brand-400 hover:bg-brand-500/15 hover:border-brand-500/40 text-xs font-semibold transition-all"
             >
               <span className="relative flex h-2 w-2">
                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-brand-400 opacity-60" />
@@ -852,7 +852,7 @@ export default function Dashboard() {
                 <input type="file" accept="image/*" className="hidden" onChange={handleImageUpload} disabled={isProcessingVision} />
                 <div className="absolute inset-0 bg-gradient-to-br from-brand-500/[0.06] to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
                 <div className="relative flex items-center gap-3">
-                  <span className="shrink-0 w-10 h-10 rounded-xl bg-brand-500/10 border border-brand-500/20 flex items-center justify-center group-hover:scale-105 group-hover:bg-brand-500/15 transition-all">
+                  <span className="shrink-0 w-10 h-10 rounded-xl bg-brand-400/10 border border-brand-500/20 flex items-center justify-center group-hover:scale-105 group-hover:bg-brand-500/15 transition-all">
                     <ImageIcon className="w-5 h-5 text-brand-400" />
                   </span>
                   <div>
@@ -860,7 +860,7 @@ export default function Dashboard() {
                     <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-tight">{t('atelier.scan.uploadDesc')}</p>
                   </div>
                 </div>
-                <span className="self-start px-2 py-0.5 rounded-md bg-brand-500/10 text-brand-400 text-[10px] font-bold font-mono border border-brand-500/20">JPG PNG WebP</span>
+                <span className="self-start px-2 py-0.5 rounded-md bg-brand-400/10 text-brand-400 text-[10px] font-bold font-mono border border-brand-500/20">JPG PNG WebP</span>
               </label>
             </div>
 
@@ -906,7 +906,7 @@ export default function Dashboard() {
             <div className="overflow-hidden rounded-2xl bg-studio-panel/60 border border-studio-border/90">
               <div className="flex items-center justify-between px-4 py-3.5 border-b border-studio-border/80">
                 <div className="flex items-center gap-2.5">
-                  <span className="w-8 h-8 rounded-lg bg-brand-500/10 border border-brand-500/20 flex items-center justify-center">
+                  <span className="w-8 h-8 rounded-lg bg-brand-400/10 border border-brand-500/20 flex items-center justify-center">
                     <Layers className="w-4 h-4 text-brand-400" />
                   </span>
                   <div>
@@ -922,7 +922,7 @@ export default function Dashboard() {
                       data-testid={`unit-toggle-${unit}`}
                       onClick={() => handleDisplayUnitChange(unit)}
                       aria-pressed={displayUnit === unit}
-                      className={`px-2.5 py-1 rounded-md text-[10px] font-bold transition-all ${displayUnit === unit ? 'bg-brand-500 text-slate-950' : 'text-slate-500 hover:text-slate-300'}`}
+                      className={`px-2.5 py-1 rounded-md text-[10px] font-bold transition-all ${displayUnit === unit ? 'bg-brand-400 text-slate-950' : 'text-slate-500 hover:text-slate-300'}`}
                     >
                       {unit}
                     </button>
@@ -997,7 +997,7 @@ export default function Dashboard() {
                         type="button"
                         onClick={() => setSheets([{ ...activeSheet, grainOrientation: dir }])}
                         aria-pressed={activeSheet.grainOrientation === dir}
-                        className={`px-2.5 py-1 rounded-md text-[10px] font-bold transition-all ${activeSheet.grainOrientation === dir ? 'bg-brand-500 text-slate-950' : 'text-slate-500 hover:text-slate-300'}`}
+                        className={`px-2.5 py-1 rounded-md text-[10px] font-bold transition-all ${activeSheet.grainOrientation === dir ? 'bg-brand-400 text-slate-950' : 'text-slate-500 hover:text-slate-300'}`}
                       >
                         {t(`atelier.stock.grain${dir === 'vertical' ? 'Vertical' : 'Horizontal'}`)}
                       </button>
@@ -1168,7 +1168,7 @@ export default function Dashboard() {
             <button
               onClick={handleRunOptimization}
               disabled={isOptimizing || pieces.length === 0}
-              className="w-full py-3.5 rounded-xl bg-brand-500 hover:bg-brand-400 text-slate-950 font-bold text-sm tracking-[0.08em] uppercase shadow-xl shadow-brand-500/30 ring-1 ring-brand-600/40 transition-all flex items-center justify-center gap-2.5 disabled:opacity-30 disabled:shadow-none disabled:ring-0 active:scale-[0.98]"
+              className="w-full py-3.5 rounded-xl bg-brand-400 hover:bg-brand-400 text-slate-950 font-bold text-sm tracking-[0.08em] uppercase shadow-xl shadow-brand-500/30 ring-1 ring-brand-600/40 transition-all flex items-center justify-center gap-2.5 disabled:opacity-30 disabled:shadow-none disabled:ring-0 active:scale-[0.98]"
             >
               {isOptimizing ? (
                 <>
@@ -1196,7 +1196,7 @@ export default function Dashboard() {
                     "savings" claim is shown here. */}
                 {/* MIX: deep-navy summary banner, mono figure, amber currency */}
                 <div className="relative overflow-hidden rounded-2xl bg-[#0F172A] dark:bg-[#060B14] border border-[#1E3A5F] p-5">
-                  <div className="absolute top-0 end-0 w-48 h-48 bg-brand-500/10 rounded-full blur-3xl -translate-y-1/2 pointer-events-none" />
+                  <div className="absolute top-0 end-0 w-48 h-48 bg-brand-400/10 rounded-full blur-3xl -translate-y-1/2 pointer-events-none" />
                   <div className="relative flex flex-wrap items-center justify-between gap-4">
                     <div>
                       <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-brand-400 mb-1 font-mono">{t('atelier.cost.bannerLabel')}</p>
@@ -1210,7 +1210,7 @@ export default function Dashboard() {
                         })}
                       </p>
                     </div>
-                    <div className="shrink-0 w-14 h-14 rounded-2xl bg-brand-500/10 border border-brand-500/30 flex items-center justify-center">
+                    <div className="shrink-0 w-14 h-14 rounded-2xl bg-brand-400/10 border border-brand-500/30 flex items-center justify-center">
                       <TrendingUp className="w-6 h-6 text-brand-400" />
                     </div>
                   </div>
@@ -1290,7 +1290,7 @@ export default function Dashboard() {
                       <span className="text-xs font-mono font-bold text-brand-500/80 dark:text-brand-400/80">%</span>
                     </div>
                     <div className="mt-2 w-full h-1.5 rounded-full bg-studio-field overflow-hidden">
-                      <div className="h-full rounded-full bg-brand-500" style={{ width: `${Math.max(0, Math.min(100, result.wastePercentage))}%` }} />
+                      <div className="h-full rounded-full bg-brand-400" style={{ width: `${Math.max(0, Math.min(100, result.wastePercentage))}%` }} />
                     </div>
                     <span className="text-[10px] text-brand-600/70 dark:text-brand-500/60 mt-1.5">{t('atelier.metrics.wasteSub', { kerf: n(options.kerfWidth) })}</span>
                   </div>
@@ -1499,7 +1499,7 @@ export default function Dashboard() {
                     <FileCode2 className="w-3.5 h-3.5 text-sky-400" />
                     {t('atelier.exports.dxf')}
                   </button>
-                  <button onClick={handleDownloadPdf} disabled={isDownloadingPdf} className="col-span-4 mt-1 py-3 rounded-xl bg-brand-500 hover:bg-brand-400 text-slate-950 font-black text-xs flex items-center justify-center gap-2 shadow-lg shadow-brand-500/20 transition-all disabled:opacity-40">
+                  <button onClick={handleDownloadPdf} disabled={isDownloadingPdf} className="col-span-4 mt-1 py-3 rounded-xl bg-brand-400 hover:bg-brand-400 text-slate-950 font-black text-xs flex items-center justify-center gap-2 shadow-lg shadow-brand-500/20 transition-all disabled:opacity-40">
                     {isDownloadingPdf ? <RefreshCw className="w-4 h-4 animate-spin" /> : <FileText className="w-4 h-4" />}
                     {isDownloadingPdf ? t('atelier.exports.pdfGenerating') : t('atelier.exports.pdf')}
                   </button>
