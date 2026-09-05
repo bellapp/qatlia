@@ -781,6 +781,17 @@ export default function Dashboard() {
               </button>
             </div>
 
+            {/* Kerf chip (Stitch header pattern): the blade width is a technical
+                figure — mono, amber-tinted, always visible for machine setup. */}
+            <div
+              dir="ltr"
+              className="hidden md:flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-brand-400/10 border border-brand-500/25 text-brand-500 dark:text-brand-400 text-xs font-mono font-bold"
+              title={t('options.kerf.title')}
+            >
+              <span className="w-1.5 h-1.5 rounded-full bg-brand-400" aria-hidden="true" />
+              {t('options.kerf.chip', { value: n(options.kerfWidth, { maximumFractionDigits: 1 }) })}
+            </div>
+
             <Link
               href="/history"
               aria-label={t('atelier.header.history')}

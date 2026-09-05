@@ -366,6 +366,7 @@ export const en: Catalog = {
   },
   options: {
     kerf: {
+      chip: 'Kerf {value} mm',
       tooltip: 'Material removed by the saw blade between two cuts. Standard: 3 mm for a carbide blade.',
       title: 'Blade thickness (kerf)',
       desc: 'Saw cut removed between two cuts',

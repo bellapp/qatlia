@@ -401,6 +401,7 @@ export const fr = {
   },
   options: {
     kerf: {
+      chip: 'Kerf {value} mm',
       tooltip: 'Épaisseur de matière retirée par le trait de scie entre chaque coupe. Standard : 3 mm pour lame carbure.',
       title: 'Épaisseur de lame (Kerf)',
       desc: 'Trait de scie retiré entre chaque coupe',
