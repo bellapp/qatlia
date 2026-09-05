@@ -6,6 +6,8 @@ export const ar: Catalog = {
     login: 'تسجيل الدخول',
     tryFree: 'جرّب مجاناً',
     tryFreeShort: 'جرّب',
+    features: 'الميزات',
+    pricing: 'الأسعار',
     languageAria: 'اختر اللغة',
     languageOptionAria: 'عرض الموقع بـ{language}',
     lightMode: 'الوضع الفاتح',
@@ -31,6 +33,12 @@ export const ar: Catalog = {
     ctaSecondary: 'لديّ حساب بالفعل',
     note: '{count} أرصدة لتحليل الصور مجاناً عند التسجيل · التحسين والتصدير مجانيان · بدون بطاقة بنكية',
     screenshotAlt: 'خطة قطع محسّنة في ورشة QatlIA: عارض ثنائي الأبعاد ومؤشرات الاستغلال والهدر',
+    stats: {
+      credits: 'تحليلات بالذكاء الاصطناعي مجاناً',
+      free: 'التحسين والتصدير مجاناً',
+      max: 'تحليلاً في الشهر (أكبر باقة)',
+      langs: 'لغات — FR · EN · AR',
+    },
   },
   // Morocco writes numbers with Western digits, not Eastern Arabic ones.
   stats: {
@@ -58,6 +66,14 @@ export const ar: Catalog = {
       title: 'تقليل البواقي',
       desc: 'اطّلع على نسبة الهدر والمساحة المستغلة. خسارة أقل تعني هامشاً أكبر.',
     },
+    edges: {
+      title: 'إدارة الحواف',
+      desc: 'شرائط حواف يمين ويسار وأعلى وأسفل لكل قطعة، مُسعّرة بالمتر الطولي.',
+    },
+    langs: {
+      title: 'واجهة متعددة اللغات',
+      desc: 'بالفرنسية والإنجليزية والعربية، مع تخطيط يتحوّل إلى القراءة من اليمين إلى اليسار.',
+    },
   },
   steps: {
     eyebrow: 'كيف يعمل',
@@ -75,6 +91,23 @@ export const ar: Catalog = {
       desc: 'حمّل ملف PDF مع مخطط القطع وقائمة المواد.',
     },
   },
+  pricing: {
+    eyebrow: 'الأسعار',
+    title: 'التحسين والتصدير مجاناً، مدى الحياة',
+    popular: 'الأكثر طلباً',
+    freeName: 'مجاني',
+    freeDesc: 'الأساسيات التي تكفي الورشات الصغيرة.',
+    freeOptimize: 'تحسين غير محدود',
+    freeExports: 'تصدير PDF وCSV وDXF وJSON',
+    freeNoScan: 'قراءة الصور بالذكاء الاصطناعي غير مفعّلة',
+    freeCta: 'أنشئ حساباً مجانياً',
+    packSuffix: '/ {count} تحليلاً',
+    packAllFree: 'كل ما في الباقة المجانية',
+    packScan: 'قراءة القوائم المكتوبة بخط اليد بالذكاء الاصطناعي',
+    packCta: 'اطّلع على الأرصدة',
+    more: 'تحتاج أكثر؟ {proName} — {proPrice} درهماً مقابل {proCredits} تحليلاً · {maxName} — {maxPrice} درهماً شهرياً مقابل {maxCredits} تحليلاً.',
+    moreLink: 'اطّلع على كل الباقات',
+  },
   finalCta: {
     title: 'هل أنت مستعد لتحسين ورشتك؟',
     body: 'ابدأ مجاناً مع {count} أرصدة لتحليل الصور. يبقى التحسين والتصدير مجانيين. بدون بطاقة بنكية وبدون التزام.',
@@ -83,6 +116,9 @@ export const ar: Catalog = {
   footer: {
     brand: 'QatlIA Pro',
     tagline: 'المغرب · درهم · تحسين القطع للنجارين',
+    links: {
+      credits: 'الأرصدة',
+    },
   },
   common: {
     cancel: 'إلغاء',

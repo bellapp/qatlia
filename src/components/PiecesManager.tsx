@@ -520,7 +520,7 @@ export const PiecesManager: React.FC<PiecesManagerProps> = ({
                     type="button"
                     onClick={handleImportSubmit}
                     disabled={disabled}
-                    className="px-3 py-2 rounded-lg bg-brand-400 hover:bg-brand-400 text-slate-950 text-xs font-bold transition-all disabled:opacity-30"
+                    className="px-3 py-2 rounded-lg bg-brand-400 hover:bg-brand-500 text-slate-950 text-xs font-bold transition-all disabled:opacity-30"
                   >
                     {t('pieces.import.submit')}
                   </button>
@@ -561,7 +561,7 @@ export const PiecesManager: React.FC<PiecesManagerProps> = ({
                     type="button"
                     onClick={handleTemplateAppend}
                     disabled={disabled}
-                    className="px-3 py-2 rounded-lg bg-brand-400 hover:bg-brand-400 text-slate-950 text-xs font-bold transition-all disabled:opacity-30"
+                    className="px-3 py-2 rounded-lg bg-brand-400 hover:bg-brand-500 text-slate-950 text-xs font-bold transition-all disabled:opacity-30"
                   >
                     {t('common.add')}
                   </button>
@@ -865,7 +865,7 @@ export const PiecesManager: React.FC<PiecesManagerProps> = ({
                   disabled={disabled}
                   aria-label={t('pieces.quickAdd.submitAria')}
                   title={t('pieces.quickAdd.submitAria')}
-                  className="w-full py-1.5 rounded-lg bg-brand-400 hover:bg-brand-400 text-slate-950 font-black text-xs transition-all active:scale-95 cursor-pointer"
+                  className="w-full py-1.5 rounded-lg bg-brand-400 hover:bg-brand-500 text-slate-950 font-black text-xs transition-all active:scale-95 cursor-pointer"
                 >
                   {/* The glyph is a symbol, not copy; the accessible name carries the wording. */}
                   <span aria-hidden="true">+</span>

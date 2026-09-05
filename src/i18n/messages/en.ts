@@ -6,6 +6,8 @@ export const en: Catalog = {
     login: 'Sign in',
     tryFree: 'Try it free',
     tryFreeShort: 'Try free',
+    features: 'Features',
+    pricing: 'Pricing',
     languageAria: 'Choose a language',
     languageOptionAria: 'View the site in {language}',
     lightMode: 'Light mode',
@@ -31,6 +33,12 @@ export const en: Catalog = {
     ctaSecondary: 'I already have an account',
     note: '{count} free photo-analysis credits when you sign up · Optimization and exports are free · No credit card',
     screenshotAlt: 'Optimized cutting plan in the QatlIA workshop: 2D visualizer, recovery metrics and offcuts',
+    stats: {
+      credits: 'free AI analyses',
+      free: 'optimization and exports free',
+      max: 'analyses / month (top pack)',
+      langs: 'languages — FR · EN · AR',
+    },
   },
   stats: {
     waste: { title: 'Measured waste', label: 'The waste rate comes from your plan, not from a promised average.' },
@@ -57,6 +65,14 @@ export const en: Catalog = {
       title: 'Less offcut waste',
       desc: 'See your waste rate and usable area. Less loss means more margin.',
     },
+    edges: {
+      title: 'Edge banding',
+      desc: 'Left, right, top and bottom edge bands per piece, priced by the linear metre.',
+    },
+    langs: {
+      title: 'Multilingual interface',
+      desc: 'French, English and Arabic, with a layout that switches to right-to-left reading.',
+    },
   },
   steps: {
     eyebrow: 'How it works',
@@ -74,6 +90,23 @@ export const en: Catalog = {
       desc: 'Download the PDF with the cut plan and the bill of materials.',
     },
   },
+  pricing: {
+    eyebrow: 'Pricing',
+    title: 'Optimization and exports free, for life',
+    popular: 'Popular',
+    freeName: 'Free',
+    freeDesc: 'The essentials for small workshops.',
+    freeOptimize: 'Unlimited optimization',
+    freeExports: 'PDF, CSV, DXF and JSON exports',
+    freeNoScan: 'AI scan disabled',
+    freeCta: 'Create a free account',
+    packSuffix: '/ {count} analyses',
+    packAllFree: 'Everything in the free plan',
+    packScan: 'AI scan of handwritten cut lists',
+    packCta: 'See the credit packs',
+    more: 'Need more? {proName} — {proPrice} MAD for {proCredits} analyses · {maxName} — {maxPrice} MAD a month for {maxCredits} analyses.',
+    moreLink: 'See every pack',
+  },
   finalCta: {
     title: 'Ready to optimize your workshop?',
     body: 'Start free with {count} photo-analysis credits. Optimization and exports stay free. No credit card, no commitment.',
@@ -82,6 +115,9 @@ export const en: Catalog = {
   footer: {
     brand: 'QatlIA Pro',
     tagline: 'Morocco · MAD · Cutting optimization for woodworkers',
+    links: {
+      credits: 'Credits',
+    },
   },
   common: {
     cancel: 'Cancel',

@@ -723,7 +723,7 @@ export const QuotationDialog: React.FC<QuotationDialogProps> = ({
           <button
             type="submit"
             disabled={submitting || !!itemLimitError}
-            className="w-full py-3 rounded-xl bg-brand-400 hover:bg-brand-400 text-slate-950 font-black text-sm flex items-center justify-center gap-2 disabled:opacity-50"
+            className="w-full py-3 rounded-xl bg-brand-400 hover:bg-brand-500 text-slate-950 font-black text-sm flex items-center justify-center gap-2 disabled:opacity-50"
           >
             {submitting ? <RefreshCw className="w-4 h-4 animate-spin" /> : <FileText className="w-4 h-4" />}
             {submitting ? t('quotation.generating') : t('quotation.submit')}

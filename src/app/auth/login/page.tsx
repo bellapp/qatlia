@@ -264,7 +264,7 @@ function AuthForm() {
               type="submit"
               disabled={loading || oauthLoading}
               aria-busy={loading}
-              className="w-full py-3.5 rounded-xl bg-brand-400 hover:bg-brand-400 text-slate-950 font-black text-sm flex items-center justify-center gap-2 disabled:opacity-50"
+              className="w-full py-3.5 rounded-xl bg-brand-400 hover:bg-brand-500 text-slate-950 font-black text-sm flex items-center justify-center gap-2 disabled:opacity-50"
             >
               {isLogin ? t('loginPage.submitLogin') : t('auth.submitSignup')}
               <ArrowRight className="w-4 h-4 rtl:-scale-x-100" aria-hidden="true" />

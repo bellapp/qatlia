@@ -211,7 +211,7 @@ export default function AccountPage() {
               type="submit"
               disabled={saving}
               aria-busy={saving}
-              className="sm:col-span-2 py-2.5 rounded-xl bg-brand-400 hover:bg-brand-400 text-slate-950 font-black text-xs disabled:opacity-50"
+              className="sm:col-span-2 py-2.5 rounded-xl bg-brand-400 hover:bg-brand-500 text-slate-950 font-black text-xs disabled:opacity-50"
             >
               {saving ? t('accountPage.saving') : t('accountPage.submit')}
             </button>

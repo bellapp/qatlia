@@ -323,7 +323,7 @@ export default function HistoryPage() {
                   </div>
                   <div className="flex items-center justify-between gap-2 pt-1">
                     <span className="text-[11px] font-mono font-bold text-slate-600 dark:text-slate-400">{tn('historyPage.sheetsUsed', sheetsUsed)}</span>
-                    <button onClick={() => handleLoadProject(proj)} aria-label={t('historyPage.openAria', { name: proj.name })} className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-brand-400 hover:bg-brand-400 text-slate-950 font-black text-xs transition-all group-hover:shadow-lg group-hover:shadow-brand-500/20">{t('historyPage.open')}<ArrowRight className="w-3.5 h-3.5 rtl:-scale-x-100" aria-hidden="true" /></button>
+                    <button onClick={() => handleLoadProject(proj)} aria-label={t('historyPage.openAria', { name: proj.name })} className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-brand-400 hover:bg-brand-500 text-slate-950 font-black text-xs transition-all group-hover:shadow-lg group-hover:shadow-brand-500/20">{t('historyPage.open')}<ArrowRight className="w-3.5 h-3.5 rtl:-scale-x-100" aria-hidden="true" /></button>
                   </div>
                 </div>
               );

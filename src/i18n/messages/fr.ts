@@ -10,6 +10,10 @@ export const fr = {
     login: 'Connexion',
     tryFree: 'Essayer gratuitement',
     tryFreeShort: 'Essayer',
+    // Header anchor links (desktop only). They point at the two sections that
+    // really exist on the landing page — no FAQ anchor, no FAQ section.
+    features: 'Fonctionnalités',
+    pricing: 'Tarifs',
     languageAria: 'Choisir la langue',
     languageOptionAria: 'Afficher le site en {language}',
     lightMode: 'Mode clair',
@@ -38,6 +42,16 @@ export const fr = {
     ctaSecondary: 'J’ai déjà un compte',
     note: '{count} crédits d’analyse photo offerts à l’inscription · Optimisation et exports gratuits · Sans carte bancaire',
     screenshotAlt: 'Plan de découpe optimisé dans l\'atelier QatlIA : visualiseur 2D, métriques de récupération et chutes',
+    // Labels of the four figures in the navy band. The figures themselves are
+    // never written here: they come from the sign-up grant, the billing catalog
+    // and the list of shipped locales, so a translation cannot promise a number
+    // the product does not honour.
+    stats: {
+      credits: 'analyses IA offertes',
+      free: 'optimisation et exports gratuits',
+      max: 'analyses / mois (pack max)',
+      langs: 'langues — FR · EN · AR',
+    },
   },
   // Each tile states something the product can actually demonstrate. Only the
   // credit count is a figure, and it is the one the sign-up flow really grants.
@@ -66,6 +80,14 @@ export const fr = {
       title: 'Réduction des chutes',
       desc: 'Visualisez le taux de chute et la surface utile. Moins de perte = plus de rentabilité.',
     },
+    edges: {
+      title: 'Gestion des chants',
+      desc: 'Bandes de chant gauche, droite, haut et bas par pièce, chiffrées au mètre linéaire.',
+    },
+    langs: {
+      title: 'Interface multilingue',
+      desc: 'Français, anglais et arabe, avec une mise en page qui passe en lecture de droite à gauche.',
+    },
   },
   steps: {
     eyebrow: 'Comment ça marche',
@@ -83,6 +105,28 @@ export const fr = {
       desc: 'Téléchargez le PDF avec le plan de coupe et la nomenclature.',
     },
   },
+  /**
+   * Landing pricing section. Every figure (`{price}`, `{count}`) is passed in
+   * from `src/lib/billing/catalog.ts`, so the cards can only ever quote what the
+   * checkout really charges and what the ledger really grants.
+   */
+  pricing: {
+    eyebrow: 'Tarifs',
+    title: 'Optimisation et exports gratuits, à vie',
+    popular: 'Populaire',
+    freeName: 'Gratuit',
+    freeDesc: 'L’essentiel pour les petits ateliers.',
+    freeOptimize: 'Optimisation illimitée',
+    freeExports: 'Exports PDF, CSV, DXF et JSON',
+    freeNoScan: 'Scan IA désactivé',
+    freeCta: 'Créer un compte gratuit',
+    packSuffix: '/ {count} analyses',
+    packAllFree: 'Tout du plan gratuit',
+    packScan: 'Scan IA des listes manuscrites',
+    packCta: 'Voir les crédits',
+    more: 'Besoin de plus ? {proName} — {proPrice} MAD pour {proCredits} analyses · {maxName} — {maxPrice} MAD par mois pour {maxCredits} analyses.',
+    moreLink: 'Voir tous les packs',
+  },
   finalCta: {
     title: 'Prêt à optimiser votre atelier ?',
     body: 'Commencez gratuitement avec {count} crédits d’analyse photo. L’optimisation et les exports restent gratuits. Pas de carte bancaire, pas d’engagement.',
@@ -91,6 +135,14 @@ export const fr = {
   footer: {
     brand: 'QatlIA Pro',
     tagline: 'Maroc · MAD · Optimisation de découpe pour menuisiers',
+    /**
+     * Only routes that exist. Terms and privacy pages are deliberately absent
+     * rather than linked to a 404. `features`/`pricing`/`login` reuse the header
+     * wording (`nav.*`).
+     */
+    links: {
+      credits: 'Crédits',
+    },
   },
   common: {
     cancel: 'Annuler',

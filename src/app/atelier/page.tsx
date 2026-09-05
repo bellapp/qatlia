@@ -1249,7 +1249,7 @@ export default function Dashboard() {
             <button
               onClick={handleRunOptimization}
               disabled={isOptimizing || pieces.length === 0}
-              className="w-full py-3.5 rounded-xl bg-brand-400 hover:bg-brand-400 text-slate-950 font-bold text-sm tracking-[0.08em] uppercase shadow-xl shadow-brand-500/30 ring-1 ring-brand-600/40 transition-all flex items-center justify-center gap-2.5 disabled:opacity-30 disabled:shadow-none disabled:ring-0 active:scale-[0.98]"
+              className="w-full py-3.5 rounded-xl bg-brand-400 hover:bg-brand-500 text-slate-950 font-bold text-sm tracking-[0.08em] uppercase shadow-xl shadow-brand-500/30 ring-1 ring-brand-600/40 transition-all flex items-center justify-center gap-2.5 disabled:opacity-30 disabled:shadow-none disabled:ring-0 active:scale-[0.98]"
             >
               {isOptimizing ? (
                 <>
@@ -1523,7 +1523,7 @@ export default function Dashboard() {
                     <FileCode2 className="w-3.5 h-3.5 text-sky-400" />
                     {t('atelier.exports.dxf')}
                   </button>
-                  <button onClick={handleDownloadPdf} disabled={isDownloadingPdf} className="col-span-4 mt-1 py-3 rounded-xl bg-brand-400 hover:bg-brand-400 text-slate-950 font-black text-xs flex items-center justify-center gap-2 shadow-lg shadow-brand-500/20 transition-all disabled:opacity-40">
+                  <button onClick={handleDownloadPdf} disabled={isDownloadingPdf} className="col-span-4 mt-1 py-3 rounded-xl bg-brand-400 hover:bg-brand-500 text-slate-950 font-black text-xs flex items-center justify-center gap-2 shadow-lg shadow-brand-500/20 transition-all disabled:opacity-40">
                     {isDownloadingPdf ? <RefreshCw className="w-4 h-4 animate-spin" /> : <FileText className="w-4 h-4" />}
                     {isDownloadingPdf ? t('atelier.exports.pdfGenerating') : t('atelier.exports.pdf')}
                   </button>
