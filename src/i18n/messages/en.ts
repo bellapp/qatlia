@@ -210,9 +210,9 @@ export const en: Catalog = {
     metrics: {
       sheets: 'Sheets',
       usable: 'Usable',
-      usableSub: 'area',
+      usableSub: '{value} m² used',
       waste: 'Waste',
-      wasteSub: 'left over',
+      wasteSub: 'Kerf {kerf} mm included',
       pieces: 'Pieces',
       piecesSub: 'placed',
     },

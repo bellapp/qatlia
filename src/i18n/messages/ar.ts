@@ -211,9 +211,9 @@ export const ar: Catalog = {
     metrics: {
       sheets: 'الألواح',
       usable: 'المستغل',
-      usableSub: 'المساحة',
+      usableSub: '{value} م² مستغلة',
       waste: 'الهدر',
-      wasteSub: 'المتبقي',
+      wasteSub: 'خط القطع {kerf} مم شامل',
       pieces: 'القطع',
       piecesSub: 'موضوعة',
     },

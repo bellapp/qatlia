@@ -13,6 +13,7 @@ import {
   MoveVertical,
   MoveHorizontal,
   Waves,
+  ClipboardPaste,
 } from 'lucide-react';
 import { Piece, MaterialType, EdgeBandingConfig, MATERIAL_LIBRARY, EDGEBANDING_PRESETS } from '@/lib/cutting/binpacking';
 import { parsePiecesImport } from '@/lib/pieces/import-parser';
@@ -375,8 +376,8 @@ export const PiecesManager: React.FC<PiecesManagerProps> = ({
 
   return (
     <div className="space-y-0">
-      <div className="flex items-center justify-between px-1 py-2 gap-2">
-        <div className="flex items-center gap-2 flex-wrap">
+      <div className="flex items-center justify-between px-1 py-2 gap-1.5">
+        <div className="flex items-center gap-1.5 flex-wrap">
           <div className="relative max-w-[170px] sm:max-w-[220px]">
             <Search className="w-3.5 h-3.5 text-slate-500 dark:text-slate-400 absolute start-2.5 top-2.5" aria-hidden="true" />
             <input
@@ -391,6 +392,7 @@ export const PiecesManager: React.FC<PiecesManagerProps> = ({
           <span className="hidden sm:inline text-[10px] font-mono text-slate-500 dark:text-slate-400 tabular-nums">
             {t('pieces.counts', { qty: totalQty, rows: tn('pieces.rowCount', filteredList.length) })}
           </span>
+          {/* Compact chip: rest state bg-studio-field / hover bg-studio-border, active state gets the brand tint. */}
           <button
             type="button"
             onClick={() => {
@@ -398,25 +400,26 @@ export const PiecesManager: React.FC<PiecesManagerProps> = ({
               setActivePanel(activePanel === 'import' ? null : 'import');
             }}
             disabled={disabled}
-            className={`px-2 py-1 rounded-lg border text-[10px] font-semibold transition-all ${
+            className={`flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-bold transition-colors ${
               activePanel === 'import'
-                ? 'border-brand-500/40 bg-brand-500/10 text-brand-500'
-                : 'border-studio-border bg-studio-panel text-slate-600 dark:text-slate-400'
+                ? 'bg-brand-500/10 text-brand-500 border border-brand-500/40'
+                : 'bg-studio-field hover:bg-studio-border text-slate-600 dark:text-slate-300'
             }`}
           >
+            <ClipboardPaste className="w-3.5 h-3.5" aria-hidden="true" />
             {t('pieces.pasteExcel')}
           </button>
           <button
             type="button"
             onClick={() => setActivePanel(activePanel === 'template' ? null : 'template')}
             disabled={disabled}
-            className={`px-2 py-1 rounded-lg border text-[10px] font-semibold transition-all flex items-center gap-1 ${
+            className={`flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-bold transition-colors ${
               activePanel === 'template'
-                ? 'border-brand-500/40 bg-brand-500/10 text-brand-500'
-                : 'border-studio-border bg-studio-panel text-slate-600 dark:text-slate-400'
+                ? 'bg-brand-500/10 text-brand-500 border border-brand-500/40'
+                : 'bg-studio-field hover:bg-studio-border text-slate-600 dark:text-slate-300'
             }`}
           >
-            <Library className="w-3 h-3" aria-hidden="true" />
+            <Library className="w-3.5 h-3.5" aria-hidden="true" />
             {t('pieces.templates')}
           </button>
         </div>
@@ -427,9 +430,9 @@ export const PiecesManager: React.FC<PiecesManagerProps> = ({
               type="button"
               onClick={handleDeleteSelected}
               aria-label={t('pieces.deleteSelectedAria')}
-              className="px-2 py-1 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 text-[10px] font-bold border border-rose-500/20 flex items-center gap-1 transition-all"
+              className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 text-xs font-bold border border-rose-500/20 transition-colors"
             >
-              <Trash2 className="w-3 h-3" aria-hidden="true" />
+              <Trash2 className="w-3.5 h-3.5" aria-hidden="true" />
               <span>{selectedIds.size}</span>
             </button>
           )}
@@ -437,8 +440,9 @@ export const PiecesManager: React.FC<PiecesManagerProps> = ({
           <button
             type="button"
             onClick={handleSelectAll}
-            className="px-2 py-1 rounded-lg bg-studio-panel hover:bg-studio-field text-slate-600 dark:text-slate-400 text-[10px] font-semibold border border-studio-border transition-all"
+            className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-studio-field hover:bg-studio-border text-slate-600 dark:text-slate-300 text-xs font-bold transition-colors"
           >
+            <CheckSquare className="w-3.5 h-3.5" aria-hidden="true" />
             {selectedIds.size === filteredList.length && filteredList.length > 0
               ? t('pieces.deselectAll')
               : t('pieces.selectAll')}
@@ -449,11 +453,11 @@ export const PiecesManager: React.FC<PiecesManagerProps> = ({
             type="button"
             onClick={handleSwapAll}
             disabled={pieces.length === 0}
-            className="px-2 py-1 rounded-lg bg-studio-panel hover:bg-studio-field text-slate-600 dark:text-slate-400 text-[10px] font-semibold border border-studio-border transition-all flex items-center gap-1 disabled:opacity-30"
+            className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-studio-field hover:bg-studio-border text-slate-600 dark:text-slate-300 text-xs font-bold transition-colors disabled:opacity-30"
             title={t('pieces.swapAllTitle')}
             aria-label={t('pieces.swapAllAria')}
           >
-            <ArrowLeftRight className="w-3 h-3" aria-hidden="true" />
+            <ArrowLeftRight className="w-3.5 h-3.5" aria-hidden="true" />
             {t('pieces.swapAll')}
           </button>
 
@@ -461,7 +465,7 @@ export const PiecesManager: React.FC<PiecesManagerProps> = ({
             type="button"
             onClick={handleExportCsv}
             disabled={pieces.length === 0}
-            className="px-2 py-1 rounded-lg bg-studio-panel hover:bg-studio-field text-slate-600 dark:text-slate-400 border border-studio-border transition-all disabled:opacity-30"
+            className="px-2.5 py-1.5 rounded-lg bg-studio-field hover:bg-studio-border text-slate-600 dark:text-slate-300 transition-colors disabled:opacity-30"
             title={t('pieces.exportCsv')}
             aria-label={t('pieces.exportCsv')}
           >
@@ -623,12 +627,12 @@ export const PiecesManager: React.FC<PiecesManagerProps> = ({
                   data-piece-name={piece.name}
                   onMouseEnter={() => setFocusedRow(piece.id || null)}
                   onMouseLeave={() => setFocusedRow(null)}
-                  className={`grid grid-cols-12 gap-1.5 items-center px-3 py-2 transition-all group ${
+                  className={`grid grid-cols-12 gap-1.5 items-center px-3 py-3 transition-all group ${
                     isSelected
                       ? 'bg-brand-500/10'
                       : index % 2 === 0
-                        ? 'bg-studio-canvas/40 hover:bg-studio-panel/60'
-                        : 'bg-studio-panel/20 hover:bg-studio-panel/60'
+                        ? 'bg-studio-canvas/40 hover:bg-studio-panel/80'
+                        : 'bg-studio-panel/20 hover:bg-studio-panel/80'
                   }`}
                 >
                   <div className="col-span-1 flex items-center gap-1">
@@ -649,7 +653,7 @@ export const PiecesManager: React.FC<PiecesManagerProps> = ({
                     </span>
                   </div>
 
-                  <div className="col-span-4 sm:col-span-4 flex items-center gap-2 min-w-0">
+                  <div className="col-span-4 sm:col-span-4 flex flex-1 items-center gap-2 min-w-0">
                     <input
                       type="text"
                       value={piece.name}

@@ -1168,7 +1168,7 @@ export default function Dashboard() {
             <button
               onClick={handleRunOptimization}
               disabled={isOptimizing || pieces.length === 0}
-              className="w-full py-4 rounded-2xl bg-brand-500 hover:bg-brand-400 text-slate-950 font-black text-sm tracking-[0.08em] uppercase shadow-xl shadow-brand-500/30 ring-1 ring-brand-600/40 transition-all flex items-center justify-center gap-2.5 disabled:opacity-30 disabled:shadow-none disabled:ring-0 active:scale-[0.98]"
+              className="w-full py-3.5 rounded-xl bg-brand-500 hover:bg-brand-400 text-slate-950 font-bold text-sm tracking-[0.08em] uppercase shadow-xl shadow-brand-500/30 ring-1 ring-brand-600/40 transition-all flex items-center justify-center gap-2.5 disabled:opacity-30 disabled:shadow-none disabled:ring-0 active:scale-[0.98]"
             >
               {isOptimizing ? (
                 <>
@@ -1249,48 +1249,60 @@ export default function Dashboard() {
                   </div>
                 )}
 
-                {/* Performance Metrics Grid — MIX: workshop KPI cards, icon-led
-                    label row + mono figure, technical caption underneath */}
-                <div className="grid grid-cols-4 gap-2">
-                  <div className="p-3.5 rounded-xl bg-studio-panel/60 border border-studio-border/80 flex flex-col gap-1.5">
-                    <div className="flex items-center justify-between text-slate-500 dark:text-slate-400">
-                      <span className="text-[9px] font-bold uppercase tracking-wider">{t('atelier.metrics.sheets')}</span>
-                      <Boxes className="w-3.5 h-3.5 text-sky-400" />
+                {/* Performance Metrics Grid — Stitch metric-card skeleton:
+                    label+icon row, baseline value+unit row, progress bar
+                    (usable/waste only) and a technical caption underneath.
+                    All figures come straight from `result`/`options` below. */}
+                <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+                  <div className="p-4 rounded-xl bg-studio-panel border border-studio-border/80 flex flex-col justify-between shadow-sm">
+                    <div className="flex items-center justify-between text-slate-500 dark:text-slate-400 mb-1">
+                      <span className="text-[11px] font-bold uppercase tracking-wider">{t('atelier.metrics.sheets')}</span>
+                      <Boxes className="w-4 h-4 text-sky-400" />
                     </div>
-                    <span className="text-2xl font-black font-mono text-slate-900 dark:text-white tabular-nums" dir="ltr">{result.sheetsUsed}</span>
-                    <span className="text-[9px] text-slate-600 dark:text-slate-500 truncate" dir="ltr">
+                    <div className="flex items-baseline gap-1.5">
+                      <span className="text-3xl font-black font-mono tracking-tight text-slate-900 dark:text-white tabular-nums" dir="ltr">{result.sheetsUsed}</span>
+                    </div>
+                    <span className="text-[10px] text-slate-500 dark:text-slate-500 mt-1.5 truncate" dir="ltr">
                       {formatDisplayValue(activeSheet.height, displayUnit)}×{formatDisplayValue(activeSheet.width, displayUnit)} {displayUnit}
                     </span>
                   </div>
-                  <div className="p-3.5 rounded-xl bg-studio-panel/60 border border-studio-border/80 flex flex-col gap-1.5">
-                    <div className="flex items-center justify-between text-slate-500 dark:text-slate-400">
-                      <span className="text-[9px] font-bold uppercase tracking-wider">{t('atelier.metrics.usable')}</span>
-                      <Leaf className="w-3.5 h-3.5 text-emerald-400" />
+                  <div className="p-4 rounded-xl bg-studio-panel border border-studio-border/80 flex flex-col justify-between shadow-sm">
+                    <div className="flex items-center justify-between text-slate-500 dark:text-slate-400 mb-1">
+                      <span className="text-[11px] font-bold uppercase tracking-wider">{t('atelier.metrics.usable')}</span>
+                      <Leaf className="w-4 h-4 text-emerald-400" />
                     </div>
-                    <span className="text-2xl font-black font-mono text-emerald-500 dark:text-emerald-400 tabular-nums" dir="ltr">{(100 - result.wastePercentage).toFixed(0)}%</span>
-                    <div className="w-full h-1 rounded-full bg-studio-field overflow-hidden">
+                    <div className="flex items-baseline gap-1.5">
+                      <span className="text-3xl font-black font-mono tracking-tight text-emerald-500 dark:text-emerald-400 tabular-nums" dir="ltr">{(100 - result.wastePercentage).toFixed(0)}</span>
+                      <span className="text-xs font-mono font-bold text-emerald-500/80 dark:text-emerald-400/80">%</span>
+                    </div>
+                    <div className="mt-2 w-full h-1.5 rounded-full bg-studio-field overflow-hidden">
                       <div className="h-full rounded-full bg-emerald-500" style={{ width: `${Math.max(0, Math.min(100, 100 - result.wastePercentage))}%` }} />
                     </div>
-                    <span className="text-[9px] text-emerald-600/70 dark:text-emerald-500/60">{t('atelier.metrics.usableSub')}</span>
+                    <span className="text-[10px] text-emerald-600/70 dark:text-emerald-500/60 mt-1.5">{t('atelier.metrics.usableSub', { value: n(result.totalAreaUsed / 10000, { maximumFractionDigits: 2 }) })}</span>
                   </div>
-                  <div className="p-3.5 rounded-xl bg-studio-panel/60 border border-studio-border/80 flex flex-col gap-1.5">
-                    <div className="flex items-center justify-between text-slate-500 dark:text-slate-400">
-                      <span className="text-[9px] font-bold uppercase tracking-wider">{t('atelier.metrics.waste')}</span>
-                      <Trash2 className="w-3.5 h-3.5 text-brand-400" />
+                  <div className="p-4 rounded-xl bg-studio-panel border border-studio-border/80 flex flex-col justify-between shadow-sm">
+                    <div className="flex items-center justify-between text-slate-500 dark:text-slate-400 mb-1">
+                      <span className="text-[11px] font-bold uppercase tracking-wider">{t('atelier.metrics.waste')}</span>
+                      <Trash2 className="w-4 h-4 text-brand-400" />
                     </div>
-                    <span className="text-2xl font-black font-mono text-brand-500 dark:text-brand-400 tabular-nums" dir="ltr">{result.wastePercentage.toFixed(0)}%</span>
-                    <div className="w-full h-1 rounded-full bg-studio-field overflow-hidden">
+                    <div className="flex items-baseline gap-1.5">
+                      <span className="text-3xl font-black font-mono tracking-tight text-brand-500 dark:text-brand-400 tabular-nums" dir="ltr">{result.wastePercentage.toFixed(0)}</span>
+                      <span className="text-xs font-mono font-bold text-brand-500/80 dark:text-brand-400/80">%</span>
+                    </div>
+                    <div className="mt-2 w-full h-1.5 rounded-full bg-studio-field overflow-hidden">
                       <div className="h-full rounded-full bg-brand-500" style={{ width: `${Math.max(0, Math.min(100, result.wastePercentage))}%` }} />
                     </div>
-                    <span className="text-[9px] text-brand-600/70 dark:text-brand-500/60">{t('atelier.metrics.wasteSub')}</span>
+                    <span className="text-[10px] text-brand-600/70 dark:text-brand-500/60 mt-1.5">{t('atelier.metrics.wasteSub', { kerf: n(options.kerfWidth) })}</span>
                   </div>
-                  <div className="p-3.5 rounded-xl bg-studio-panel/60 border border-studio-border/80 flex flex-col gap-1.5">
-                    <div className="flex items-center justify-between text-slate-500 dark:text-slate-400">
-                      <span className="text-[9px] font-bold uppercase tracking-wider">{t('atelier.metrics.pieces')}</span>
-                      <Scissors className="w-3.5 h-3.5 text-sky-400" />
+                  <div className="p-4 rounded-xl bg-studio-panel border border-studio-border/80 flex flex-col justify-between shadow-sm">
+                    <div className="flex items-center justify-between text-slate-500 dark:text-slate-400 mb-1">
+                      <span className="text-[11px] font-bold uppercase tracking-wider">{t('atelier.metrics.pieces')}</span>
+                      <Scissors className="w-4 h-4 text-sky-400" />
                     </div>
-                    <span className="text-2xl font-black font-mono text-sky-500 dark:text-sky-400 tabular-nums" dir="ltr">{result.placedPieces.length}</span>
-                    <span className="text-[9px] text-sky-600/70 dark:text-sky-400/60">{t('atelier.metrics.piecesSub')}</span>
+                    <div className="flex items-baseline gap-1.5">
+                      <span className="text-3xl font-black font-mono tracking-tight text-sky-500 dark:text-sky-400 tabular-nums" dir="ltr">{result.placedPieces.length}</span>
+                    </div>
+                    <span className="text-[10px] text-sky-600/70 dark:text-sky-400/60 mt-1.5">{t('atelier.metrics.piecesSub')}</span>
                   </div>
                 </div>
 
@@ -1300,7 +1312,7 @@ export default function Dashboard() {
                 <div className="overflow-hidden rounded-2xl border border-studio-border/80 shadow-xl shadow-black/[0.06] dark:shadow-black/30">
                   {/* Tabs for sheets — opaque toolbar: the plan scrolls under it
                       when zoomed, translucency made that read as an overlap bug */}
-                  <div data-testid="cut-plan-toolbar" className="relative z-20 flex flex-wrap items-center justify-between gap-2 px-4 py-2.5 bg-studio-panel border-b border-studio-border/60">
+                  <div data-testid="cut-plan-toolbar" className="relative z-20 flex flex-wrap items-center gap-2 px-4 py-2.5 bg-studio-panel border-b border-studio-border/60">
                     <div className="flex min-w-0 flex-1 items-center gap-1 overflow-x-auto">
                       {Array.from({length: result.sheetsUsed}).map((_, i) => (
                         <button
@@ -1319,9 +1331,17 @@ export default function Dashboard() {
                         </button>
                       ))}
                     </div>
-                    {/* The zoom pair reads out/in like the plan it drives, so it
-                        keeps the plan's LTR order in every locale. */}
-                    <div dir="ltr" className="flex shrink-0 items-center gap-1.5 bg-studio-field rounded-lg border border-studio-border p-0.5">
+                  </div>
+
+                  {/* SVG Canvas — the plan is geometry, not prose: its origin is
+                      the sheet's top-left corner and its labels are cm/mm
+                      figures, so it stays LTR even when the workshop is RTL. */}
+                  <div dir="ltr" data-testid="cut-plan-viewport" className={`relative min-h-[420px] max-h-[70vh] overflow-auto overscroll-contain p-5 flex ${isDark ? 'bg-[#040812]' : 'bg-[#F1F5F9]'}`}>
+                    {/* Zoom controls — floating instrument control, pinned to the
+                        viewport itself (not the toolbar) so it stays reachable
+                        while the plan underneath scrolls. Reads out/in like the
+                        plan it drives, so it keeps LTR order in every locale. */}
+                    <div dir="ltr" className="absolute bottom-3 end-3 z-10 flex items-center gap-1.5 bg-studio-panel/90 backdrop-blur rounded-lg border border-studio-border p-0.5 shadow-sm">
                       <button aria-label={t('atelier.plan.zoomOut')} onClick={() => setZoomLevel(Math.max(0.5, zoomLevel - 0.25))} disabled={zoomLevel <= 0.5} className="p-1 rounded-md hover:bg-studio-border transition-colors text-slate-600 dark:text-slate-400 disabled:opacity-35 disabled:cursor-not-allowed">
                         <ZoomOut className="w-3.5 h-3.5" />
                       </button>
@@ -1330,16 +1350,11 @@ export default function Dashboard() {
                         <ZoomIn className="w-3.5 h-3.5" />
                       </button>
                     </div>
-                  </div>
-
-                  {/* SVG Canvas — the plan is geometry, not prose: its origin is
-                      the sheet's top-left corner and its labels are cm/mm
-                      figures, so it stays LTR even when the workshop is RTL. */}
-                  <div dir="ltr" data-testid="cut-plan-viewport" className={`relative min-h-[420px] max-h-[70vh] overflow-auto overscroll-contain p-5 flex ${isDark ? 'bg-[#040812]' : 'bg-[#F1F5F9]'}`}>
                     {/* Technical corner readout — decorative blueprint annotation
                         (sheet size + kerf), pinned to the viewport itself so it
-                        stays put while the plan underneath scrolls/zooms. */}
-                    <div aria-hidden="true" dir="ltr" className="pointer-events-none absolute bottom-3 end-3 z-10 flex items-center gap-2 rounded-lg border border-studio-border/70 bg-studio-panel/90 backdrop-blur px-2.5 py-1.5 font-mono text-[10px] font-bold text-slate-500 dark:text-slate-400 shadow-sm">
+                        stays put while the plan underneath scrolls/zooms. Sits
+                        at the opposite corner from the zoom controls above. */}
+                    <div aria-hidden="true" dir="ltr" className="pointer-events-none absolute bottom-3 start-3 z-10 flex items-center gap-2 rounded-lg border border-studio-border/70 bg-studio-panel/90 backdrop-blur px-2.5 py-1.5 font-mono text-[10px] font-bold text-slate-500 dark:text-slate-400 shadow-sm">
                       <span className="flex items-center gap-1">
                         <Boxes className="w-3 h-3 text-sky-400" />
                         {formatDisplayValue(activeSheet.height, displayUnit)}×{formatDisplayValue(activeSheet.width, displayUnit)} {displayUnit}

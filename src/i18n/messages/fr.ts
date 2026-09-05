@@ -234,9 +234,9 @@ export const fr = {
     metrics: {
       sheets: 'Feuilles',
       usable: 'Utile',
-      usableSub: 'surface',
+      usableSub: '{value} m² exploités',
       waste: 'Chute',
-      wasteSub: 'résiduelle',
+      wasteSub: 'Kerf {kerf} mm inclus',
       pieces: 'Pièces',
       piecesSub: 'placées',
     },
