@@ -30,6 +30,7 @@ export const en: Catalog = {
     ctaPrimary: 'Try it free',
     ctaSecondary: 'I already have an account',
     note: '{count} free photo-analysis credits when you sign up · Optimization and exports are free · No credit card',
+    screenshotAlt: 'Optimized cutting plan in the QatlIA workshop: 2D visualizer, recovery metrics and offcuts',
   },
   stats: {
     waste: { title: 'Measured waste', label: 'The waste rate comes from your plan, not from a promised average.' },

@@ -30,6 +30,7 @@ export const ar: Catalog = {
     ctaPrimary: 'جرّب مجاناً',
     ctaSecondary: 'لديّ حساب بالفعل',
     note: '{count} أرصدة لتحليل الصور مجاناً عند التسجيل · التحسين والتصدير مجانيان · بدون بطاقة بنكية',
+    screenshotAlt: 'خطة قطع محسّنة في ورشة QatlIA: عارض ثنائي الأبعاد ومؤشرات الاستغلال والهدر',
   },
   // Morocco writes numbers with Western digits, not Eastern Arabic ones.
   stats: {

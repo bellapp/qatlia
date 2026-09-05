@@ -98,6 +98,29 @@ export default function LandingPage() {
           <p className="mt-4 text-[11px] text-slate-600">
             {t('hero.note', { count: FREE_VISION_CREDITS })}
           </p>
+
+          {/* Product screenshot (real app capture) in a framed instrument window,
+              like the Stitch mix hero: soft amber glow + fine border + browser dot. */}
+          <div className="relative mt-14 max-w-3xl mx-auto">
+            <div aria-hidden="true" className="absolute -inset-6 bg-[radial-gradient(400px_circle_at_50%_30%,rgba(245,166,35,0.14),transparent_70%)] pointer-events-none" />
+            <div className="relative rounded-2xl border border-studio-border bg-white shadow-2xl shadow-slate-900/10 overflow-hidden">
+              {/* window chrome bar */}
+              <div className="flex items-center gap-1.5 px-4 py-2.5 bg-studio-field/70 border-b border-studio-border">
+                <span className="w-2.5 h-2.5 rounded-full bg-rose-400/80" />
+                <span className="w-2.5 h-2.5 rounded-full bg-amber-400/80" />
+                <span className="w-2.5 h-2.5 rounded-full bg-emerald-400/80" />
+                <span className="ms-3 text-[10px] font-mono text-slate-500" dir="ltr">qatlia.ma — atelier</span>
+              </div>
+              <img
+                src="/hero-atelier.webp"
+                alt={t('hero.screenshotAlt')}
+                width={810}
+                height={770}
+                className="w-full h-auto block"
+                loading="eager"
+              />
+            </div>
+          </div>
         </div>
       </section>
 

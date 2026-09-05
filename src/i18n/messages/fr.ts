@@ -37,6 +37,7 @@ export const fr = {
     ctaPrimary: 'Essayer gratuitement',
     ctaSecondary: 'J’ai déjà un compte',
     note: '{count} crédits d’analyse photo offerts à l’inscription · Optimisation et exports gratuits · Sans carte bancaire',
+    screenshotAlt: 'Plan de découpe optimisé dans l\'atelier QatlIA : visualiseur 2D, métriques de récupération et chutes',
   },
   // Each tile states something the product can actually demonstrate. Only the
   // credit count is a figure, and it is the one the sign-up flow really grants.
