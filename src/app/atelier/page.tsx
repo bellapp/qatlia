@@ -415,8 +415,43 @@ const commitPanelName = () => {
       migratedFromLegacyUnit: persistedMigratedFromLegacyUnit,
     });
 
-    writeLocalHistoryItem({
-      id: `${source}_${Date.now()}`,
+        // The local history entry above now carries explicit unit metadata, so
+    // this project no longer owes a migration rewrite on its next save —
+    // but the historical marker itself is carried forward, not reset.
+    setPendingUnitMigration(false);
+    setMigratedFromLegacyUnit(persistedMigratedFromLegacyUnit);
+
+    // History duplication fix: a signed-in save goes to the cloud ONLY —
+    // the local entry was previously written too, and the merge could show
+    // the same run twice. Local history is now the fallback for anonymous
+    // users and failed uploads, never an addition to a successful cloud save.
+    let savedToCloud = false;
+    try {
+      const supabase = createClient();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (user) {
+        const res = await fetch('/api/projects', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        });
+        if (res.ok) {
+          savedToCloud = true;
+          const data = await res.json().catch(() => null);
+          // The quotation dialog merges its metadata into *this* saved
+          // project's options_json (see /api/export-quotation) — only once
+          // the server confirms the save, never a client-guessed id.
+          if (data?.success && typeof data.projectId === 'string') setLastSavedProjectId(data.projectId);
+        }
+      }
+    } catch (err) {
+      console.error('Erreur auto-save projet:', err);
+    }
+    if (!savedToCloud) {
+      writeLocalHistoryItem({
+        id: `${source}_${Date.now()}`,
       name: payload.name,
       material: activeSheet.material || 'mdf',
       sheet_width: activeSheet.width,
@@ -427,32 +462,6 @@ const commitPanelName = () => {
       created_at: new Date().toISOString(),
       options_json: payload as unknown as LocalHistoryItem['options_json'],
     });
-    // The local history entry above now carries explicit unit metadata, so
-    // this project no longer owes a migration rewrite on its next save —
-    // but the historical marker itself is carried forward, not reset.
-    setPendingUnitMigration(false);
-    setMigratedFromLegacyUnit(persistedMigratedFromLegacyUnit);
-
-    try {
-      const supabase = createClient();
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-      if (!user) return;
-      const res = await fetch('/api/projects', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      });
-      if (res.ok) {
-        const data = await res.json().catch(() => null);
-        // The quotation dialog merges its metadata into *this* saved
-        // project's options_json (see /api/export-quotation) — only once
-        // the server confirms the save, never a client-guessed id.
-        if (data?.success && typeof data.projectId === 'string') setLastSavedProjectId(data.projectId);
-      }
-    } catch (err) {
-      console.error('Erreur auto-save projet:', err);
     }
   };
 

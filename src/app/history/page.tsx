@@ -98,6 +98,9 @@ function mergeHistory(cloud: ProjectHistoryItem[], local: LocalHistoryItem[]): P
   }));
   const seen = new Set<string>();
   const out: ProjectHistoryItem[] = [];
+  // Cloud rows are inserted FIRST so that when a local fallback copy exists
+  // for the same run (same name + same minute — the pre-cloud-save era wrote
+  // both), the cloud row wins and the local twin is dropped.
   for (const item of [...cloud, ...mappedLocal]) {
     const key = `${item.name}|${item.created_at.slice(0, 16)}`;
     if (seen.has(item.id) || seen.has(key)) continue;
