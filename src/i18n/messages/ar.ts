@@ -187,7 +187,8 @@ export const ar: Catalog = {
       nameBars: 'قضبان {material} — {count} قطعة',
       nameSheets: 'قائمة قطع {material} — {count} قطعة',
       defaultTitle: 'مشروع القطع',
-      piecesCount: 'قطعة',
+      nameAria: 'تسمية المشروع',
+            piecesCount: 'قطعة',
       lineCount: 'خطوط',
       optimized: 'تم التحسين بنجاح',
       rerun: 'إعادة التحسين',
@@ -626,6 +627,7 @@ export const ar: Catalog = {
     back: 'العودة إلى قطع الألواح',
   },
   historyPage: {
+      renameAria: 'إعادة تسمية المشروع {name}',
     backToAtelier: 'الورشة',
     eyebrow: 'الورشة',
     heading: 'قوائم القطع الخاصة بك',

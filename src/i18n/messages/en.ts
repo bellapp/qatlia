@@ -186,7 +186,8 @@ export const en: Catalog = {
       nameBars: 'Bars {material} — {count} pcs',
       nameSheets: 'Cut list {material} — {count} pcs',
       defaultTitle: 'Cutting project',
-      piecesCount: 'pieces',
+      nameAria: 'Name the project',
+            piecesCount: 'pieces',
       lineCount: 'lines',
       optimized: 'Optimization complete',
       rerun: 'Re-run optimization',
@@ -626,6 +627,7 @@ export const en: Catalog = {
     back: 'Back to panel cutting',
   },
   historyPage: {
+      renameAria: 'Rename project {name}',
     backToAtelier: 'Workshop',
     eyebrow: 'Workshop',
     heading: 'Your cut lists',

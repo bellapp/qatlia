@@ -181,7 +181,10 @@ export default function Dashboard() {
 // Panel naming: the artisan can name a stock panel; without a name the
   // dimensions stand in. The draft syncs when the panel itself changes.
   const [panelNameDraft, setPanelNameDraft] = useState<string>('');
-  const [presetNameDraft, setPresetNameDraft] = useState<string>('');
+
+  // Custom project name (audit feature): empty means auto-name fallback.
+  const [projectName, setProjectName] = useState<string>('');
+  const [projectNameDraft, setProjectNameDraft] = useState<string>('');  const [presetNameDraft, setPresetNameDraft] = useState<string>('');
   const [presetFeedback, setPresetFeedback] = useState<{ tone: 'success' | 'warning'; text: string } | null>(null);
 
   useEffect(() => {
@@ -190,7 +193,7 @@ export default function Dashboard() {
   }, [activeSheet.id]);
 
   /** Applies the typed name to the current stock panel (payload `label`). */
-  const commitPanelName = () => {
+const commitPanelName = () => {
     const name = panelNameDraft.trim();
     // Two panels must not carry the same name: uniqueness guard.
     const duplicate = sheets.some((s) => s.id !== activeSheet.id && (s.label || '') === name && name !== '');
@@ -232,6 +235,21 @@ export default function Dashboard() {
   const { theme } = useTheme();
   const isDark = theme === 'dark';
   const { t, tn, n, locale } = useLocale();
+
+  /** Commits the typed project name (no uniqueness constraint — several
+   *  projects may share a name). Empty reverts to the auto-name fallback. */
+  const commitProjectName = () => {
+    const name = projectNameDraft.trim();
+    setProjectName(name);
+  };
+
+  /** The name a saved project carries: custom > panel label > auto. */
+  const derivedProjectName = projectName.trim()
+    || activeSheet.label?.trim()
+    || t(cutMode === '1d' ? 'atelier.project.nameBars' : 'atelier.project.nameSheets', {
+      material: (activeSheet.material || 'mdf').toUpperCase(),
+      count: pieces.reduce((s, p) => s + (p.quantity || 1), 0),
+    });
 
   // Re-sync the free-typed drafts whenever the canonical sheet dimensions or
   // the display unit change from *outside* the draft itself (a cm↔mm toggle,
@@ -315,6 +333,10 @@ export default function Dashboard() {
         if (parsed.sheet) setSheets([parsed.sheet]);
         if (parsed.sheets) setSheets(parsed.sheets);
         if (Array.isArray(parsed.pieces)) setPieces(normalizePiecesWithColors(parsed.pieces));
+        if (typeof parsed.projectName === 'string' && parsed.projectName.trim()) {
+          setProjectName(parsed.projectName.trim());
+          setProjectNameDraft(parsed.projectName.trim());
+        }
         if (parsed.options) setOptions((prev) => ({ ...prev, ...parsed.options }));
         if (restoredProjectId) setLastSavedProjectId(restoredProjectId);
         // Legacy saved projects carry no unit metadata at all; they predate
@@ -376,10 +398,9 @@ export default function Dashboard() {
       // rather than a translated label, so a project keeps the same identity in
       // history whatever language it was saved in; only the wording around it
       // follows the artisan's locale.
-      name: t(cutMode === '1d' ? 'atelier.project.nameBars' : 'atelier.project.nameSheets', {
-        material: (activeSheet.material || 'mdf').toUpperCase(),
-        count: pieces.reduce((s, p) => s + (p.quantity || 1), 0),
-      }),
+      // Custom project name (when the artisan named it) > panel label > auto.
+      name: derivedProjectName,
+      projectName: projectName.trim() || undefined,
       sheets,
       sheet: activeSheet,
       pieces,
@@ -684,7 +705,7 @@ export default function Dashboard() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(
-          buildPdfPayload(t('atelier.exports.pdfDefaultProjectName'), activeSheet, pieces, result, displayUnit, locale)
+          buildPdfPayload(derivedProjectName, activeSheet, pieces, result, displayUnit, locale)
         ),
       });
 
@@ -890,9 +911,16 @@ export default function Dashboard() {
                 <ClipboardList className="w-4 h-4 text-brand-500 dark:text-brand-400" />
               </span>
               <div className="min-w-0">
-                <p className="text-sm font-black text-slate-900 dark:text-white truncate">
-                  {activeSheet.label?.trim() ? activeSheet.label : t('atelier.project.defaultTitle')}
-                </p>
+                <input
+                  value={projectNameDraft}
+                  onChange={(e) => setProjectNameDraft(e.target.value)}
+                  onBlur={commitProjectName}
+                  onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur(); }}
+                  placeholder={activeSheet.label?.trim() || t('atelier.project.defaultTitle')}
+                  aria-label={t('atelier.project.nameAria')}
+                  data-testid="project-name-input"
+                  className="block w-full max-w-[260px] bg-transparent text-sm font-black text-slate-900 dark:text-white outline-none border-none p-0 focus:ring-0 placeholder:text-slate-400 dark:placeholder:text-slate-500 truncate"
+                />
                 <p className="text-[10px] text-slate-500 font-mono" dir="ltr">
                   {pieces.length} {t('atelier.project.piecesCount')} · {new Set(pieces.map((p) => p.name)).size} {t('atelier.project.lineCount')}
                 </p>

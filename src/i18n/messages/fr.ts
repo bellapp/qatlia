@@ -226,7 +226,8 @@ export const fr = {
       nameBars: 'Barres {material} — {count} pcs',
       nameSheets: 'Débit {material} — {count} pcs',
       defaultTitle: 'Projet de débit',
-      piecesCount: 'pièces',
+      nameAria: 'Nommer le projet',
+            piecesCount: 'pièces',
       lineCount: 'lignes',
       optimized: 'Optimisation réussie',
       rerun: 'Relancer l’optimisation',
@@ -705,6 +706,7 @@ export const fr = {
     back: 'Retourner au Débit de Panneaux',
   },
   historyPage: {
+      renameAria: 'Renommer le projet {name}',
     backToAtelier: 'Atelier',
     eyebrow: 'Atelier',
     heading: 'Vos débits',

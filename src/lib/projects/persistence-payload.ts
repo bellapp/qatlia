@@ -15,6 +15,8 @@ import {
 
 export interface PersistedProjectPayloadInput {
   name: string;
+  /** The artisan's own project name when set (undefined = auto-name). */
+  projectName?: string;
   sheets: Sheet[];
   sheet: Sheet;
   pieces: Piece[];
@@ -31,6 +33,8 @@ export interface PersistedProjectPayloadInput {
 
 export interface PersistedProjectPayload extends ProjectUnitPersistenceMetadata {
   name: string;
+  /** Present only when the artisan named the project themselves. */
+  projectName?: string;
   sheets: Sheet[];
   sheet: Sheet;
   pieces: Piece[];
@@ -47,6 +51,7 @@ export function buildPersistedProjectPayload(
 ): PersistedProjectPayload {
   return {
     name: input.name,
+    ...(input.projectName?.trim() ? { projectName: input.projectName.trim() } : {}),
     sheets: input.sheets,
     sheet: input.sheet,
     pieces: input.pieces,

@@ -11,6 +11,7 @@ import {
   RefreshCw,
   CloudOff,
   Search,
+  Pencil,
 } from 'lucide-react';
 import { readLocalHistory, type LocalHistoryItem } from '@/lib/history';
 import { AccountMenu } from '@/components/AccountMenu';
@@ -138,6 +139,42 @@ export default function HistoryPage() {
   const [syncNote, setSyncNote] = useState<TranslationKey | null>(null);
   const [filterText, setFilterText] = useState('');
   const [materialFilter, setMaterialFilter] = useState('');
+
+  // Inline rename state: which card is being edited + its draft value.
+  const [renamingId, setRenamingId] = useState<string | null>(null);
+  const [renameDraft, setRenameDraft] = useState('');
+
+  /** Commits a rename: cloud rows go through PATCH /api/projects/[id]
+   *  (ownership-checked); local-only rows update localStorage directly. */
+  const commitRename = async (proj: ProjectHistoryItem) => {
+    const name = renameDraft.trim();
+    setRenamingId(null);
+    if (!name || name === proj.name) return;
+    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(proj.id);
+    let ok = false;
+    if (isUuid) {
+      try {
+        const res = await fetch(`/api/projects/${proj.id}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name }),
+        });
+        ok = res.ok;
+      } catch { ok = false; }
+    } else {
+      // Local-only item: rename inside the localStorage history.
+      try {
+        const raw = window.localStorage.getItem('qatlia_local_history_v1');
+        const list = raw ? (JSON.parse(raw) as Array<{ id: string; name: string }>) : [];
+        const next = list.map((it) => (it.id === proj.id ? { ...it, name } : it));
+        window.localStorage.setItem('qatlia_local_history_v1', JSON.stringify(next));
+        ok = true;
+      } catch { ok = false; }
+    }
+    if (ok) {
+      setProjects((prev) => prev.map((p) => (p.id === proj.id ? { ...p, name } : p)));
+    }
+  };
 
   const fetchHistory = async () => {
     setLoading(true);
@@ -314,7 +351,33 @@ export default function HistoryPage() {
                       </span>
                       {getMaterialBadge(proj.material)}
                     </div>
-                    <h3 className="text-base font-black text-slate-900 dark:text-white truncate">{proj.name}</h3>
+                    {renamingId === proj.id ? (
+                      <input
+                        autoFocus
+                        value={renameDraft}
+                        onChange={(e) => setRenameDraft(e.target.value)}
+                        onBlur={() => void commitRename(proj)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') e.currentTarget.blur();
+                          if (e.key === 'Escape') setRenamingId(null);
+                        }}
+                        aria-label={t('historyPage.renameAria')}
+                        data-testid="history-rename-input"
+                        className="w-full bg-transparent text-base font-black text-slate-900 dark:text-white outline-none border-b border-brand-500/50 pb-0.5"
+                      />
+                    ) : (
+                      <h3 className="text-base font-black text-slate-900 dark:text-white truncate flex items-center gap-1.5">
+                        <span className="truncate">{proj.name}</span>
+                        <button
+                          onClick={() => { setRenamingId(proj.id); setRenameDraft(proj.name); }}
+                          aria-label={t('historyPage.renameAria', { name: proj.name })}
+                          data-testid="history-rename-btn"
+                          className="shrink-0 w-6 h-6 rounded-lg text-slate-400 hover:text-brand-500 dark:hover:text-brand-400 hover:bg-studio-field opacity-0 group-hover:opacity-100 focus:opacity-100 transition-all flex items-center justify-center"
+                        >
+                          <Pencil className="w-3.5 h-3.5" aria-hidden="true" />
+                        </button>
+                      </h3>
+                    )}
                     <div className="grid grid-cols-3 gap-2 pt-2 border-t border-studio-border text-xs font-mono">
                       <div className="p-2 rounded-lg bg-studio-canvas"><span className="text-[10px] text-slate-500 dark:text-slate-400 block">{t('historyPage.stats.panel')}</span><span dir="ltr" className="font-bold text-slate-900 dark:text-white">{t('historyPage.sheetSize', { height: proj.sheet_height, width: proj.sheet_width, unit: CANONICAL_UNIT })}</span></div>
                       <div className="p-2 rounded-lg bg-studio-canvas"><span className="text-[10px] text-slate-500 dark:text-slate-400 block">{t('historyPage.stats.pieces')}</span><span className="font-bold text-brand-400">{t('historyPage.piecesValue', { count: n(pieceCount) })}</span></div>
@@ -334,3 +397,4 @@ export default function HistoryPage() {
     </div>
   );
 }
+

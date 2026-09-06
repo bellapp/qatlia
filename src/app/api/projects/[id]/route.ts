@@ -96,3 +96,61 @@ export async function GET(_req: Request, context: { params: { id: string } }) {
     return NextResponse.json({ error: 'SERVER_ERROR' }, { status: 500 });
   }
 }
+
+
+/**
+ * `PATCH /api/projects/[id]` — rename a saved project. Ownership-checked:
+ * the row only updates when it belongs to the signed-in artisan, and
+ * "doesn't exist" / "belongs to someone else" answer identically (the same
+ * enumeration-protection convention as the GET handler).
+ *
+ * Local-only projects (never synced to the cloud `projects` table) cannot be
+ * renamed here — the client renames those directly in localStorage.
+ */
+const RenameSchema = z.object({
+  name: z.string().trim().min(1, 'EMPTY_NAME').max(80, 'NAME_TOO_LONG'),
+});
+
+export async function PATCH(
+  req: Request,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const supabase = createClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) {
+      return NextResponse.json({ error: 'AUTH_REQUIRED' }, { status: 401 });
+    }
+
+    const parsed = RenameSchema.safeParse(await req.json());
+    if (!parsed.success) {
+      return NextResponse.json({ error: 'INVALID_NAME' }, { status: 400 });
+    }
+    const { name } = parsed.data;
+
+    // UUID guard: a non-UUID id can never be a cloud row; refuse early.
+    const { id } = await params;
+    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)) {
+      return NextResponse.json({ error: 'NOT_FOUND' }, { status: 404 });
+    }
+
+    const db = createDbClient();
+    const { data, error } = await db
+      .from('projects')
+      .update({ name })
+      .eq('id', id)
+      .eq('user_id', user.id)
+      .select('id, name')
+      .single();
+
+    if (error || !data) {
+      return NextResponse.json({ error: 'NOT_FOUND' }, { status: 404 });
+    }
+    return NextResponse.json({ success: true, id: data.id, name: data.name });
+  } catch (err) {
+    console.error('project rename failed:', err);
+    return NextResponse.json({ error: 'SERVER_ERROR' }, { status: 500 });
+  }
+}
