@@ -25,7 +25,7 @@ import type { Locale } from '@/i18n';
  */
 
 const fr = {
-  brand: 'QatlIA Pro 2026',
+  brand: 'QatlIA — 2026',
   tagline: 'Plan de Débit Linéaire & Optimisation',
   pageIndicator: (page: number, total: number) => `Page ${page} / ${total}`,
   currencyLabel: 'Devise : MAD',
@@ -89,7 +89,7 @@ const fr = {
 export type PdfCatalog = typeof fr;
 
 const en: PdfCatalog = {
-  brand: 'QatlIA Pro 2026',
+  brand: 'QatlIA — 2026',
   tagline: 'Linear Cutting Plan & Optimization',
   pageIndicator: (page, total) => `Page ${page} / ${total}`,
   currencyLabel: 'Currency: MAD',
@@ -150,7 +150,7 @@ const en: PdfCatalog = {
 };
 
 const ar: PdfCatalog = {
-  brand: 'QatlIA Pro 2026',
+  brand: 'QatlIA — 2026',
   tagline: 'مخطط القطع الخطي والتحسين',
   pageIndicator: (page, total) => `صفحة ${page} / ${total}`,
   currencyLabel: 'العملة: MAD',

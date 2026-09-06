@@ -37,7 +37,7 @@ export const fr = {
     // measured on the artisan's own plan, and never a fleet-wide average it
     // has no measurement for.
     subtitle:
-      'Scannez vos fiches de débit, optimisez le placement, exportez votre plan en PDF industriel. Le taux de chute affiché est celui calculé sur votre plan.',
+      'Scannez vos fiches de débit, optimisez le placement, exportez votre plan en PDF avec plan de coupe, cotes et nomenclature. Le taux de chute affiché est celui calculé sur votre plan.',
     ctaPrimary: 'Essayer gratuitement',
     ctaSecondary: 'J’ai déjà un compte',
     note: '{count} crédits d’analyse photo offerts à l’inscription · Optimisation et exports gratuits · Sans carte bancaire',
@@ -58,7 +58,7 @@ export const fr = {
   stats: {
     waste: { title: 'Chutes mesurées', label: 'Le taux de chute vient de votre plan, pas d’une moyenne annoncée.' },
     surface: { title: 'Surface utile calculée', label: 'Calculée à partir des pièces réellement placées sur vos panneaux.' },
-    time: { title: 'Plan en quelques secondes', label: 'De la liste de pièces au plan de coupe, sans attente.' },
+    time: { title: 'Plan en quelques secondes', label: 'De la liste de pièces au plan de coupe en quelques secondes.' },
     credits: { title: '{count} crédits offerts', label: 'Analyses photo offertes à l’inscription.' },
   },
   features: {
@@ -91,14 +91,14 @@ export const fr = {
   },
   steps: {
     eyebrow: 'Comment ça marche',
-    title: 'Trois étapes, un plan parfait',
+    title: 'Trois étapes pour votre plan de coupe',
     one: {
       title: 'Ajoutez vos pièces',
       desc: 'Scannez une fiche ou saisissez les dimensions manuellement en centimètres.',
     },
     two: {
       title: 'Lancez l’optimisation',
-      desc: 'L’algorithme calcule le placement optimal en quelques secondes.',
+      desc: 'L’algorithme génère un placement optimisé en quelques secondes.',
     },
     three: {
       title: 'Exportez le rapport',
@@ -118,7 +118,8 @@ export const fr = {
     freeDesc: 'L’essentiel pour les petits ateliers.',
     freeOptimize: 'Optimisation illimitée',
     freeExports: 'Exports PDF, CSV, DXF et JSON',
-    freeNoScan: 'Scan IA désactivé',
+    freeNoScan: '5 analyses IA offertes à l’inscription, puis Scan IA par crédits',
+    freeCredits: '5 analyses IA offertes à l’inscription — un crédit = 1 photo analysée. Scan raté = pas débité.',
     freeCta: 'Créer un compte gratuit',
     packSuffix: '/ {count} analyses',
     packAllFree: 'Tout du plan gratuit',
@@ -127,13 +128,29 @@ export const fr = {
     more: 'Besoin de plus ? {proName} — {proPrice} MAD pour {proCredits} analyses · {maxName} — {maxPrice} MAD par mois pour {maxCredits} analyses.',
     moreLink: 'Voir tous les packs',
   },
+  faq2: {
+    eyebrow: 'Questions fréquentes',
+    title: 'Ce que QatlIA fait (et ne promet pas)',
+    q1: 'Puis-je régler la largeur du trait de scie (kerf) ?',
+    a1: 'Oui — l’épaisseur de lame est paramétrable (0,1 mm de précision) et elle est déduite du plan.',
+    q2: 'Le sens du bois (ramage) est-il respecté ?',
+    a2: 'Oui — déclarez un panneau avec ramage, choisissez son sens, et marquez les pièces à contraindre : elles ne seront jamais placées à contre-fil.',
+    q3: 'Plusieurs tailles de panneaux et matériaux ?',
+    a3: 'Oui — chaque projet garde son format, son matériau et son kerf ; les formats favoris sont sauvegardables.',
+    q4: 'Que se passe-t-il si une pièce ne tient pas ?',
+    a4: 'Elle apparaît dans une alerte claire avec sa raison (trop grande pour le panneau, stock épuisé) — rien n’est silencieux.',
+    q5: 'Puis-je vérifier les dimensions extraites par l’IA ?',
+    a5: 'Oui — la liste extraite est modifiable pièce par pièce avant l’optimisation ; un scan raté ne coûte aucun crédit.',
+    q6: 'Les projets sont-ils sauvegardés ?',
+    a6: 'Oui — chaque optimisation est conservée dans votre historique et rouvrable en un clic.',
+  },
   finalCta: {
     title: 'Prêt à optimiser votre atelier ?',
     body: 'Commencez gratuitement avec {count} crédits d’analyse photo. L’optimisation et les exports restent gratuits. Pas de carte bancaire, pas d’engagement.',
     button: 'Essayer QatlIA maintenant',
   },
   footer: {
-    brand: 'QatlIA Pro',
+    brand: 'QatlIA',
     tagline: 'Maroc · MAD · Optimisation de découpe pour menuisiers',
     /**
      * Only routes that exist. Terms and privacy pages are deliberately absent

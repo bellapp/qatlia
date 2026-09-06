@@ -304,7 +304,10 @@ export default function LandingPage() {
               <ul className="mt-8 mb-10 space-y-4 flex-grow text-sm">
                 <PlanLine>{t('pricing.freeOptimize')}</PlanLine>
                 <PlanLine>{t('pricing.freeExports')}</PlanLine>
-                <PlanLine included={false}>{t('pricing.freeNoScan')}</PlanLine>
+                {/* The free tier DOES include the 5 sign-up credits (audit fix:
+                    'Scan IA désactivé' contradicted the hero offer). */}
+                <PlanLine>{t('pricing.freeNoScan')}</PlanLine>
+                <PlanLine>{t('pricing.freeCredits')}</PlanLine>
               </ul>
               <Link
                 href="/auth/login"
@@ -353,6 +356,30 @@ export default function LandingPage() {
               {t('pricing.moreLink')}
             </Link>
           </p>
+        </div>
+      </section>
+
+      {/* Workshop FAQ — verifiable answers only (audit recommendation):
+          every entry describes real app behavior, no invented claims. */}
+      <section className="max-w-3xl mx-auto px-6 sm:px-10 pb-24">
+        <div className="text-center mb-10">
+          <p className="text-[11px] font-bold uppercase tracking-[0.25em] text-brand-400 mb-3 font-mono">{t('faq2.eyebrow')}</p>
+          <h2 className="text-3xl sm:text-4xl font-black tracking-[-0.02em] text-slate-900 dark:text-white">{t('faq2.title')}</h2>
+        </div>
+        <div className="space-y-3">
+          {([
+            ['q1', 'a1'], ['q2', 'a2'], ['q3', 'a3'], ['q4', 'a4'], ['q5', 'a5'], ['q6', 'a6'],
+          ] as const).map(([q, a]) => (
+            <details key={q} className="group rounded-xl bg-studio-panel border border-studio-border overflow-hidden">
+              <summary className="flex items-center justify-between gap-3 px-5 py-4 cursor-pointer text-sm font-bold text-slate-800 dark:text-slate-200 hover:text-brand-500 dark:hover:text-brand-400 transition-colors list-none">
+                {t(`faq2.${q}` as const)}
+                <span className="shrink-0 w-5 h-5 rounded-full bg-studio-field flex items-center justify-center text-slate-500 text-xs group-open:rotate-45 transition-transform" aria-hidden="true">+</span>
+              </summary>
+              <p className="px-5 pb-4 text-xs text-slate-600 dark:text-slate-400 leading-relaxed">
+                {t(`faq2.${a}` as const)}
+              </p>
+            </details>
+          ))}
         </div>
       </section>
 
