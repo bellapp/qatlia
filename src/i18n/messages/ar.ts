@@ -685,7 +685,7 @@ export const ar: Catalog = {
     perkCredits: '{count} أرصدة مجانية عند التسجيل',
     perkHistory: 'سجل لكل مخطط تُنشئه',
     perkSecurity: 'تسجيل دخول آمن عبر Google أو البريد الإلكتروني',
-    asideFooter: 'QatlIA Pro · المغرب · MAD',
+    asideFooter: 'QatlIA · المغرب · MAD',
     titleSignup: 'إنشاء حساب',
     subtitleLogin: 'استعد قوائم القطع والأرصدة الخاصة بك.',
     subtitleSignup: '{count} أرصدة مجانية لتشغيل أول عمليات المسح.',

@@ -8,7 +8,7 @@ const inter = Inter({ subsets: ["latin"], variable: "--font-inter", display: "sw
 const jetbrainsMono = JetBrains_Mono({ subsets: ["latin"], variable: "--font-mono", display: "swap" });
 
 export const metadata: Metadata = {
-  title: "QatlIA Pro — Optimisation de Découpe & Débit IA",
+  title: "QatlIA — Optimisation de Découpe & Débit IA pour Menuisiers",
   description: "Solution professionnelle d'optimisation de découpe de panneaux pour menuisiers et artisans.",
   manifest: "/manifest.json",
   icons: {

@@ -686,7 +686,7 @@ export const en: Catalog = {
     perkCredits: '{count} free credits when you sign up',
     perkHistory: 'A history of every plan you generate',
     perkSecurity: 'Secure Google or email sign-in',
-    asideFooter: 'QatlIA Pro · Morocco · MAD',
+    asideFooter: 'QatlIA · Morocco · MAD',
     titleSignup: 'Create an account',
     subtitleLogin: 'Pick up your cut lists and credits.',
     subtitleSignup: '{count} free credits to run your first scans.',

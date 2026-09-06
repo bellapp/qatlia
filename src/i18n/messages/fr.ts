@@ -768,7 +768,7 @@ export const fr = {
     perkCredits: '{count} crédits offerts à l’inscription',
     perkHistory: 'Historique de chaque plan généré',
     perkSecurity: 'Connexion Google ou email sécurisée',
-    asideFooter: 'QatlIA Pro · Maroc · MAD',
+    asideFooter: 'QatlIA · Maroc · MAD',
     titleSignup: 'Créer un compte',
     subtitleLogin: 'Retrouvez vos débits et crédits.',
     subtitleSignup: '{count} crédits offerts pour lancer vos premiers scans.',
