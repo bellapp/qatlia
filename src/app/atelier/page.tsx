@@ -59,6 +59,7 @@ import { writeLocalHistoryItem, type LocalHistoryItem } from '@/lib/history';
 import { deriveQuotationPanels, deriveQuotationPieces } from '@/lib/quotation-items';
 import { buildPdfPayload } from '@/lib/pdf-payload';
 import { buildPersistedProjectPayload } from '@/lib/projects/persistence-payload';
+import { downscaleDataUrl } from '@/lib/image-downscale';
 import {
   type DisplayUnit,
   DEFAULT_DISPLAY_UNIT,
@@ -136,6 +137,9 @@ export default function Dashboard() {
   // who switches language after a failed scan sees the message follow them.
   const [visionError, setVisionError] = useState<TranslationKey | null>(null);
   const [previewImage, setPreviewImage] = useState<string | null>(null);
+  // Lightweight thumbnail persisted with the project (history card preview).
+  const [scanThumb, setScanThumb] = useState<string | null>(null);
+  const [pdfGeneratedAt, setPdfGeneratedAt] = useState<string | null>(null);
   const [isAuthModalOpen, setIsAuthModalOpen] = useState<boolean>(false);
   // Which action opened the (shared) auth modal, so its onSuccess handler
   // resumes the right one instead of always re-triggering the PDF export.
@@ -337,6 +341,8 @@ const commitPanelName = () => {
           setProjectName(parsed.projectName.trim());
           setProjectNameDraft(parsed.projectName.trim());
         }
+        setScanThumb(typeof parsed.scanThumb === 'string' ? parsed.scanThumb : null);
+        setPdfGeneratedAt(typeof parsed.pdfGeneratedAt === 'string' ? parsed.pdfGeneratedAt : null);
         if (parsed.options) setOptions((prev) => ({ ...prev, ...parsed.options }));
         if (restoredProjectId) setLastSavedProjectId(restoredProjectId);
         // Legacy saved projects carry no unit metadata at all; they predate
@@ -401,6 +407,8 @@ const commitPanelName = () => {
       // Custom project name (when the artisan named it) > panel label > auto.
       name: derivedProjectName,
       projectName: projectName.trim() || undefined,
+      scanThumb: scanThumb || undefined,
+      pdfGeneratedAt: pdfGeneratedAt || undefined,
       sheets,
       sheet: activeSheet,
       pieces,
@@ -507,6 +515,7 @@ const commitPanelName = () => {
         const data = await res.json();
         if (data.success && Array.isArray(data.pieces) && data.pieces.length > 0) {
           setPreviewImage(base64);
+          void downscaleDataUrl(base64).then(setScanThumb);
           const newPieces: Piece[] = data.pieces.map((p: { name?: string; width?: number | string; height?: number | string; quantity?: number | string; material?: string; color?: string }, i: number) => {
             // /api/vision always extracts and returns canonical centimetres
             // (see its prompt), so no magnitude-based mm heuristic is applied
@@ -719,6 +728,7 @@ const commitPanelName = () => {
       });
 
       if (res.ok) {
+        setPdfGeneratedAt(new Date().toISOString());
         await persistProject(result, 'pdf');
 
         const blob = await res.blob();

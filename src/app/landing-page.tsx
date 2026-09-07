@@ -10,7 +10,7 @@ import { LOCALES } from '@/i18n';
 import { BILLING_CURRENCY, CREDIT_PACKS } from '@/lib/billing/catalog';
 
 /** Vision analyses granted on sign-up; optimization and exports stay free. */
-const FREE_VISION_CREDITS = 5;
+const FREE_VISION_CREDITS = 10;
 
 /**
  * Every figure printed on this page is read from the code that enforces it:

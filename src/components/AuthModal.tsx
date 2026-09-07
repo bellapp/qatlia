@@ -12,7 +12,7 @@ import type { TranslationKey } from '@/i18n';
  * `FREE_VISION_CREDITS`). It is interpolated into the copy rather than written
  * into it, so no locale can quietly promise a different number.
  */
-const FREE_VISION_CREDITS = 5;
+const FREE_VISION_CREDITS = 10;
 
 /** Kept in one place: the input constraint and the copy shown when it is not met. */
 const MIN_PASSWORD_LENGTH = 6;

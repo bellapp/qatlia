@@ -12,6 +12,7 @@ import {
   CloudOff,
   Search,
   Pencil,
+  FileDown,
 } from 'lucide-react';
 import { readLocalHistory, type LocalHistoryItem } from '@/lib/history';
 import { AccountMenu } from '@/components/AccountMenu';
@@ -179,6 +180,44 @@ export default function HistoryPage() {
     }
   };
 
+  /** Rebuilds and downloads the cutting-plan PDF from the stored project
+   *  data — the PDF itself is never persisted, only regenerated on demand. */
+  const downloadPdf = async (proj: ProjectHistoryItem) => {
+    try {
+      const optJson = (proj.options_json || {}) as {
+        sheet?: unknown; sheets?: unknown; pieces?: unknown; options?: unknown; result?: unknown;
+        displayUnit?: string; projectName?: string; name?: string;
+        scanThumb?: string; pdfGeneratedAt?: string;
+      };
+      const payload = {
+        projectName: optJson.projectName || proj.name,
+        sheet: optJson.sheet,
+        pieces: optJson.pieces,
+        result: optJson.result,
+        displayUnit: optJson.displayUnit || 'cm',
+        locale,
+      };
+      const res = await fetch('/api/export-pdf', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      if (!res.ok) return;
+      const blob = await res.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `QatlIA_${(optJson.projectName || proj.name).replace(/\s+/g, '_')}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(url);
+    } catch {
+      /* download failed silently — the card stays usable */
+    }
+  };
+
+
   const fetchHistory = async () => {
     setLoading(true);
     setSyncNote(null);
@@ -339,7 +378,9 @@ export default function HistoryPage() {
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {filtered.map((proj) => {
-              const optJson = proj.options_json || {};
+              const optJson = (proj.options_json || {}) as ProjectHistoryItem['options_json'] & {
+                scanThumb?: string; pdfGeneratedAt?: string;
+              };
               const res = optJson.result;
               const pieceCount = optJson.pieces?.reduce((s, p) => s + (p.quantity || 1), 0) || 0;
               const wasteRate = res?.wastePercentage ?? 0;
@@ -381,7 +422,30 @@ export default function HistoryPage() {
                         </button>
                       </h3>
                     )}
-                    <div className="grid grid-cols-3 gap-2 pt-2 border-t border-studio-border text-xs font-mono">
+                    {/* Scan thumbnail + PDF indicator (persisted with the project) */}
+                  {(optJson.scanThumb || optJson.pdfGeneratedAt) && (
+                    <div className="flex items-center gap-2.5">
+                      {optJson.scanThumb && (
+                        <img
+                          src={optJson.scanThumb}
+                          alt={t('historyPage.scanThumbAlt', { name: proj.name })}
+                          className="w-14 h-14 object-cover rounded-lg border border-studio-border shadow-sm"
+                          loading="lazy"
+                        />
+                      )}
+                      {optJson.pdfGeneratedAt && (
+                        <button
+                          onClick={() => void downloadPdf(proj)}
+                          aria-label={t('historyPage.pdfAria', { name: proj.name })}
+                          className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-studio-field hover:bg-studio-border text-[11px] font-bold text-slate-600 dark:text-slate-300 hover:text-brand-500 dark:hover:text-brand-400 transition-colors"
+                        >
+                          <FileDown className="w-3.5 h-3.5" aria-hidden="true" />
+                          {t('historyPage.pdfLabel')}
+                        </button>
+                      )}
+                    </div>
+                  )}
+                  <div className="grid grid-cols-3 gap-2 pt-2 border-t border-studio-border text-xs font-mono">
                       <div className="p-2 rounded-lg bg-studio-canvas"><span className="text-[10px] text-slate-500 dark:text-slate-400 block">{t('historyPage.stats.panel')}</span><span dir="ltr" className="font-bold text-slate-900 dark:text-white">{t('historyPage.sheetSize', { height: proj.sheet_height, width: proj.sheet_width, unit: CANONICAL_UNIT })}</span></div>
                       <div className="p-2 rounded-lg bg-studio-canvas"><span className="text-[10px] text-slate-500 dark:text-slate-400 block">{t('historyPage.stats.pieces')}</span><span className="font-bold text-brand-400">{t('historyPage.piecesValue', { count: n(pieceCount) })}</span></div>
                       <div className="p-2 rounded-lg bg-studio-canvas"><span className="text-[10px] text-slate-500 dark:text-slate-400 block">{t('historyPage.stats.waste')}</span><span dir="ltr" className="font-bold text-emerald-400">{wasteRate > 0 ? `${wasteRate}%` : '—'}</span></div>

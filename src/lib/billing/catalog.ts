@@ -46,9 +46,9 @@ export const CREDIT_PACKS: Record<PackId, CreditPack> = {
     description: 'Idéal pour tester ou pour 1 petit chantier',
     credits: 10,
     displayCredits: '10',
-    priceMAD: 10,
+    priceMAD: 20,
     monthly: false,
-    badge: '10 DH',
+    badge: '20 DH',
     highlight: false,
   },
   standard: {

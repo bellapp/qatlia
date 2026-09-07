@@ -13,7 +13,7 @@ CREATE TABLE IF NOT EXISTS public.profiles (
   email         TEXT NOT NULL,
   full_name     TEXT,
   locale        TEXT DEFAULT 'fr',
-  credits       INTEGER NOT NULL DEFAULT 5,
+  credits       INTEGER NOT NULL DEFAULT 10,
   created_at    TIMESTAMPTZ DEFAULT NOW(),
   updated_at    TIMESTAMPTZ DEFAULT NOW()
 );

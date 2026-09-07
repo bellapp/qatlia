@@ -17,6 +17,10 @@ export interface PersistedProjectPayloadInput {
   name: string;
   /** The artisan's own project name when set (undefined = auto-name). */
   projectName?: string;
+  /** Downscaled JPEG dataURL of the scanned cut-list photo (optional). */
+  scanThumb?: string | null;
+  /** ISO timestamp of the last PDF export for this project (optional). */
+  pdfGeneratedAt?: string | null;
   sheets: Sheet[];
   sheet: Sheet;
   pieces: Piece[];
@@ -35,6 +39,8 @@ export interface PersistedProjectPayload extends ProjectUnitPersistenceMetadata 
   name: string;
   /** Present only when the artisan named the project themselves. */
   projectName?: string;
+  scanThumb?: string | null;
+  pdfGeneratedAt?: string | null;
   sheets: Sheet[];
   sheet: Sheet;
   pieces: Piece[];
@@ -52,6 +58,8 @@ export function buildPersistedProjectPayload(
   return {
     name: input.name,
     ...(input.projectName?.trim() ? { projectName: input.projectName.trim() } : {}),
+    ...(input.scanThumb ? { scanThumb: input.scanThumb } : {}),
+    ...(input.pdfGeneratedAt ? { pdfGeneratedAt: input.pdfGeneratedAt } : {}),
     sheets: input.sheets,
     sheet: input.sheet,
     pieces: input.pieces,

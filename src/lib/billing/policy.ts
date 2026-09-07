@@ -21,8 +21,8 @@ export const BILLABLE_ACTIONS: readonly BillableAction[] = [
   'quotation',
 ];
 
-/** A successful photo analysis costs exactly one credit. */
-export const VISION_CREDIT_COST = 1;
+/** A successful photo analysis costs exactly two credits (user pricing 2026-09). */
+export const VISION_CREDIT_COST = 2;
 
 /** Credits charged per action. Anything not listed here is not a known action. */
 export const CREDIT_POLICY: Record<BillableAction, number> = {
