@@ -40,7 +40,7 @@ export const fr = {
       'Scannez vos fiches de débit, optimisez le placement, exportez votre plan en PDF avec plan de coupe, cotes et nomenclature. Le taux de chute affiché est celui calculé sur votre plan.',
     ctaPrimary: 'Essayer gratuitement',
     ctaSecondary: 'J’ai déjà un compte',
-    note: '{count} crédits d’analyse photo offerts à l’inscription · Optimisation et exports gratuits · Sans carte bancaire',
+    note: '{count} crédits d’analyse photo offerts à l’inscription · Analyse IA 2 crédits, optimisation 1 crédit · Sans carte bancaire',
     screenshotAlt: 'Plan de découpe optimisé dans l\'atelier QatlIA : visualiseur 2D, métriques de récupération et chutes',
     // Labels of the four figures in the navy band. The figures themselves are
     // never written here: they come from the sign-up grant, the billing catalog
@@ -112,18 +112,18 @@ export const fr = {
    */
   pricing: {
     eyebrow: 'Tarifs',
-    title: 'Optimisation et exports gratuits, à vie',
+    title: 'Essai gratuit : 10 crédits offerts',
     popular: 'Populaire',
     freeName: 'Gratuit',
-    freeDesc: 'L’essentiel pour les petits ateliers.',
-    freeOptimize: 'Optimisation illimitée',
-    freeExports: 'Exports PDF, CSV, DXF et JSON',
+    freeDesc: 'Créez un compte, testez avec vos 10 crédits.',
+    freeOptimize: '1 crédit par optimisation',
+    freeExports: 'Exports PDF, CSV, DXF et JSON inclus',
     freeNoScan: '10 analyses IA offertes à l’inscription, puis Scan IA par crédits',
-    freeCredits: '10 analyses IA offertes à l’inscription — une analyse = 2 crédits. Scan raté = pas débité.',
+    freeCredits: '10 crédits offerts à l’inscription — analyse IA 2 crédits, optimisation 1 crédit. Échec = non débité.',
     freeCta: 'Créer un compte gratuit',
     packSuffix: '/ {count} analyses',
-    packAllFree: 'Tout du plan gratuit',
-    packScan: 'Scan IA des listes manuscrites',
+    packAllFree: 'Fonctions complètes incluses',
+    packScan: 'Scan IA — 2 crédits par analyse',
     packCta: 'Voir les crédits',
     more: 'Besoin de plus ? {proName} — {proPrice} MAD pour {proCredits} analyses · {maxName} — {maxPrice} MAD par mois pour {maxCredits} analyses.',
     moreLink: 'Voir tous les packs',
@@ -146,7 +146,7 @@ export const fr = {
   },
   finalCta: {
     title: 'Prêt à optimiser votre atelier ?',
-    body: 'Commencez gratuitement avec {count} crédits d’analyse photo. L’optimisation et les exports restent gratuits. Pas de carte bancaire, pas d’engagement.',
+    body: 'Commencez gratuitement avec {count} crédits d’analyse photo. Les exports restent gratuits. Pas de carte bancaire, pas d’engagement.',
     button: 'Essayer QatlIA maintenant',
   },
   footer: {
@@ -300,6 +300,11 @@ export const fr = {
       toggle: 'Réglages de coupe avancés',
     },
     optimize: {
+      authRequired: 'Connectez-vous pour lancer une optimisation.',
+      noCredits: 'Crédits épuisés — 1 crédit par optimisation.',
+      failed: 'L’optimisation a échoué. Réessayez.',
+      network: 'Erreur réseau. Vérifiez votre connexion.',
+      recharge: 'Recharger',
       running: 'Calcul du calepinage…',
       cta: 'Optimiser le plan de coupe',
     },
@@ -661,8 +666,8 @@ export const fr = {
     // Rendered in two parts around {count} so the allowance stays bold.
     packAnalyses: '{count} analyses photo',
     packAnalysesMonthly: '{count} analyses photo par mois',
-    freePlans: 'Schémas de coupe illimités et gratuits',
-    freeExports: 'Exports PDF, DXF, JSON et PNG gratuits',
+    freePlans: '1 crédit par schéma de coupe',
+    freeExports: 'Exports PDF, DXF, JSON et PNG inclus',
     choose: 'Choisir ce pack',
     chooseAria: 'Choisir le {pack}',
     redirecting: 'Redirection vers le paiement…',
@@ -747,7 +752,7 @@ export const fr = {
     creditsRemaining: 'crédits restants',
     ledgerAria: 'Mouvements de crédits',
     noMovements:
-      'Aucun mouvement pour l’instant. Un crédit est débité uniquement lors d’une analyse photo réussie ; l’optimisation et les exports sont gratuits.',
+      'Aucun mouvement pour l’instant. Un crédit est débité uniquement lors d’une analyse photo réussie ; les exports sont gratuits.',
     /** Shown only for a ledger row saved without its own description. */
     txDebit: 'Analyse photo IA',
     txCredit: 'Achat de crédits',

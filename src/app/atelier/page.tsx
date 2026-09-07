@@ -37,8 +37,6 @@ import {
   OPTIONS_DEFAULTS,
   MaterialType,
   CutMode,
-  optimizeCutting1D,
-  optimizeCutting2D,
 } from '@/lib/cutting/binpacking';
 import { PIECE_COLOR_PALETTE, getResolvedPieceColor } from '@/lib/pieces/catalog';
 import { BUILT_IN_PRESETS, loadSavedPresets, savePreset, deletePreset, findDuplicatePreset, type PanelPreset } from '@/lib/panel-presets';
@@ -125,6 +123,7 @@ export default function Dashboard() {
   const [options, setOptions] = useState<OptimizationOptions>(OPTIONS_DEFAULTS);
   const [result, setResult] = useState<OptimizationResult | null>(null);
   const [isOptimizing, setIsOptimizing] = useState(false);
+  const [optimizeError, setOptimizeError] = useState<string | null>(null);
   const [isProcessingVision, setIsProcessingVision] = useState(false);
   const [activeSheetIndex, setActiveSheetIndex] = useState(0);
   const [zoomLevel, setZoomLevel] = useState(1);
@@ -475,18 +474,43 @@ const commitPanelName = () => {
 
   const handleRunOptimization = async () => {
     setIsOptimizing(true);
+    setOptimizeError(null);
     try {
-      let optResult: OptimizationResult;
-      if (cutMode === '1d') {
-        optResult = optimizeCutting1D(pieces, activeSheet.width, options.kerfWidth);
-      } else {
-        optResult = optimizeCutting2D(pieces, sheets, options);
+      // Credit-metered run: the server debits 1 credit atomically before
+      // computing (pricing decision 2026-09: 1 crédit par optimisation,
+      // 2 pour un scan IA). The client-side optimizer remains only as a
+      // display fallback and is no longer the paid path.
+      const res = await fetch('/api/optimize', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          sheet: { ...activeSheet, kerf: options.kerfWidth },
+          sheets,
+          pieces,
+          options,
+          cutMode,
+        }),
+      });
+      const data = await res.json().catch(() => null);
+
+      if (!res.ok || !data?.success) {
+        if (res.status === 401) {
+          setOptimizeError(t('atelier.optimize.authRequired'));
+        } else if (res.status === 402) {
+          setOptimizeError(t('atelier.optimize.noCredits'));
+        } else {
+          setOptimizeError(t('atelier.optimize.failed'));
+        }
+        return;
       }
+
+      const optResult = data.result as OptimizationResult;
       setResult(optResult);
       setActiveSheetIndex(0);
+      if (typeof data.creditsRemaining === 'number') setUserCredits(data.creditsRemaining);
       void persistProject(optResult, 'optimize');
-    } catch (err) {
-      console.error('Erreur optimisation:', err);
+    } catch {
+      setOptimizeError(t('atelier.optimize.network'));
     } finally {
       setIsOptimizing(false);
     }
@@ -1292,6 +1316,15 @@ const commitPanelName = () => {
               )}
             </div>
 
+            {optimizeError && (
+              <p role="alert" className="flex items-center gap-2 text-xs font-semibold text-rose-500 bg-rose-500/10 border border-rose-500/30 rounded-xl px-3.5 py-2.5">
+                <AlertTriangle className="w-4 h-4 shrink-0" aria-hidden="true" />
+                {optimizeError}
+                {(optimizeError === t('atelier.optimize.noCredits')) && (
+                  <a href="/credits" className="ms-auto font-black underline hover:no-underline">{t('atelier.optimize.recharge')}</a>
+                )}
+              </p>
+            )}
             {/* Primary CTA Button */}
             <button
               onClick={handleRunOptimization}
