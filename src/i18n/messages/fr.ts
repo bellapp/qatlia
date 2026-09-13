@@ -303,6 +303,7 @@ export const fr = {
       authRequired: 'Connectez-vous pour lancer une optimisation.',
       noCredits: 'Crédits épuisés — 1 crédit par optimisation.',
       failed: 'L’optimisation a échoué. Réessayez.',
+      tooLarge: 'Plan trop volumineux : {max} pièces maximum par optimisation. Découpez le projet en plusieurs lots — aucun crédit n’a été débité.',
       network: 'Erreur réseau. Vérifiez votre connexion.',
       recharge: 'Recharger',
       running: 'Calcul du calepinage…',

@@ -9,6 +9,15 @@ export const MAX_PIECES = 5000;
 export const MAX_PIECE_QUANTITY = 10000;
 export const MAX_SHEETS = 100;
 
+// Budget cap, not a geometry cap: the number of pieces the optimizer actually
+// places (sum of the per-row quantities) that we are confident fits inside the
+// optimize route's `maxDuration`. MAX_PIECES x MAX_PIECE_QUANTITY is orders of
+// magnitude past what binpacking can chew through in 60s, and a run killed by
+// a platform timeout cannot refund its own credit — so /api/optimize rejects
+// anything above this BEFORE debiting. Enforced in the route (it needs the
+// expanded total across rows), not here.
+export const MAX_EXPANDED_PIECES = 2000;
+
 // Mirrors src/lib/costing.ts's StockPricing/LaborPricing exactly. Every rate
 // must be finite and >= 0 — never a bare `z.number()` that would let NaN,
 // Infinity, or a negative price reach the shared cost calculator, which

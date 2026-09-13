@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { optimizeCutting2D, optimizeCutting1D, Piece, Sheet, OptimizationOptions } from '@/lib/cutting/binpacking';
-import { OptimizeSchema } from '@/lib/cutting/optimize-schema';
+import { OptimizeSchema, MAX_EXPANDED_PIECES } from '@/lib/cutting/optimize-schema';
 import { createClient } from '@/lib/supabase/server';
 import { createClient as createAdminClient, type SupabaseClient } from '@supabase/supabase-js';
 import { getSupabaseAdminConfig } from '@/lib/billing/config';
@@ -23,7 +23,33 @@ import { OPTIMIZE_CREDIT_COST } from '@/lib/billing/policy';
  * the vision route.
  */
 
+// 60s is the ceiling on Vercel's Hobby plan and the highest value that is
+// valid on every plan we may run on (Pro allows more, Hobby hard-caps at 60).
+// It must stay in sync with the pre-debit workload guard below: the guard's
+// job is to reject anything that could not finish inside this window, because
+// a platform timeout kills the function before any refund path can run.
+export const maxDuration = 60;
+
 type AdminClient = SupabaseClient;
+
+/**
+ * Total number of pieces the optimizer would actually place, i.e. the sum of
+ * the per-row `quantity` after expansion. Runs on the RAW body, before the
+ * credit is debited and before Zod validation, so every field is untrusted:
+ * anything non-numeric or non-positive counts as the schema's default of 1,
+ * and a non-array `pieces` yields 0 (the schema will reject it later, on the
+ * refundable path).
+ */
+function estimateExpandedPieceCount(body: unknown): number {
+  const pieces = (body as { pieces?: unknown } | null)?.pieces;
+  if (!Array.isArray(pieces)) return 0;
+  let total = 0;
+  for (const piece of pieces) {
+    const raw = Number((piece as { quantity?: unknown } | null)?.quantity);
+    total += Number.isFinite(raw) && raw > 0 ? Math.floor(raw) : 1;
+  }
+  return total;
+}
 
 function createLedgerClient(): AdminClient | null {
   const adminConfig = getSupabaseAdminConfig();
@@ -79,6 +105,29 @@ export async function POST(req: Request) {
       );
     }
 
+    const body = await req.json();
+
+    // Pre-debit workload guard. Everything below the debit is refundable only
+    // as long as our own code keeps running; a Vercel timeout is not — the
+    // platform kills the function mid-computation and the refund RPC never
+    // fires, leaving the artisan charged for nothing. So any payload that
+    // could plausibly outlive `maxDuration` is rejected HERE, before a single
+    // credit is spent. The cap is on the EXPANDED piece count (sum of
+    // quantities), which is what drives binpacking cost — not on the number
+    // of rows, which MAX_PIECES already bounds further down.
+    const expandedPieceCount = estimateExpandedPieceCount(body);
+    if (expandedPieceCount > MAX_EXPANDED_PIECES) {
+      return NextResponse.json(
+        {
+          error: 'WORKLOAD_TOO_LARGE',
+          message: `Plan trop volumineux : ${expandedPieceCount} pièces à placer pour un maximum de ${MAX_EXPANDED_PIECES}. Découpez le projet en plusieurs lots.`,
+          maxPieces: MAX_EXPANDED_PIECES,
+          requestedPieces: expandedPieceCount,
+        },
+        { status: 400 }
+      );
+    }
+
     // Debit BEFORE computing: the row lock in consume_credit serializes
     // concurrent runs, so two tabs can never spend the same last credit.
     // The computation below is deterministic and cannot fail on valid input
@@ -101,7 +150,6 @@ export async function POST(req: Request) {
       );
     }
 
-    const body = await req.json();
     // cutMode rides outside the strict geometry schema (1D bars reuse the
     // sheet width; the mode is a presentation-level switch, not geometry).
     const cutMode = body?.cutMode === '1d' ? '1d' as const : '2d' as const;

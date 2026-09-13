@@ -20,13 +20,13 @@ export const ar: Catalog = {
   },
   hero: {
     badge: 'تحسين القطع للنجارين',
-    titleLead: 'حسِّن ألواحك',
+    titleLead: 'حسِّن قصّ ألواحك',
     titleHighlight: 'في ثوانٍ معدودة',
     // Slogan 1 (client copy): gain framed in two beats, second beat highlighted.
     taglineGain: 'استغل البانو كامل،',
     taglineSave: 'ونقّص ضياع الخشب',
     // Slogan 2 (client copy): three action beats, rendered as a standalone band.
-    actionSlogan: 'قِس، صوّر، ووفّر',
+    actionSlogan: 'عبر، صوّر، ووفّر',
     subtitle:
       'صوّر قوائم القياسات، حسِّن ترتيب القطع، وصدّر مخطط القطع بصيغة PDF جاهزة للورشة. نسبة الهدر المعروضة محسوبة على مخططك أنت.',
     ctaPrimary: 'جرّب مجاناً',
@@ -263,6 +263,7 @@ export const ar: Catalog = {
       authRequired: 'سجّل الدخول لإجراء التحسين.',
       noCredits: 'نفدت الأرصدة — رصيد واحد لكل تحسين.',
       failed: 'فشل التحسين. أعد المحاولة.',
+      tooLarge: 'المخطط كبير جدًا: {max} قطعة كحد أقصى لكل عملية تحسين. قسّم المشروع إلى دفعات — لم يُخصم أي رصيد.',
       network: 'خطأ في الشبكة. تحقق من اتصالك.',
       recharge: 'إعادة الشحن',
       running: 'جارٍ حساب التوزيع…',

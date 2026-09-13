@@ -262,6 +262,7 @@ export const en: Catalog = {
       authRequired: 'Sign in to run an optimization.',
       noCredits: 'Out of credits — 1 credit per optimization.',
       failed: 'The optimization failed. Try again.',
+      tooLarge: 'Plan too large: {max} pieces maximum per optimization. Split the project into several batches — no credit was charged.',
       network: 'Network error. Check your connection.',
       recharge: 'Recharge',
       running: 'Computing the nesting…',

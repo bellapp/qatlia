@@ -498,6 +498,9 @@ const commitPanelName = () => {
           setOptimizeError(t('atelier.optimize.authRequired'));
         } else if (res.status === 402) {
           setOptimizeError(t('atelier.optimize.noCredits'));
+        } else if (data?.error === 'WORKLOAD_TOO_LARGE') {
+          // Rejected before the debit — no credit was spent on this run.
+          setOptimizeError(t('atelier.optimize.tooLarge', { max: String(data.maxPieces ?? '') }));
         } else {
           setOptimizeError(t('atelier.optimize.failed'));
         }
@@ -527,19 +530,26 @@ const commitPanelName = () => {
     reader.onload = async () => {
       try {
         const base64 = reader.result as string;
+        // A phone photo is 1–4 MB of base64; Gemini reads a cut list fine at
+        // 1600px, so shrink before the upload — it is the slowest leg of the
+        // scan on a workshop connection. A failed downscale (no canvas, exotic
+        // codec) must never block a scan: fall back to the original bytes.
+        const scanImage = (await downscaleDataUrl(base64, 1600, 0.8)) ?? base64;
         const res = await fetch('/api/vision', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            imageBase64: base64,
+            imageBase64: scanImage,
             sheetMaterial: activeSheet.material || 'mdf',
           }),
         });
 
         const data = await res.json();
         if (data.success && Array.isArray(data.pieces) && data.pieces.length > 0) {
-          setPreviewImage(base64);
-          void downscaleDataUrl(base64).then(setScanThumb);
+          // The thumbnail is rendered at 12x12 — the downscaled bytes are
+          // indistinguishable there and keep the full-res photo out of state.
+          setPreviewImage(scanImage);
+          void downscaleDataUrl(scanImage).then(setScanThumb);
           const newPieces: Piece[] = data.pieces.map((p: { name?: string; width?: number | string; height?: number | string; quantity?: number | string; material?: string; color?: string }, i: number) => {
             // /api/vision always extracts and returns canonical centimetres
             // (see its prompt), so no magnitude-based mm heuristic is applied

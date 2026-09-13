@@ -129,6 +129,11 @@ export default function LandingPage() {
             <span className="text-brand-400 underline decoration-brand-500/40 decoration-[3px] underline-offset-8">{t('hero.titleHighlight')}</span>
           </h1>
 
+          {/* Action slogan directly under the headline (user directive) */}
+          <p className="mt-5 text-lg sm:text-2xl font-black tracking-tight text-brand-500 dark:text-brand-400">
+            {t('hero.actionSlogan')}
+          </p>
+
           <p className="mt-6 text-base sm:text-lg text-slate-600 dark:text-slate-400 max-w-2xl mx-auto leading-relaxed">
             {t('hero.subtitle')}
           </p>
