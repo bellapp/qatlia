@@ -650,11 +650,17 @@ export const PiecesManager: React.FC<PiecesManagerProps> = ({
                   </div>
 
                   <div className="col-span-4 sm:col-span-4 flex flex-1 items-center gap-2 min-w-0">
+                    {/* `dir="auto"` isolates the stored name from the UI
+                        direction: a Latin name ("Panneau Latéral Gauche") keeps
+                        its own LTR flow and `truncate` eats its END, while an
+                        Arabic name stays RTL. `text-start` follows whichever
+                        direction wins instead of pinning the text left/right. */}
                     <input
                       type="text"
+                      dir="auto"
                       value={piece.name}
                       onChange={(event) => handleUpdate(piece.id || '', 'name', event.target.value)}
-                      className="w-full bg-transparent text-slate-900 dark:text-slate-100 font-medium text-xs outline-none focus:text-slate-900 dark:focus:text-white truncate placeholder-slate-500"
+                      className="w-full bg-transparent text-start text-slate-900 dark:text-slate-100 font-medium text-xs outline-none focus:text-slate-900 dark:focus:text-white truncate placeholder-slate-500"
                       placeholder={t('pieces.row.namePlaceholder')}
                     />
                     {!isFocused && (
@@ -698,12 +704,18 @@ export const PiecesManager: React.FC<PiecesManagerProps> = ({
                   </div>
 
                   <div className="col-span-1 flex justify-center">
+                    {/* The digit is always Latin: `dir="ltr"` keeps it out of
+                        the RTL run so it is never reordered inside the amber
+                        badge, and the size/weight/colour are stated explicitly
+                        so the number stays legible on the amber background in
+                        both themes. */}
                     <input
                       type="number"
                       min="1"
+                      dir="ltr"
                       value={piece.quantity || 1}
                       onChange={(event) => handleUpdate(piece.id || '', 'quantity', parseInt(event.target.value, 10) || 1)}
-                      className="w-6 h-6 text-center bg-brand-400 rounded text-slate-950 font-mono font-black text-[10px] leading-none outline-none border border-transparent focus:border-brand-600 focus:ring-1 focus:ring-brand-500/40 tabular-nums appearance-none [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                      className="w-6 h-6 text-center bg-brand-400 rounded text-slate-900 font-mono font-bold text-[11px] leading-none outline-none border border-transparent focus:border-brand-600 focus:ring-1 focus:ring-brand-500/40 tabular-nums appearance-none [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
                       aria-label={t('pieces.row.quantityAria')}
                     />
                   </div>
@@ -849,10 +861,13 @@ export const PiecesManager: React.FC<PiecesManagerProps> = ({
                 <input
                   id="quick-piece-name"
                   type="text"
+                  // Same bidirectional isolation as the name cell of the table:
+                  // the typed name drives its own direction, not the UI locale.
+                  dir="auto"
                   placeholder={t('pieces.quickAdd.namePlaceholder')}
                   value={newReference}
                   onChange={(event) => setNewReference(event.target.value)}
-                  className="w-full px-2 py-1.5 rounded-lg bg-studio-field border border-studio-border text-slate-800 dark:text-slate-200 text-xs outline-none focus:border-brand-500/50 placeholder-slate-600"
+                  className="w-full px-2 py-1.5 rounded-lg bg-studio-field border border-studio-border text-start text-slate-800 dark:text-slate-200 text-xs outline-none focus:border-brand-500/50 placeholder-slate-600"
                 />
               </div>
               <div className="col-span-1 flex items-end gap-1">
