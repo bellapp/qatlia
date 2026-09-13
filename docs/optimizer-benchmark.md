@@ -69,8 +69,8 @@ Every figure is rounded exactly once, in the runner, at those precisions.
 
 | Fixture | Version | Source rows | Pieces | Piece area (m²) | Area lower bound (sheets) | Sheets used | Placed / unplaced | Utilization | Waste | Candidates | Goal |
 | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- |
-| `standard-135` | 1.0.0 | 21 | 135 | 19.241 | 4 | 4 | 135 / 0 | 83.2 % | 16.8 % | 8 | linear_guillotine |
-| `standard-16` | 1.0.0 | 5 | 16 | 8.7103 | 2 | 2 | 16 / 0 | 75.3 % | 24.7 % | 8 | linear_guillotine |
+| `standard-135` | 1.0.0 | 21 | 135 | 19.241 | 4 | 4 | 135 / 0 | 83.2 % | 16.8 % | 9 | linear_guillotine |
+| `standard-16` | 1.0.0 | 5 | 16 | 8.7103 | 2 | 2 | 16 / 0 | 75.3 % | 24.7 % | 9 | linear_guillotine |
 
 | Fixture | Sheet H×W (cm) | Kerf (cm) | Margin (cm) | Rotation | Material separation | Grain locked | Active constraints |
 | --- | --- | ---: | ---: | --- | --- | --- | --- |

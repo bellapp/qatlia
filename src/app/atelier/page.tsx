@@ -827,7 +827,9 @@ const commitPanelName = () => {
       {/* Top Navbar Studio */}
       <header className="sticky top-0 z-40 border-b border-studio-border/70 bg-studio-canvas/70 backdrop-blur-2xl backdrop-saturate-150">
         <div className="absolute inset-0 -z-10 bg-gradient-to-b from-brand-500/[0.04] to-transparent pointer-events-none" />
-        <div className="max-w-7xl mx-auto flex min-w-0 items-center justify-between overflow-hidden px-4 sm:px-8 h-16">
+        {/* No overflow clipping on this row: the account menu's dropdown is
+            absolutely positioned under its chip and must escape the header. */}
+        <div className="max-w-7xl mx-auto flex min-w-0 items-center justify-between px-4 sm:px-8 h-16">
           <div className="flex shrink-0 items-center gap-3">
             <div className="text-brand-400">
               <QatlIALogo size="md" />
@@ -843,46 +845,52 @@ const commitPanelName = () => {
             </div>
           </div>
 
-          <div role="group" aria-label={t('atelier.header.actionsAria')} className="flex min-w-0 items-center gap-2 overflow-x-auto overscroll-x-contain">
-            {/* Mode Toggle: 2D / 1D — the two labels are domain notation, not
-                prose, so the pair keeps its LTR order in every locale; only the
-                tooltip that explains them is translated. */}
-            <div dir="ltr" className="flex items-center p-0.5 rounded-lg bg-studio-field border border-studio-border">
-              <button type="button" onClick={() => setCutMode('2d')} aria-pressed={cutMode === '2d'} title={t('atelier.header.cutMode2dAria')}
-                className={`px-2.5 py-1 rounded-md text-[10px] font-bold transition-all ${cutMode === '2d' ? 'bg-brand-400 text-slate-950' : 'text-slate-500 hover:text-slate-300'}`}>
-                2D
-              </button>
-              <button type="button" onClick={() => setCutMode('1d')} aria-pressed={cutMode === '1d'} title={t('atelier.header.cutMode1dAria')}
-                className={`px-2.5 py-1 rounded-md text-[10px] font-bold transition-all ${cutMode === '1d' ? 'bg-brand-400 text-slate-950' : 'text-slate-500 hover:text-slate-300'}`}>
-                1D
-              </button>
+          <div role="group" aria-label={t('atelier.header.actionsAria')} className="flex min-w-0 items-center gap-2">
+            {/* Only the toolbar itself scrolls sideways on a narrow screen. The
+                account menu stays outside this container: `overflow-x-auto`
+                computes `overflow-y` to `auto` too, which would clip its
+                dropdown just as the row's old `overflow-hidden` did. */}
+            <div className="flex min-w-0 items-center gap-2 overflow-x-auto overscroll-x-contain">
+              {/* Mode Toggle: 2D / 1D — the two labels are domain notation, not
+                  prose, so the pair keeps its LTR order in every locale; only the
+                  tooltip that explains them is translated. */}
+              <div dir="ltr" className="flex items-center p-0.5 rounded-lg bg-studio-field border border-studio-border">
+                <button type="button" onClick={() => setCutMode('2d')} aria-pressed={cutMode === '2d'} title={t('atelier.header.cutMode2dAria')}
+                  className={`px-2.5 py-1 rounded-md text-[10px] font-bold transition-all ${cutMode === '2d' ? 'bg-brand-400 text-slate-950' : 'text-slate-500 hover:text-slate-300'}`}>
+                  2D
+                </button>
+                <button type="button" onClick={() => setCutMode('1d')} aria-pressed={cutMode === '1d'} title={t('atelier.header.cutMode1dAria')}
+                  className={`px-2.5 py-1 rounded-md text-[10px] font-bold transition-all ${cutMode === '1d' ? 'bg-brand-400 text-slate-950' : 'text-slate-500 hover:text-slate-300'}`}>
+                  1D
+                </button>
+              </div>
+
+              <Link
+                href="/history"
+                aria-label={t('atelier.header.history')}
+                className="group relative flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-xs font-medium text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:text-white hover:bg-studio-panel transition-all"
+              >
+                <History className="w-4 h-4 text-slate-600 dark:text-slate-400 group-hover:text-brand-400 transition-colors" />
+                <span className="hidden sm:inline">{t('atelier.header.history')}</span>
+              </Link>
+
+              <LocaleSwitcher />
+              <OnboardingTour />
+              <ThemeToggle />
+              <Link
+                href="/credits"
+                aria-label={t('atelier.header.creditsAria')}
+                className="group relative flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-brand-400/10 border border-brand-500/25 text-brand-400 hover:bg-brand-500/15 hover:border-brand-500/40 text-xs font-semibold transition-all"
+              >
+                <span className="relative flex h-2 w-2">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-brand-400 opacity-60" />
+                  <span className="relative inline-flex rounded-full h-2 w-2 bg-brand-400" />
+                </span>
+                <Zap className="w-3.5 h-3.5 fill-brand-400 text-brand-400" />
+                <span className="font-mono font-bold" dir="ltr">{userCredits === null ? '—' : n(userCredits)}</span>
+                <span className="text-[10px] opacity-80 hidden sm:inline">{t('atelier.header.credits')}</span>
+              </Link>
             </div>
-
-            <Link
-              href="/history"
-              aria-label={t('atelier.header.history')}
-              className="group relative flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-xs font-medium text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:text-white hover:bg-studio-panel transition-all"
-            >
-              <History className="w-4 h-4 text-slate-600 dark:text-slate-400 group-hover:text-brand-400 transition-colors" />
-              <span className="hidden sm:inline">{t('atelier.header.history')}</span>
-            </Link>
-
-            <LocaleSwitcher />
-            <OnboardingTour />
-            <ThemeToggle />
-            <Link
-              href="/credits"
-              aria-label={t('atelier.header.creditsAria')}
-              className="group relative flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-brand-400/10 border border-brand-500/25 text-brand-400 hover:bg-brand-500/15 hover:border-brand-500/40 text-xs font-semibold transition-all"
-            >
-              <span className="relative flex h-2 w-2">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-brand-400 opacity-60" />
-                <span className="relative inline-flex rounded-full h-2 w-2 bg-brand-400" />
-              </span>
-              <Zap className="w-3.5 h-3.5 fill-brand-400 text-brand-400" />
-              <span className="font-mono font-bold" dir="ltr">{userCredits === null ? '—' : n(userCredits)}</span>
-              <span className="text-[10px] opacity-80 hidden sm:inline">{t('atelier.header.credits')}</span>
-            </Link>
 
             {userEmail ? (
               <AccountMenu email={userEmail} />

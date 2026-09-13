@@ -346,6 +346,17 @@ interface PackingStrategy {
   axis: StripAxis;
   order: PieceOrdering;
   levelSelection: LevelSelection;
+  /**
+   * Which per-sheet packer this strategy drives:
+   * - 'free_rect' (default) — the maximal-free-rectangle guillotine packer
+   *   (`packSheetWithFreeRects`), which places pieces one at a time wherever
+   *   they score best.
+   * - 'band' — the shared-width band packer (`packSheetWithSharedWidthBands`),
+   *   which first groups pieces that share a common dimension and cuts each
+   *   group from one full-width band, so pieces of the same width come off the
+   *   SAME rip instead of being scattered across leftover rectangles.
+   */
+  mode?: 'free_rect' | 'band';
 }
 
 interface PlacementCandidate {
@@ -395,6 +406,10 @@ const PACKING_STRATEGIES: PackingStrategy[] = [
   { id: 'column-width-tight-primary', axis: 'columns', order: 'width_desc', levelSelection: 'tight_primary' },
   { id: 'column-height-tight-secondary', axis: 'columns', order: 'height_desc', levelSelection: 'tight_secondary' },
   { id: 'column-perimeter-tight-primary', axis: 'columns', order: 'perimeter_desc', levelSelection: 'tight_primary' },
+  // Workshop practice: pieces that share a width belong on the same saw line —
+  // one long rip frees the band, then crosscuts inside it. See
+  // `packSheetWithSharedWidthBands`.
+  { id: 'band-width-shared', axis: 'rows', order: 'long_side_desc', levelSelection: 'tight_primary', mode: 'band' },
 ];
 
 function compareNumbersDesc(a: number, b: number): number {
@@ -600,7 +615,7 @@ function sortFreeRects(freeRects: FreeRect[], axis: StripAxis): FreeRect[] {
   });
 }
 
-function packSheetWithStrategy(
+function packSheetWithFreeRects(
   items: ExpandedPiece[],
   sheet: Sheet,
   strategy: PackingStrategy,
@@ -667,6 +682,211 @@ function packSheetWithStrategy(
     freeRects,
     cuts,
   };
+}
+
+// ─── Shared-width band packing ────────────────────────────────────
+//
+// Classic workshop practice for a guillotine saw: every piece that shares a
+// width is cut from ONE band — a single long rip frees a full-width strip of
+// that width, then short crosscuts inside the strip release the individual
+// pieces. The free-rectangle packer above optimizes area and will happily
+// scatter same-width pieces into unrelated leftover rectangles, which costs
+// the operator extra saw passes and a messy floor plan; this packer optimizes
+// for the shared saw line instead. Both compete in the same plan search (see
+// `runStrategySearch`), so the band layout only wins when it actually scores
+// better under the active goal.
+
+// Two band dimensions count as "the same width" when they agree to this many
+// cm decimals, so floating-point noise never splits one band in two.
+const BAND_DIMENSION_DECIMALS = 6;
+function bandDimensionKey(value: number): string {
+  return roundTo(value, BAND_DIMENSION_DECIMALS).toFixed(BAND_DIMENSION_DECIMALS);
+}
+
+/** One way a piece can sit inside a band: its band dimension becomes the band's height, the other its length along the rip. */
+interface BandOrientation { bandHeight: number; length: number; rotated: boolean; }
+
+// Rotation-aware candidate band dimensions for one piece. A piece that may
+// rotate can join a band matching EITHER of its dimensions; a rotation-locked
+// piece (rotatable=false — which is exactly how `expandPieces` encodes an
+// active grain/ramage constraint) keeps its stored h×w, so it can only ever
+// join a band whose height equals its fixed height. A grain-locked piece is
+// therefore never rotated to fit a band; if no band matches it, it simply
+// forms its own.
+function getBandOrientations(item: ExpandedPiece): BandOrientation[] {
+  const natural: BandOrientation = { bandHeight: item.height, length: item.width, rotated: false };
+  if (!item.rotatable) return [natural];
+  const rotated: BandOrientation = { bandHeight: item.width, length: item.height, rotated: true };
+  if (bandDimensionKey(natural.bandHeight) === bandDimensionKey(rotated.bandHeight)) return [natural];
+  return [natural, rotated];
+}
+
+interface BandMember { item: ExpandedPiece; length: number; rotated: boolean; }
+interface BandGroup { bandHeight: number; members: BandMember[] }
+
+// Greedy shared-width grouping: repeatedly take the band dimension that gathers
+// the most piece AREA among the pieces still ungrouped, assign every piece that
+// can join it, and continue with what is left. Maximizing area (rather than
+// piece count) keeps the big shared rip — the one that dominates cut length —
+// as the first band. Pieces that fit no band at all on this sheet (too long for
+// the usable width, or thicker than the usable height in every orientation) are
+// left ungrouped for the caller to carry over to the next sheet.
+function buildSharedWidthBandGroups(items: ExpandedPiece[], usableWidth: number, usableHeight: number): BandGroup[] {
+  const groups: BandGroup[] = [];
+  let ungrouped = [...items];
+
+  while (ungrouped.length > 0) {
+    const byBandKey = new Map<string, BandGroup>();
+
+    for (const item of ungrouped) {
+      for (const orientation of getBandOrientations(item)) {
+        if (orientation.bandHeight > usableHeight + 1e-9) continue;
+        if (orientation.length > usableWidth + 1e-9) continue;
+        const key = bandDimensionKey(orientation.bandHeight);
+        const group = byBandKey.get(key);
+        const member: BandMember = { item, length: orientation.length, rotated: orientation.rotated };
+        if (group) group.members.push(member);
+        else byBandKey.set(key, { bandHeight: orientation.bandHeight, members: [member] });
+      }
+    }
+
+    if (byBandKey.size === 0) break;
+
+    const groupArea = (group: BandGroup) => group.members.reduce((sum, m) => sum + (m.length * group.bandHeight), 0);
+    // Deterministic pick: most grouped area, then the taller band (band heights
+    // are the map keys, so no two candidates can tie on both) — never map
+    // insertion order.
+    const best = Array.from(byBandKey.values())
+      .sort((a, b) => (groupArea(b) - groupArea(a)) || (b.bandHeight - a.bandHeight))[0];
+
+    groups.push(best);
+    const claimed = new Set(best.members.map((m) => m.item));
+    ungrouped = ungrouped.filter((item) => !claimed.has(item));
+  }
+
+  return groups;
+}
+
+// Packs one sheet band by band, bottom-up. Every band is a full-usable-width
+// horizontal level whose height IS the shared band dimension, filled best-fit
+// (longest piece that still fits the remaining run) so the crosscuts inside a
+// band stay as few as possible. Kerf and margins are consumed exactly as
+// `splitFreeRect` does for the free-rectangle packer — a band's rip is the
+// horizontal cut across the usable width, a crosscut is a vertical cut the
+// height of the band — so the two packers' `totalLinearCutMeters` are directly
+// comparable.
+function packSheetWithSharedWidthBands(
+  items: ExpandedPiece[],
+  sheet: Sheet,
+  sheetIndex: number,
+  nextPieceNumber: number
+): SheetPackingCandidate {
+  const margin = Math.max(0, sheet.margin || 0);
+  const usableWidth = Math.max(0, sheet.width - (margin * 2));
+  const usableHeight = Math.max(0, sheet.height - (margin * 2));
+  const kerf = Math.max(0, sheet.kerf || 0);
+  const pieces: PlacedPiece[] = [];
+  const cuts: CutInstruction[] = [];
+  const freeRects: FreeRect[] = [];
+  const placedItems = new Set<ExpandedPiece>();
+  let usedArea = 0;
+
+  if (usableWidth <= 0 || usableHeight <= 0) {
+    return { pieces, remaining: [...items], usedArea, freeRects, cuts };
+  }
+
+  const bottomEdge = margin + usableHeight;
+  const rightEdge = margin + usableWidth;
+  const groups = buildSharedWidthBandGroups(items, usableWidth, usableHeight);
+  let cursorY = margin;
+
+  for (const group of groups) {
+    // Longest run first: the piece ordering inside a band decides how many
+    // bands the group needs, and longest-first is the classic decreasing fill.
+    const pending = [...group.members].sort((a, b) => (b.length - a.length) || String(a.item.id || '').localeCompare(String(b.item.id || '')));
+
+    while (pending.length > 0 && cursorY + group.bandHeight <= bottomEdge + 1e-9) {
+      let cursorX = margin;
+      let placedInBand = 0;
+
+      while (pending.length > 0) {
+        // Best fit = the longest remaining member that still fits the run left
+        // in this band, which leaves the smallest end-of-band offcut.
+        const nextIndex = pending.findIndex((member) => member.length <= (rightEdge - cursorX) + 1e-9);
+        if (nextIndex === -1) break;
+        const [member] = pending.splice(nextIndex, 1);
+
+        pieces.push({
+          pieceId: member.item.id,
+          pieceNumber: nextPieceNumber + pieces.length,
+          name: member.item.name,
+          baseName: member.item.baseName,
+          isUnnamed: member.item.isUnnamed,
+          originalHeight: member.item.originalHeight,
+          originalWidth: member.item.originalWidth,
+          height: group.bandHeight,
+          width: member.length,
+          x: cursorX,
+          y: cursorY,
+          rotated: member.rotated,
+          sheetIndex,
+          material: member.item.material,
+          color: member.item.color,
+          originalIndex: member.item.originalIndex,
+          edges: member.item.edges,
+          // Rotation is blocked at expandPieces for any grain-constrained
+          // piece, so a placed unit's grain axis always equals its source axis.
+          grain: member.item.grain,
+        });
+        placedItems.add(member.item);
+        usedArea += member.length * group.bandHeight;
+        placedInBand += 1;
+
+        const runLeft = rightEdge - (cursorX + member.length) - kerf;
+        if (runLeft > 1e-9) {
+          // Crosscut releasing this piece from the rest of its band.
+          cuts.push({ id: `sheet${sheetIndex}_cut_${cuts.length}`, sheetIndex, axis: 'vertical', lengthCm: group.bandHeight });
+        }
+        cursorX += member.length + kerf;
+      }
+
+      if (placedInBand === 0) break;
+
+      const bandLeftover = rightEdge - cursorX;
+      if (bandLeftover > 1e-9) freeRects.push({ x: cursorX, y: cursorY, width: bandLeftover, height: group.bandHeight });
+
+      const heightLeft = bottomEdge - (cursorY + group.bandHeight) - kerf;
+      if (heightLeft > 1e-9) {
+        // The long rip separating this band from the material below it.
+        cuts.push({ id: `sheet${sheetIndex}_cut_${cuts.length}`, sheetIndex, axis: 'horizontal', lengthCm: usableWidth });
+      }
+      cursorY += group.bandHeight + kerf;
+    }
+  }
+
+  const tailHeight = bottomEdge - cursorY;
+  if (tailHeight > 1e-9) freeRects.push({ x: margin, y: cursorY, width: usableWidth, height: tailHeight });
+
+  return {
+    pieces,
+    remaining: items.filter((item) => !placedItems.has(item)),
+    usedArea,
+    freeRects: sortFreeRects(pruneFreeRects(freeRects), 'rows'),
+    cuts,
+  };
+}
+
+function packSheetWithStrategy(
+  items: ExpandedPiece[],
+  sheet: Sheet,
+  strategy: PackingStrategy,
+  sheetIndex: number,
+  nextPieceNumber: number
+): SheetPackingCandidate {
+  if (strategy.mode === 'band') {
+    return packSheetWithSharedWidthBands(items, sheet, sheetIndex, nextPieceNumber);
+  }
+  return packSheetWithFreeRects(items, sheet, strategy, sheetIndex, nextPieceNumber);
 }
 
 // Round to a fixed cm precision so IDs/areas are stable across floating-point noise.
@@ -869,6 +1089,33 @@ function simulatePlanForStrategy(
 //
 // Waste is expressed as a 0..1 fraction of available sheet area so it can
 // never outweigh a whole extra sheet when summed with a sheet count.
+//
+// Sawing effort is appended LAST wherever the policy already had a tiebreak, so
+// it can never outrank sheet count or waste — it only decides between layouts
+// that the material-level criteria leave indistinguishable. Two plans that
+// place the same pieces on the same sheets with the same waste cost the shop
+// the same material but not the same labor, and before this term the winner was
+// simply whichever strategy the table happened to list first.
+//
+// Effort is modeled as the real cut length plus a fixed handling allowance per
+// saw pass, because a pass is never free: the operator re-squares and re-feeds
+// a full panel against the fence for each one. The allowance is expressed in
+// the same unit as the cut itself (cm of travel) so the two terms are
+// commensurable; 50 cm is a deliberately conservative stand-in for handling a
+// panel, well under the ~2 m of travel a full rip costs. Both packers record
+// cuts by the same rule (see `splitFreeRect` and
+// `packSheetWithSharedWidthBands`), so the figure is comparable across
+// strategies. Measured from the real `CutInstruction`s, never estimated.
+const SAW_PASS_HANDLING_EQUIVALENT_CM = 50;
+
+function planCutEffortCm(plan: PlanCandidate): number {
+  return plan.sheets.reduce((sum, sheet) => {
+    const cuts = sheet.cuts || [];
+    const length = cuts.reduce((sheetSum, cut) => sheetSum + cut.lengthCm, 0);
+    return sum + length + (cuts.length * SAW_PASS_HANDLING_EQUIVALENT_CM);
+  }, 0);
+}
+
 function planScoreTuple(plan: PlanCandidate, priority: OptimizationPriority): number[] {
   const waste = plan.totalAreaAvailable > 0
     ? (plan.totalAreaAvailable - plan.totalAreaUsed) / plan.totalAreaAvailable
@@ -885,19 +1132,21 @@ function planScoreTuple(plan: PlanCandidate, priority: OptimizationPriority): nu
       // Sheet count still gates first: using more sheets than necessary is
       // never "less wasteful" for the same piece set. Among equal feasible
       // sheet counts, the lower waste percentage wins.
-      return [plan.unplacedPieces.length, plan.sheets.length, waste, -plan.totalAreaUsed];
+      return [plan.unplacedPieces.length, plan.sheets.length, waste, -plan.totalAreaUsed, planCutEffortCm(plan)];
     case 'balanced':
       // Deterministic composite: sheets stay dominant (waste is always < 1)
       // while still tie-breaking on waste when sheet counts are equal.
-      return [plan.unplacedPieces.length, plan.sheets.length + waste];
+      return [plan.unplacedPieces.length, plan.sheets.length + waste, planCutEffortCm(plan)];
     case 'linear_guillotine':
     default:
       // Every layout produced by this packer is guillotine/through-cut valid
       // by construction (see splitFreeRect), so no additional geometric
       // preference is needed for validity. This matches the historical
       // fewest-sheets/lowest-waste ordering that the locked benchmark
-      // fixtures were verified against.
-      return [plan.unplacedPieces.length, plan.sheets.length, waste, -plan.totalAreaUsed];
+      // fixtures were verified against — cut length only breaks ties that
+      // ordering leaves open, which is where the shared-width band layout
+      // earns its place.
+      return [plan.unplacedPieces.length, plan.sheets.length, waste, -plan.totalAreaUsed, planCutEffortCm(plan)];
   }
 }
 
