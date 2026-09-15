@@ -741,12 +741,14 @@ export const PiecesManager: React.FC<PiecesManagerProps> = ({
       )}
 
       <div className="grid grid-cols-12 gap-1.5 px-3 py-2 text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 border-b border-studio-border">
-        <div className="col-span-1 ps-1">{t('pieces.columns.number')}</div>
-        <div className="col-span-3 sm:col-span-3">{t('pieces.columns.piece')}</div>
-        <div className="col-span-3 sm:col-span-3 text-end">{t('pieces.columns.dimensions', { unit: displayUnit })}</div>
-        <div className="col-span-1 text-center">{t('pieces.columns.quantity')}</div>
-        <div className="hidden sm:flex col-span-2 gap-0.5 justify-center">{t('pieces.columns.edges')}</div>
-        <div className="col-span-3 sm:col-span-2 text-end pe-1">{t('pieces.columns.color')}</div>
+        <div className="col-span-1 text-end pe-1">{t('pieces.columns.number')}</div>
+        <div className="col-span-3">{t('pieces.columns.piece')}</div>
+        <div className="col-span-3 text-end">{t('pieces.columns.dimensions', { unit: displayUnit })}</div>
+        <div className="col-span-1 text-center pe-0.5">{t('pieces.columns.quantity')}</div>
+        <div className="hidden sm:flex col-span-1 justify-center overflow-hidden">
+          <span className="truncate text-[9px] tracking-normal leading-none">{t('pieces.columns.edges')}</span>
+        </div>
+        <div className="col-span-3 text-end pe-1">{t('pieces.columns.color')}</div>
       </div>
 
       <div ref={listRef} data-testid="pieces-list" className="max-h-[340px] overflow-y-auto overscroll-contain scroll-smooth">
@@ -784,7 +786,7 @@ export const PiecesManager: React.FC<PiecesManagerProps> = ({
                     isSelected ? 'bg-brand-400/10' : 'hover:bg-studio-field/60'
                   }`}
                 >
-                  <div className="col-span-1 flex items-center gap-1">
+                  <div className="col-span-1 flex items-center justify-end gap-1 pe-1">
                     <button
                       type="button"
                       onClick={() => handleToggleSelect(piece.id || '')}
@@ -838,7 +840,7 @@ export const PiecesManager: React.FC<PiecesManagerProps> = ({
                         if (canonical === null || canonical <= 0) return;
                         handleUpdate(piece.id || '', 'height', canonical);
                       }}
-                      className="w-10 sm:w-12 min-w-0 text-end bg-transparent text-slate-900 dark:text-white font-bold outline-none border-b border-dashed border-transparent hover:border-brand-400 focus:border-brand-400 focus:bg-studio-field focus:rounded px-1 py-0.5 -mx-1 tabular-nums cursor-text transition-colors"
+                      className="w-9 sm:w-10 min-w-0 text-end bg-transparent text-slate-900 dark:text-white font-bold outline-none border-b border-dashed border-transparent hover:border-brand-400 focus:border-brand-400 focus:bg-studio-field focus:rounded px-1 py-0.5 -mx-1 tabular-nums cursor-text transition-colors"
                       aria-label={t('pieces.row.heightAria', { unit: displayUnit })}
                     />
                     <span className="text-slate-400 dark:text-slate-500 shrink-0">×</span>
@@ -851,7 +853,7 @@ export const PiecesManager: React.FC<PiecesManagerProps> = ({
                         if (canonical === null || canonical <= 0) return;
                         handleUpdate(piece.id || '', 'width', canonical);
                       }}
-                      className="w-10 sm:w-12 min-w-0 text-end bg-transparent text-slate-900 dark:text-white font-bold outline-none border-b border-dashed border-transparent hover:border-brand-400 focus:border-brand-400 focus:bg-studio-field focus:rounded px-1 py-0.5 -mx-1 tabular-nums cursor-text transition-colors"
+                      className="w-9 sm:w-10 min-w-0 text-end bg-transparent text-slate-900 dark:text-white font-bold outline-none border-b border-dashed border-transparent hover:border-brand-400 focus:border-brand-400 focus:bg-studio-field focus:rounded px-1 py-0.5 -mx-1 tabular-nums cursor-text transition-colors"
                       aria-label={t('pieces.row.widthAria', { unit: displayUnit })}
                     />
                   </div>
@@ -873,7 +875,7 @@ export const PiecesManager: React.FC<PiecesManagerProps> = ({
                     />
                   </div>
 
-                  <div className="hidden sm:flex col-span-2 items-center justify-center">
+                  <div className="hidden sm:flex col-span-1 items-center justify-center">
                     <EdgePickerButton
                       name={piece.name || t('pieces.row.fallbackName', { index: index + 1 })}
                       edges={edges}
@@ -881,7 +883,7 @@ export const PiecesManager: React.FC<PiecesManagerProps> = ({
                     />
                   </div>
 
-                  <div className="col-span-3 sm:col-span-2 min-w-0 overflow-visible flex items-center justify-end gap-0.5 sm:gap-1">
+                  <div className="col-span-3 min-w-0 overflow-visible flex items-center justify-end gap-0.5 sm:gap-1">
                     {/* Swap H<->W for this piece; the icon is the accessible
                         name's symbol, the title carries the translated wording. */}
                     <button

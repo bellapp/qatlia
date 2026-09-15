@@ -112,14 +112,14 @@ export const fr = {
    */
   pricing: {
     eyebrow: 'Tarifs',
-    title: 'Essai gratuit : 10 crédits offerts',
+    title: 'Essai gratuit : 30 crédits offerts',
     popular: 'Populaire',
     freeName: 'Gratuit',
-    freeDesc: 'Créez un compte, testez avec vos 10 crédits.',
+    freeDesc: 'Créez un compte, testez avec vos 30 crédits.',
     freeOptimize: '1 crédit par optimisation',
     freeExports: 'Exports PDF, CSV, DXF et JSON inclus',
-    freeNoScan: '10 analyses IA offertes à l’inscription, puis Scan IA par crédits',
-    freeCredits: '10 crédits offerts à l’inscription — analyse IA 2 crédits, optimisation 1 crédit. Échec = non débité.',
+    freeNoScan: '30 analyses IA offertes à l’inscription, puis Scan IA par crédits',
+    freeCredits: '30 crédits offerts à l’inscription — analyse IA 2 crédits, optimisation 1 crédit. Échec = non débité.',
     freeCta: 'Créer un compte gratuit',
     packSuffix: '/ {count} analyses',
     packAllFree: 'Fonctions complètes incluses',
