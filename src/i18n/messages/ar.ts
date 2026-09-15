@@ -405,6 +405,8 @@ export const ar: Catalog = {
       swapAria: 'تبديل الارتفاع والعرض لـ{name}',
       deleteAria: 'حذف',
       materialAria: 'المادة: {material}',
+      duplicateAria: 'تكرار {name}',
+      duplicateTitle: 'تكرار القطعة',
     },
     edge: {
       left: 'يسار',
@@ -416,6 +418,8 @@ export const ar: Catalog = {
       topShort: 'أع',
       bottomShort: 'أس',
       title: 'حرف {side}',
+      pickerAria: 'حواف {name} ({count} نشطة)',
+      pickerTitle: 'حواف {name}',
     },
     edgeBanding: {
       none: 'بدون',

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   Search,
   Plus,
@@ -14,6 +14,7 @@ import {
   MoveHorizontal,
   Waves,
   ClipboardPaste,
+  Copy,
 } from 'lucide-react';
 import { Piece, MaterialType, EdgeBandingConfig, MATERIAL_LIBRARY, EDGEBANDING_PRESETS } from '@/lib/cutting/binpacking';
 import { parsePiecesImport } from '@/lib/pieces/import-parser';
@@ -33,6 +34,141 @@ const IMPORT_FORMAT_SPEC = 'Nom;Hauteur;Largeur;Quantité';
 const IMPORT_EXAMPLE_VALUES = '230;45,5;2';
 
 const EDGE_SIDES: readonly EdgeSide[] = ['left', 'right', 'top', 'bottom'];
+
+/** Amber stroke color for active edges, matching the brand accent used elsewhere for edge state. */
+const EDGE_ACTIVE_STROKE = '#f59e0b';
+
+/**
+ * Compact "piece from above" diagram: a row button that always reflects the
+ * current edge state, and a popover with 4 clickable zones to toggle each
+ * side. The square's left/right/top/bottom map to the piece's physical sides
+ * (not the UI's logical start/end), so the diagram stays geometrically
+ * correct in RTL — only the popover's own placement follows text direction.
+ */
+function EdgePickerButton({
+  name,
+  edges,
+  onToggle,
+}: {
+  name: string;
+  edges: EdgeBandingConfig;
+  onToggle: (side: EdgeSide) => void;
+}) {
+  const { t } = useLocale();
+  const [open, setOpen] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const handlePointerDown = (event: MouseEvent) => {
+      if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
+        setOpen(false);
+      }
+    };
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setOpen(false);
+        triggerRef.current?.focus();
+      }
+    };
+    document.addEventListener('mousedown', handlePointerDown);
+    document.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.removeEventListener('mousedown', handlePointerDown);
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [open]);
+
+  const activeCount = EDGE_SIDES.filter((side) => edges[side]).length;
+
+  const zoneClass = (active: boolean) =>
+    `absolute rounded-sm transition-colors ${active ? 'bg-brand-400' : 'bg-transparent hover:bg-studio-border'}`;
+
+  return (
+    <div ref={containerRef} className="relative">
+      <button
+        ref={triggerRef}
+        type="button"
+        data-testid="edge-picker-btn"
+        onClick={() => setOpen((current) => !current)}
+        aria-haspopup="dialog"
+        aria-expanded={open}
+        aria-label={t('pieces.edge.pickerAria', { name, count: activeCount })}
+        className="w-6 h-6 flex items-center justify-center rounded hover:bg-studio-border transition-colors"
+      >
+        <svg viewBox="0 0 20 20" width="18" height="18" aria-hidden="true">
+          <rect
+            x="3"
+            y="3"
+            width="14"
+            height="14"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1"
+            strokeDasharray="2 2"
+            className="text-slate-400 dark:text-slate-500"
+          />
+          {edges.top && <line x1="3" y1="3" x2="17" y2="3" stroke={EDGE_ACTIVE_STROKE} strokeWidth="2.5" strokeLinecap="round" />}
+          {edges.right && <line x1="17" y1="3" x2="17" y2="17" stroke={EDGE_ACTIVE_STROKE} strokeWidth="2.5" strokeLinecap="round" />}
+          {edges.bottom && <line x1="3" y1="17" x2="17" y2="17" stroke={EDGE_ACTIVE_STROKE} strokeWidth="2.5" strokeLinecap="round" />}
+          {edges.left && <line x1="3" y1="3" x2="3" y2="17" stroke={EDGE_ACTIVE_STROKE} strokeWidth="2.5" strokeLinecap="round" />}
+        </svg>
+      </button>
+
+      {open && (
+        <div
+          data-testid="edge-picker-popover"
+          role="dialog"
+          aria-label={t('pieces.edge.pickerTitle', { name })}
+          className="absolute z-20 top-full mt-1 start-0 w-36 rounded-lg border border-studio-border bg-studio-panel shadow-lg p-2.5"
+        >
+          <p className="text-[10px] font-semibold text-slate-700 dark:text-slate-200 truncate mb-2" dir="auto">
+            {t('pieces.edge.pickerTitle', { name })}
+          </p>
+          <div className="relative mx-auto" style={{ width: 68, height: 68 }}>
+            <div className="absolute inset-3 border border-dashed border-slate-400 dark:border-slate-600 rounded-sm pointer-events-none" />
+            <button
+              type="button"
+              onClick={() => onToggle('top')}
+              title={t('pieces.edge.title', { side: t(EDGE_SIDE_KEYS.top.label) })}
+              aria-label={t('pieces.edge.title', { side: t(EDGE_SIDE_KEYS.top.label) })}
+              className={`${zoneClass(!!edges.top)} left-3 right-3 top-0 h-3`}
+            />
+            <button
+              type="button"
+              onClick={() => onToggle('bottom')}
+              title={t('pieces.edge.title', { side: t(EDGE_SIDE_KEYS.bottom.label) })}
+              aria-label={t('pieces.edge.title', { side: t(EDGE_SIDE_KEYS.bottom.label) })}
+              className={`${zoneClass(!!edges.bottom)} left-3 right-3 bottom-0 h-3`}
+            />
+            <button
+              type="button"
+              onClick={() => onToggle('left')}
+              title={t('pieces.edge.title', { side: t(EDGE_SIDE_KEYS.left.label) })}
+              aria-label={t('pieces.edge.title', { side: t(EDGE_SIDE_KEYS.left.label) })}
+              className={`${zoneClass(!!edges.left)} top-3 bottom-3 left-0 w-3`}
+            />
+            <button
+              type="button"
+              onClick={() => onToggle('right')}
+              title={t('pieces.edge.title', { side: t(EDGE_SIDE_KEYS.right.label) })}
+              aria-label={t('pieces.edge.title', { side: t(EDGE_SIDE_KEYS.right.label) })}
+              className={`${zoneClass(!!edges.right)} top-3 bottom-3 right-0 w-3`}
+            />
+          </div>
+          <div className="flex justify-center gap-2 mt-2 font-mono text-[9px] text-slate-500 dark:text-slate-400">
+            {EDGE_SIDES.map((side) => (
+              <span key={side} className={edges[side] ? 'text-brand-400 font-bold' : ''}>
+                {t(EDGE_SIDE_KEYS[side].short)}
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
 
 interface PiecesManagerProps {
   pieces: Piece[];
@@ -325,6 +461,22 @@ export const PiecesManager: React.FC<PiecesManagerProps> = ({
       return { ...piece, edges: { ...currentEdges, [side]: !currentEdges[side] } };
     });
     onUpdatePieces(updated);
+  };
+
+  /** Inserts a copy of a piece right after it: same id-generation path as
+   *  `appendPieces` (`ensureUniquePieceId`) and the same state setter, but the
+   *  copy keeps every field (name, dimensions, edges, color, grain, rotation)
+   *  exactly as-is rather than renormalizing them. */
+  const handleDuplicate = (id: string) => {
+    const sourceIndex = pieces.findIndex((piece) => piece.id === id);
+    if (sourceIndex === -1) return;
+    const source = pieces[sourceIndex];
+    const existingIds = new Set(pieces.map((piece) => piece.id).filter((pid): pid is string => Boolean(pid)));
+    const duplicateId = ensureUniquePieceId(existingIds, source.id || `piece_${pieces.length + 1}`);
+    const duplicate: Piece = { ...source, id: duplicateId, edges: { ...source.edges } };
+    const next = [...pieces];
+    next.splice(sourceIndex + 1, 0, duplicate);
+    onUpdatePieces(next);
   };
 
   const handleRemove = (id: string) => {
@@ -720,42 +872,15 @@ export const PiecesManager: React.FC<PiecesManagerProps> = ({
                     />
                   </div>
 
-                  <div className="hidden sm:flex col-span-2 items-center justify-center gap-0.5 font-mono text-[9px]">
-                    {EDGE_SIDES.map((side) => {
-                      const label = t(EDGE_SIDE_KEYS[side].short);
-                      const isEdgeActive = edges[side];
-                      return (
-                        <button
-                          key={side}
-                          type="button"
-                          onClick={() => handleToggleEdge(piece.id || '', side)}
-                          className={`w-5 h-5 rounded text-[10px] font-bold transition-colors ${
-                            isEdgeActive
-                              ? 'bg-brand-400 text-slate-950'
-                              : 'bg-studio-field text-slate-500 dark:text-slate-400 hover:bg-studio-border'
-                          }`}
-                          title={t('pieces.edge.title', { side: t(EDGE_SIDE_KEYS[side].label) })}
-                        >
-                          {label}
-                        </button>
-                      );
-                    })}
+                  <div className="hidden sm:flex col-span-2 items-center justify-center">
+                    <EdgePickerButton
+                      name={piece.name || t('pieces.row.fallbackName', { index: index + 1 })}
+                      edges={edges}
+                      onToggle={(side) => handleToggleEdge(piece.id || '', side)}
+                    />
                   </div>
 
-                  <div className="col-span-3 sm:col-span-2 flex items-center justify-end gap-1">
-                    <label className="sr-only" htmlFor={`piece-color-${piece.id || index}`}>
-                      {t('pieces.row.colorLabel')}
-                    </label>
-                    <input
-                      id={`piece-color-${piece.id || index}`}
-                      type="color"
-                      value={rowColor}
-                      onChange={(event) => handleUpdate(piece.id || '', 'color', event.target.value)}
-                      className="h-7 w-7 rounded-md border border-studio-border bg-transparent p-0.5 cursor-pointer"
-                      aria-label={t('pieces.row.colorAria', {
-                        name: piece.name || t('pieces.row.fallbackName', { index: index + 1 }),
-                      })}
-                    />
+                  <div className="col-span-3 sm:col-span-2 flex items-center justify-end gap-0.5 sm:gap-1">
                     {/* Swap H<->W for this piece; the icon is the accessible
                         name's symbol, the title carries the translated wording. */}
                     <button
@@ -790,6 +915,32 @@ export const PiecesManager: React.FC<PiecesManagerProps> = ({
                         <Waves className="w-3 h-3" />
                       )}
                     </button>
+                    {/* Insert a copy of this piece right after it, via the
+                        same id-generation path used to add pieces. */}
+                    <button
+                      type="button"
+                      data-testid="piece-duplicate"
+                      onClick={() => handleDuplicate(piece.id || '')}
+                      disabled={disabled}
+                      className="w-5 h-5 rounded bg-studio-field text-slate-500 dark:text-slate-400 hover:bg-brand-400 hover:text-slate-950 transition-colors flex items-center justify-center disabled:opacity-40 shrink-0"
+                      title={t('pieces.row.duplicateTitle')}
+                      aria-label={t('pieces.row.duplicateAria', { name: piece.name || String(index + 1) })}
+                    >
+                      <Copy className="w-3 h-3" />
+                    </button>
+                    <label className="sr-only" htmlFor={`piece-color-${piece.id || index}`}>
+                      {t('pieces.row.colorLabel')}
+                    </label>
+                    <input
+                      id={`piece-color-${piece.id || index}`}
+                      type="color"
+                      value={rowColor}
+                      onChange={(event) => handleUpdate(piece.id || '', 'color', event.target.value)}
+                      className="h-7 w-7 rounded-md border border-studio-border bg-transparent p-0.5 cursor-pointer"
+                      aria-label={t('pieces.row.colorAria', {
+                        name: piece.name || t('pieces.row.fallbackName', { index: index + 1 }),
+                      })}
+                    />
                     <button
                       type="button"
                       onClick={() => handleRemove(piece.id || '')}

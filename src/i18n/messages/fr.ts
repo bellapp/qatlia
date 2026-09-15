@@ -456,6 +456,8 @@ export const fr = {
       swapAria: 'Permuter hauteur et largeur de {name}',
       deleteAria: 'Supprimer',
       materialAria: 'Matériau : {material}',
+      duplicateAria: 'Dupliquer {name}',
+      duplicateTitle: 'Dupliquer la pièce',
     },
     edge: {
       left: 'Gauche',
@@ -467,6 +469,8 @@ export const fr = {
       topShort: 'H',
       bottomShort: 'B',
       title: 'Chant {side}',
+      pickerAria: 'Chants de {name} ({count} actifs)',
+      pickerTitle: 'Chants de {name}',
     },
     edgeBanding: {
       none: 'Aucun',

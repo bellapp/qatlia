@@ -404,6 +404,8 @@ export const en: Catalog = {
       swapAria: 'Swap height and width of {name}',
       deleteAria: 'Delete',
       materialAria: 'Material: {material}',
+      duplicateAria: 'Duplicate {name}',
+      duplicateTitle: 'Duplicate piece',
     },
     edge: {
       left: 'Left',
@@ -415,6 +417,8 @@ export const en: Catalog = {
       topShort: 'T',
       bottomShort: 'B',
       title: '{side} edge',
+      pickerAria: 'Edges of {name} ({count} active)',
+      pickerTitle: 'Edges of {name}',
     },
     edgeBanding: {
       none: 'None',
