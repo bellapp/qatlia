@@ -15,6 +15,7 @@ import {
   Waves,
   ClipboardPaste,
   Copy,
+  Palette,
 } from 'lucide-react';
 import { Piece, MaterialType, EdgeBandingConfig, MATERIAL_LIBRARY, EDGEBANDING_PRESETS } from '@/lib/cutting/binpacking';
 import { parsePiecesImport } from '@/lib/pieces/import-parser';
@@ -121,7 +122,7 @@ function EdgePickerButton({
           data-testid="edge-picker-popover"
           role="dialog"
           aria-label={t('pieces.edge.pickerTitle', { name })}
-          className="absolute z-20 top-full mt-1 start-0 w-36 rounded-lg border border-studio-border bg-studio-panel shadow-lg p-2.5"
+          className="absolute z-50 top-full mt-1 left-1/2 -translate-x-1/2 w-36 rounded-lg border border-studio-border bg-studio-panel shadow-lg p-2.5"
         >
           <p className="text-[10px] font-semibold text-slate-700 dark:text-slate-200 truncate mb-2" dir="auto">
             {t('pieces.edge.pickerTitle', { name })}
@@ -812,7 +813,7 @@ export const PiecesManager: React.FC<PiecesManagerProps> = ({
                       dir="auto"
                       value={piece.name}
                       onChange={(event) => handleUpdate(piece.id || '', 'name', event.target.value)}
-                      className="w-full bg-transparent text-start text-slate-900 dark:text-slate-100 font-medium text-xs outline-none focus:text-slate-900 dark:focus:text-white truncate placeholder-slate-500"
+                      className="w-full min-w-0 bg-transparent text-start text-slate-900 dark:text-slate-100 font-medium text-xs outline-none focus:text-slate-900 dark:focus:text-white truncate placeholder-slate-500"
                       placeholder={t('pieces.row.namePlaceholder')}
                     />
                     {!isFocused && (
@@ -823,7 +824,7 @@ export const PiecesManager: React.FC<PiecesManagerProps> = ({
                     )}
                   </div>
 
-                  <div className="col-span-3 sm:col-span-3 flex items-center justify-end gap-0.5 font-mono text-xs tabular-nums">
+                  <div className="col-span-3 sm:col-span-3 min-w-0 flex items-center justify-end gap-0.5 font-mono text-xs tabular-nums">
                     <input
                       type="number"
                       step="0.1"
@@ -837,10 +838,10 @@ export const PiecesManager: React.FC<PiecesManagerProps> = ({
                         if (canonical === null || canonical <= 0) return;
                         handleUpdate(piece.id || '', 'height', canonical);
                       }}
-                      className="w-12 sm:w-14 text-end bg-transparent text-slate-900 dark:text-white font-bold outline-none border-b border-dashed border-transparent hover:border-brand-400 focus:border-brand-400 focus:bg-studio-field focus:rounded px-1 py-0.5 -mx-1 tabular-nums cursor-text transition-colors"
+                      className="w-10 sm:w-12 min-w-0 text-end bg-transparent text-slate-900 dark:text-white font-bold outline-none border-b border-dashed border-transparent hover:border-brand-400 focus:border-brand-400 focus:bg-studio-field focus:rounded px-1 py-0.5 -mx-1 tabular-nums cursor-text transition-colors"
                       aria-label={t('pieces.row.heightAria', { unit: displayUnit })}
                     />
-                    <span className="text-slate-400 dark:text-slate-500">×</span>
+                    <span className="text-slate-400 dark:text-slate-500 shrink-0">×</span>
                     <input
                       type="number"
                       step="0.1"
@@ -850,12 +851,12 @@ export const PiecesManager: React.FC<PiecesManagerProps> = ({
                         if (canonical === null || canonical <= 0) return;
                         handleUpdate(piece.id || '', 'width', canonical);
                       }}
-                      className="w-12 sm:w-14 text-end bg-transparent text-slate-900 dark:text-white font-bold outline-none border-b border-dashed border-transparent hover:border-brand-400 focus:border-brand-400 focus:bg-studio-field focus:rounded px-1 py-0.5 -mx-1 tabular-nums cursor-text transition-colors"
+                      className="w-10 sm:w-12 min-w-0 text-end bg-transparent text-slate-900 dark:text-white font-bold outline-none border-b border-dashed border-transparent hover:border-brand-400 focus:border-brand-400 focus:bg-studio-field focus:rounded px-1 py-0.5 -mx-1 tabular-nums cursor-text transition-colors"
                       aria-label={t('pieces.row.widthAria', { unit: displayUnit })}
                     />
                   </div>
 
-                  <div className="col-span-1 flex justify-center">
+                  <div className="col-span-1 shrink-0 flex justify-center">
                     {/* The digit is always Latin: `dir="ltr"` keeps it out of
                         the RTL run so it is never reordered inside the amber
                         badge, and the size/weight/colour are stated explicitly
@@ -880,7 +881,7 @@ export const PiecesManager: React.FC<PiecesManagerProps> = ({
                     />
                   </div>
 
-                  <div className="col-span-3 sm:col-span-2 flex items-center justify-end gap-0.5 sm:gap-1">
+                  <div className="col-span-3 sm:col-span-2 min-w-0 overflow-visible flex items-center justify-end gap-0.5 sm:gap-1">
                     {/* Swap H<->W for this piece; the icon is the accessible
                         name's symbol, the title carries the translated wording. */}
                     <button
@@ -916,31 +917,44 @@ export const PiecesManager: React.FC<PiecesManagerProps> = ({
                       )}
                     </button>
                     {/* Insert a copy of this piece right after it, via the
-                        same id-generation path used to add pieces. */}
+                        same id-generation path used to add pieces. Hover-reveal
+                        on sm+ (width collapses to 0 so it never contests space
+                        with the other 4 buttons); always visible on touch/mobile
+                        where the row gets a wider actions column. */}
                     <button
                       type="button"
                       data-testid="piece-duplicate"
                       onClick={() => handleDuplicate(piece.id || '')}
                       disabled={disabled}
-                      className="w-5 h-5 rounded bg-studio-field text-slate-500 dark:text-slate-400 hover:bg-brand-400 hover:text-slate-950 transition-colors flex items-center justify-center disabled:opacity-40 shrink-0"
+                      className="w-5 h-5 shrink-0 rounded bg-studio-field text-slate-500 dark:text-slate-400 hover:bg-brand-400 hover:text-slate-950 transition-all duration-150 flex items-center justify-center disabled:opacity-40 sm:w-0 sm:min-w-0 sm:shrink sm:opacity-0 sm:overflow-hidden sm:group-hover:w-5 sm:group-hover:opacity-100"
                       title={t('pieces.row.duplicateTitle')}
                       aria-label={t('pieces.row.duplicateAria', { name: piece.name || String(index + 1) })}
                     >
-                      <Copy className="w-3 h-3" />
+                      <Copy className="w-3 h-3 shrink-0" />
                     </button>
-                    <label className="sr-only" htmlFor={`piece-color-${piece.id || index}`}>
-                      {t('pieces.row.colorLabel')}
-                    </label>
-                    <input
-                      id={`piece-color-${piece.id || index}`}
-                      type="color"
-                      value={rowColor}
-                      onChange={(event) => handleUpdate(piece.id || '', 'color', event.target.value)}
-                      className="h-7 w-7 rounded-md border border-studio-border bg-transparent p-0.5 cursor-pointer"
-                      aria-label={t('pieces.row.colorAria', {
-                        name: piece.name || t('pieces.row.fallbackName', { index: index + 1 }),
-                      })}
-                    />
+                    <div className="relative w-6 h-6 shrink-0">
+                      <div className="w-6 h-6 rounded-md border border-studio-border flex items-center justify-center">
+                        <Palette className="w-3.5 h-3.5" style={{ color: rowColor }} aria-hidden="true" />
+                        <span
+                          className="absolute bottom-0 end-0 w-1.5 h-1.5 rounded-full border border-studio-panel"
+                          style={{ backgroundColor: rowColor }}
+                          aria-hidden="true"
+                        />
+                      </div>
+                      <label className="sr-only" htmlFor={`piece-color-${piece.id || index}`}>
+                        {t('pieces.row.colorLabel')}
+                      </label>
+                      <input
+                        id={`piece-color-${piece.id || index}`}
+                        type="color"
+                        value={rowColor}
+                        onChange={(event) => handleUpdate(piece.id || '', 'color', event.target.value)}
+                        className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                        aria-label={t('pieces.row.colorAria', {
+                          name: piece.name || t('pieces.row.fallbackName', { index: index + 1 }),
+                        })}
+                      />
+                    </div>
                     <button
                       type="button"
                       onClick={() => handleRemove(piece.id || '')}
