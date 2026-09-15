@@ -376,7 +376,7 @@ export const PiecesManager: React.FC<PiecesManagerProps> = ({
 
   return (
     <div className="space-y-0">
-      <div className="flex items-center justify-between px-1 py-2 gap-1.5">
+      <div className="flex items-center justify-between px-1 py-2 gap-1.5 flex-wrap">
         <div className="flex items-center gap-1.5 flex-wrap">
           <div className="relative max-w-[170px] sm:max-w-[220px]">
             <Search className="w-3.5 h-3.5 text-slate-500 dark:text-slate-400 absolute start-2.5 top-2.5" aria-hidden="true" />
@@ -400,7 +400,7 @@ export const PiecesManager: React.FC<PiecesManagerProps> = ({
               setActivePanel(activePanel === 'import' ? null : 'import');
             }}
             disabled={disabled}
-            className={`flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-bold transition-colors ${
+            className={`flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-bold transition-colors whitespace-nowrap shrink-0 ${
               activePanel === 'import'
                 ? 'bg-brand-400/10 text-brand-500 border border-brand-500/40'
                 : 'bg-studio-field hover:bg-studio-border text-slate-600 dark:text-slate-300'
@@ -413,7 +413,7 @@ export const PiecesManager: React.FC<PiecesManagerProps> = ({
             type="button"
             onClick={() => setActivePanel(activePanel === 'template' ? null : 'template')}
             disabled={disabled}
-            className={`flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-bold transition-colors ${
+            className={`flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-bold transition-colors whitespace-nowrap shrink-0 ${
               activePanel === 'template'
                 ? 'bg-brand-400/10 text-brand-500 border border-brand-500/40'
                 : 'bg-studio-field hover:bg-studio-border text-slate-600 dark:text-slate-300'
@@ -424,13 +424,13 @@ export const PiecesManager: React.FC<PiecesManagerProps> = ({
           </button>
         </div>
 
-        <div className="flex items-center gap-1.5">
+        <div className="flex items-center gap-1.5 flex-wrap">
           {selectedIds.size > 0 && (
             <button
               type="button"
               onClick={handleDeleteSelected}
               aria-label={t('pieces.deleteSelectedAria')}
-              className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 text-xs font-bold border border-rose-500/20 transition-colors"
+              className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 text-xs font-bold border border-rose-500/20 transition-colors whitespace-nowrap shrink-0"
             >
               <Trash2 className="w-3.5 h-3.5" aria-hidden="true" />
               <span>{selectedIds.size}</span>
@@ -440,7 +440,7 @@ export const PiecesManager: React.FC<PiecesManagerProps> = ({
           <button
             type="button"
             onClick={handleSelectAll}
-            className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-studio-field hover:bg-studio-border text-slate-600 dark:text-slate-300 text-xs font-bold transition-colors"
+            className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-studio-field hover:bg-studio-border text-slate-600 dark:text-slate-300 text-xs font-bold transition-colors whitespace-nowrap shrink-0"
           >
             <CheckSquare className="w-3.5 h-3.5" aria-hidden="true" />
             {selectedIds.size === filteredList.length && filteredList.length > 0
@@ -453,7 +453,7 @@ export const PiecesManager: React.FC<PiecesManagerProps> = ({
             type="button"
             onClick={handleSwapAll}
             disabled={pieces.length === 0}
-            className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-studio-field hover:bg-studio-border text-slate-600 dark:text-slate-300 text-xs font-bold transition-colors disabled:opacity-30"
+            className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-studio-field hover:bg-studio-border text-slate-600 dark:text-slate-300 text-xs font-bold transition-colors disabled:opacity-30 whitespace-nowrap shrink-0"
             title={t('pieces.swapAllTitle')}
             aria-label={t('pieces.swapAllAria')}
           >
@@ -465,7 +465,7 @@ export const PiecesManager: React.FC<PiecesManagerProps> = ({
             type="button"
             onClick={handleExportCsv}
             disabled={pieces.length === 0}
-            className="px-2.5 py-1.5 rounded-lg bg-studio-field hover:bg-studio-border text-slate-600 dark:text-slate-300 transition-colors disabled:opacity-30"
+            className="px-2.5 py-1.5 rounded-lg bg-studio-field hover:bg-studio-border text-slate-600 dark:text-slate-300 transition-colors disabled:opacity-30 shrink-0"
             title={t('pieces.exportCsv')}
             aria-label={t('pieces.exportCsv')}
           >
@@ -589,11 +589,11 @@ export const PiecesManager: React.FC<PiecesManagerProps> = ({
 
       <div className="grid grid-cols-12 gap-1.5 px-3 py-2 text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 border-b border-studio-border">
         <div className="col-span-1 ps-1">{t('pieces.columns.number')}</div>
-        <div className="col-span-4 sm:col-span-4">{t('pieces.columns.piece')}</div>
+        <div className="col-span-3 sm:col-span-3">{t('pieces.columns.piece')}</div>
         <div className="col-span-3 sm:col-span-3 text-end">{t('pieces.columns.dimensions', { unit: displayUnit })}</div>
         <div className="col-span-1 text-center">{t('pieces.columns.quantity')}</div>
         <div className="hidden sm:flex col-span-2 gap-0.5 justify-center">{t('pieces.columns.edges')}</div>
-        <div className="col-span-3 sm:col-span-1 text-end pe-1">{t('pieces.columns.color')}</div>
+        <div className="col-span-3 sm:col-span-2 text-end pe-1">{t('pieces.columns.color')}</div>
       </div>
 
       <div ref={listRef} data-testid="pieces-list" className="max-h-[340px] overflow-y-auto overscroll-contain scroll-smooth">
@@ -649,7 +649,7 @@ export const PiecesManager: React.FC<PiecesManagerProps> = ({
                     </span>
                   </div>
 
-                  <div className="col-span-4 sm:col-span-4 flex flex-1 items-center gap-2 min-w-0">
+                  <div className="col-span-3 sm:col-span-3 flex flex-1 items-center gap-2 min-w-0">
                     {/* `dir="auto"` isolates the stored name from the UI
                         direction: a Latin name ("Panneau Latéral Gauche") keeps
                         its own LTR flow and `truncate` eats its END, while an
@@ -740,13 +740,29 @@ export const PiecesManager: React.FC<PiecesManagerProps> = ({
                         </button>
                       );
                     })}
+                  </div>
+
+                  <div className="col-span-3 sm:col-span-2 flex items-center justify-end gap-1">
+                    <label className="sr-only" htmlFor={`piece-color-${piece.id || index}`}>
+                      {t('pieces.row.colorLabel')}
+                    </label>
+                    <input
+                      id={`piece-color-${piece.id || index}`}
+                      type="color"
+                      value={rowColor}
+                      onChange={(event) => handleUpdate(piece.id || '', 'color', event.target.value)}
+                      className="h-7 w-7 rounded-md border border-studio-border bg-transparent p-0.5 cursor-pointer"
+                      aria-label={t('pieces.row.colorAria', {
+                        name: piece.name || t('pieces.row.fallbackName', { index: index + 1 }),
+                      })}
+                    />
                     {/* Swap H<->W for this piece; the icon is the accessible
                         name's symbol, the title carries the translated wording. */}
                     <button
                       type="button"
                       onClick={() => handleSwapDimensions(piece.id || '')}
                       disabled={disabled}
-                      className="w-5 h-5 rounded bg-studio-field text-slate-500 dark:text-slate-400 hover:bg-brand-400 hover:text-slate-950 transition-colors flex items-center justify-center disabled:opacity-40"
+                      className="w-5 h-5 rounded bg-studio-field text-slate-500 dark:text-slate-400 hover:bg-brand-400 hover:text-slate-950 transition-colors flex items-center justify-center disabled:opacity-40 shrink-0"
                       title={t('pieces.row.swapTitle')}
                       aria-label={t('pieces.row.swapAria', { name: piece.name || String(index + 1) })}
                     >
@@ -758,7 +774,7 @@ export const PiecesManager: React.FC<PiecesManagerProps> = ({
                       type="button"
                       onClick={() => handleCycleGrain(piece.id || '')}
                       disabled={disabled}
-                      className={`w-5 h-5 rounded transition-colors flex items-center justify-center disabled:opacity-40 ${
+                      className={`w-5 h-5 rounded transition-colors flex items-center justify-center disabled:opacity-40 shrink-0 ${
                         (piece.grain ?? 'none') !== 'none'
                           ? 'bg-amber-600 text-white'
                           : 'bg-studio-field text-slate-500 dark:text-slate-400 hover:bg-studio-border'
@@ -774,22 +790,6 @@ export const PiecesManager: React.FC<PiecesManagerProps> = ({
                         <Waves className="w-3 h-3" />
                       )}
                     </button>
-                  </div>
-
-                  <div className="col-span-3 sm:col-span-1 flex items-center justify-end gap-1">
-                    <label className="sr-only" htmlFor={`piece-color-${piece.id || index}`}>
-                      {t('pieces.row.colorLabel')}
-                    </label>
-                    <input
-                      id={`piece-color-${piece.id || index}`}
-                      type="color"
-                      value={rowColor}
-                      onChange={(event) => handleUpdate(piece.id || '', 'color', event.target.value)}
-                      className="h-7 w-7 rounded-md border border-studio-border bg-transparent p-0.5 cursor-pointer"
-                      aria-label={t('pieces.row.colorAria', {
-                        name: piece.name || t('pieces.row.fallbackName', { index: index + 1 }),
-                      })}
-                    />
                     <button
                       type="button"
                       onClick={() => handleRemove(piece.id || '')}
