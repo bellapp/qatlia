@@ -9,13 +9,15 @@ import { QatlIALogo } from '@/components/QatlIALogo';
 import { LocaleSwitcher, useLocale } from '@/components/LocaleProvider';
 import { authErrorKey } from '@/components/AuthModal';
 import type { TranslationKey } from '@/i18n';
+import { SIGNUP_FREE_CREDITS } from '@/lib/billing/policy';
 
 /**
- * Vision analyses granted on sign-up (same figure as the landing page's
- * `FREE_VISION_CREDITS`), interpolated into the copy rather than written into
- * it, so no locale can quietly promise a different number.
+ * Vision analyses granted on sign-up, read from the credit policy so the copy
+ * cannot drift from what the database grants, and interpolated into the copy
+ * rather than written into it, so no locale can quietly promise a different
+ * number.
  */
-const FREE_VISION_CREDITS = 30;
+const FREE_VISION_CREDITS = SIGNUP_FREE_CREDITS;
 
 /** Kept in one place: the input constraint and the copy shown when it is not met. */
 const MIN_PASSWORD_LENGTH = 6;

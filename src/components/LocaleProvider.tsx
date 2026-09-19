@@ -3,12 +3,12 @@
 import React, { createContext, useCallback, useContext, useEffect, useLayoutEffect, useMemo, useState } from 'react';
 import {
   DEFAULT_LOCALE,
-  LOCALES,
+  SELECTABLE_LOCALES,
   LOCALE_COOKIE_NAME,
   LOCALE_STORAGE_KEY,
   dirFor,
   formatNumber,
-  isLocale,
+  isSelectableLocale,
   translate,
   translatePlural,
   type Direction,
@@ -51,13 +51,13 @@ const useApplyEffect = typeof window === 'undefined' ? useEffect : useLayoutEffe
 function readPersistedLocale(): Locale {
   try {
     const stored = window.localStorage.getItem(LOCALE_STORAGE_KEY);
-    if (isLocale(stored)) return stored;
+    if (isSelectableLocale(stored)) return stored;
   } catch {
     // Private-mode storage access can throw; the cookie mirror still applies.
   }
   const match = document.cookie.match(new RegExp(`(?:^|; )${LOCALE_COOKIE_NAME}=([^;]*)`));
   const fromCookie = match ? decodeURIComponent(match[1]) : null;
-  return isLocale(fromCookie) ? fromCookie : DEFAULT_LOCALE;
+  return isSelectableLocale(fromCookie) ? fromCookie : DEFAULT_LOCALE;
 }
 
 function persistLocale(locale: Locale): void {
@@ -169,13 +169,13 @@ export function LocaleSwitcher({ className = '' }: { className?: string }) {
         aria-label={t('nav.languageAria')}
         value={locale}
         onChange={(event) => {
-          const next = isLocale(event.target.value) ? event.target.value : DEFAULT_LOCALE;
+          const next = isSelectableLocale(event.target.value) ? event.target.value : DEFAULT_LOCALE;
           setLocale(next);
         }}
         style={{ colorScheme: 'light dark' }}
         className="appearance-none bg-transparent border border-slate-300 dark:border-studio-border hover:border-slate-400 dark:hover:border-studio-border-hover rounded-lg py-1 ps-9 pe-6 text-xs font-bold text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-brand-500/50 cursor-pointer transition-colors [&>option]:bg-white [&>option]:text-slate-900 dark:[&>option]:bg-slate-900 dark:[&>option]:text-slate-100"
       >
-        {LOCALES.map((candidate) => (
+        {SELECTABLE_LOCALES.map((candidate) => (
           <option key={candidate} value={candidate} lang={candidate}>
             {t(`language.${candidate}`)}
           </option>
