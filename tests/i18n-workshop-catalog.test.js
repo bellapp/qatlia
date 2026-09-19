@@ -113,6 +113,9 @@ function loadAuthErrorMapper() {
     '@/lib/supabase/client': {},
     '@/components/QatlIALogo': {},
     '@/components/LocaleProvider': {},
+    // Not a stub: the sign-up grant quoted in the modal must be the real
+    // SIGNUP_FREE_CREDITS, so a drift between policy and copy fails here.
+    '@/lib/billing/policy': loadTsModule(path.join(PROJECT_ROOT, 'src/lib/billing/policy.ts')),
   };
   const mod = new Module.Module(AUTH_MODAL_PATH, module);
   mod.filename = AUTH_MODAL_PATH;

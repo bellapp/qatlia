@@ -50,7 +50,7 @@ export const fr = {
       credits: 'analyses IA offertes',
       free: 'optimisation et exports gratuits',
       max: 'analyses / mois (pack max)',
-      langs: 'langues — FR · EN · AR',
+      langs: 'langues — FR · AR',
     },
   },
   // Each tile states something the product can actually demonstrate. Only the
@@ -112,14 +112,14 @@ export const fr = {
    */
   pricing: {
     eyebrow: 'Tarifs',
-    title: 'Essai gratuit : 30 crédits offerts',
+    title: 'Essai gratuit : {count} crédits offerts',
     popular: 'Populaire',
     freeName: 'Gratuit',
-    freeDesc: 'Créez un compte, testez avec vos 30 crédits.',
+    freeDesc: 'Créez un compte, testez avec vos {count} crédits.',
     freeOptimize: '1 crédit par optimisation',
     freeExports: 'Exports PDF, CSV, DXF et JSON inclus',
-    freeNoScan: '30 analyses IA offertes à l’inscription, puis Scan IA par crédits',
-    freeCredits: '30 crédits offerts à l’inscription — analyse IA 2 crédits, optimisation 1 crédit. Échec = non débité.',
+    freeNoScan: '{count} analyses IA offertes à l’inscription, puis Scan IA par crédits',
+    freeCredits: '{count} crédits offerts à l’inscription — analyse IA 2 crédits, optimisation 1 crédit. Échec = non débité.',
     freeCta: 'Créer un compte gratuit',
     packSuffix: '/ {count} analyses',
     packAllFree: 'Fonctions complètes incluses',

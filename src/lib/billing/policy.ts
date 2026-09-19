@@ -26,6 +26,16 @@ export const BILLABLE_ACTIONS: readonly BillableAction[] = [
 export const VISION_CREDIT_COST = 2;
 export const OPTIMIZE_CREDIT_COST = 1;
 
+/**
+ * Credits granted to a new account on sign-up.
+ *
+ * Stated once here because three surfaces quote it (landing page, auth modal,
+ * login page) and the database grants it. The SQL side is kept in step by
+ * `supabase/migrations/009_free_credits_50.sql`; changing this number alone
+ * would make the copy promise what the ledger does not give.
+ */
+export const SIGNUP_FREE_CREDITS = 50;
+
 /** Credits charged per action. Anything not listed here is not a known action. */
 export const CREDIT_POLICY: Record<BillableAction, number> = {
   vision: VISION_CREDIT_COST,

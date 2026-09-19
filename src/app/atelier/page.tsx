@@ -908,63 +908,73 @@ const commitPanelName = () => {
 
       {/* Main Workspace Grid */}
       <main className="max-w-[1500px] mx-auto px-4 sm:px-6 py-6">
-        <div className="flex flex-col lg:flex-row gap-6 items-start">
+        <div className="space-y-4">
 
-          {/* Pilotage rail — desktop-only navigation to the sections below;
-              mobile keeps the top navbar as its only navigation (never hidden). */}
-          <aside className="hidden lg:flex sticky top-[57px] self-start flex-col w-56 shrink-0 h-[calc(100vh-57px)] border-e border-studio-border bg-studio-panel/40 px-3 py-4 space-y-1 overflow-y-auto">
-            <p className="text-[9px] font-bold uppercase tracking-[0.2em] text-slate-400 px-3 mb-2">{t('atelier.sidebar.title')}</p>
-
-            <a href="#plan-top" className="flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-bold bg-brand-400/10 text-brand-500 dark:text-brand-400">
-              <LayoutGrid className="w-4 h-4" />
-              {t('atelier.sidebar.navOptimization')}
-            </a>
-            <a href="#stock-card" className="flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-bold text-slate-600 dark:text-slate-300 hover:bg-studio-panel hover:text-slate-900 dark:hover:text-white transition-colors">
-              <PackageOpen className="w-4 h-4" />
-              {t('atelier.sidebar.navMaterials')}
-            </a>
-            <Link href="/history" className="flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-bold text-slate-600 dark:text-slate-300 hover:bg-studio-panel hover:text-slate-900 dark:hover:text-white transition-colors">
-              <History className="w-4 h-4" />
-              {t('atelier.header.history')}
-            </Link>
-            <button
-              type="button"
-              onClick={() => setIsQuotationDialogOpen(true)}
-              disabled={!result?.costingInput}
-              className="flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-bold text-slate-600 dark:text-slate-300 hover:bg-studio-panel hover:text-slate-900 dark:hover:text-white transition-colors disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-transparent"
-            >
-              <FileText className="w-4 h-4" />
-              {t('atelier.sidebar.navQuotation')}
-            </button>
-            <button
-              type="button"
-              onClick={() => setShowAdvancedOptions(!showAdvancedOptions)}
-              aria-expanded={showAdvancedOptions}
-              aria-controls="advanced-cutting-options"
-              className="flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-bold text-slate-600 dark:text-slate-300 hover:bg-studio-panel hover:text-slate-900 dark:hover:text-white transition-colors"
-            >
-              <Settings2 className="w-4 h-4" />
-              {t('atelier.sidebar.navCutSettings')}
-            </button>
-
-            <div className="mt-auto pt-4 border-t border-studio-border space-y-2">
-              <p className="font-mono text-[10px] text-slate-500" dir="ltr">
-                {formatDisplayValue(activeSheet.height, displayUnit)} × {formatDisplayValue(activeSheet.width, displayUnit)} {displayUnit}
+          {/* Pilotage bar — the workspace navigation, back on top: as a left
+              rail it ate 14rem of every row below, which is what squeezed the
+              pieces table. It sticks under the header (h-16 = top-16) and is the
+              only element allowed to scroll sideways on a narrow screen. */}
+          <nav
+            aria-label={t('atelier.sidebar.title')}
+            className="sticky top-16 z-30 -mx-4 sm:-mx-6 px-4 sm:px-6 py-2 border-b border-studio-border bg-studio-canvas/85 backdrop-blur-xl"
+          >
+            <div className="flex min-w-0 items-center gap-1 overflow-x-auto overscroll-x-contain">
+              <p className="hidden xl:block shrink-0 pe-3 text-[9px] font-bold uppercase tracking-[0.2em] text-slate-400">
+                {t('atelier.sidebar.title')}
               </p>
-              {/* Kerf chip (Stitch header pattern): the blade width is a technical
-                  figure — mono, amber-tinted, always visible for machine setup. */}
-              <div
-                dir="ltr"
-                className="hidden md:flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-brand-400/10 border border-brand-500/25 text-brand-500 dark:text-brand-400 text-xs font-mono font-bold"
-                title={t('options.kerf.title')}
+
+              <a href="#plan-top" className="inline-flex shrink-0 items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-bold transition-colors bg-brand-400/10 text-brand-500 dark:text-brand-400">
+                <LayoutGrid className="w-4 h-4" />
+                {t('atelier.sidebar.navOptimization')}
+              </a>
+              <a href="#stock-card" className="inline-flex shrink-0 items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-bold transition-colors text-slate-600 dark:text-slate-300 hover:bg-studio-panel hover:text-slate-900 dark:hover:text-white">
+                <PackageOpen className="w-4 h-4" />
+                {t('atelier.sidebar.navMaterials')}
+              </a>
+              <Link href="/history" className="inline-flex shrink-0 items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-bold transition-colors text-slate-600 dark:text-slate-300 hover:bg-studio-panel hover:text-slate-900 dark:hover:text-white">
+                <History className="w-4 h-4" />
+                {t('atelier.header.history')}
+              </Link>
+              <button
+                type="button"
+                onClick={() => setIsQuotationDialogOpen(true)}
+                disabled={!result?.costingInput}
+                className="inline-flex shrink-0 items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-bold transition-colors text-slate-600 dark:text-slate-300 hover:bg-studio-panel hover:text-slate-900 dark:hover:text-white disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-transparent"
               >
-                <span className="w-1.5 h-1.5 rounded-full bg-brand-400" aria-hidden="true" />
-                {t('options.kerf.chip', { value: n(options.kerfWidth, { maximumFractionDigits: 1 }) })}
+                <FileText className="w-4 h-4" />
+                {t('atelier.sidebar.navQuotation')}
+              </button>
+              <button
+                type="button"
+                onClick={() => setShowAdvancedOptions(!showAdvancedOptions)}
+                aria-expanded={showAdvancedOptions}
+                aria-controls="advanced-cutting-options"
+                className="inline-flex shrink-0 items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-bold transition-colors text-slate-600 dark:text-slate-300 hover:bg-studio-panel hover:text-slate-900 dark:hover:text-white"
+              >
+                <Settings2 className="w-4 h-4" />
+                {t('atelier.sidebar.navCutSettings')}
+              </button>
+
+              {/* Machine setup figures, pushed to the trailing edge. */}
+              <div className="ms-auto flex shrink-0 items-center gap-2 ps-3">
+                <p className="hidden lg:block font-mono text-[10px] text-slate-500" dir="ltr">
+                  {formatDisplayValue(activeSheet.height, displayUnit)} × {formatDisplayValue(activeSheet.width, displayUnit)} {displayUnit}
+                </p>
+                {/* Kerf chip (Stitch header pattern): the blade width is a technical
+                    figure — mono, amber-tinted, always visible for machine setup. */}
+                <div
+                  dir="ltr"
+                  className="hidden md:flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-brand-400/10 border border-brand-500/25 text-brand-500 dark:text-brand-400 text-xs font-mono font-bold"
+                  title={t('options.kerf.title')}
+                >
+                  <span className="w-1.5 h-1.5 rounded-full bg-brand-400" aria-hidden="true" />
+                  {t('options.kerf.chip', { value: n(options.kerfWidth, { maximumFractionDigits: 1 }) })}
+                </div>
               </div>
             </div>
-          </aside>
+          </nav>
 
-          <div className="flex-1 min-w-0 w-full space-y-4">
+          <div className="min-w-0 w-full space-y-4">
 
             {/* Project strip — always visible, independent of the result state. */}
             <div className="flex flex-wrap items-center gap-2.5 px-4 py-3 rounded-xl bg-studio-panel border border-studio-border shadow-sm">
@@ -995,9 +1005,11 @@ const commitPanelName = () => {
 
             <div id="plan-top" className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
 
-          {/* LEFT COLUMN: Controls & Input Studio (4 cols — MIX gives the
-              visualizer the wider stage) */}
-          <div className="lg:col-span-4 space-y-4">
+          {/* LEFT COLUMN: Controls & Input Studio (5 cols — widened once the
+              pilotage rail moved to the top bar: the pieces table lives here and
+              was truncating piece names and the "Chants" header at 4 cols. The
+              visualizer keeps the wider stage at 7 cols. */}
+          <div className="lg:col-span-5 space-y-4">
             
             {/* Quick Actions: Hero Cards */}
             <div className="grid grid-cols-2 gap-3">
@@ -1365,7 +1377,7 @@ const commitPanelName = () => {
 
           {/* RIGHT COLUMN: Visual Studio & Results (8 cols — the 2D plan is
               the hero of the atelier) */}
-          <div className="lg:col-span-8 space-y-4">
+          <div className="lg:col-span-7 space-y-4">
             
             {result ? (
               <>

@@ -11,7 +11,7 @@ CREATE TABLE IF NOT EXISTS public.profiles (
   email         TEXT NOT NULL,
   full_name     TEXT,
   locale        TEXT DEFAULT 'fr',
-  credits       INTEGER NOT NULL DEFAULT 30,
+  credits       INTEGER NOT NULL DEFAULT 50,
   created_at    TIMESTAMPTZ DEFAULT NOW(),
   updated_at    TIMESTAMPTZ DEFAULT NOW()
 );
@@ -104,8 +104,9 @@ CREATE POLICY "Users can view own results"
 CREATE OR REPLACE FUNCTION public.handle_new_user()
 RETURNS TRIGGER AS $$
 BEGIN
-  INSERT INTO public.profiles (id, email, full_name, credits)
-  VALUES (new.id, new.email, COALESCE(new.raw_user_meta_data->>'full_name', split_part(new.email, '@', 1)), 5)
+  -- `credits` is deliberately not listed: the column DEFAULT is the grant.
+  INSERT INTO public.profiles (id, email, full_name)
+  VALUES (new.id, new.email, COALESCE(new.raw_user_meta_data->>'full_name', split_part(new.email, '@', 1)))
   ON CONFLICT (id) DO NOTHING;
   RETURN NEW;
 END;
@@ -118,8 +119,8 @@ CREATE TRIGGER on_auth_user_created
   FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();
 
 -- 10. Insérer les profils pour les utilisateurs déjà créés
-INSERT INTO public.profiles (id, email, full_name, credits)
-SELECT id, email, COALESCE(raw_user_meta_data->>'full_name', split_part(email, '@', 1)), 5
+INSERT INTO public.profiles (id, email, full_name)
+SELECT id, email, COALESCE(raw_user_meta_data->>'full_name', split_part(email, '@', 1))
 FROM auth.users
 ON CONFLICT (id) DO NOTHING;
 
@@ -155,12 +156,12 @@ AS $$
 DECLARE
   v_credits INT;
 BEGIN
-  INSERT INTO public.profiles (id, email, full_name, credits)
+  -- `credits` n'est volontairement pas listé : le DEFAULT de la colonne est l'octroi.
+  INSERT INTO public.profiles (id, email, full_name)
   VALUES (
     p_user_id,
     COALESCE(p_email, 'artisan@qatlia.ma'),
-    COALESCE(p_full_name, split_part(COALESCE(p_email, 'artisan'), '@', 1)),
-    5
+    COALESCE(p_full_name, split_part(COALESCE(p_email, 'artisan'), '@', 1))
   )
   ON CONFLICT (id) DO UPDATE
     -- N'écrase jamais `credits` : le solde dépensé ne doit pas être réinitialisé.

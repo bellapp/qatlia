@@ -6,13 +6,15 @@ import { ArrowRight, Lock, Mail, User, X, Gift, Eye, EyeOff } from 'lucide-react
 import { QatlIALogo } from '@/components/QatlIALogo';
 import { useLocale } from '@/components/LocaleProvider';
 import type { TranslationKey } from '@/i18n';
+import { SIGNUP_FREE_CREDITS } from '@/lib/billing/policy';
 
 /**
- * Vision analyses granted on sign-up (same figure as the landing page's
- * `FREE_VISION_CREDITS`). It is interpolated into the copy rather than written
- * into it, so no locale can quietly promise a different number.
+ * Vision analyses granted on sign-up, read from the credit policy so the copy
+ * cannot drift from what the database grants. It is interpolated into the copy
+ * rather than written into it, so no locale can quietly promise a different
+ * number.
  */
-const FREE_VISION_CREDITS = 30;
+const FREE_VISION_CREDITS = SIGNUP_FREE_CREDITS;
 
 /** Kept in one place: the input constraint and the copy shown when it is not met. */
 const MIN_PASSWORD_LENGTH = 6;

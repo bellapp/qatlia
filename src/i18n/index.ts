@@ -8,6 +8,17 @@ export type Locale = 'fr' | 'en' | 'ar';
 export type Direction = 'ltr' | 'rtl';
 
 export const LOCALES: readonly Locale[] = ['fr', 'en', 'ar'];
+
+/**
+ * The locales actually offered to a visitor. English is shipped and fully
+ * translated but not offered for now (user decision, 2026-09-19): the quotation
+ * and the shop-floor documents exist in FR and AR only, so a visitor could pick
+ * a UI language the exports cannot honour.
+ *
+ * `LOCALES` stays the set the app can *render* — `catalogs`, the PDF schema and
+ * `Locale` are unchanged — so putting English back is a one-line edit here.
+ */
+export const SELECTABLE_LOCALES: readonly Locale[] = ['fr', 'ar'];
 export const DEFAULT_LOCALE: Locale = 'fr';
 export const RTL_LOCALES: readonly Locale[] = ['ar'];
 
@@ -57,6 +68,16 @@ export const INTL_LOCALES: Record<Locale, string> = {
 
 export function isLocale(value: unknown): value is Locale {
   return typeof value === 'string' && (LOCALES as readonly string[]).includes(value);
+}
+
+/**
+ * Stricter than `isLocale`: a preference is only honoured while the locale is
+ * still offered. A visitor who stored `en` before it was withdrawn therefore
+ * lands back on French instead of being stranded on a language the switcher no
+ * longer lists.
+ */
+export function isSelectableLocale(value: unknown): value is Locale {
+  return typeof value === 'string' && (SELECTABLE_LOCALES as readonly string[]).includes(value);
 }
 
 export function dirFor(locale: Locale): Direction {
@@ -153,10 +174,11 @@ export function formatDateTime(
 /**
  * Runs before the body paints so the document direction and language are right
  * on the first frame, including for a returning Arabic visitor. It reads only
- * the persisted preference and only accepts the three allowed codes, so nothing
- * from storage or cookies can reach the DOM unvalidated.
+ * the persisted preference and only accepts the offered codes, so nothing from
+ * storage or cookies can reach the DOM unvalidated — and a withdrawn locale
+ * resolves to the default here exactly as it does in the provider.
  */
-export const localeInitScript = `(function(){try{var a=${JSON.stringify(LOCALES)};var k=${JSON.stringify(
+export const localeInitScript = `(function(){try{var a=${JSON.stringify(SELECTABLE_LOCALES)};var k=${JSON.stringify(
   LOCALE_STORAGE_KEY
 )};var l=null;try{l=window.localStorage.getItem(k);}catch(e){}
 if(a.indexOf(l)<0){var m=document.cookie.match(new RegExp('(?:^|; )'+k+'=([^;]*)'));l=m?decodeURIComponent(m[1]):null;}

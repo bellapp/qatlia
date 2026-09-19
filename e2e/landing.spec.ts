@@ -37,11 +37,14 @@ test.describe('Landing Page (/)', () => {
     await expect(page.locator('button[aria-label*="Mode" i]').first()).toBeVisible();
   });
 
-  test('locale switcher buttons are visible (at least 2)', async ({ page }) => {
+  test('the locale switcher offers exactly the locales the app still serves', async ({ page }) => {
     await page.goto('/');
-    const frBtn = page.locator('button').filter({ hasText: 'FR' });
-    const enBtn = page.locator('button').filter({ hasText: 'EN' });
-    await expect(frBtn.first()).toBeVisible();
-    await expect(enBtn.first()).toBeVisible();
+    // A native <select>, not buttons, and English is withdrawn from it
+    // (SELECTABLE_LOCALES) while the quotation exists in FR and AR only.
+    const picker = page.locator('select:has(option[value="fr"])').first();
+    await expect(picker).toBeVisible();
+    await expect(picker.locator('option')).toHaveCount(2);
+    await expect(picker.locator('option[value="ar"]')).toHaveCount(1);
+    await expect(picker.locator('option[value="en"]')).toHaveCount(0);
   });
 });

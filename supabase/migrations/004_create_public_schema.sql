@@ -13,7 +13,7 @@ CREATE TABLE IF NOT EXISTS public.profiles (
   email         TEXT NOT NULL,
   full_name     TEXT,
   locale        TEXT DEFAULT 'fr',
-  credits       INTEGER NOT NULL DEFAULT 30,
+  credits       INTEGER NOT NULL DEFAULT 50,
   created_at    TIMESTAMPTZ DEFAULT NOW(),
   updated_at    TIMESTAMPTZ DEFAULT NOW()
 );
@@ -123,12 +123,12 @@ SECURITY DEFINER
 SET search_path = public
 AS $$
 BEGIN
-  INSERT INTO public.profiles (id, email, full_name, credits)
+  -- `credits` is deliberately not listed: the column DEFAULT is the grant.
+  INSERT INTO public.profiles (id, email, full_name)
   VALUES (
     NEW.id,
     COALESCE(NEW.email, 'artisan@qatlia.ma'),
-    COALESCE(NEW.raw_user_meta_data->>'full_name', split_part(COALESCE(NEW.email, 'artisan'), '@', 1)),
-    5
+    COALESCE(NEW.raw_user_meta_data->>'full_name', split_part(COALESCE(NEW.email, 'artisan'), '@', 1))
   )
   ON CONFLICT (id) DO NOTHING;
   RETURN NEW;
@@ -140,12 +140,11 @@ CREATE TRIGGER on_auth_user_created
   AFTER INSERT ON auth.users
   FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();
 
-INSERT INTO public.profiles (id, email, full_name, credits)
+INSERT INTO public.profiles (id, email, full_name)
 SELECT
   id,
   COALESCE(email, 'artisan@qatlia.ma'),
-  COALESCE(raw_user_meta_data->>'full_name', split_part(COALESCE(email, 'artisan'), '@', 1)),
-  5
+  COALESCE(raw_user_meta_data->>'full_name', split_part(COALESCE(email, 'artisan'), '@', 1))
 FROM auth.users
 ON CONFLICT (id) DO NOTHING;
 

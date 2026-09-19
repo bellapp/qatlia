@@ -6,11 +6,12 @@ import { ArrowRight, Scissors, Camera, TrendingUp, FileText, Layers, Languages, 
 import { QatlIALogo } from '@/components/QatlIALogo';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { LocaleSwitcher, useLocale } from '@/components/LocaleProvider';
-import { LOCALES } from '@/i18n';
+import { SELECTABLE_LOCALES } from '@/i18n';
 import { BILLING_CURRENCY, CREDIT_PACKS } from '@/lib/billing/catalog';
+import { SIGNUP_FREE_CREDITS } from '@/lib/billing/policy';
 
 /** Vision analyses granted on sign-up; optimization and exports stay free. */
-const FREE_VISION_CREDITS = 30;
+const FREE_VISION_CREDITS = SIGNUP_FREE_CREDITS;
 
 /**
  * Every figure printed on this page is read from the code that enforces it:
@@ -28,7 +29,7 @@ const HERO_STATS = [
   { key: 'credits', value: String(FREE_VISION_CREDITS) },
   { key: 'free', value: `0 ${BILLING_CURRENCY}` },
   { key: 'max', value: MAX_PACK.displayCredits },
-  { key: 'langs', value: String(LOCALES.length) },
+  { key: 'langs', value: String(SELECTABLE_LOCALES.length) },
 ] as const;
 
 /** Six things the product really does, in a 3×2 grid, icons all amber. */
@@ -296,23 +297,24 @@ export default function LandingPage() {
           is free on every plan. */}
       <section id="tarifs" className="bg-[#F8FAFC] dark:bg-[#0B1424] border-y border-studio-border/60 px-6 sm:px-10 py-20 sm:py-24">
         <div className="max-w-5xl mx-auto">
-          <SectionHeading eyebrow={t('pricing.eyebrow')} title={t('pricing.title')} />
+          <SectionHeading eyebrow={t('pricing.eyebrow')} title={t('pricing.title', { count: FREE_VISION_CREDITS })} />
 
           <div className="grid md:grid-cols-2 gap-6 sm:gap-8 max-w-4xl mx-auto">
             {/* Free plan */}
             <div className="flex flex-col p-8 sm:p-10 rounded-2xl bg-white dark:bg-studio-panel border border-studio-border shadow-sm">
               <h3 className="text-2xl font-black tracking-[-0.01em] text-slate-900 dark:text-white">{t('pricing.freeName')}</h3>
-              <p className="mt-2 text-sm text-slate-600 dark:text-slate-400">{t('pricing.freeDesc')}</p>
+              <p className="mt-2 text-sm text-slate-600 dark:text-slate-400">{t('pricing.freeDesc', { count: FREE_VISION_CREDITS })}</p>
               <p className="mt-8 font-mono text-[40px] leading-none font-bold text-slate-900 dark:text-white" dir="ltr">
                 0 <span className="text-xl text-slate-500 dark:text-slate-400">{BILLING_CURRENCY}</span>
               </p>
               <ul className="mt-8 mb-10 space-y-4 flex-grow text-sm">
                 <PlanLine>{t('pricing.freeOptimize')}</PlanLine>
                 <PlanLine>{t('pricing.freeExports')}</PlanLine>
-                {/* The free tier DOES include the 5 sign-up credits (audit fix:
-                    'Scan IA désactivé' contradicted the hero offer). */}
-                <PlanLine>{t('pricing.freeNoScan')}</PlanLine>
-                <PlanLine>{t('pricing.freeCredits')}</PlanLine>
+                {/* The free tier DOES include the sign-up credits (audit fix:
+                    'Scan IA désactivé' contradicted the hero offer). The figure
+                    comes from SIGNUP_FREE_CREDITS, never from the locale copy. */}
+                <PlanLine>{t('pricing.freeNoScan', { count: FREE_VISION_CREDITS })}</PlanLine>
+                <PlanLine>{t('pricing.freeCredits', { count: FREE_VISION_CREDITS })}</PlanLine>
               </ul>
               <Link
                 href="/auth/login"
