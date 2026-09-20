@@ -224,6 +224,19 @@ export const PiecesManager: React.FC<PiecesManagerProps> = ({
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [activePanel, setActivePanel] = useState<ActivePanel>(null);
   const [focusedRow, setFocusedRow] = useState<string | null>(null);
+  /**
+   * In-flight text for the numeric row fields, keyed `<pieceId>:<field>`.
+   *
+   * These inputs are controlled by the committed piece, so every keystroke used
+   * to be validated and immediately echoed back: clearing a quantity fired
+   * `parseInt('') || 1` and re-rendered a `1`, which made "change 1 to 2"
+   * impossible without selecting the digit first, and typing over a dimension
+   * produced "1.02" instead of "12". The draft holds whatever the artisan is
+   * typing — including the empty string mid-edit — while a value that parses is
+   * still committed on the spot, so nothing downstream waits for a blur.
+   * Dropping the draft on blur re-syncs the field with what was stored.
+   */
+  const [fieldDrafts, setFieldDrafts] = useState<Record<string, string>>({});
   const [newEdgeColor, setNewEdgeColor] = useState('none');
   const [feedback, setFeedback] = useState<{ tone: FeedbackTone; text: string } | null>(null);
   const [importText, setImportText] = useState('');
@@ -304,6 +317,14 @@ export const PiecesManager: React.FC<PiecesManagerProps> = ({
 
   const handleAddPieceQuick = (event: React.FormEvent) => {
     event.preventDefault();
+    submitQuickAdd();
+  };
+
+  /**
+   * Shared by the quick-add panel and the inline row at the foot of the table,
+   * so both paths validate, append and report identically.
+   */
+  const submitQuickAdd = () => {
     // parseDisplayInputToCanonical never throws: it returns null for empty,
     // non-numeric or non-finite text (including "1e400"/"Infinity"), so a
     // pasted garbage value is rejected here instead of reaching
@@ -362,6 +383,20 @@ export const PiecesManager: React.FC<PiecesManagerProps> = ({
       setActivePanel(null);
     }
   };
+
+  const draftKey = (id: string, field: 'height' | 'width' | 'quantity') => `${id}:${field}`;
+
+  const setDraft = (id: string, field: 'height' | 'width' | 'quantity', value: string) =>
+    setFieldDrafts((current) => ({ ...current, [draftKey(id, field)]: value }));
+
+  /** Drops the in-flight text so the field falls back to the stored value. */
+  const clearDraft = (id: string, field: 'height' | 'width' | 'quantity') =>
+    setFieldDrafts((current) => {
+      if (!(draftKey(id, field) in current)) return current;
+      const next = { ...current };
+      delete next[draftKey(id, field)];
+      return next;
+    });
 
   const handleUpdate = (
     id: string,
@@ -743,7 +778,7 @@ export const PiecesManager: React.FC<PiecesManagerProps> = ({
       <div className="grid grid-cols-12 gap-1.5 px-3 py-2 text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 border-b border-studio-border">
         <div className="col-span-1 text-end pe-1">{t('pieces.columns.number')}</div>
         <div className="col-span-3">{t('pieces.columns.piece')}</div>
-        <div className="col-span-3 text-end">{t('pieces.columns.dimensions', { unit: displayUnit })}</div>
+        <div className="col-span-4 sm:col-span-3 text-end">{t('pieces.columns.dimensions', { unit: displayUnit })}</div>
         <div className="col-span-1 text-center pe-0.5">{t('pieces.columns.quantity')}</div>
         <div className="hidden sm:flex col-span-1 justify-center overflow-hidden">
           <span className="truncate text-[9px] tracking-normal leading-none">{t('pieces.columns.edges')}</span>
@@ -804,7 +839,7 @@ export const PiecesManager: React.FC<PiecesManagerProps> = ({
                     </span>
                   </div>
 
-                  <div className="col-span-3 sm:col-span-3 flex flex-1 items-center gap-2 min-w-0">
+                  <div className="col-span-3 flex flex-1 items-center gap-2 min-w-0">
                     {/* `dir="auto"` isolates the stored name from the UI
                         direction: a Latin name ("Panneau Latéral Gauche") keeps
                         its own LTR flow and `truncate` eats its END, while an
@@ -826,34 +861,44 @@ export const PiecesManager: React.FC<PiecesManagerProps> = ({
                     )}
                   </div>
 
-                  <div className="col-span-3 sm:col-span-3 min-w-0 flex items-center justify-end gap-0.5 font-mono text-xs tabular-nums">
+                  {/* The two figures share the cell instead of sitting in
+                      fixed 36/40px boxes: a display value always carries one
+                      decimal, so "230.0" already overflowed in cm and "2780.0"
+                      in mm, and the digits were clipped mid-character. */}
+                  <div className="col-span-4 sm:col-span-3 min-w-0 flex items-center justify-end gap-0.5 font-mono text-[9px] min-[360px]:text-[10px] sm:text-[11px] lg:text-[10px] xl:text-xs tabular-nums">
                     <input
                       type="number"
                       step="0.1"
-                      value={formatDisplayValue(piece.height, displayUnit)}
+                      value={fieldDrafts[draftKey(piece.id || '', 'height')] ?? formatDisplayValue(piece.height, displayUnit)}
                       onChange={(event) => {
-                        // Safe boundary: reject anything null/non-finite/<=0
-                        // (empty string, "abc", "1e400", "Infinity", 0, a
-                        // negative) instead of letting it corrupt canonical
-                        // state or reach `toCanonicalCm`, which throws.
+                        // The raw text is kept as-is so a half-typed or cleared
+                        // field survives the render. Safe boundary unchanged:
+                        // anything null/non-finite/<=0 ("", "abc", "1e400",
+                        // "Infinity", 0, a negative) is simply not committed,
+                        // so it can never corrupt canonical state or reach
+                        // `toCanonicalCm`, which throws.
+                        setDraft(piece.id || '', 'height', event.target.value);
                         const canonical = parseDisplayInputToCanonical(event.target.value, displayUnit);
                         if (canonical === null || canonical <= 0) return;
                         handleUpdate(piece.id || '', 'height', canonical);
                       }}
-                      className="w-9 sm:w-10 min-w-0 text-end bg-transparent text-slate-900 dark:text-white font-bold outline-none border-b border-dashed border-transparent hover:border-brand-400 focus:border-brand-400 focus:bg-studio-field focus:rounded px-1 py-0.5 -mx-1 tabular-nums cursor-text transition-colors"
+                      onBlur={() => clearDraft(piece.id || '', 'height')}
+                      className="flex-1 min-w-0 max-w-[4.5rem] text-end bg-transparent text-slate-900 dark:text-white font-bold outline-none border-b border-dashed border-transparent hover:border-brand-400 focus:border-brand-400 focus:bg-studio-field focus:rounded px-0 py-0.5 tabular-nums cursor-text transition-colors"
                       aria-label={t('pieces.row.heightAria', { unit: displayUnit })}
                     />
                     <span className="text-slate-400 dark:text-slate-500 shrink-0">×</span>
                     <input
                       type="number"
                       step="0.1"
-                      value={formatDisplayValue(piece.width, displayUnit)}
+                      value={fieldDrafts[draftKey(piece.id || '', 'width')] ?? formatDisplayValue(piece.width, displayUnit)}
                       onChange={(event) => {
+                        setDraft(piece.id || '', 'width', event.target.value);
                         const canonical = parseDisplayInputToCanonical(event.target.value, displayUnit);
                         if (canonical === null || canonical <= 0) return;
                         handleUpdate(piece.id || '', 'width', canonical);
                       }}
-                      className="w-9 sm:w-10 min-w-0 text-end bg-transparent text-slate-900 dark:text-white font-bold outline-none border-b border-dashed border-transparent hover:border-brand-400 focus:border-brand-400 focus:bg-studio-field focus:rounded px-1 py-0.5 -mx-1 tabular-nums cursor-text transition-colors"
+                      onBlur={() => clearDraft(piece.id || '', 'width')}
+                      className="flex-1 min-w-0 max-w-[4.5rem] text-end bg-transparent text-slate-900 dark:text-white font-bold outline-none border-b border-dashed border-transparent hover:border-brand-400 focus:border-brand-400 focus:bg-studio-field focus:rounded px-0 py-0.5 tabular-nums cursor-text transition-colors"
                       aria-label={t('pieces.row.widthAria', { unit: displayUnit })}
                     />
                   </div>
@@ -868,9 +913,15 @@ export const PiecesManager: React.FC<PiecesManagerProps> = ({
                       type="number"
                       min="1"
                       dir="ltr"
-                      value={piece.quantity || 1}
-                      onChange={(event) => handleUpdate(piece.id || '', 'quantity', parseInt(event.target.value, 10) || 1)}
-                      className="w-6 h-6 text-center bg-brand-400 rounded text-slate-900 font-mono font-bold text-[11px] leading-none outline-none border border-transparent focus:border-brand-600 focus:ring-1 focus:ring-brand-500/40 tabular-nums appearance-none [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                      value={fieldDrafts[draftKey(piece.id || '', 'quantity')] ?? String(piece.quantity || 1)}
+                      onChange={(event) => {
+                        setDraft(piece.id || '', 'quantity', event.target.value);
+                        const parsed = parseInt(event.target.value, 10);
+                        if (!Number.isFinite(parsed) || parsed < 1) return;
+                        handleUpdate(piece.id || '', 'quantity', parsed);
+                      }}
+                      onBlur={() => clearDraft(piece.id || '', 'quantity')}
+                      className="w-7 h-6 text-center bg-brand-400 rounded text-slate-900 font-mono font-bold text-[11px] leading-none outline-none border border-transparent focus:border-brand-600 focus:ring-1 focus:ring-brand-500/40 tabular-nums appearance-none [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
                       aria-label={t('pieces.row.quantityAria')}
                     />
                   </div>
@@ -971,6 +1022,98 @@ export const PiecesManager: React.FC<PiecesManagerProps> = ({
             })}
           </div>
         )}
+      </div>
+
+      {/* Direct entry: the last line of the table is live. Height, width and
+          Enter append the piece without leaving the grid or opening a panel —
+          the columns line up with the rows above, so it reads as the next row
+          rather than as a form. The full panel below stays for the cases this
+          line deliberately leaves out (edge banding, colour, material). */}
+      {/* A <div>, not a <form>: an extra form ahead of the quick-add panel
+          would silently re-point every `locator('form').first()` in the specs.
+          Enter is wired by hand instead, which is the only form behaviour this
+          row needs. */}
+      <div
+        role="group"
+        onKeyDown={(event) => {
+          if (event.key !== 'Enter') return;
+          event.preventDefault();
+          submitQuickAdd();
+        }}
+        aria-label={t('pieces.inlineAdd.rowAria')}
+        data-testid="pieces-inline-add"
+        className="grid grid-cols-12 gap-1.5 items-center px-3 py-2 border-t border-dashed border-studio-border/80 bg-studio-field/30"
+      >
+        <div className="col-span-1 flex items-center justify-end pe-1 text-slate-400 dark:text-slate-500">
+          <Plus className="w-3.5 h-3.5" aria-hidden="true" />
+        </div>
+
+        <div className="col-span-3 min-w-0">
+          <input
+            value={newReference}
+            onChange={(event) => setNewReference(event.target.value)}
+            disabled={disabled}
+            placeholder={t('pieces.inlineAdd.namePlaceholder')}
+            aria-label={t('pieces.inlineAdd.nameAria')}
+            className="w-full min-w-0 bg-transparent text-xs font-semibold text-slate-900 dark:text-white outline-none border-b border-dashed border-transparent focus:border-brand-400 placeholder:text-slate-400 dark:placeholder:text-slate-500 truncate py-0.5"
+          />
+        </div>
+
+        <div className="col-span-4 sm:col-span-3 min-w-0 flex items-center justify-end gap-0.5 font-mono text-[9px] min-[360px]:text-[10px] sm:text-[11px] lg:text-[10px] xl:text-xs tabular-nums">
+          <input
+            type="number"
+            step="0.1"
+            inputMode="decimal"
+            value={newHeight}
+            onChange={(event) => setNewHeight(event.target.value)}
+            disabled={disabled}
+            placeholder="H"
+            aria-label={t('pieces.inlineAdd.heightAria', { unit: displayUnit })}
+            className="flex-1 min-w-0 max-w-[4.5rem] text-end bg-transparent text-slate-900 dark:text-white font-bold outline-none border-b border-dashed border-studio-border focus:border-brand-400 px-0 py-0.5 tabular-nums placeholder:font-normal placeholder:text-slate-400"
+          />
+          <span className="text-slate-400 dark:text-slate-500 shrink-0">×</span>
+          <input
+            type="number"
+            step="0.1"
+            inputMode="decimal"
+            value={newWidth}
+            onChange={(event) => setNewWidth(event.target.value)}
+            disabled={disabled}
+            placeholder="L"
+            aria-label={t('pieces.inlineAdd.widthAria', { unit: displayUnit })}
+            className="flex-1 min-w-0 max-w-[4.5rem] text-end bg-transparent text-slate-900 dark:text-white font-bold outline-none border-b border-dashed border-studio-border focus:border-brand-400 px-0 py-0.5 tabular-nums placeholder:font-normal placeholder:text-slate-400"
+          />
+        </div>
+
+        <div className="col-span-1 shrink-0 flex justify-center">
+          <input
+            type="number"
+            min="1"
+            dir="ltr"
+            value={newQty}
+            onChange={(event) => setNewQty(event.target.value)}
+            disabled={disabled}
+            aria-label={t('pieces.inlineAdd.quantityAria')}
+            className="w-7 h-6 text-center bg-studio-field border border-studio-border rounded text-slate-900 dark:text-white font-mono font-bold text-[11px] leading-none outline-none focus:border-brand-400 tabular-nums appearance-none [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+          />
+        </div>
+
+        <div className="hidden sm:block col-span-1" aria-hidden="true" />
+
+        <div className="col-span-3 min-w-0 flex items-center justify-end gap-2">
+          <button
+            type="button"
+            onClick={submitQuickAdd}
+            disabled={disabled}
+            aria-label={t('pieces.inlineAdd.submitAria')}
+            /* The hint rides on the button rather than taking a column of its
+               own, where it only ever rendered as "Saisissez H et L p…". */
+            title={t('pieces.inlineAdd.hint')}
+            className="w-6 h-6 shrink-0 rounded bg-brand-400 text-slate-950 hover:bg-brand-300 flex items-center justify-center transition-colors disabled:opacity-40"
+          >
+            <Plus className="w-3.5 h-3.5" aria-hidden="true" />
+          </button>
+        </div>
       </div>
 
       <div className="pt-2">

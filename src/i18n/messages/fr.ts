@@ -493,6 +493,16 @@ export const fr = {
       edgesLabel: 'Chants :',
       colorLabel: 'Couleur',
     },
+    inlineAdd: {
+      rowAria: 'Nouvelle ligne — saisie directe',
+      nameAria: 'Nom de la nouvelle pièce',
+      namePlaceholder: 'Nouvelle pièce…',
+      heightAria: 'Hauteur de la nouvelle pièce ({unit})',
+      widthAria: 'Largeur de la nouvelle pièce ({unit})',
+      quantityAria: 'Quantité de la nouvelle pièce',
+      submitAria: 'Ajouter cette ligne',
+      hint: 'Saisissez H et L puis Entrée',
+    },
   },
   options: {
     kerf: {
