@@ -441,6 +441,16 @@ export const en: Catalog = {
       edgesLabel: 'Edging:',
       colorLabel: 'Color',
     },
+    inlineAdd: {
+      rowAria: 'New line — type straight in',
+      nameAria: 'Name of the new piece',
+      namePlaceholder: 'New piece…',
+      heightAria: 'Height of the new piece ({unit})',
+      widthAria: 'Width of the new piece ({unit})',
+      quantityAria: 'Quantity of the new piece',
+      submitAria: 'Add this line',
+      hint: 'Type H and W, then Enter',
+    },
   },
   options: {
     kerf: {

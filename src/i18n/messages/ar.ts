@@ -442,6 +442,16 @@ export const ar: Catalog = {
       edgesLabel: 'الحواف:',
       colorLabel: 'اللون',
     },
+    inlineAdd: {
+      rowAria: 'سطر جديد — إدخال مباشر',
+      nameAria: 'اسم القطعة الجديدة',
+      namePlaceholder: 'قطعة جديدة…',
+      heightAria: 'ارتفاع القطعة الجديدة ({unit})',
+      widthAria: 'عرض القطعة الجديدة ({unit})',
+      quantityAria: 'كمية القطعة الجديدة',
+      submitAria: 'أضف هذا السطر',
+      hint: 'أدخل الارتفاع والعرض ثم اضغط مفتاح الإدخال',
+    },
   },
   options: {
     kerf: {
