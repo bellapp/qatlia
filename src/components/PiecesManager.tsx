@@ -775,15 +775,20 @@ export const PiecesManager: React.FC<PiecesManagerProps> = ({
         </div>
       )}
 
-      <div className="grid grid-cols-12 gap-1.5 px-3 py-2 text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 border-b border-studio-border">
+      {/* Mobile reclaims 30px of horizontal budget over the sm+ layout — a
+          narrower gutter and gap — because at 390px twelve `minmax(0,1fr)`
+          tracks are only ~20px each and the actions cell cannot hold its five
+          buttons. The three grids (header, row, quick-add) carry the SAME
+          px/gap pair so the columns stay aligned. */}
+      <div className="grid grid-cols-12 gap-1 sm:gap-1.5 px-2 sm:px-3 py-2 text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 border-b border-studio-border">
         <div className="col-span-1 text-end pe-1">{t('pieces.columns.number')}</div>
-        <div className="col-span-3">{t('pieces.columns.piece')}</div>
+        <div className="col-span-2 sm:col-span-3">{t('pieces.columns.piece')}</div>
         <div className="col-span-4 sm:col-span-3 text-end">{t('pieces.columns.dimensions', { unit: displayUnit })}</div>
         <div className="col-span-1 text-center pe-0.5">{t('pieces.columns.quantity')}</div>
         <div className="hidden sm:flex col-span-1 justify-center overflow-hidden">
           <span className="truncate text-[9px] tracking-normal leading-none">{t('pieces.columns.edges')}</span>
         </div>
-        <div className="col-span-3 text-end pe-1">{t('pieces.columns.color')}</div>
+        <div className="col-span-4 sm:col-span-3 text-end pe-1">{t('pieces.columns.color')}</div>
       </div>
 
       <div ref={listRef} data-testid="pieces-list" className="max-h-[340px] overflow-y-auto overscroll-contain scroll-smooth">
@@ -817,7 +822,7 @@ export const PiecesManager: React.FC<PiecesManagerProps> = ({
                   data-piece-name={piece.name}
                   onMouseEnter={() => setFocusedRow(piece.id || null)}
                   onMouseLeave={() => setFocusedRow(null)}
-                  className={`grid grid-cols-12 gap-1.5 items-center px-3 py-2.5 transition-colors group ${
+                  className={`grid grid-cols-12 gap-1 sm:gap-1.5 items-center px-2 sm:px-3 py-2.5 transition-colors group ${
                     isSelected ? 'bg-brand-400/10' : 'hover:bg-studio-field/60'
                   }`}
                 >
@@ -839,7 +844,7 @@ export const PiecesManager: React.FC<PiecesManagerProps> = ({
                     </span>
                   </div>
 
-                  <div className="col-span-3 flex flex-1 items-center gap-2 min-w-0">
+                  <div className="col-span-2 sm:col-span-3 flex flex-1 items-center gap-2 min-w-0">
                     {/* `dir="auto"` isolates the stored name from the UI
                         direction: a Latin name ("Panneau Latéral Gauche") keeps
                         its own LTR flow and `truncate` eats its END, while an
@@ -934,14 +939,19 @@ export const PiecesManager: React.FC<PiecesManagerProps> = ({
                     />
                   </div>
 
-                  <div className="col-span-3 min-w-0 overflow-visible flex items-center justify-end gap-0.5 sm:gap-1">
+                  {/* Five buttons in ~101px on mobile: uniform 18px boxes
+                      (18×5 + 4 gaps of 2px = 98px) instead of the 20/24/22px
+                      mix, which needed 114px and squeezed the grain icon out.
+                      Every `sm:` size below restores the validated desktop
+                      geometry exactly. */}
+                  <div className="col-span-4 sm:col-span-3 min-w-0 overflow-visible flex items-center justify-end gap-0.5 sm:gap-1">
                     {/* Swap H<->W for this piece; the icon is the accessible
                         name's symbol, the title carries the translated wording. */}
                     <button
                       type="button"
                       onClick={() => handleSwapDimensions(piece.id || '')}
                       disabled={disabled}
-                      className="w-5 h-5 rounded bg-studio-field text-slate-500 dark:text-slate-400 hover:bg-brand-400 hover:text-slate-950 transition-colors flex items-center justify-center disabled:opacity-40 shrink-0"
+                      className="w-[18px] h-[18px] sm:w-5 sm:h-5 rounded bg-studio-field text-slate-500 dark:text-slate-400 hover:bg-brand-400 hover:text-slate-950 transition-colors flex items-center justify-center disabled:opacity-40 shrink-0"
                       title={t('pieces.row.swapTitle')}
                       aria-label={t('pieces.row.swapAria', { name: piece.name || String(index + 1) })}
                     >
@@ -953,7 +963,7 @@ export const PiecesManager: React.FC<PiecesManagerProps> = ({
                       type="button"
                       onClick={() => handleCycleGrain(piece.id || '')}
                       disabled={disabled}
-                      className={`w-5 h-5 rounded transition-colors flex items-center justify-center disabled:opacity-40 shrink-0 ${
+                      className={`w-[18px] h-[18px] sm:w-5 sm:h-5 rounded transition-colors flex items-center justify-center disabled:opacity-40 shrink-0 ${
                         (piece.grain ?? 'none') !== 'none'
                           ? 'bg-amber-600 text-white'
                           : 'bg-studio-field text-slate-500 dark:text-slate-400 hover:bg-studio-border'
@@ -979,15 +989,15 @@ export const PiecesManager: React.FC<PiecesManagerProps> = ({
                       data-testid="piece-duplicate"
                       onClick={() => handleDuplicate(piece.id || '')}
                       disabled={disabled}
-                      className="w-5 h-5 shrink-0 rounded bg-studio-field text-slate-500 dark:text-slate-400 hover:bg-brand-400 hover:text-slate-950 transition-all duration-150 flex items-center justify-center disabled:opacity-40 sm:w-0 sm:min-w-0 sm:shrink sm:opacity-0 sm:overflow-hidden sm:group-hover:w-5 sm:group-hover:opacity-100"
+                      className="w-[18px] h-[18px] shrink-0 rounded bg-studio-field text-slate-500 dark:text-slate-400 hover:bg-brand-400 hover:text-slate-950 transition-all duration-150 flex items-center justify-center disabled:opacity-40 sm:h-5 sm:w-0 sm:min-w-0 sm:shrink sm:opacity-0 sm:overflow-hidden sm:group-hover:w-5 sm:group-hover:opacity-100"
                       title={t('pieces.row.duplicateTitle')}
                       aria-label={t('pieces.row.duplicateAria', { name: piece.name || String(index + 1) })}
                     >
                       <Copy className="w-3 h-3 shrink-0" />
                     </button>
-                    <div className="relative w-6 h-6 shrink-0">
-                      <div className="w-6 h-6 rounded-md border border-studio-border flex items-center justify-center">
-                        <Palette className="w-3.5 h-3.5" style={{ color: rowColor }} aria-hidden="true" />
+                    <div className="relative w-[18px] h-[18px] sm:w-6 sm:h-6 shrink-0">
+                      <div className="w-full h-full rounded-md border border-studio-border flex items-center justify-center">
+                        <Palette className="w-3 h-3 sm:w-3.5 sm:h-3.5" style={{ color: rowColor }} aria-hidden="true" />
                         <span
                           className="absolute bottom-0 end-0 w-1.5 h-1.5 rounded-full border border-studio-panel"
                           style={{ backgroundColor: rowColor }}
@@ -1011,10 +1021,10 @@ export const PiecesManager: React.FC<PiecesManagerProps> = ({
                     <button
                       type="button"
                       onClick={() => handleRemove(piece.id || '')}
-                      className="p-1 rounded-md text-slate-600 hover:text-rose-400 hover:bg-rose-500/10 opacity-100 sm:opacity-0 group-hover:opacity-100 transition-all"
+                      className="w-[18px] h-[18px] sm:w-[22px] sm:h-[22px] shrink-0 flex items-center justify-center rounded-md text-slate-600 hover:text-rose-400 hover:bg-rose-500/10 opacity-100 sm:opacity-0 group-hover:opacity-100 transition-all"
                       aria-label={t('pieces.row.deleteAria')}
                     >
-                      <Trash2 className="w-3.5 h-3.5" aria-hidden="true" />
+                      <Trash2 className="w-3 h-3 sm:w-3.5 sm:h-3.5" aria-hidden="true" />
                     </button>
                   </div>
                 </div>
@@ -1042,13 +1052,13 @@ export const PiecesManager: React.FC<PiecesManagerProps> = ({
         }}
         aria-label={t('pieces.inlineAdd.rowAria')}
         data-testid="pieces-inline-add"
-        className="grid grid-cols-12 gap-1.5 items-center px-3 py-2 border-t border-dashed border-studio-border/80 bg-studio-field/30"
+        className="grid grid-cols-12 gap-1 sm:gap-1.5 items-center px-2 sm:px-3 py-2 border-t border-dashed border-studio-border/80 bg-studio-field/30"
       >
         <div className="col-span-1 flex items-center justify-end pe-1 text-slate-400 dark:text-slate-500">
           <Plus className="w-3.5 h-3.5" aria-hidden="true" />
         </div>
 
-        <div className="col-span-3 min-w-0">
+        <div className="col-span-2 sm:col-span-3 min-w-0">
           <input
             value={newReference}
             onChange={(event) => setNewReference(event.target.value)}
@@ -1100,7 +1110,7 @@ export const PiecesManager: React.FC<PiecesManagerProps> = ({
 
         <div className="hidden sm:block col-span-1" aria-hidden="true" />
 
-        <div className="col-span-3 min-w-0 flex items-center justify-end gap-2">
+        <div className="col-span-4 sm:col-span-3 min-w-0 flex items-center justify-end gap-2">
           <button
             type="button"
             onClick={submitQuickAdd}
