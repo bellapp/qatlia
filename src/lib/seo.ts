@@ -10,7 +10,7 @@
  */
 
 import { BILLING_CURRENCY, CREDIT_PACKS, PACK_IDS } from '@/lib/billing/catalog';
-import { SIGNUP_FREE_CREDITS } from '@/lib/billing/policy';
+import { OPTIMIZE_CREDIT_COST, SIGNUP_FREE_CREDITS, VISION_CREDIT_COST } from '@/lib/billing/policy';
 import { fr } from '@/i18n/messages/fr';
 
 export const SITE_URL = 'https://qatlia.ma';
@@ -52,7 +52,9 @@ export function landingJsonLd(): Record<string, unknown>[] {
       return {
         '@type': 'Offer',
         name: pack.name,
-        description: pack.description,
+        // Stated in credits, the unit the ledger grants. The marketing description counts
+        // « analyses », but one photo analysis costs VISION_CREDIT_COST credits.
+        description: `${pack.credits} crédits${pack.monthly ? ' par mois' : ''} — analyse photo ${VISION_CREDIT_COST} crédits, optimisation ${OPTIMIZE_CREDIT_COST} crédit, exports gratuits`,
         price: pack.priceMAD,
         priceCurrency: BILLING_CURRENCY,
         ...(pack.monthly
