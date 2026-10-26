@@ -3,13 +3,25 @@ import { Inter, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
 import { ClientShell } from "@/components/ClientShell";
 import { DEFAULT_LOCALE, dirFor, localeInitScript } from "@/i18n";
+import { SITE_DESCRIPTION, SITE_NAME, SITE_URL } from "@/lib/seo";
 
 const inter = Inter({ subsets: ["latin"], variable: "--font-inter", display: "swap" });
 const jetbrainsMono = JetBrains_Mono({ subsets: ["latin"], variable: "--font-mono", display: "swap" });
 
+const TITLE = "QatlIA — Optimisation de Découpe & Débit IA pour Menuisiers";
+
 export const metadata: Metadata = {
-  title: "QatlIA — Optimisation de Découpe & Débit IA pour Menuisiers",
-  description: "Solution professionnelle d'optimisation de découpe de panneaux pour menuisiers et artisans.",
+  metadataBase: new URL(SITE_URL),
+  title: TITLE,
+  description: SITE_DESCRIPTION,
+  openGraph: {
+    type: "website",
+    siteName: SITE_NAME,
+    title: TITLE,
+    description: SITE_DESCRIPTION,
+    locale: "fr_MA",
+    images: [{ url: "/hero-atelier.webp", width: 810, height: 770, alt: "Plan de découpe optimisé dans l'atelier QatlIA" }],
+  },
   manifest: "/manifest.json",
   icons: {
     icon: [
