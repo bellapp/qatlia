@@ -27,6 +27,15 @@ export const PUBLIC_ROUTES = ['/'] as const;
 /** Routes crawlers have no reason to fetch: APIs, account and admin screens. */
 export const PRIVATE_ROUTES = ['/api/', '/admin', '/account', '/auth/', '/history', '/credits/success'] as const;
 
+/**
+ * QatlIA's official profiles elsewhere. Listed as `sameAs` so search engines and AI
+ * assistants tie them to qatlia.ma as one entity — Google still autocorrects « QatlIA »
+ * to « KalIA ». Use each platform's canonical URL, without tracking parameters.
+ */
+export const SAME_AS = [
+  'https://www.facebook.com/p/qatlia-61594192830493/',
+] as const;
+
 const FAQ_KEYS = [1, 2, 3, 4, 5, 6] as const;
 
 export function landingJsonLd(): Record<string, unknown>[] {
@@ -38,6 +47,7 @@ export function landingJsonLd(): Record<string, unknown>[] {
     url: `${SITE_URL}/`,
     logo: `${SITE_URL}/icon.svg`,
     areaServed: { '@type': 'Country', name: 'Maroc' },
+    ...(SAME_AS.length ? { sameAs: [...SAME_AS] } : {}),
   };
 
   const offers = [
