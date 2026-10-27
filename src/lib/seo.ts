@@ -12,6 +12,7 @@
 import { BILLING_CURRENCY, CREDIT_PACKS, PACK_IDS } from '@/lib/billing/catalog';
 import { OPTIMIZE_CREDIT_COST, SIGNUP_FREE_CREDITS, VISION_CREDIT_COST } from '@/lib/billing/policy';
 import { fr } from '@/i18n/messages/fr';
+import { SELECTABLE_LOCALES } from '@/i18n';
 
 export const SITE_URL = 'https://qatlia.ma';
 export const SITE_NAME = 'QatlIA';
@@ -85,7 +86,7 @@ export function landingJsonLd(): Record<string, unknown>[] {
     applicationCategory: 'BusinessApplication',
     applicationSubCategory: 'Optimisation de découpe de panneaux',
     operatingSystem: 'Web',
-    inLanguage: ['fr', 'ar'],
+    inLanguage: [...SELECTABLE_LOCALES],
     audience: { '@type': 'BusinessAudience', name: 'Menuisiers et ateliers de menuiserie' },
     featureList: [
       fr.features.scan.title,

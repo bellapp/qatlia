@@ -37,7 +37,7 @@ export const en: Catalog = {
       credits: 'free credits at sign-up',
       free: 'free PDF, DXF and PNG exports',
       max: 'credits / month (top pack)',
-      langs: 'languages — FR · AR',
+      langs: 'languages — FR · EN · AR',
     },
   },
   stats: {

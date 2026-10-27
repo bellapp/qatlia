@@ -13,15 +13,12 @@ const HERO_AR = 'حسِّن قصّ ألواحك';
  * not a row of buttons, and it only offers the locales in `SELECTABLE_LOCALES`.
  * Selecting by option value keeps this independent of the localized labels.
  */
-async function switchTo(page: Page, locale: 'fr' | 'ar') {
+async function switchTo(page: Page, locale: 'fr' | 'en' | 'ar') {
   await page.locator('select:has(option[value="fr"])').first().selectOption(locale);
 }
 
 test.describe('Landing page localization', () => {
-  // English is translated and still renders, but it is no longer offered in the
-  // picker (SELECTABLE_LOCALES, 2026-09-19). These two cases drive the picker,
-  // so they are retired with it — un-skip them if English is offered again.
-  test.skip('defaults to French, then switching to EN changes the visible hero and CTA', async ({ page }) => {
+  test('defaults to French, then switching to EN changes the visible hero and CTA', async ({ page }) => {
     await page.goto('/');
 
     const html = page.locator('html');
@@ -29,7 +26,7 @@ test.describe('Landing page localization', () => {
     await expect(html).toHaveAttribute('dir', 'ltr');
     await expect(page.locator('h1')).toContainText(HERO_FR);
 
-    await switchTo(page, 'ar');
+    await switchTo(page, 'en');
 
     await expect(page.locator('h1')).toContainText(HERO_EN);
     await expect(page.getByRole('link', { name: /try (it )?free/i }).first()).toBeVisible();
@@ -38,9 +35,9 @@ test.describe('Landing page localization', () => {
     await expect(html).toHaveAttribute('dir', 'ltr');
   });
 
-  test.skip('the chosen locale survives a reload', async ({ page }) => {
+  test('the chosen locale survives a reload', async ({ page }) => {
     await page.goto('/');
-    await switchTo(page, 'ar');
+    await switchTo(page, 'en');
     await expect(page.locator('h1')).toContainText(HERO_EN);
 
     await page.reload();
@@ -74,7 +71,7 @@ test.describe('Landing page localization', () => {
   });
 
   test('no raw translation keys leak into the rendered landing page', async ({ page }) => {
-    for (const code of ['fr', 'ar'] as const) {
+    for (const code of ['fr', 'en', 'ar'] as const) {
       await page.goto('/');
       await switchTo(page, code);
       const body = (await page.locator('body').innerText()).trim();
@@ -95,19 +92,19 @@ async function openAtelier(page: Page) {
 }
 
 test.describe('Atelier localization', () => {
-  test.skip('switching to English translates the workshop chrome an artisan reads', async ({ page }) => {
+  test('switching to English translates the workshop chrome an artisan reads', async ({ page }) => {
     await openAtelier(page);
 
     // French is still the default inside the workshop.
-    await expect(page.getByRole('link', { name: /historique/i })).toBeVisible();
+    await expect(page.getByRole('banner').getByRole('link', { name: /historique/i })).toBeVisible();
 
-    await switchTo(page, 'ar');
+    await switchTo(page, 'en');
 
     await expect(page.locator('html')).toHaveAttribute('lang', 'en');
     // Header: tagline, history, credits, guided tour.
     await expect(page.getByText('Cutting & nesting workshop')).toBeVisible();
-    await expect(page.getByRole('link', { name: /^history$/i })).toBeVisible();
-    await expect(page.getByRole('link', { name: /credits/i })).toBeVisible();
+    await expect(page.getByRole('banner').getByRole('link', { name: /^history$/i })).toBeVisible();
+    await expect(page.getByRole('banner').getByRole('link', { name: /credits/i })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Tour', exact: true })).toBeVisible();
     await expect(page.getByTitle('Guided tour')).toBeVisible();
     // The 1D/2D toggle keeps its domain labels; only the tooltip is translated.
@@ -145,9 +142,9 @@ test.describe('Atelier localization', () => {
     await expect(page.getByRole('button', { name: 'Optimize the cut plan' })).toBeVisible();
   });
 
-  test.skip('the advanced options panel is translated once expanded', async ({ page }) => {
+  test('the advanced options panel is translated once expanded', async ({ page }) => {
     await openAtelier(page);
-    await switchTo(page, 'ar');
+    await switchTo(page, 'en');
 
     const toggle = page.getByRole('button', { name: 'Advanced cutting settings' });
     await expect(toggle).toBeVisible();
@@ -161,9 +158,9 @@ test.describe('Atelier localization', () => {
     await expect(page.getByText('Pricing')).toBeVisible();
   });
 
-  test.skip('an English optimization run translates the results, plan and exports', async ({ page }) => {
+  test('an English optimization run translates the results, plan and exports', async ({ page }) => {
     await openAtelier(page);
-    await switchTo(page, 'ar');
+    await switchTo(page, 'en');
 
     await page.getByRole('button', { name: 'Optimize the cut plan' }).click();
 
@@ -189,16 +186,16 @@ test.describe('Atelier localization', () => {
     await expect(page.getByRole('button', { name: 'Download the plan as DXF for CNC' })).toBeVisible();
   });
 
-  test.skip('the workshop locale survives a reload', async ({ page }) => {
+  test('the workshop locale survives a reload', async ({ page }) => {
     await openAtelier(page);
-    await switchTo(page, 'ar');
+    await switchTo(page, 'en');
     await expect(page.getByRole('button', { name: 'Optimize the cut plan' })).toBeVisible();
 
     await page.reload();
 
     await expect(page.locator('html')).toHaveAttribute('lang', 'en');
     await expect(page.getByRole('button', { name: 'Optimize the cut plan' })).toBeVisible();
-    await expect(page.getByRole('link', { name: /^history$/i })).toBeVisible();
+    await expect(page.getByRole('banner').getByRole('link', { name: /^history$/i })).toBeVisible();
   });
 
   test('Arabic translates the workshop and flips it to RTL', async ({ page }) => {
@@ -240,10 +237,10 @@ test.describe('Atelier localization', () => {
   });
 
   test('no raw translation keys leak into the rendered workshop', async ({ page }) => {
-    for (const code of ['fr', 'ar'] as const) {
+    for (const code of ['fr', 'en', 'ar'] as const) {
       await openAtelier(page);
       await switchTo(page, code);
-      await page.getByRole('button', { name: /optimiser|حسِّن/i }).click();
+      await page.getByRole('button', { name: /optimiser|optimize|حسِّن/i }).click();
       await expect(page.getByTestId('cut-plan-svg')).toBeVisible({ timeout: 15000 });
 
       const body = (await page.locator('body').innerText()).trim();

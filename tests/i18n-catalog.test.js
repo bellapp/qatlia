@@ -139,12 +139,11 @@ test('the early-init script only ever accepts the locale codes still offered', (
   assert.equal(LOCALE_COOKIE_NAME, 'qatlia-locale');
   // The allow-list is SELECTABLE_LOCALES, not LOCALES: a locale withdrawn from
   // the picker must not survive in storage and reach the DOM on the first paint.
-  assert.deepEqual([...SELECTABLE_LOCALES], ['fr', 'ar']);
+  assert.deepEqual([...SELECTABLE_LOCALES], ['fr', 'en', 'ar']);
   assert.ok(
     localeInitScript.includes(JSON.stringify(SELECTABLE_LOCALES)),
     'allow-list is not inlined verbatim'
   );
-  assert.ok(!localeInitScript.includes('"en"'), 'a withdrawn locale is still accepted at init');
   assert.ok(localeInitScript.includes(LOCALE_STORAGE_KEY));
   // No script-closing sequence and no dynamic evaluation may reach the DOM.
   assert.ok(!/<\/script/i.test(localeInitScript));

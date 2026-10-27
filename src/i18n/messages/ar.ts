@@ -37,7 +37,7 @@ export const ar: Catalog = {
       credits: 'رصيداً مجانياً عند التسجيل',
       free: 'تصدير PDF وDXF وPNG مجاناً',
       max: 'رصيد في الشهر (أكبر باقة)',
-      langs: 'لغات — FR · AR',
+      langs: 'لغات — FR · EN · AR',
     },
   },
   // Morocco writes numbers with Western digits, not Eastern Arabic ones.
