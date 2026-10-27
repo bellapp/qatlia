@@ -50,7 +50,7 @@ export const fr = {
       credits: 'crédits offerts à l’inscription',
       free: 'exports PDF, DXF et PNG gratuits',
       max: 'crédits / mois (pack max)',
-      langs: 'langues — FR · AR',
+      langs: 'langues — FR · EN · AR',
     },
   },
   // Each tile states something the product can actually demonstrate. Only the

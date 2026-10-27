@@ -39,12 +39,11 @@ test.describe('Landing Page (/)', () => {
 
   test('the locale switcher offers exactly the locales the app still serves', async ({ page }) => {
     await page.goto('/');
-    // A native <select>, not buttons, and English is withdrawn from it
-    // (SELECTABLE_LOCALES) while the quotation exists in FR and AR only.
+    // A native <select>, not buttons, offering exactly SELECTABLE_LOCALES.
     const picker = page.locator('select:has(option[value="fr"])').first();
     await expect(picker).toBeVisible();
-    await expect(picker.locator('option')).toHaveCount(2);
+    await expect(picker.locator('option')).toHaveCount(3);
+    await expect(picker.locator('option[value="en"]')).toHaveCount(1);
     await expect(picker.locator('option[value="ar"]')).toHaveCount(1);
-    await expect(picker.locator('option[value="en"]')).toHaveCount(0);
   });
 });

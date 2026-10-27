@@ -10,15 +10,15 @@ export type Direction = 'ltr' | 'rtl';
 export const LOCALES: readonly Locale[] = ['fr', 'en', 'ar'];
 
 /**
- * The locales actually offered to a visitor. English is shipped and fully
- * translated but not offered for now (user decision, 2026-09-19): the quotation
- * and the shop-floor documents exist in FR and AR only, so a visitor could pick
- * a UI language the exports cannot honour.
+ * The locales actually offered to a visitor. English was withdrawn on 2026-09-19
+ * because the quotation document exists in FR and AR only, and offered again on
+ * 2026-10-27: software directories (AlternativeTo) require English support. The
+ * quotation dialog already asks for the document language (FR or AR) whatever
+ * the UI locale, and the cut-plan PDF has its own English catalog.
  *
- * `LOCALES` stays the set the app can *render* — `catalogs`, the PDF schema and
- * `Locale` are unchanged — so putting English back is a one-line edit here.
+ * `LOCALES` is the set the app can *render*; this is the set a visitor can pick.
  */
-export const SELECTABLE_LOCALES: readonly Locale[] = ['fr', 'ar'];
+export const SELECTABLE_LOCALES: readonly Locale[] = ['fr', 'en', 'ar'];
 export const DEFAULT_LOCALE: Locale = 'fr';
 export const RTL_LOCALES: readonly Locale[] = ['ar'];
 
