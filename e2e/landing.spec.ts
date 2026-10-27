@@ -39,11 +39,15 @@ test.describe('Landing Page (/)', () => {
 
   test('the locale switcher offers exactly the locales the app still serves', async ({ page }) => {
     await page.goto('/');
-    // A native <select>, not buttons, offering exactly SELECTABLE_LOCALES.
-    const picker = page.locator('select:has(option[value="fr"])').first();
+    // A combobox offering exactly SELECTABLE_LOCALES, each option with its flag.
+    const picker = page.getByTestId('locale-switcher').first();
     await expect(picker).toBeVisible();
-    await expect(picker.locator('option')).toHaveCount(3);
-    await expect(picker.locator('option[value="en"]')).toHaveCount(1);
-    await expect(picker.locator('option[value="ar"]')).toHaveCount(1);
+    await picker.click();
+    const options = page.getByRole('listbox').getByRole('option');
+    await expect(options).toHaveCount(3);
+    await expect(options.locator('svg').first()).toBeVisible();
+    await expect(options.filter({ has: page.locator('svg') })).toHaveCount(3);
+    await expect(page.locator('[role="option"][data-locale="en"]')).toHaveCount(1);
+    await expect(page.locator('[role="option"][data-locale="ar"]')).toHaveCount(1);
   });
 });

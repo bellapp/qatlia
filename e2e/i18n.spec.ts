@@ -9,12 +9,13 @@ const HERO_EN = 'Optimize your panels';
 const HERO_AR = 'حسِّن قصّ ألواحك';
 
 /**
- * The language picker is a native <select> (LocaleProvider's `LocaleSwitcher`),
- * not a row of buttons, and it only offers the locales in `SELECTABLE_LOCALES`.
- * Selecting by option value keeps this independent of the localized labels.
+ * The language picker is a select-only combobox (LocaleProvider's `LocaleSwitcher`)
+ * whose options carry flags, and it only offers the locales in `SELECTABLE_LOCALES`.
+ * Choosing by the option's data-locale keeps this independent of the localized labels.
  */
 async function switchTo(page: Page, locale: 'fr' | 'en' | 'ar') {
-  await page.locator('select:has(option[value="fr"])').first().selectOption(locale);
+  await page.getByTestId('locale-switcher').first().click();
+  await page.locator(`[role="option"][data-locale="${locale}"]`).click();
 }
 
 test.describe('Landing page localization', () => {
