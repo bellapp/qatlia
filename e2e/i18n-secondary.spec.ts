@@ -81,7 +81,7 @@ test.describe('Credits page localization', () => {
       await expect(page.locator('span.text-3xl', { hasText: new RegExp(`^${price}$`) }).first()).toBeVisible();
     }
     await expect(page.getByRole('heading', { level: 1 })).toContainText('10 DH');
-    await expect(page.getByRole('heading', { level: 1 })).toContainText('10 photo analyses');
+    await expect(page.getByRole('heading', { level: 1 })).toContainText('10 credits');
     await expect(page.getByText(/charged in dirhams \(MAD\)/i)).toBeVisible();
 
     // Balance and the per-pack call to action.

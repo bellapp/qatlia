@@ -80,7 +80,7 @@ export const CREDIT_PACKS: Record<PackId, CreditPack> = {
     // atomic consume_credit path as the one-off packs, and the 1001st analysis
     // is refused. The plan is now named and priced for what it actually is.
     name: 'Abonnement Atelier Max',
-    description: '1000 analyses photo IA par mois, pour les ateliers à très fort volume',
+    description: '1000 crédits par mois, pour les ateliers à très fort volume',
     credits: 1000,
     displayCredits: '1000',
     priceMAD: 99,
