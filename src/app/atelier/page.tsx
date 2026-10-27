@@ -69,8 +69,18 @@ import {
 } from '@/lib/units';
 
 const DEFAULT_SHEETS: Sheet[] = [
-  { id: 's0', height: 278, width: 208, kerf: 0.3, margin: 1.0, grainDirection: false, material: 'mdf', quantity: 1, label: 'Panneau standard 278×208' },
+  { id: 's0', height: 278, width: 208, kerf: 0.3, margin: 1.0, grainDirection: false, material: 'mdf', quantity: 1 },
 ];
+
+/**
+ * The French name the default panel used to carry. It described the 278×208
+ * size only, so it went stale as soon as the artisan typed another size (and
+ * never followed the locale). A restored sheet still carrying it is unnamed:
+ * its dimensions stand in, like any panel the artisan did not name.
+ */
+const LEGACY_DEFAULT_PANEL_LABEL = 'Panneau standard 278×208';
+const withoutLegacyPanelLabel = (sheet: Sheet): Sheet =>
+  sheet.label === LEGACY_DEFAULT_PANEL_LABEL ? { ...sheet, label: undefined } : sheet;
 
 /**
  * The stock materials offered in the workshop's quick selector. These are the
@@ -193,7 +203,7 @@ export default function Dashboard() {
   useEffect(() => {
     setPanelNameDraft(activeSheet.label || '');
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeSheet.id]);
+  }, [activeSheet.id, activeSheet.label]);
 
   /** Applies the typed name to the current stock panel (payload `label`). */
 const commitPanelName = () => {
@@ -333,8 +343,8 @@ const commitPanelName = () => {
     if (savedProj) {
       try {
         const parsed = JSON.parse(savedProj);
-        if (parsed.sheet) setSheets([parsed.sheet]);
-        if (parsed.sheets) setSheets(parsed.sheets);
+        if (parsed.sheet) setSheets([withoutLegacyPanelLabel(parsed.sheet)]);
+        if (Array.isArray(parsed.sheets)) setSheets(parsed.sheets.map(withoutLegacyPanelLabel));
         if (Array.isArray(parsed.pieces)) setPieces(normalizePiecesWithColors(parsed.pieces));
         if (typeof parsed.projectName === 'string' && parsed.projectName.trim()) {
           setProjectName(parsed.projectName.trim());
@@ -563,7 +573,7 @@ const commitPanelName = () => {
             const quantity = Math.max(1, Math.round(safeFinitePositive(p.quantity, 1)));
             return {
               id: `ext_${Date.now()}_${i}`,
-              name: p.name || `Pièce ${i + 1}`,
+              name: p.name || t('pieces.defaultName', { index: i + 1 }),
               height: Math.round(h * 10) / 10,
               width: Math.round(w * 10) / 10,
               quantity,
@@ -992,8 +1002,13 @@ const commitPanelName = () => {
                   data-testid="project-name-input"
                   className="block w-full max-w-[260px] bg-transparent text-sm font-black text-slate-900 dark:text-white outline-none border-none p-0 focus:ring-0 placeholder:text-slate-400 dark:placeholder:text-slate-500 truncate"
                 />
-                <p className="text-[10px] text-slate-500 font-mono" dir="ltr">
-                  {pieces.length} {t('atelier.project.piecesCount')} · {new Set(pieces.map((p) => p.name)).size} {t('atelier.project.lineCount')}
+                {/* Same figures as the cut-list chip: pieces are quantities summed,
+                    lines are rows (counting distinct names merged same-named rows). */}
+                <p className="text-[10px] text-slate-500 font-mono">
+                  {t('pieces.counts', {
+                    qty: pieces.reduce((sum, p) => sum + (p.quantity || 1), 0),
+                    rows: tn('pieces.rowCount', pieces.length),
+                  })}
                 </p>
               </div>
               {result && (
