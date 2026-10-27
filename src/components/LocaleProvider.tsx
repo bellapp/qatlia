@@ -1,6 +1,8 @@
 'use client';
 
-import React, { createContext, useCallback, useContext, useEffect, useLayoutEffect, useMemo, useState } from 'react';
+import React, { createContext, useCallback, useContext, useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
+import { Check, ChevronDown } from 'lucide-react';
 import {
   DEFAULT_LOCALE,
   SELECTABLE_LOCALES,
@@ -112,6 +114,8 @@ export function LocaleProvider({ children }: { children: React.ReactNode }) {
 /** Inline SVG country flags — emoji flags render as letter pairs (FR/GB/MA)
  *  on Windows Chrome, so real vector flags are the only cross-platform option. */
 function LocaleFlag({ locale, className = '' }: { locale: Locale; className?: string }) {
+  // Each rendered UK flag needs its own clipPath id: the list shows several flags at once.
+  const clipId = `uk-clip-${useId().replace(/:/g, '')}`;
   if (locale === 'fr') {
     return (
       <svg viewBox="0 0 3 2" className={className} aria-hidden="true">
@@ -124,10 +128,10 @@ function LocaleFlag({ locale, className = '' }: { locale: Locale; className?: st
   if (locale === 'en') {
     return (
       <svg viewBox="0 0 60 30" className={className} aria-hidden="true">
-        <clipPath id="uk-clip">
+        <clipPath id={clipId}>
           <rect width="60" height="30" rx="3" />
         </clipPath>
-        <g clipPath="url(#uk-clip)">
+        <g clipPath={`url(#${clipId})`}>
           <rect width="60" height="30" fill="#012169" />
           <path d="M0,0 60,30 M60,0 0,30" stroke="#FFFFFF" strokeWidth="6" />
           <path d="M0,0 60,30 M60,0 0,30" stroke="#C8102E" strokeWidth="3.6" />
@@ -160,36 +164,172 @@ function LocaleFlag({ locale, className = '' }: { locale: Locale; className?: st
   );
 }
 
+type ListPosition = { top: number; minWidth: number; left?: number; right?: number };
+
+/** Select-only combobox (WAI-ARIA pattern): a native <select> cannot show the
+ *  flags inside its options, so the list is rendered by hand. Focus stays on the
+ *  button; the highlighted option is exposed through aria-activedescendant.
+ *  The list is portalled to <body> with fixed positioning: headers host the
+ *  switcher inside overflow-x-auto rows, which would clip an absolute popup. */
 export function LocaleSwitcher({ className = '' }: { className?: string }) {
-  const { locale, setLocale, t } = useLocale();
+  const { locale, setLocale, t, dir } = useLocale();
+  const [open, setOpen] = useState(false);
+  const [active, setActive] = useState(0);
+  const [position, setPosition] = useState<ListPosition | null>(null);
+  const buttonRef = useRef<HTMLButtonElement>(null);
+  const listRef = useRef<HTMLUListElement>(null);
+  const listId = useId();
+  const optionId = (index: number) => `${listId}-option-${index}`;
+
+  useLayoutEffect(() => {
+    if (!open) return;
+    const place = () => {
+      const button = buttonRef.current;
+      if (!button) return;
+      const r = button.getBoundingClientRect();
+      // Align the list with the button's leading edge: left in LTR, right in RTL.
+      setPosition(
+        dir === 'rtl'
+          ? { top: r.bottom + 4, minWidth: r.width, right: document.documentElement.clientWidth - r.right }
+          : { top: r.bottom + 4, minWidth: r.width, left: r.left }
+      );
+    };
+    place();
+    window.addEventListener('resize', place);
+    window.addEventListener('scroll', place, true);
+    return () => {
+      window.removeEventListener('resize', place);
+      window.removeEventListener('scroll', place, true);
+    };
+  }, [open, dir]);
+
+  useEffect(() => {
+    if (!open) return;
+    const onClick = (e: MouseEvent) => {
+      const target = e.target as Node;
+      if (!buttonRef.current?.contains(target) && !listRef.current?.contains(target)) setOpen(false);
+    };
+    document.addEventListener('mousedown', onClick);
+    return () => document.removeEventListener('mousedown', onClick);
+  }, [open]);
+
+  const openList = () => {
+    setActive(Math.max(0, SELECTABLE_LOCALES.indexOf(locale)));
+    setOpen(true);
+  };
+
+  const choose = (next: Locale) => {
+    setLocale(next);
+    setOpen(false);
+  };
+
+  // Enter and Space are handled on keydown (and Space's keyup click is cancelled)
+  // so the button's native click never toggles the list a second time.
+  const onKeyDown = (e: React.KeyboardEvent<HTMLButtonElement>) => {
+    const last = SELECTABLE_LOCALES.length - 1;
+    if (!open) {
+      if (['ArrowDown', 'ArrowUp', 'Enter', ' '].includes(e.key)) {
+        e.preventDefault();
+        openList();
+      }
+      return;
+    }
+    switch (e.key) {
+      case 'ArrowDown':
+        e.preventDefault();
+        setActive((i) => Math.min(last, i + 1));
+        break;
+      case 'ArrowUp':
+        e.preventDefault();
+        setActive((i) => Math.max(0, i - 1));
+        break;
+      case 'Home':
+        e.preventDefault();
+        setActive(0);
+        break;
+      case 'End':
+        e.preventDefault();
+        setActive(last);
+        break;
+      case 'Enter':
+      case ' ':
+        e.preventDefault();
+        choose(SELECTABLE_LOCALES[active]);
+        break;
+      case 'Escape':
+        e.preventDefault();
+        setOpen(false);
+        break;
+      case 'Tab':
+        setOpen(false);
+        break;
+    }
+  };
+
   return (
-    <div role="group" aria-label={t('nav.languageAria')} className={`relative inline-flex items-center ${className}`}>
-      <LocaleFlag locale={locale} className="w-5 h-3.5 rounded-[2px] pointer-events-none absolute start-2 z-10 shadow-sm" />
-      <select
+    <div className={`inline-flex ${className}`}>
+      <button
+        ref={buttonRef}
+        type="button"
+        role="combobox"
+        data-testid="locale-switcher"
         aria-label={t('nav.languageAria')}
-        value={locale}
-        onChange={(event) => {
-          const next = isSelectableLocale(event.target.value) ? event.target.value : DEFAULT_LOCALE;
-          setLocale(next);
+        aria-haspopup="listbox"
+        aria-expanded={open}
+        aria-controls={listId}
+        aria-activedescendant={open ? optionId(active) : undefined}
+        onClick={() => (open ? setOpen(false) : openList())}
+        onKeyDown={onKeyDown}
+        onKeyUp={(e) => {
+          if (e.key === ' ') e.preventDefault();
         }}
-        style={{ colorScheme: 'light dark' }}
-        className="appearance-none bg-transparent border border-slate-300 dark:border-studio-border hover:border-slate-400 dark:hover:border-studio-border-hover rounded-lg py-1 ps-9 pe-6 text-xs font-bold text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-brand-500/50 cursor-pointer transition-colors [&>option]:bg-white [&>option]:text-slate-900 dark:[&>option]:bg-slate-900 dark:[&>option]:text-slate-100"
+        className="flex items-center gap-2 border border-slate-300 dark:border-studio-border hover:border-slate-400 dark:hover:border-studio-border-hover rounded-lg py-1 ps-2 pe-1.5 text-xs font-bold text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-brand-500/50 cursor-pointer transition-colors"
       >
-        {SELECTABLE_LOCALES.map((candidate) => (
-          <option key={candidate} value={candidate} lang={candidate}>
-            {t(`language.${candidate}`)}
-          </option>
-        ))}
-      </select>
-      {/* Chevron (native select arrow is hidden by appearance-none) */}
-      <svg
-        className="w-3 h-3 text-slate-500 dark:text-slate-400 pointer-events-none absolute end-2"
-        viewBox="0 0 20 20"
-        fill="currentColor"
-        aria-hidden="true"
-      >
-        <path fillRule="evenodd" d="M5.23 7.21a.75.75 0 0 1 1.06.02L10 11.168l3.71-3.938a.75.75 0 1 1 1.08 1.04l-4.25 4.5a.75.75 0 0 1-1.08 0l-4.25-4.5a.75.75 0 0 1 .02-1.06Z" clipRule="evenodd" />
-      </svg>
+        <LocaleFlag locale={locale} className="w-5 h-3.5 rounded-[2px] shadow-sm shrink-0" />
+        <span lang={locale}>{t(`language.${locale}`)}</span>
+        <ChevronDown
+          className={`w-3.5 h-3.5 text-slate-500 dark:text-slate-400 transition-transform duration-200 ${open ? 'rotate-180' : ''}`}
+          aria-hidden="true"
+        />
+      </button>
+
+      {open && position && createPortal(
+        <ul
+          ref={listRef}
+          id={listId}
+          role="listbox"
+          dir={dir}
+          aria-label={t('nav.languageAria')}
+          style={position}
+          className="fixed w-max rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-studio-border shadow-lg shadow-black/10 dark:shadow-black/40 py-1 z-[100]"
+        >
+          {SELECTABLE_LOCALES.map((candidate, index) => {
+            const selected = candidate === locale;
+            return (
+              <li
+                key={candidate}
+                id={optionId(index)}
+                role="option"
+                aria-selected={selected}
+                data-locale={candidate}
+                lang={candidate}
+                // mousedown would blur the button before the click lands.
+                onMouseDown={(e) => e.preventDefault()}
+                onMouseEnter={() => setActive(index)}
+                onClick={() => choose(candidate)}
+                className={`flex items-center gap-2 px-2.5 py-1.5 text-xs cursor-pointer transition-colors ${
+                  index === active ? 'bg-slate-100 dark:bg-white/5' : ''
+                } ${selected ? 'font-bold text-brand-600 dark:text-brand-400' : 'text-slate-700 dark:text-slate-200'}`}
+              >
+                <LocaleFlag locale={candidate} className="w-5 h-3.5 rounded-[2px] shadow-sm shrink-0" />
+                <span className="flex-1">{t(`language.${candidate}`)}</span>
+                <Check className={`w-3.5 h-3.5 ${selected ? '' : 'invisible'}`} aria-hidden="true" />
+              </li>
+            );
+          })}
+        </ul>,
+        document.body
+      )}
     </div>
   );
 }
