@@ -127,8 +127,8 @@ export function buildCheckoutParams({ pack, userId, userEmail, origin }: Checkou
           product_data: {
             name: `QatlIA — ${pack.name}`,
             description: pack.monthly
-              ? `${pack.displayCredits} analyses photo IA par mois`
-              : `${pack.displayCredits} analyses photo IA`,
+              ? `${pack.displayCredits} crédits par mois`
+              : `${pack.displayCredits} crédits`,
           },
           unit_amount: toStripeMinorUnits(pack.priceMAD),
           ...(pack.monthly ? { recurring: { interval: 'month' as const } } : {}),

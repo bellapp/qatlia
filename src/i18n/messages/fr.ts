@@ -47,9 +47,9 @@ export const fr = {
     // and the list of shipped locales, so a translation cannot promise a number
     // the product does not honour.
     stats: {
-      credits: 'analyses IA offertes',
-      free: 'optimisation et exports gratuits',
-      max: 'analyses / mois (pack max)',
+      credits: 'crédits offerts à l’inscription',
+      free: 'exports PDF, DXF et PNG gratuits',
+      max: 'crédits / mois (pack max)',
       langs: 'langues — FR · AR',
     },
   },
@@ -59,7 +59,7 @@ export const fr = {
     waste: { title: 'Chutes mesurées', label: 'Le taux de chute vient de votre plan, pas d’une moyenne annoncée.' },
     surface: { title: 'Surface utile calculée', label: 'Calculée à partir des pièces réellement placées sur vos panneaux.' },
     time: { title: 'Plan en quelques secondes', label: 'De la liste de pièces au plan de coupe en quelques secondes.' },
-    credits: { title: '{count} crédits offerts', label: 'Analyses photo offertes à l’inscription.' },
+    credits: { title: '{count} crédits offerts', label: 'Analyse photo 2 crédits, optimisation 1 crédit.' },
   },
   features: {
     eyebrow: 'Fonctionnalités',
@@ -118,14 +118,14 @@ export const fr = {
     freeDesc: 'Créez un compte, testez avec vos {count} crédits.',
     freeOptimize: '1 crédit par optimisation',
     freeExports: 'Exports PDF, CSV, DXF et JSON inclus',
-    freeNoScan: '{count} analyses IA offertes à l’inscription, puis Scan IA par crédits',
+    freeNoScan: 'Scan IA inclus avec les crédits offerts, puis par crédits',
     freeCredits: '{count} crédits offerts à l’inscription — analyse IA 2 crédits, optimisation 1 crédit. Échec = non débité.',
     freeCta: 'Créer un compte gratuit',
-    packSuffix: '/ {count} analyses',
+    packSuffix: '/ {count} crédits',
     packAllFree: 'Fonctions complètes incluses',
     packScan: 'Scan IA — 2 crédits par analyse',
     packCta: 'Voir les crédits',
-    more: 'Besoin de plus ? {proName} — {proPrice} MAD pour {proCredits} analyses · {maxName} — {maxPrice} MAD par mois pour {maxCredits} analyses.',
+    more: 'Besoin de plus ? {proName} — {proPrice} MAD pour {proCredits} crédits · {maxName} — {maxPrice} MAD par mois pour {maxCredits} crédits.',
     moreLink: 'Voir tous les packs',
   },
   faq2: {
@@ -658,7 +658,7 @@ export const fr = {
       },
       atelierMax: {
         name: 'Abonnement Atelier Max',
-        description: '{count} analyses photo IA par mois, pour les ateliers à très fort volume',
+        description: '{count} crédits par mois, pour les ateliers à très fort volume',
         badge: '{price} DH / mois',
         renewal: '{count} crédits ajoutés à votre solde chaque mois',
       },
@@ -671,16 +671,16 @@ export const fr = {
     eyebrow: 'Recharge de Crédits',
     // `{price}` is the entry pack's MAD price and `{count}` its credits, both
     // read from the billing catalog.
-    headline: '{price} = {count} analyses photo',
+    headline: '{price} = {count} crédits',
     policy:
-      '1 crédit est débité uniquement lors d’une analyse photo réussie. L’optimisation du schéma et tous les exports (PDF, DXF, JSON, PNG, devis) sont gratuits et illimités.',
+      'Une analyse photo réussie coûte 2 crédits, une optimisation 1 crédit. Tous les exports (PDF, DXF, JSON, PNG, devis) sont gratuits et illimités.',
     recommended: 'Recommandé',
     /** Dirham symbol as printed on the cards; identical in every locale. */
     currency: 'DH',
     perMonth: '/mois',
     // Rendered in two parts around {count} so the allowance stays bold.
-    packAnalyses: '{count} analyses photo',
-    packAnalysesMonthly: '{count} analyses photo par mois',
+    packAnalyses: '{count} crédits',
+    packAnalysesMonthly: '{count} crédits par mois',
     freePlans: '1 crédit par schéma de coupe',
     freeExports: 'Exports PDF, DXF, JSON et PNG inclus',
     choose: 'Choisir ce pack',
@@ -767,7 +767,7 @@ export const fr = {
     creditsRemaining: 'crédits restants',
     ledgerAria: 'Mouvements de crédits',
     noMovements:
-      'Aucun mouvement pour l’instant. Un crédit est débité uniquement lors d’une analyse photo réussie ; les exports sont gratuits.',
+      'Aucun mouvement pour l’instant. Une analyse photo réussie coûte 2 crédits, une optimisation 1 crédit ; les exports sont gratuits.',
     /** Shown only for a ledger row saved without its own description. */
     txDebit: 'Analyse photo IA',
     txCredit: 'Achat de crédits',
