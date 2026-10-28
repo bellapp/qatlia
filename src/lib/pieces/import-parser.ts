@@ -22,6 +22,8 @@ export interface ParsePiecesImportParams {
    * flag, never by a `value > 500` heuristic.
    */
   unit: DisplayUnit;
+  /** Name for a line pasted without one, in the artisan's locale (1-based index). */
+  defaultName?: (index: number) => string;
 }
 
 export interface ParsePiecesImportResult {
@@ -134,6 +136,7 @@ export function parsePiecesImport({
   input,
   defaultMaterial,
   unit,
+  defaultName = (index) => `Pièce ${index}`,
 }: ParsePiecesImportParams): ParsePiecesImportResult {
   const lines = input
     .split(/\r?\n/)
@@ -176,7 +179,7 @@ export function parsePiecesImport({
 
     importedPieces.push({
       id: `import_${importedPieces.length + 1}`,
-      name: rawName.replace(/^["']|["']$/g, '').trim() || `Pièce ${importedPieces.length + 1}`,
+      name: rawName.replace(/^["']|["']$/g, '').trim() || defaultName(importedPieces.length + 1),
       height: normalizedHeight,
       width: normalizedWidth,
       quantity: Math.max(1, Math.round(quantity)),

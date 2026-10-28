@@ -187,8 +187,6 @@ export const en: Catalog = {
       nameSheets: 'Cut list {material} — {count} pcs',
       defaultTitle: 'Cutting project',
       nameAria: 'Name the project',
-            piecesCount: 'pieces',
-      lineCount: 'lines',
       optimized: 'Optimization complete',
       rerun: 'Re-run optimization',
     },
@@ -332,6 +330,7 @@ export const en: Catalog = {
     },
   },
   pieces: {
+    defaultName: 'Piece {index}',
     filterPlaceholder: 'Filter...',
     filterAria: 'Filter the pieces',
     counts: '{qty} pcs · {rows}',

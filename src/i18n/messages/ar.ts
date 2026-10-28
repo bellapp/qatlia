@@ -188,8 +188,6 @@ export const ar: Catalog = {
       nameSheets: 'قائمة قطع {material} — {count} قطعة',
       defaultTitle: 'مشروع القطع',
       nameAria: 'تسمية المشروع',
-            piecesCount: 'قطعة',
-      lineCount: 'أسطر',
       optimized: 'تم التحسين بنجاح',
       rerun: 'إعادة التحسين',
     },
@@ -333,6 +331,7 @@ export const ar: Catalog = {
     },
   },
   pieces: {
+    defaultName: 'القطعة {index}',
     filterPlaceholder: 'تصفية...',
     filterAria: 'تصفية القطع',
     counts: '{qty} قطعة · {rows}',

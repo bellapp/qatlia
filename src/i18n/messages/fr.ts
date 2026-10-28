@@ -227,8 +227,6 @@ export const fr = {
       nameSheets: 'Débit {material} — {count} pcs',
       defaultTitle: 'Projet de débit',
       nameAria: 'Nommer le projet',
-            piecesCount: 'pièces',
-      lineCount: 'lignes',
       optimized: 'Optimisation réussie',
       rerun: 'Relancer l’optimisation',
     },
@@ -374,6 +372,8 @@ export const fr = {
     },
   },
   pieces: {
+    // Name given to a piece the artisan did not name (scan, quick add, import).
+    defaultName: 'Pièce {index}',
     filterPlaceholder: 'Filtrer...',
     filterAria: 'Filtrer les pièces',
     counts: '{qty} pcs · {rows}',

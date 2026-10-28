@@ -282,7 +282,7 @@ export const PiecesManager: React.FC<PiecesManagerProps> = ({
       existingIds.add(id);
       return {
         id,
-        name: draft.name?.trim() || `Pièce ${pieces.length + index + 1}`,
+        name: draft.name?.trim() || t('pieces.defaultName', { index: pieces.length + index + 1 }),
         height: Math.round(draft.height * 10) / 10,
         width: Math.round(draft.width * 10) / 10,
         quantity: Math.max(1, Math.round(draft.quantity || 1)),
@@ -341,7 +341,7 @@ export const PiecesManager: React.FC<PiecesManagerProps> = ({
 
     appendPieces([
       {
-        name: newReference.trim() || `Pièce ${pieces.length + 1}`,
+        name: newReference.trim() || t('pieces.defaultName', { index: pieces.length + 1 }),
         height: roundCanonical(height),
         width: roundCanonical(width),
         quantity,
@@ -356,7 +356,12 @@ export const PiecesManager: React.FC<PiecesManagerProps> = ({
   };
 
   const handleImportSubmit = () => {
-    const result = parsePiecesImport({ input: importText, defaultMaterial, unit: importUnit });
+    const result = parsePiecesImport({
+      input: importText,
+      defaultMaterial,
+      unit: importUnit,
+      defaultName: (index) => t('pieces.defaultName', { index }),
+    });
     // The parser reports counts; the sentence around them is built here so it
     // follows the artisan's locale (and its plural rules) instead of the
     // parser's French wording.
