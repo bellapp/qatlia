@@ -34,7 +34,7 @@ export const PRIVATE_ROUTES = ['/api/', '/admin', '/account', '/auth/', '/histor
  * to « KalIA ». Use each platform's canonical URL, without tracking parameters.
  */
 export const SAME_AS = [
-  'https://www.facebook.com/p/qatlia-61594192830493/',
+  'https://www.facebook.com/qatlia.ma',
 ] as const;
 
 const FAQ_KEYS = [1, 2, 3, 4, 5, 6] as const;
