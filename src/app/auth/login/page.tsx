@@ -38,6 +38,7 @@ function AuthForm() {
   const [isLogin, setIsLogin] = useState(true);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [fullName, setFullName] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -59,6 +60,18 @@ function AuthForm() {
     }
     checkUser();
   }, [redirectTo, router]);
+
+  useEffect(() => {
+    // Coming back from Google with the Back button restores this page from the
+    // browser cache as it was left: still "redirecting", every button disabled.
+    const onPageShow = (event: PageTransitionEvent) => {
+      if (!event.persisted) return;
+      setOauthLoading(false);
+      setLoading(false);
+    };
+    window.addEventListener('pageshow', onPageShow);
+    return () => window.removeEventListener('pageshow', onPageShow);
+  }, []);
 
   /**
    * Supabase answers in English; the upstream string is only ever mapped, never
@@ -86,11 +99,17 @@ function AuthForm() {
     }
   };
 
+  const passwordMismatch = !isLogin && confirmPassword !== '' && confirmPassword !== password;
+
   const handleAuth = async (e: React.FormEvent) => {
     e.preventDefault();
+    setSuccessMsg(null);
+    if (!isLogin && confirmPassword !== password) {
+      setErrorMsg(t('auth.errors.passwordMismatch'));
+      return;
+    }
     setLoading(true);
     setErrorMsg(null);
-    setSuccessMsg(null);
     const supabase = createClient();
 
     try {
@@ -182,10 +201,10 @@ function AuthForm() {
           </div>
 
           {errorMsg && (
-            <div role="alert" className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-300 text-xs font-medium">{errorMsg}</div>
+            <div role="alert" className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-700 dark:text-rose-300 text-xs font-medium">{errorMsg}</div>
           )}
           {successMsg && (
-            <div role="status" className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 text-xs font-medium">{successMsg}</div>
+            <div role="status" className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-700 dark:text-emerald-300 text-xs font-medium">{successMsg}</div>
           )}
 
           <button
@@ -261,6 +280,24 @@ function AuthForm() {
                 </button>
               </div>
             </label>
+            {!isLogin && (
+              <label className="block">
+                <span className="text-[11px] font-semibold text-slate-600 dark:text-slate-400">{t('auth.confirmPasswordLabel')}</span>
+                <div className="relative mt-1">
+                  <Lock className="w-4 h-4 text-slate-500 dark:text-slate-400 absolute start-3 top-3" aria-hidden="true" />
+                  <input
+                    type={showPassword ? 'text' : 'password'}
+                    required
+                    autoComplete="new-password"
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
+                    placeholder="••••••••"
+                    aria-invalid={passwordMismatch}
+                    className={`w-full bg-studio-field border rounded-xl ps-9 pe-3 py-2.5 text-sm text-slate-900 dark:text-white placeholder-slate-600 outline-none ${passwordMismatch ? 'border-rose-500/60' : 'border-studio-border focus:border-brand-500/50'}`}
+                  />
+                </div>
+              </label>
+            )}
 
             <button
               type="submit"
