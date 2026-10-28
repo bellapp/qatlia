@@ -4,8 +4,9 @@ import React, { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
-import { ChevronDown, KeyRound, LogOut, Receipt, User } from 'lucide-react';
+import { ChevronDown, KeyRound, LogOut, MessageCircle, Receipt, User } from 'lucide-react';
 import { useLocale } from '@/components/LocaleProvider';
+import { supportWhatsAppUrl } from '@/lib/support';
 
 interface AccountMenuProps {
   email: string;
@@ -80,6 +81,16 @@ export function AccountMenu({ email }: AccountMenuProps) {
             <KeyRound className="w-3.5 h-3.5 text-brand-400" />
             {t('account.changePassword')}
           </Link>
+          <a
+            href={supportWhatsAppUrl(t('support.prefill'))}
+            target="_blank"
+            rel="noopener noreferrer"
+            onClick={() => setOpen(false)}
+            className="flex items-center gap-2 px-3 py-2 text-xs text-slate-700 dark:text-slate-300 hover:bg-studio-field/60 transition-colors"
+          >
+            <MessageCircle className="w-3.5 h-3.5 text-brand-400" />
+            {t('support.menuEntry')}
+          </a>
           <button
             type="button"
             onClick={handleLogout}

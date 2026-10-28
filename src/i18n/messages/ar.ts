@@ -542,6 +542,14 @@ export const ar: Catalog = {
     changePassword: 'تغيير كلمة المرور',
     logout: 'تسجيل الخروج',
   },
+  support: {
+    footerHeading: 'تواصل معنا',
+    menuEntry: 'التواصل مع الدعم',
+    needHelp: 'تحتاج مساعدة؟ راسلنا:',
+    paymentHelp: 'مشكلة في الدفع؟ راسلنا مع رقم طلبك:',
+    prefill: 'السلام عليكم QatlIA، ',
+    prefillOrder: 'السلام عليكم QatlIA، عندي سؤال بخصوص طلبي رقم {orderNumber}.',
+  },
   auth: {
     defaultTitle: 'تحميل تقرير PDF',
     defaultSubtitle: '{count} أرصدة مجانية عند إنشاء الحساب.',

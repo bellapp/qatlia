@@ -13,6 +13,7 @@ import { BILLING_CURRENCY, CREDIT_PACKS, PACK_IDS } from '@/lib/billing/catalog'
 import { OPTIMIZE_CREDIT_COST, SIGNUP_FREE_CREDITS, VISION_CREDIT_COST } from '@/lib/billing/policy';
 import { fr } from '@/i18n/messages/fr';
 import { SELECTABLE_LOCALES } from '@/i18n';
+import { SUPPORT_EMAIL, SUPPORT_PHONE_E164 } from '@/lib/support';
 
 export const SITE_URL = 'https://qatlia.ma';
 export const SITE_NAME = 'QatlIA';
@@ -49,6 +50,13 @@ export function landingJsonLd(): Record<string, unknown>[] {
     logo: `${SITE_URL}/icon.svg`,
     areaServed: { '@type': 'Country', name: 'Maroc' },
     ...(SAME_AS.length ? { sameAs: [...SAME_AS] } : {}),
+    contactPoint: {
+      '@type': 'ContactPoint',
+      contactType: 'customer support',
+      email: SUPPORT_EMAIL,
+      telephone: SUPPORT_PHONE_E164,
+      availableLanguage: [...SELECTABLE_LOCALES],
+    },
   };
 
   const offers = [

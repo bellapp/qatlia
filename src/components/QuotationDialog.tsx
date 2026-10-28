@@ -4,6 +4,7 @@ import React, { useEffect, useId, useRef, useState } from 'react';
 import { X, FileText, RefreshCw, Upload, Trash2 } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { useLocale } from '@/components/LocaleProvider';
+import { SupportContact } from '@/components/SupportContact';
 import { quotationErrorKey } from '@/i18n/domain';
 import type { TranslationKey } from '@/i18n';
 import type { CostBreakdownInput, DiscountMode } from '@/lib/costing';
@@ -385,6 +386,7 @@ export const QuotationDialog: React.FC<QuotationDialogProps> = ({
           {itemLimitError && (
             <div role="alert" className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-400 text-xs">
               {itemLimitError}
+              <SupportContact label={t('support.needHelp')} message={t('support.prefill')} className="mt-2" />
             </div>
           )}
           {errorKey && (
