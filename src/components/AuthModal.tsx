@@ -113,6 +113,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   const [isLogin, setIsLogin] = useState(initialMode === 'login');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [fullName, setFullName] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -146,7 +147,21 @@ export const AuthModal: React.FC<AuthModalProps> = ({
     };
   }, [isOpen]);
 
+  useEffect(() => {
+    // Coming back from Google with the Back button restores the page from the
+    // browser cache as it was left: still "redirecting", every button disabled.
+    const onPageShow = (event: PageTransitionEvent) => {
+      if (!event.persisted) return;
+      setOauthLoading(false);
+      setLoading(false);
+    };
+    window.addEventListener('pageshow', onPageShow);
+    return () => window.removeEventListener('pageshow', onPageShow);
+  }, []);
+
   if (!isOpen) return null;
+
+  const passwordMismatch = !isLogin && confirmPassword !== '' && confirmPassword !== password;
 
   const showAuthError = (error: unknown, fallback: TranslationKey) => {
     setErrorMsg(t(authErrorKey(error, fallback), { min: MIN_PASSWORD_LENGTH }));
@@ -171,6 +186,10 @@ export const AuthModal: React.FC<AuthModalProps> = ({
 
   const handleAuth = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!isLogin && confirmPassword !== password) {
+      setErrorMsg(t('auth.errors.passwordMismatch'));
+      return;
+    }
     setLoading(true);
     setErrorMsg(null);
     const supabase = createClient();
@@ -223,7 +242,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
         </div>
 
         {errorMsg && (
-          <div role="alert" className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-300 text-xs">{errorMsg}</div>
+          <div role="alert" className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-700 dark:text-rose-300 text-xs">{errorMsg}</div>
         )}
 
         <button
@@ -293,6 +312,22 @@ export const AuthModal: React.FC<AuthModalProps> = ({
               {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
             </button>
           </div>
+          {!isLogin && (
+            <div className="relative">
+              <Lock className="w-4 h-4 text-slate-500 dark:text-slate-400 absolute start-3 top-3" aria-hidden="true" />
+              <input
+                type={showPassword ? 'text' : 'password'}
+                required
+                autoComplete="new-password"
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                placeholder={t('auth.confirmPasswordLabel')}
+                aria-label={t('auth.confirmPasswordLabel')}
+                aria-invalid={passwordMismatch}
+                className={`w-full bg-studio-field border rounded-xl ps-9 pe-3 py-2.5 text-sm text-slate-900 dark:text-white placeholder-slate-600 outline-none ${passwordMismatch ? 'border-rose-500/60' : 'border-studio-border focus:border-brand-500/50'}`}
+              />
+            </div>
+          )}
           <button
             type="submit"
             disabled={loading || oauthLoading}
