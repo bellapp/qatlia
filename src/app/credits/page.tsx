@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { createClient } from '@/lib/supabase/client';
 import { CREDIT_PACKS, PACK_IDS, formatMAD, BILLING_CURRENCY } from '@/lib/billing/catalog';
 import { LocaleSwitcher, useLocale } from '@/components/LocaleProvider';
+import { SupportContact } from '@/components/SupportContact';
 import { checkoutErrorKey, creditPackLabelKeys } from '@/i18n/domain';
 
 /** The payment provider is a proper noun, so it is interpolated, not translated. */
@@ -190,6 +191,11 @@ export default function CreditsPage() {
             <p className="text-[11px] text-amber-300/90 bg-amber-500/10 border border-amber-500/30 rounded-lg px-3 py-2">
               {t('creditsPage.manual.keepReference')}
             </p>
+            <SupportContact
+              label={t('support.paymentHelp')}
+              message={t('support.prefillOrder', { orderNumber: manualOrder.order_number })}
+              className="text-slate-300"
+            />
             <button
               onClick={() => setManualOrder(null)}
               className="w-full py-2.5 rounded-xl bg-white/10 hover:bg-white/20 text-white text-xs font-bold transition-colors"
@@ -216,6 +222,11 @@ export default function CreditsPage() {
                 </span>
               </div>
             ))}
+            <SupportContact
+              label={t('support.paymentHelp')}
+              message={t('support.prefill')}
+              className="pt-1 text-slate-500 dark:text-slate-400"
+            />
           </div>
         )}
 

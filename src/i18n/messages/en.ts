@@ -541,6 +541,14 @@ export const en: Catalog = {
     changePassword: 'Change password',
     logout: 'Sign out',
   },
+  support: {
+    footerHeading: 'Contact',
+    menuEntry: 'Contact support',
+    needHelp: 'Need help? Write to us:',
+    paymentHelp: 'A problem with a payment? Write to us with your order number:',
+    prefill: 'Hello QatlIA, ',
+    prefillOrder: 'Hello QatlIA, I have a question about my order {orderNumber}.',
+  },
   auth: {
     defaultTitle: 'Download the PDF report',
     defaultSubtitle: '{count} free credits when you create your account.',

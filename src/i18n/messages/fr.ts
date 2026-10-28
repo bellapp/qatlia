@@ -599,6 +599,16 @@ export const fr = {
     changePassword: 'Changer le mot de passe',
     logout: 'Déconnexion',
   },
+  /** Contact channels; the address and number themselves live in `@/lib/support`. */
+  support: {
+    footerHeading: 'Contact',
+    menuEntry: 'Contacter le support',
+    needHelp: 'Besoin d’aide ? Écrivez-nous :',
+    paymentHelp: 'Un souci avec un paiement ? Écrivez-nous avec votre numéro de commande :',
+    /** Prefilled in WhatsApp / the email body so the first message is never blank. */
+    prefill: 'Bonjour QatlIA, ',
+    prefillOrder: 'Bonjour QatlIA, j’ai une question sur ma commande {orderNumber}.',
+  },
   auth: {
     defaultTitle: 'Télécharger le rapport PDF',
     defaultSubtitle: '{count} crédits offerts à la création du compte.',

@@ -2,13 +2,14 @@
 
 import React from 'react';
 import Link from 'next/link';
-import { ArrowRight, Scissors, Camera, TrendingUp, FileText, Layers, Languages, Check, X } from 'lucide-react';
+import { ArrowRight, Scissors, Camera, TrendingUp, FileText, Layers, Languages, Check, X, Mail, MessageCircle } from 'lucide-react';
 import { QatlIALogo } from '@/components/QatlIALogo';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { LocaleSwitcher, useLocale } from '@/components/LocaleProvider';
 import { SELECTABLE_LOCALES } from '@/i18n';
 import { BILLING_CURRENCY, CREDIT_PACKS } from '@/lib/billing/catalog';
 import { SIGNUP_FREE_CREDITS } from '@/lib/billing/policy';
+import { SUPPORT_EMAIL, supportMailto, supportWhatsAppUrl } from '@/lib/support';
 
 /** Vision analyses granted on sign-up; optimization and exports stay free. */
 const FREE_VISION_CREDITS = SIGNUP_FREE_CREDITS;
@@ -422,6 +423,26 @@ export default function LandingPage() {
               <span className="font-black text-white tracking-tight">{t('footer.brand')}</span>
             </div>
             <p className="text-[11px] text-slate-400 max-w-md leading-relaxed">{t('footer.tagline')}</p>
+            <div className="mt-4 flex flex-wrap items-center justify-center md:justify-start gap-x-4 gap-y-2 text-[11px]">
+              <span className="font-mono uppercase tracking-[0.12em] text-slate-500">{t('support.footerHeading')}</span>
+              <a
+                href={supportWhatsAppUrl(t('support.prefill'))}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1.5 font-semibold text-slate-300 hover:text-brand-400 transition-colors"
+              >
+                <MessageCircle className="w-3.5 h-3.5" aria-hidden="true" />
+                WhatsApp
+              </a>
+              <a
+                href={supportMailto()}
+                dir="ltr"
+                className="inline-flex items-center gap-1.5 font-semibold text-slate-300 hover:text-brand-400 transition-colors"
+              >
+                <Mail className="w-3.5 h-3.5" aria-hidden="true" />
+                {SUPPORT_EMAIL}
+              </a>
+            </div>
           </div>
 
           <nav className="flex flex-wrap items-center justify-center md:justify-end gap-x-6 gap-y-3">
