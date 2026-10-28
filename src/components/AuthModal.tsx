@@ -80,6 +80,15 @@ export function authErrorKey(error: unknown, fallback: TranslationKey = 'auth.ge
   return fallback;
 }
 
+/**
+ * With email confirmation on, signing up with an address that already has an
+ * account (by password or by Google) is not an error: Supabase answers with a
+ * placeholder user that has no identities, sets no password and sends no email.
+ */
+export function isExistingAccount(user: { identities?: unknown[] } | null | undefined): boolean {
+  return !!user && Array.isArray(user.identities) && user.identities.length === 0;
+}
+
 interface AuthModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -198,12 +207,17 @@ export const AuthModal: React.FC<AuthModalProps> = ({
         const { error } = await supabase.auth.signInWithPassword({ email, password });
         if (error) throw error;
       } else {
-        const { error } = await supabase.auth.signUp({
+        const { data, error } = await supabase.auth.signUp({
           email,
           password,
           options: { data: { full_name: fullName } },
         });
         if (error) throw error;
+        if (isExistingAccount(data.user)) {
+          setErrorMsg(t('auth.errors.alreadyRegistered'));
+          setIsLogin(true);
+          return;
+        }
       }
       onSuccess();
       onClose();

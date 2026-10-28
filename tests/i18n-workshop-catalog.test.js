@@ -452,6 +452,28 @@ test('every Supabase auth failure an artisan can hit maps to localized copy', ()
   assert.match(flatten(catalogs.fr)['auth.errors.weakPassword'], /\{min\}/);
 });
 
+test('signing up with an address that already has an account is recognised, not reported as created', () => {
+  const { isExistingAccount } = loadAuthErrorMapper();
+
+  // GoTrue's answer for an existing account: a placeholder user without identities.
+  assert.equal(isExistingAccount({ id: 'obfuscated', identities: [] }), true);
+  // A real sign-up carries the new email identity.
+  assert.equal(isExistingAccount({ id: 'u1', identities: [{ provider: 'email' }] }), false);
+  // No user, or a payload without the field, is not proof of an existing account.
+  assert.equal(isExistingAccount(null), false);
+  assert.equal(isExistingAccount(undefined), false);
+  assert.equal(isExistingAccount({ id: 'u1' }), false);
+
+  for (const file of ['src/components/AuthModal.tsx', 'src/app/auth/login/page.tsx']) {
+    const source = fs.readFileSync(path.join(PROJECT_ROOT, file), 'utf8');
+    assert.match(
+      source,
+      /isExistingAccount\(data\.user\)\)\s*\{\s*setErrorMsg\(t\('auth\.errors\.alreadyRegistered'\)\)/,
+      `${file} must tell the artisan the account already exists`
+    );
+  }
+});
+
 test('an unrecognised auth error falls back to localized copy, never to the upstream English', () => {
   const { authErrorKey } = loadAuthErrorMapper();
   const { LOCALES, translate } = loadI18n();

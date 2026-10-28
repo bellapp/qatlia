@@ -553,7 +553,7 @@ export const ar: Catalog = {
     genericError: 'حدث خطأ ما',
     errors: {
       invalidCredentials: 'البريد الإلكتروني أو كلمة المرور غير صحيحة.',
-      alreadyRegistered: 'يوجد حساب بهذا البريد الإلكتروني. سجّل الدخول بدل ذلك.',
+      alreadyRegistered: 'يوجد حساب بهذا البريد الإلكتروني. سجّل الدخول، عبر Google إذا كنت قد أنشأته عبر Google.',
       emailNotConfirmed: 'أكّد بريدك الإلكتروني قبل تسجيل الدخول.',
       weakPassword: 'يجب أن تحتوي كلمة المرور على {min} أحرف على الأقل.',
       rateLimited: 'محاولات كثيرة جداً. أعد المحاولة بعد بضع دقائق.',

@@ -552,7 +552,7 @@ export const en: Catalog = {
     genericError: 'Something went wrong',
     errors: {
       invalidCredentials: 'Wrong email or password.',
-      alreadyRegistered: 'An account already exists for this email. Sign in instead.',
+      alreadyRegistered: 'An account already exists for this email. Sign in instead, with Google if you created it with Google.',
       emailNotConfirmed: 'Confirm your email address before signing in.',
       weakPassword: 'The password must be at least {min} characters long.',
       rateLimited: 'Too many attempts. Try again in a few minutes.',
