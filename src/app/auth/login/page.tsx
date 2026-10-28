@@ -35,7 +35,10 @@ function GoogleMark() {
 
 function AuthForm() {
   const { t } = useLocale();
-  const [isLogin, setIsLogin] = useState(true);
+  const searchParams = useSearchParams();
+  // /signup redirects here with ?mode=signup, so directories and the « free account »
+  // buttons can open the form straight in sign-up mode.
+  const [isLogin, setIsLogin] = useState(searchParams?.get('mode') !== 'signup');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -47,7 +50,6 @@ function AuthForm() {
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
 
   const router = useRouter();
-  const searchParams = useSearchParams();
   const redirectTo = searchParams?.get('redirect') || '/atelier';
 
   useEffect(() => {

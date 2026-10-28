@@ -26,7 +26,7 @@ export const SITE_DESCRIPTION =
 export const PUBLIC_ROUTES = ['/'] as const;
 
 /** Routes crawlers have no reason to fetch: APIs, account and admin screens. */
-export const PRIVATE_ROUTES = ['/api/', '/admin', '/account', '/auth/', '/history', '/credits/success'] as const;
+export const PRIVATE_ROUTES = ['/api/', '/admin', '/account', '/auth/', '/signup', '/history', '/credits/success'] as const;
 
 /**
  * QatlIA's official profiles elsewhere. Listed as `sameAs` so search engines and AI
