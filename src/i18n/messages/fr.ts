@@ -616,7 +616,7 @@ export const fr = {
      */
     errors: {
       invalidCredentials: 'Email ou mot de passe incorrect.',
-      alreadyRegistered: 'Un compte existe déjà avec cet email. Connectez-vous.',
+      alreadyRegistered: 'Un compte existe déjà avec cet email. Connectez-vous, avec Google si vous l’avez créé avec Google.',
       emailNotConfirmed: 'Confirmez votre email avant de vous connecter.',
       weakPassword: 'Le mot de passe doit contenir au moins {min} caractères.',
       rateLimited: 'Trop de tentatives. Réessayez dans quelques minutes.',

@@ -7,7 +7,7 @@ import { ArrowRight, Lock, Mail, User, Eye, EyeOff, Gift, ShieldCheck, Scissors 
 import { useRouter, useSearchParams } from 'next/navigation';
 import { QatlIALogo } from '@/components/QatlIALogo';
 import { LocaleSwitcher, useLocale } from '@/components/LocaleProvider';
-import { authErrorKey } from '@/components/AuthModal';
+import { authErrorKey, isExistingAccount } from '@/components/AuthModal';
 import type { TranslationKey } from '@/i18n';
 import { SIGNUP_FREE_CREDITS } from '@/lib/billing/policy';
 
@@ -125,7 +125,10 @@ function AuthForm() {
           options: { data: { full_name: fullName } },
         });
         if (error) throw error;
-        if (data.session) {
+        if (isExistingAccount(data.user)) {
+          setErrorMsg(t('auth.errors.alreadyRegistered'));
+          setIsLogin(true);
+        } else if (data.session) {
           router.push(redirectTo);
           router.refresh();
         } else {
