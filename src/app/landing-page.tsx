@@ -317,7 +317,7 @@ export default function LandingPage() {
                 <PlanLine>{t('pricing.freeCredits', { count: FREE_VISION_CREDITS })}</PlanLine>
               </ul>
               <Link
-                href="/auth/login"
+                href="/signup"
                 className="mt-auto w-full text-center py-3 rounded-xl border border-studio-border hover:border-studio-border-hover text-slate-800 dark:text-slate-200 font-bold text-sm transition-colors"
               >
                 {t('pricing.freeCta')}
