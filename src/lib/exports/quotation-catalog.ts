@@ -50,7 +50,7 @@ const fr = {
   totalLabel: 'TOTAL À PAYER (MAD)',
   amountInWordsLabel: 'Arrêté le présent devis à la somme de :',
   notesLabel: 'Notes',
-  footerNote: "Devis établi par QatlIA — n'engage l'émetteur que jusqu'à sa date de validité.",
+  footerNote: "Devis établi par QatliA — n'engage l'émetteur que jusqu'à sa date de validité.",
   // Panels/pieces detail table (Task 8 remediation — item 1) — rendered only
   // when the request actually carries panels/pieces (see route.ts); never
   // fabricated when the optimizer result carried none.
@@ -101,7 +101,7 @@ const ar: QuotationCatalog = {
   totalLabel: 'المجموع الإجمالي الواجب أداؤه (MAD)',
   amountInWordsLabel: 'أوقفنا هذا العرض عند مبلغ:',
   notesLabel: 'ملاحظات',
-  footerNote: 'عرض سعر صادر عن QatlIA — لا يلزم المُصدر إلا إلى غاية تاريخ صلاحيته.',
+  footerNote: 'عرض سعر صادر عن QatliA — لا يلزم المُصدر إلا إلى غاية تاريخ صلاحيته.',
   panelsTitle: 'الألواح المستعملة',
   panelsColumnRef: 'المرجع',
   panelsColumnMaterial: 'المادة',

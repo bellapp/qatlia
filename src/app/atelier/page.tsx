@@ -719,7 +719,7 @@ const commitPanelName = () => {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          projectName: 'QatlIA_CNC_Plan',
+          projectName: 'QatliA_CNC_Plan',
           // Coordinates/dimensions below stay canonical cm; displayUnit is
           // metadata only (see src/lib/units.ts).
           displayUnit,
@@ -846,7 +846,7 @@ const commitPanelName = () => {
             </div>
             <div className="leading-tight">
               <div className="flex items-center gap-2">
-                <span className="font-display font-extrabold text-[17px] tracking-tight text-slate-900 dark:text-white">QatlIA</span>
+                <span className="font-display font-extrabold text-[17px] tracking-tight text-slate-900 dark:text-white">QatliA</span>
                 <span className="text-[9px] font-mono font-bold px-1.5 py-0.5 rounded-md bg-brand-400/10 text-brand-400 border border-brand-500/20 tracking-wide">
                   PRO
                 </span>

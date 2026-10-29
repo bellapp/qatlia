@@ -125,7 +125,7 @@ export function buildCheckoutParams({ pack, userId, userEmail, origin }: Checkou
         price_data: {
           currency: STRIPE_CURRENCY,
           product_data: {
-            name: `QatlIA — ${pack.name}`,
+            name: `QatliA — ${pack.name}`,
             description: pack.monthly
               ? `${pack.displayCredits} crédits par mois`
               : `${pack.displayCredits} crédits`,

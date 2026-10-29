@@ -602,14 +602,14 @@ export async function POST(req: Request) {
         .replace(/[^\x20-\x7E]/g, '')
         .trim()
         .replace(/\s+/g, '_') || 'EXPORT';
-    const utf8FileName = `QatlIA_${projectName.toUpperCase().replace(/\s+/g, '_')}.pdf`;
+    const utf8FileName = `QatliA_${projectName.toUpperCase().replace(/\s+/g, '_')}.pdf`;
 
     return new Response(pdfBuffer, {
       status: 200,
       headers: {
         'Content-Type': 'application/pdf',
         'Content-Disposition':
-          `attachment; filename="QatlIA_${asciiProjectName}.pdf"; ` +
+          `attachment; filename="QatliA_${asciiProjectName}.pdf"; ` +
           `filename*=UTF-8''${encodeURIComponent(utf8FileName)}`,
       },
     });

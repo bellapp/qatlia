@@ -313,7 +313,7 @@ Règles impératives :
         ...(isUsingOpenRouter
           ? {
               'HTTP-Referer': 'https://qatlia.vercel.app',
-              'X-Title': 'QatlIA Cutting Optimization',
+              'X-Title': 'QatliA Cutting Optimization',
             }
           : {}),
       },

@@ -270,12 +270,12 @@ export async function POST(req: Request) {
     const pdfBytes = await renderQuotationPdf(input, totals, logo);
 
     const asciiQuoteNumber = sanitizeQuoteNumberForFilename(input.quoteNumber);
-    const utf8FileName = `QatlIA_Devis_${input.quoteNumber}.pdf`;
+    const utf8FileName = `QatliA_Devis_${input.quoteNumber}.pdf`;
 
     const headers: Record<string, string> = {
       'Content-Type': 'application/pdf',
       'Content-Disposition':
-        `attachment; filename="QatlIA_Devis_${asciiQuoteNumber}.pdf"; ` +
+        `attachment; filename="QatliA_Devis_${asciiQuoteNumber}.pdf"; ` +
         `filename*=UTF-8''${encodeRfc5987Filename(utf8FileName)}`,
     };
     if (input.projectId) headers['X-Quotation-Project-Saved'] = String(projectSaved === true);

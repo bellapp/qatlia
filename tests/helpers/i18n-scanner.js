@@ -4,7 +4,7 @@ const ts = require('typescript');
 
 // A French accented/ligature character is the primary, low-false-positive
 // signal: none of these appear in English UI copy, technical identifiers,
-// CSS class names, brand names ("QatlIA Pro 2026"), unit tokens (cm, mm,
+// CSS class names, brand names ("QatliA Pro 2026"), unit tokens (cm, mm,
 // m², MAD) or error codes (SCREAMING_SNAKE_CASE) used in this codebase.
 const FRENCH_ACCENTS = /[àâäéèêëîïôöùûüçÀÂÄÉÈÊËÎÏÔÖÙÛÜÇœŒæÆ]/;
 
@@ -96,7 +96,7 @@ function calleeName(expr) {
 // the unit/currency tokens this app-wide convention (see pdf-catalog.ts's
 // module doc comment) never translates. Kept intentionally tiny: broadening
 // this is exactly what the task this scanner supports asks not to do.
-const ALLOWLIST = new Set(['QatlIA', 'QatlIA Pro', 'QatlIA Pro 2026', 'cm', 'mm', 'm²', 'm2', 'MAD']);
+const ALLOWLIST = new Set(['QatliA', 'QatliA Pro', 'QatliA Pro 2026', 'cm', 'mm', 'm²', 'm2', 'MAD']);
 
 function looksFrench(text) {
   return FRENCH_ACCENTS.test(text) || FRENCH_WORD_PATTERN.test(text);

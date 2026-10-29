@@ -1,7 +1,7 @@
 import { z } from 'zod';
 
 export const DxfSchema = z.object({
-  projectName: z.string().default('QatlIA_Plan'),
+  projectName: z.string().default('QatliA_Plan'),
   sheet: z.object({
     width: z.number(),
     height: z.number(),

@@ -223,7 +223,7 @@ export default function AdminPage() {
             <div className="mx-auto w-12 h-12 rounded-2xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-center">
               <Lock className="w-5 h-5 text-amber-400" aria-hidden="true" />
             </div>
-            <h1 className="text-xl font-black text-white">QatlIA — Back office</h1>
+            <h1 className="text-xl font-black text-white">QatliA — Back office</h1>
             <p className="text-xs text-slate-400">Validation des paiements manuels</p>
           </div>
 

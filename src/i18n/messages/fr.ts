@@ -6,7 +6,7 @@
  */
 export const fr = {
   nav: {
-    brandAria: 'QatlIA — accueil',
+    brandAria: 'QatliA — accueil',
     login: 'Connexion',
     tryFree: 'Essayer gratuitement',
     tryFreeShort: 'Essayer',
@@ -41,7 +41,7 @@ export const fr = {
     ctaPrimary: 'Essayer gratuitement',
     ctaSecondary: 'J’ai déjà un compte',
     note: '{count} crédits d’analyse photo offerts à l’inscription · Analyse IA 2 crédits, optimisation 1 crédit · Sans carte bancaire',
-    screenshotAlt: 'Plan de découpe optimisé dans l\'atelier QatlIA : visualiseur 2D, métriques de récupération et chutes',
+    screenshotAlt: 'Plan de découpe optimisé dans l\'atelier QatliA : visualiseur 2D, métriques de récupération et chutes',
     // Labels of the four figures in the navy band. The figures themselves are
     // never written here: they come from the sign-up grant, the billing catalog
     // and the list of shipped locales, so a translation cannot promise a number
@@ -130,7 +130,7 @@ export const fr = {
   },
   faq2: {
     eyebrow: 'Questions fréquentes',
-    title: 'Ce que QatlIA fait (et ne promet pas)',
+    title: 'Ce que QatliA fait (et ne promet pas)',
     q1: 'Puis-je régler la largeur du trait de scie (kerf) ?',
     a1: 'Oui — l’épaisseur de lame est paramétrable (0,1 mm de précision) et elle est déduite du plan.',
     q2: 'Le sens du bois (ramage) est-il respecté ?',
@@ -147,10 +147,10 @@ export const fr = {
   finalCta: {
     title: 'Prêt à optimiser votre atelier ?',
     body: 'Commencez gratuitement avec {count} crédits d’analyse photo. Les exports restent gratuits. Pas de carte bancaire, pas d’engagement.',
-    button: 'Essayer QatlIA maintenant',
+    button: 'Essayer QatliA maintenant',
   },
   footer: {
-    brand: 'QatlIA',
+    brand: 'QatliA',
     tagline: 'Maroc · MAD · Optimisation de découpe pour menuisiers',
     /**
      * Only routes that exist. Terms and privacy pages are deliberately absent
@@ -354,7 +354,7 @@ export const fr = {
       pdfGenerating: 'Génération…',
       pdf: 'Exporter le rapport PDF',
       /** Default PDF project title when the artisan never named the project. */
-      pdfDefaultProjectName: 'Plan Découpe QatlIA',
+      pdfDefaultProjectName: 'Plan Découpe QatliA',
     },
     cutOrder: {
       title: 'Ordre de coupe',
@@ -805,7 +805,7 @@ export const fr = {
     perkCredits: '{count} crédits offerts à l’inscription',
     perkHistory: 'Historique de chaque plan généré',
     perkSecurity: 'Connexion Google ou email sécurisée',
-    asideFooter: 'QatlIA · Maroc · MAD',
+    asideFooter: 'QatliA · Maroc · MAD',
     titleSignup: 'Créer un compte',
     subtitleLogin: 'Retrouvez vos débits et crédits.',
     subtitleSignup: '{count} crédits offerts pour lancer vos premiers scans.',

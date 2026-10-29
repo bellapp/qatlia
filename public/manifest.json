@@ -1,6 +1,6 @@
 {
-  "name": "QatlIA Pro — Optimisation de Découpe",
-  "short_name": "QatlIA",
+  "name": "QatliA Pro — Optimisation de Découpe",
+  "short_name": "QatliA",
   "description": "Solution professionnelle d'optimisation de découpe de panneaux pour menuisiers et artisans. Moteur 2D Guillotine, OCR Vision IA, exports PDF & DXF CNC.",
   "start_url": "/atelier",
   "display": "standalone",
