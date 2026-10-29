@@ -77,22 +77,44 @@ function applyDocumentLocale(locale: Locale): void {
   root.dir = dirFor(locale);
 }
 
-export function LocaleProvider({ children }: { children: React.ReactNode }) {
-  // The server renders the default locale, so the first client render must too;
-  // the stored preference is adopted immediately after hydration.
-  const [locale, setLocaleState] = useState<Locale>(DEFAULT_LOCALE);
+/** Where the default-locale site lives; a page pinned to another locale sends a
+ *  visitor here when they pick a different language. */
+const DEFAULT_LOCALE_HOME = '/';
+
+export function LocaleProvider({
+  children,
+  pinnedLocale,
+}: {
+  children: React.ReactNode;
+  /** Set by a route served in one language (`/ar`): its server HTML is already in
+   *  that locale, so the stored preference must never override it after hydration. */
+  pinnedLocale?: Locale;
+}) {
+  // The server renders the default locale (or the pinned one), so the first client
+  // render must too; an unpinned page adopts the stored preference right after hydration.
+  const [locale, setLocaleState] = useState<Locale>(pinnedLocale ?? DEFAULT_LOCALE);
 
   useApplyEffect(() => {
+    if (pinnedLocale) {
+      // The atelier and sign-up pages this one links to then open in the same language.
+      persistLocale(pinnedLocale);
+      return;
+    }
     const persisted = readPersistedLocale();
     setLocaleState(persisted);
     applyDocumentLocale(persisted);
-  }, []);
+  }, [pinnedLocale]);
 
   const setLocale = useCallback((next: Locale) => {
-    setLocaleState(next);
     persistLocale(next);
+    if (pinnedLocale && next !== pinnedLocale) {
+      // This URL only exists in the pinned language: the chosen one lives on the main site.
+      window.location.assign(DEFAULT_LOCALE_HOME);
+      return;
+    }
+    setLocaleState(next);
     applyDocumentLocale(next);
-  }, []);
+  }, [pinnedLocale]);
 
   const value = useMemo<LocaleContextValue>(
     () => ({

@@ -33,7 +33,7 @@ const config: Config = {
         },
       },
       fontFamily: {
-        // next/font exposes Inter as `--font-inter` (see src/app/layout.tsx).
+        // next/font exposes Inter as `--font-inter` (see src/app/site-shell.ts).
         // Without the variable the stack fell through to the generic sans-serif.
         display: ['var(--font-inter)', 'Inter', 'sans-serif'],
         body: ['var(--font-inter)', 'Inter', 'sans-serif'],
