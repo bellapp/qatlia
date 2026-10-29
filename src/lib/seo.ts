@@ -36,6 +36,7 @@ export const PRIVATE_ROUTES = ['/api/', '/admin', '/account', '/auth/', '/signup
  */
 export const SAME_AS = [
   'https://www.facebook.com/qatlia.ma',
+  'https://www.linkedin.com/company/qatlia/',
 ] as const;
 
 const FAQ_KEYS = [1, 2, 3, 4, 5, 6] as const;
