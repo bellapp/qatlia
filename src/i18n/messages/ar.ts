@@ -1,4 +1,5 @@
 import type { Catalog } from './fr';
+import { legalAr } from './legal/ar';
 
 export const ar: Catalog = {
   nav: {
@@ -804,4 +805,5 @@ export const ar: Catalog = {
     },
     closeAria: 'إغلاق',
   },
+  legal: legalAr,
 };

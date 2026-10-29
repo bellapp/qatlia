@@ -413,8 +413,8 @@ export default function LandingPage() {
       </section>
 
       {/* Footer — Stitch layout (brand left, links right, dashed top rule) on the
-          real navy ground. Only routes that exist are linked: there is no terms
-          or privacy page yet, so neither is invented here. */}
+          real navy ground. Only routes that exist are linked; the legal row is
+          what Creem's store review looks for. */}
       <footer className="bg-[#0F172A] dark:bg-[#060B14] border-t border-dashed border-white/15 px-6 sm:px-10 py-10">
         <div className="max-w-6xl mx-auto flex flex-col gap-8 md:flex-row md:items-start md:justify-between">
           <div className="text-center md:text-start">
@@ -460,6 +460,14 @@ export default function LandingPage() {
             </Link>
           </nav>
         </div>
+        <nav
+          aria-label={t('legal.otherDocs')}
+          className="max-w-6xl mx-auto mt-8 pt-6 border-t border-white/10 flex flex-wrap items-center justify-center md:justify-start gap-x-5 gap-y-2 text-[11px]"
+        >
+          <Link href="/terms" className="text-slate-400 hover:text-brand-400 transition-colors">{t('legal.nav.terms')}</Link>
+          <Link href="/privacy" className="text-slate-400 hover:text-brand-400 transition-colors">{t('legal.nav.privacy')}</Link>
+          <Link href="/refund" className="text-slate-400 hover:text-brand-400 transition-colors">{t('legal.nav.refund')}</Link>
+        </nav>
       </footer>
     </div>
   );
