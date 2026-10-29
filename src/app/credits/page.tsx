@@ -150,7 +150,7 @@ export default function CreditsPage() {
         <div className="flex items-center justify-between gap-3">
           <Link
             href="/atelier"
-            className="flex items-center gap-2 text-xs font-bold text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:text-white transition-colors"
+            className="flex items-center gap-2 text-xs font-bold text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition-colors"
           >
             <ArrowLeft className="w-4 h-4 rtl:-scale-x-100" aria-hidden="true" />
             {t('creditsPage.back')}
@@ -259,6 +259,11 @@ export default function CreditsPage() {
             const [analysesBefore, analysesAfter = ''] = t(
               p.monthly ? 'creditsPage.packAnalysesMonthly' : 'creditsPage.packAnalyses'
             ).split('{count}');
+            // The highlighted card sits on navy in both themes, so its text is
+            // always light; the others follow the theme.
+            const tone = p.highlight
+              ? { strong: 'text-white', muted: 'text-slate-300', rule: 'border-white/15' }
+              : { strong: 'text-slate-900 dark:text-white', muted: 'text-slate-600 dark:text-slate-300', rule: 'border-studio-border' };
             return (
               <div
                 key={p.id}
@@ -276,23 +281,23 @@ export default function CreditsPage() {
 
                 <div>
                   <div className="flex items-center justify-between mb-2">
-                    <h3 className="text-base font-bold text-slate-900 dark:text-white">{packName}</h3>
+                    <h3 className={`text-base font-bold ${tone.strong}`}>{packName}</h3>
                   </div>
                   <div className="flex items-baseline gap-1 my-3">
-                    <span dir="ltr" className="text-3xl font-black text-slate-900 dark:text-white">
+                    <span dir="ltr" className={`text-3xl font-black ${tone.strong}`}>
                       {n(p.priceMAD)}
                     </span>
-                    <span className="text-sm font-bold text-slate-600 dark:text-slate-400">
+                    <span className={`text-sm font-bold ${tone.muted}`}>
                       {t('creditsPage.currency')} {p.monthly ? t('creditsPage.perMonth') : ''}
                     </span>
                   </div>
-                  <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed mb-6">
+                  <p className={`text-xs leading-relaxed mb-6 ${tone.muted}`}>
                     {t(labels.description, { count: p.credits })}
                   </p>
 
-                  <div className="space-y-2.5 pt-4 border-t border-studio-border/60 text-xs">
-                    <div className="flex items-center gap-2 text-slate-900 dark:text-white">
-                      <Check className="w-4 h-4 text-emerald-400 shrink-0" aria-hidden="true" />
+                  <div className={`space-y-2.5 pt-4 border-t text-xs ${tone.rule}`}>
+                    <div className={`flex items-center gap-2 ${tone.strong}`}>
+                      <Check className={`w-4 h-4 shrink-0 ${p.highlight ? 'text-emerald-400' : 'text-emerald-600 dark:text-emerald-400'}`} aria-hidden="true" />
                       <span>
                         {analysesBefore}
                         <strong>{p.displayCredits}</strong>
@@ -300,17 +305,17 @@ export default function CreditsPage() {
                       </span>
                     </div>
                     {labels.renewalNote && p.renewalNote && (
-                      <div className="flex items-center gap-2 text-[#CBD5E1]">
-                        <Check className="w-4 h-4 text-emerald-400 shrink-0" aria-hidden="true" />
+                      <div className={`flex items-center gap-2 ${tone.muted}`}>
+                        <Check className={`w-4 h-4 shrink-0 ${p.highlight ? 'text-emerald-400' : 'text-emerald-600 dark:text-emerald-400'}`} aria-hidden="true" />
                         <span>{t(labels.renewalNote, { count: p.credits })}</span>
                       </div>
                     )}
-                    <div className="flex items-center gap-2 text-[#CBD5E1]">
-                      <Check className="w-4 h-4 text-emerald-400 shrink-0" aria-hidden="true" />
+                    <div className={`flex items-center gap-2 ${tone.muted}`}>
+                      <Check className={`w-4 h-4 shrink-0 ${p.highlight ? 'text-emerald-400' : 'text-emerald-600 dark:text-emerald-400'}`} aria-hidden="true" />
                       <span>{t('creditsPage.freePlans')}</span>
                     </div>
-                    <div className="flex items-center gap-2 text-[#CBD5E1]">
-                      <Check className="w-4 h-4 text-emerald-400 shrink-0" aria-hidden="true" />
+                    <div className={`flex items-center gap-2 ${tone.muted}`}>
+                      <Check className={`w-4 h-4 shrink-0 ${p.highlight ? 'text-emerald-400' : 'text-emerald-600 dark:text-emerald-400'}`} aria-hidden="true" />
                       <span>{t('creditsPage.freeExports')}</span>
                     </div>
                   </div>
@@ -324,7 +329,7 @@ export default function CreditsPage() {
                   className={`w-full mt-6 py-3 rounded-xl font-black text-xs uppercase tracking-wider transition-all flex items-center justify-center gap-2 ${
                     p.highlight
                       ? 'bg-[#F5A623] hover:bg-[#D97706] text-black shadow-lg shadow-orange-500/20'
-                      : 'bg-[#0284C7] hover:bg-[#0369A1] text-slate-900 dark:text-white'
+                      : 'bg-[#0284C7] hover:bg-[#0369A1] text-white'
                   }`}
                 >
                   {loadingPack === p.id ? (
@@ -340,7 +345,7 @@ export default function CreditsPage() {
                   )}
                 </button>
                 {cardProvider === 'creem' && (
-                  <p className="mt-1.5 text-center text-[11px] font-semibold text-slate-600 dark:text-slate-400">
+                  <p className={`mt-1.5 text-center text-[11px] font-semibold ${tone.muted}`}>
                     <span dir="ltr">{t('creditsPage.cardPrice', { price: formatUSD(p.priceUSD) })}</span>
                     {p.monthly ? ` ${t('creditsPage.perMonth')}` : ''}
                   </p>
@@ -349,7 +354,9 @@ export default function CreditsPage() {
                   onClick={() => handleManualOrder(p.id)}
                   disabled={loadingPack === `manual-${p.id}`}
                   aria-busy={loadingPack === `manual-${p.id}`}
-                  className="w-full mt-2 py-2.5 rounded-xl border border-studio-border hover:border-[#F5A623]/50 text-slate-600 dark:text-slate-300 hover:text-[#F5A623] font-bold text-[11px] transition-all flex items-center justify-center gap-2 disabled:opacity-40"
+                  className={`w-full mt-2 py-2.5 rounded-xl border hover:border-[#F5A623]/50 hover:text-[#F5A623] font-bold text-[11px] transition-all flex items-center justify-center gap-2 disabled:opacity-40 ${
+                    p.highlight ? 'border-white/25 text-slate-200' : 'border-studio-border text-slate-600 dark:text-slate-300'
+                  }`}
                 >
                   <Landmark className="w-3.5 h-3.5" aria-hidden="true" />
                   {t('creditsPage.manual.button')}

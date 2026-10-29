@@ -106,8 +106,6 @@ export const ar: Catalog = {
     packAllFree: 'كل ما في الباقة المجانية',
     packScan: 'مسح بالذكاء الاصطناعي — رصيدان لكل تحليل',
     packCta: 'اطّلع على الأرصدة',
-    more: 'تحتاج أكثر؟ {proName} — {proPrice} درهماً مقابل {proCredits} رصيد · {maxName} — {maxPrice} درهماً شهرياً مقابل {maxCredits} رصيد.',
-    moreLink: 'اطّلع على كل الباقات',
   },
   faq2: {
     eyebrow: 'أسئلة شائعة',
