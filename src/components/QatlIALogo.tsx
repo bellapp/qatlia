@@ -11,7 +11,7 @@ export function QatlIALogo({ size = 'md' }: { size?: 'sm' | 'md' | 'lg' }) {
       fill="none"
       xmlns="http://www.w3.org/2000/svg"
       className="shrink-0"
-      aria-label="QatlIA"
+      aria-label="QatliA"
     >
       {/* Outer ring */}
       <circle cx="24" cy="24" r="22" fill="url(#qg)" stroke="currentColor" strokeWidth="1.5" className="text-brand-400/60" />

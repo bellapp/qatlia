@@ -50,7 +50,7 @@ test.describe('Credit debits', () => {
     });
 
     await page.goto('/atelier', { waitUntil: 'domcontentloaded' });
-    await expect(page.getByRole('img', { name: 'QatlIA' })).toBeVisible({ timeout: 15000 });
+    await expect(page.getByRole('img', { name: 'QatliA' })).toBeVisible({ timeout: 15000 });
 
     // Run a real optimization, then exercise the free export paths.
     await page.getByRole('button', { name: /optimiser/i }).first().click();
@@ -75,7 +75,7 @@ test.describe('Credit debits', () => {
     });
 
     await page.goto('/atelier', { waitUntil: 'domcontentloaded' });
-    await expect(page.getByRole('img', { name: 'QatlIA' })).toBeVisible({ timeout: 15000 });
+    await expect(page.getByRole('img', { name: 'QatliA' })).toBeVisible({ timeout: 15000 });
     await page.getByRole('button', { name: /optimiser/i }).first().click();
     await page.waitForTimeout(3000);
 

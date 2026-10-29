@@ -69,7 +69,7 @@ const MINIMAL_PDF = Buffer.from(
 
 async function runOptimization(page: import('@playwright/test').Page) {
   await page.goto('/atelier', { waitUntil: 'domcontentloaded' });
-  await expect(page.getByRole('img', { name: 'QatlIA' })).toBeVisible({ timeout: 15000 });
+  await expect(page.getByRole('img', { name: 'QatliA' })).toBeVisible({ timeout: 15000 });
   await page.getByRole('button', { name: /optimiser/i }).first().click();
   await expect(page.getByTestId('cut-plan-svg')).toBeVisible({ timeout: 15000 });
 }
@@ -77,7 +77,7 @@ async function runOptimization(page: import('@playwright/test').Page) {
 test.describe('Quotation dialog', () => {
   test('the "Devis client" action is absent before optimizing and appears once a result exists', async ({ page }) => {
     await page.goto('/atelier', { waitUntil: 'domcontentloaded' });
-    await expect(page.getByRole('img', { name: 'QatlIA' })).toBeVisible({ timeout: 15000 });
+    await expect(page.getByRole('img', { name: 'QatliA' })).toBeVisible({ timeout: 15000 });
     await expect(page.getByRole('button', { name: 'Devis client' })).toHaveCount(0);
 
     await page.getByRole('button', { name: /optimiser/i }).first().click();

@@ -546,8 +546,8 @@ export const en: Catalog = {
     menuEntry: 'Contact support',
     needHelp: 'Need help? Write to us:',
     paymentHelp: 'A problem with a payment? Write to us with your order number:',
-    prefill: 'Hello QatlIA, ',
-    prefillOrder: 'Hello QatlIA, I have a question about my order {orderNumber}.',
+    prefill: 'Hello QatliA, ',
+    prefillOrder: 'Hello QatliA, I have a question about my order {orderNumber}.',
   },
   auth: {
     defaultTitle: 'Download the PDF report',

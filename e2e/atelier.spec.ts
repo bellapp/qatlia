@@ -3,7 +3,7 @@ import { test, expect } from '@playwright/test';
 test.describe('Atelier Dashboard (/atelier)', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/atelier', { waitUntil: 'domcontentloaded' });
-    await expect(page.getByRole('img', { name: 'QatlIA' })).toBeVisible({ timeout: 15000 });
+    await expect(page.getByRole('img', { name: 'QatliA' })).toBeVisible({ timeout: 15000 });
   });
 
   test('loads and shows QatliA logo and PRO badge', async ({ page }) => {
@@ -252,7 +252,7 @@ test.describe('Atelier Dashboard (/atelier)', () => {
   test('switching sheet unit to mm converts dimensions and persists after reload', async ({ page }) => {
     await page.evaluate(() => localStorage.clear());
     await page.goto('/atelier', { waitUntil: 'domcontentloaded' });
-    await expect(page.getByRole('img', { name: 'QatlIA' })).toBeVisible({ timeout: 15000 });
+    await expect(page.getByRole('img', { name: 'QatliA' })).toBeVisible({ timeout: 15000 });
 
     const heightInput = page.getByTestId('sheet-height-input');
     const widthInput = page.getByTestId('sheet-width-input');
@@ -269,7 +269,7 @@ test.describe('Atelier Dashboard (/atelier)', () => {
     await expect(page.getByTestId('cut-plan-svg')).toBeVisible({ timeout: 15000 });
 
     await page.reload();
-    await expect(page.getByRole('img', { name: 'QatlIA' })).toBeVisible({ timeout: 15000 });
+    await expect(page.getByRole('img', { name: 'QatliA' })).toBeVisible({ timeout: 15000 });
 
     const mmButtonAfterReload = page.getByRole('group', { name: /unité/i }).getByRole('button', { name: 'mm' });
     await expect(mmButtonAfterReload).toHaveAttribute('aria-pressed', 'true');
@@ -280,7 +280,7 @@ test.describe('Atelier Dashboard (/atelier)', () => {
   test('imported piece dimensions convert correctly between mm and cm', async ({ page }) => {
     await page.evaluate(() => localStorage.clear());
     await page.goto('/atelier', { waitUntil: 'domcontentloaded' });
-    await expect(page.getByRole('img', { name: 'QatlIA' })).toBeVisible({ timeout: 15000 });
+    await expect(page.getByRole('img', { name: 'QatliA' })).toBeVisible({ timeout: 15000 });
 
     const unitGroup = page.getByRole('group', { name: /unité/i });
     await unitGroup.getByRole('button', { name: 'mm' }).click();
@@ -322,7 +322,7 @@ test.describe('Atelier Dashboard (/atelier)', () => {
       legacyProject
     );
     await page.reload({ waitUntil: 'domcontentloaded' });
-    await expect(page.getByRole('img', { name: 'QatlIA' })).toBeVisible({ timeout: 15000 });
+    await expect(page.getByRole('img', { name: 'QatliA' })).toBeVisible({ timeout: 15000 });
 
     const unitGroup = page.getByRole('group', { name: /unité/i });
     await expect(unitGroup.getByRole('button', { name: 'cm' })).toHaveAttribute('aria-pressed', 'true');
@@ -351,7 +351,7 @@ test.describe('Atelier Dashboard (/atelier)', () => {
     page.on('pageerror', (error) => pageErrors.push(error));
 
     await page.goto('/atelier', { waitUntil: 'domcontentloaded' });
-    await expect(page.getByRole('img', { name: 'QatlIA' })).toBeVisible({ timeout: 15000 });
+    await expect(page.getByRole('img', { name: 'QatliA' })).toBeVisible({ timeout: 15000 });
 
     const heightInput = page.getByTestId('sheet-height-input');
     await expect(heightInput).toHaveValue('278.0');
@@ -368,7 +368,7 @@ test.describe('Atelier Dashboard (/atelier)', () => {
     // The page must stay responsive (no uncaught error broke rendering) and
     // the input must safely revert to its last valid value, whether the
     // browser normalized 1e400 to '' or left it as an out-of-range string.
-    await expect(page.getByRole('img', { name: 'QatlIA' })).toBeVisible();
+    await expect(page.getByRole('img', { name: 'QatliA' })).toBeVisible();
     await expect(heightInput).toHaveValue('278.0');
     expect(pageErrors).toEqual([]);
   });
