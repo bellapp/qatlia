@@ -8,7 +8,7 @@ import { SITE_DESCRIPTION, SITE_NAME, SITE_URL } from "@/lib/seo";
 const inter = Inter({ subsets: ["latin"], variable: "--font-inter", display: "swap" });
 const jetbrainsMono = JetBrains_Mono({ subsets: ["latin"], variable: "--font-mono", display: "swap" });
 
-const TITLE = "QatlIA — Optimisation de Découpe & Débit IA pour Menuisiers";
+const TITLE = "QatliA — Optimisation de Découpe & Débit IA pour Menuisiers";
 
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
@@ -20,7 +20,7 @@ export const metadata: Metadata = {
     title: TITLE,
     description: SITE_DESCRIPTION,
     locale: "fr_MA",
-    images: [{ url: "/hero-atelier.webp", width: 810, height: 770, alt: "Plan de découpe optimisé dans l'atelier QatlIA" }],
+    images: [{ url: "/hero-atelier.webp", width: 810, height: 770, alt: "Plan de découpe optimisé dans l'atelier QatliA" }],
   },
   manifest: "/manifest.json",
   icons: {
@@ -30,7 +30,7 @@ export const metadata: Metadata = {
     ],
     apple: "/apple-touch-icon.png",
   },
-  appleWebApp: { capable: true, title: "QatlIA", statusBarStyle: "black-translucent" },
+  appleWebApp: { capable: true, title: "QatliA", statusBarStyle: "black-translucent" },
 };
 
 export const viewport: Viewport = { themeColor: "#F5A623" };

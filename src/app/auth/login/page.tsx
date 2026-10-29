@@ -157,7 +157,7 @@ function AuthForm() {
         <div className="flex items-center gap-3">
           <div className="text-brand-400"><QatlIALogo size="lg" /></div>
           <div>
-            <p className="font-display font-extrabold text-lg tracking-tight">QatlIA</p>
+            <p className="font-display font-extrabold text-lg tracking-tight">QatliA</p>
             <p className="text-[11px] text-slate-600 dark:text-slate-400">{t('loginPage.brandTagline')}</p>
           </div>
         </div>
@@ -189,7 +189,7 @@ function AuthForm() {
           <div className="flex items-center justify-between gap-3">
             <div className="lg:hidden flex items-center gap-3">
               <div className="text-brand-400"><QatlIALogo size="sm" /></div>
-              <span className="font-display font-extrabold">QatlIA</span>
+              <span className="font-display font-extrabold">QatliA</span>
             </div>
             <LocaleSwitcher className="ms-auto" />
           </div>

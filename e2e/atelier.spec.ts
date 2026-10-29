@@ -6,8 +6,8 @@ test.describe('Atelier Dashboard (/atelier)', () => {
     await expect(page.getByRole('img', { name: 'QatlIA' })).toBeVisible({ timeout: 15000 });
   });
 
-  test('loads and shows QatlIA logo and PRO badge', async ({ page }) => {
-    await expect(page.getByText('QatlIA', { exact: false }).first()).toBeVisible();
+  test('loads and shows QatliA logo and PRO badge', async ({ page }) => {
+    await expect(page.getByText('QatliA', { exact: false }).first()).toBeVisible();
     await expect(page.getByText('PRO')).toBeVisible();
   });
 

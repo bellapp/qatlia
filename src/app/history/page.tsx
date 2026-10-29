@@ -207,7 +207,7 @@ export default function HistoryPage() {
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `QatlIA_${(optJson.projectName || proj.name).replace(/\s+/g, '_')}.pdf`;
+      a.download = `QatliA_${(optJson.projectName || proj.name).replace(/\s+/g, '_')}.pdf`;
       document.body.appendChild(a);
       a.click();
       a.remove();

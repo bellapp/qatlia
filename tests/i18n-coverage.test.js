@@ -261,7 +261,7 @@ test('does not flag JSX comments', () => {
       return (
         <div>
           {/* Télécharger le rapport ici, pas un vrai texte affiché */}
-          <span>QatlIA Pro 2026</span>
+          <span>QatliA Pro 2026</span>
         </div>
       );
     }
@@ -285,7 +285,7 @@ test('does not flag the allowlisted brand string or unit/currency tokens', () =>
     export function X() {
       return (
         <div>
-          <span>QatlIA Pro 2026</span>
+          <span>QatliA Pro 2026</span>
           <span>208.5 cm</span>
           <span>5.78 m²</span>
           <span title="MAD" />

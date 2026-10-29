@@ -2,7 +2,7 @@ import type { Catalog } from './fr';
 
 export const en: Catalog = {
   nav: {
-    brandAria: 'QatlIA — home',
+    brandAria: 'QatliA — home',
     login: 'Sign in',
     tryFree: 'Try it free',
     tryFreeShort: 'Try free',
@@ -32,7 +32,7 @@ export const en: Catalog = {
     ctaPrimary: 'Try it free',
     ctaSecondary: 'I already have an account',
     note: '{count} credits at sign-up · AI scan 2 credits, optimization 1 credit · No credit card',
-    screenshotAlt: 'Optimized cutting plan in the QatlIA workshop: 2D visualizer, recovery metrics and offcuts',
+    screenshotAlt: 'Optimized cutting plan in the QatliA workshop: 2D visualizer, recovery metrics and offcuts',
     stats: {
       credits: 'free credits at sign-up',
       free: 'free PDF, DXF and PNG exports',
@@ -110,7 +110,7 @@ export const en: Catalog = {
   },
   faq2: {
     eyebrow: 'FAQ',
-    title: 'What QatlIA does (and doesn’t promise)',
+    title: 'What QatliA does (and doesn’t promise)',
     q1: 'Can I set the blade width (kerf)?',
     a1: 'Yes — kerf is adjustable to 0.1 mm precision and deducted from the plan.',
     q2: 'Is wood grain direction respected?',
@@ -127,10 +127,10 @@ export const en: Catalog = {
   finalCta: {
     title: 'Ready to optimize your workshop?',
     body: 'Start free with {count} photo-analysis credits. Exports stay free. No credit card, no commitment.',
-    button: 'Try QatlIA now',
+    button: 'Try QatliA now',
   },
   footer: {
-    brand: 'QatlIA',
+    brand: 'QatliA',
     tagline: 'Morocco · MAD · Cutting optimization for woodworkers',
     links: {
       credits: 'Credits',
@@ -312,7 +312,7 @@ export const en: Catalog = {
       dxfAria: 'Download the plan as DXF for CNC',
       pdfGenerating: 'Generating…',
       pdf: 'Export the PDF report',
-      pdfDefaultProjectName: 'QatlIA Cutting Plan',
+      pdfDefaultProjectName: 'QatliA Cutting Plan',
     },
     cutOrder: {
       title: 'Cutting order',
@@ -712,7 +712,7 @@ export const en: Catalog = {
     perkCredits: '{count} free credits when you sign up',
     perkHistory: 'A history of every plan you generate',
     perkSecurity: 'Secure Google or email sign-in',
-    asideFooter: 'QatlIA · Morocco · MAD',
+    asideFooter: 'QatliA · Morocco · MAD',
     titleSignup: 'Create an account',
     subtitleLogin: 'Pick up your cut lists and credits.',
     subtitleSignup: '{count} free credits to run your first scans.',

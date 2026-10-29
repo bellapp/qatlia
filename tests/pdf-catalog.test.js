@@ -64,7 +64,7 @@ test('the ar catalog\'s brand and currency labels keep "MAD" untranslated, match
 test('the ar catalog\'s string leaves actually contain Arabic-script characters (not left untranslated as fr/en copies)', () => {
   const { pdfCatalogs } = load();
   const ARABIC = /[؀-ۿ]/;
-  // "brand" is the product name (QatlIA Pro 2026) -- a proper noun, never
+  // "brand" is the product name (QatliA Pro 2026) -- a proper noun, never
   // translated in any locale, exactly like the "MAD" currency code (see the
   // module doc comment in pdf-catalog.ts).
   const UNTRANSLATED = new Set(['brand']);

@@ -2,7 +2,7 @@ import type { Catalog } from './fr';
 
 export const ar: Catalog = {
   nav: {
-    brandAria: 'QatlIA — الصفحة الرئيسية',
+    brandAria: 'QatliA — الصفحة الرئيسية',
     login: 'تسجيل الدخول',
     tryFree: 'جرّب مجاناً',
     tryFreeShort: 'جرّب',
@@ -32,7 +32,7 @@ export const ar: Catalog = {
     ctaPrimary: 'جرّب مجاناً',
     ctaSecondary: 'لديّ حساب بالفعل',
     note: '{count} أرصدة لتحليل الصور مجاناً عند التسجيل · بدون بطاقة بنكية',
-    screenshotAlt: 'خطة قطع محسّنة في ورشة QatlIA: عارض ثنائي الأبعاد ومؤشرات الاستغلال والهدر',
+    screenshotAlt: 'خطة قطع محسّنة في ورشة QatliA: عارض ثنائي الأبعاد ومؤشرات الاستغلال والهدر',
     stats: {
       credits: 'رصيداً مجانياً عند التسجيل',
       free: 'تصدير PDF وDXF وPNG مجاناً',
@@ -111,7 +111,7 @@ export const ar: Catalog = {
   },
   faq2: {
     eyebrow: 'أسئلة شائعة',
-    title: 'ما يفعله QatlIA (وما لا يَعِد به)',
+    title: 'ما يفعله QatliA (وما لا يَعِد به)',
     q1: 'هل يمكن ضبط عرض القرص (الكرف)؟',
     a1: 'نعم — سماكة القرص قابلة للتعديل بدقة 0,1 مم وتُخصم من الخطة.',
     q2: 'هل يُحترم اتجاه عروق الخشب؟',
@@ -128,10 +128,10 @@ export const ar: Catalog = {
   finalCta: {
     title: 'هل أنت مستعد لتحسين ورشتك؟',
     body: 'ابدأ مجاناً مع {count} أرصدة لتحليل الصور. يبقى التصدير مجانياً. بدون بطاقة بنكية وبدون التزام.',
-    button: 'جرّب QatlIA الآن',
+    button: 'جرّب QatliA الآن',
   },
   footer: {
-    brand: 'QatlIA',
+    brand: 'QatliA',
     tagline: 'المغرب · درهم · تحسين القطع للنجارين',
     links: {
       credits: 'الأرصدة',
@@ -313,7 +313,7 @@ export const ar: Catalog = {
       dxfAria: 'تحميل المخطط بصيغة DXF للتحكم الرقمي',
       pdfGenerating: 'جارٍ الإنشاء…',
       pdf: 'تصدير تقرير PDF',
-      pdfDefaultProjectName: 'مخطط قطع QatlIA',
+      pdfDefaultProjectName: 'مخطط قطع QatliA',
     },
     cutOrder: {
       title: 'ترتيب القطع',
@@ -711,7 +711,7 @@ export const ar: Catalog = {
     perkCredits: '{count} أرصدة مجانية عند التسجيل',
     perkHistory: 'سجل لكل مخطط تُنشئه',
     perkSecurity: 'تسجيل دخول آمن عبر Google أو البريد الإلكتروني',
-    asideFooter: 'QatlIA · المغرب · MAD',
+    asideFooter: 'QatliA · المغرب · MAD',
     titleSignup: 'إنشاء حساب',
     subtitleLogin: 'استعد قوائم القطع والأرصدة الخاصة بك.',
     subtitleSignup: '{count} أرصدة مجانية لتشغيل أول عمليات المسح.',

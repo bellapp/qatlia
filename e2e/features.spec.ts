@@ -85,8 +85,8 @@ test.describe('Responsive', () => {
   test('atelier loads on tablet viewport', async ({ page }) => {
     await page.setViewportSize({ width: 768, height: 1024 });
     await page.goto('/atelier');
-    await page.waitForSelector('text=QatlIA', { timeout: 5000 });
-    await expect(page.getByText('QatlIA').first()).toBeVisible();
+    await page.waitForSelector('text=QatliA', { timeout: 5000 });
+    await expect(page.getByText('QatliA').first()).toBeVisible();
   });
 });
 
@@ -116,7 +116,7 @@ test.describe('Arabic layout: no horizontal overflow at fixed viewports', () => 
         await expect(html).toHaveAttribute('lang', 'ar');
         // Let the page settle past first paint (fonts, layout of the
         // atelier's heavier client components) before measuring.
-        await page.waitForSelector('text=QatlIA', { timeout: 15000 });
+        await page.waitForSelector('text=QatliA', { timeout: 15000 });
 
         const widths = await page.evaluate(() => ({
           viewport: window.innerWidth,
@@ -190,7 +190,7 @@ test.describe('Keyboard focus order: DOM order holds, visual order mirrors under
       ] as const) {
         await setLocale(page, path, locale);
         await expect(page.locator('html')).toHaveAttribute('dir', dir);
-        await page.waitForSelector('text=QatlIA', { timeout: 15000 });
+        await page.waitForSelector('text=QatliA', { timeout: 15000 });
 
         const controlCount = await tagFocusableOrder(page, containerSelector);
         expect(controlCount).toBeGreaterThan(0);
@@ -220,7 +220,7 @@ test.describe('Keyboard focus order: DOM order holds, visual order mirrors under
       const firstLastX: Record<'fr' | 'ar', { first: number; last: number }> = { fr: null!, ar: null! };
       for (const locale of ['fr', 'ar'] as const) {
         await setLocale(page, path, locale);
-        await page.waitForSelector('text=QatlIA', { timeout: 15000 });
+        await page.waitForSelector('text=QatliA', { timeout: 15000 });
 
         await tagFocusableOrder(page, containerSelector);
         const boxes = await page.locator(`${containerSelector} [data-tab-probe]`).evaluateAll((els) =>

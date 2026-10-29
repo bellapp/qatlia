@@ -15,11 +15,11 @@ import { fr } from '@/i18n/messages/fr';
 import { SELECTABLE_LOCALES } from '@/i18n';
 
 export const SITE_URL = 'https://qatlia.ma';
-export const SITE_NAME = 'QatlIA';
+export const SITE_NAME = 'QatliA';
 
 /** Used for <meta name="description"> and Open Graph. 50–160 characters. */
 export const SITE_DESCRIPTION =
-  `Photographiez votre fiche de débit : QatlIA calcule le plan de découpe de vos panneaux et l’exporte en PDF. ` +
+  `Photographiez votre fiche de débit : QatliA calcule le plan de découpe de vos panneaux et l’exporte en PDF. ` +
   `Pour menuisiers au Maroc, ${SIGNUP_FREE_CREDITS} crédits offerts.`;
 
 /** Public, indexable routes. Everything behind a login stays out of the sitemap. */

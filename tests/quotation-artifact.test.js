@@ -356,14 +356,14 @@ for (const locale of ['fr', 'ar']) {
     // sentence extracts in *visual* (bidi-reordered, word order included)
     // order, not logical reading order (see pdf-fonts.ts's `arabicBidiOptions`
     // doc comment) — so instead of matching the whole footer sentence, this
-    // checks for "QatlIA" (kept untranslated/Latin in both catalogs, see
+    // checks for "QatliA" (kept untranslated/Latin in both catalogs, see
     // quotation-catalog.ts) as a reliable, shaping-agnostic footer marker,
     // and the page/total figures (Western digits, never reshaped) for the
     // page indicator.
     for (let p = 1; p <= doc.numPages; p += 1) {
       const pText = await pageText(doc, p);
       assert.ok(pText.includes(`${p} / ${doc.numPages}`), `expected the page indicator "${p} / ${doc.numPages}" on page ${p}: ${pText.slice(-200)}`);
-      assert.ok(pText.includes('QatlIA'), `expected the footer note (marked by "QatlIA") on page ${p}`);
+      assert.ok(pText.includes('QatliA'), `expected the footer note (marked by "QatliA") on page ${p}`);
     }
   });
 
