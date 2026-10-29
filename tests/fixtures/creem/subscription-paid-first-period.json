@@ -1,0 +1,95 @@
+{
+  "eventType": "subscription.paid",
+  "object": {
+    "id": "sub_1j4psYae2ie5xuFEMmd9Xc",
+    "object": "subscription",
+    "product": {
+      "id": "prod_592WDHbLmTPSI7Gb0J2VVc",
+      "object": "product",
+      "name": "QatliA - Abonnement Atelier Max",
+      "description": "1000 crédits par mois",
+      "price": 999,
+      "currency": "USD",
+      "billing_type": "recurring",
+      "billing_period": "every-month",
+      "recurring_interval": "month",
+      "recurring_interval_count": 1,
+      "trial_period_days": null,
+      "trial_price": null,
+      "status": "active",
+      "tax_mode": "inclusive",
+      "business_net_pricing": false,
+      "tax_category": "saas",
+      "default_success_url": null,
+      "created_at": "2026-10-29T10:59:31.441Z",
+      "updated_at": "2026-10-29T10:59:31.441Z",
+      "mode": "test"
+    },
+    "customer": {
+      "id": "cust_hajr3SwJOUR7g5jSS2oDU",
+      "object": "customer",
+      "email": "probe@example.com",
+      "name": "Probe Test",
+      "metadata": {
+        "packId": "atelier_max",
+        "userId": "11111111-2222-4333-8444-555555555555",
+        "credits": "1000"
+      },
+      "country": "MA",
+      "external_id": null,
+      "created_at": "2026-10-29T11:05:36.290Z",
+      "updated_at": "2026-10-29T11:05:36.290Z",
+      "mode": "test"
+    },
+    "items": [
+      {
+        "object": "subscription_item",
+        "id": "sitem_2E147AMlLeLBcdmProFakC",
+        "product_id": "prod_592WDHbLmTPSI7Gb0J2VVc",
+        "price_id": "pprice_1xaZwJ4yisXdW5qUSnciXA",
+        "units": 1,
+        "created_at": "2026-10-29T11:05:40.934Z",
+        "updated_at": "2026-10-29T11:05:40.934Z",
+        "mode": "test"
+      }
+    ],
+    "collection_method": "charge_automatically",
+    "status": "active",
+    "last_transaction_id": "tran_53J3L7LwLOMHcNTxMAw8UY",
+    "last_transaction": {
+      "id": "tran_53J3L7LwLOMHcNTxMAw8UY",
+      "object": "transaction",
+      "amount": 999,
+      "amount_paid": 999,
+      "currency": "USD",
+      "type": "invoice",
+      "tax_country": "MA",
+      "tax_amount": 0,
+      "status": "paid",
+      "refunded_amount": null,
+      "order": "ord_25HGC5rr9tY4mMP72r6fRB",
+      "subscription": "sub_1j4psYae2ie5xuFEMmd9Xc",
+      "customer": null,
+      "description": "Subscription payment",
+      "period_start": 1793271938686,
+      "period_end": 1795950338686,
+      "created_at": 1793271941806,
+      "mode": "test"
+    },
+    "last_transaction_date": "2026-10-29T11:05:38.686Z",
+    "next_transaction_date": "2026-11-29T11:05:38.686Z",
+    "current_period_start_date": "2026-10-29T11:05:38.686Z",
+    "current_period_end_date": "2026-11-29T11:05:38.686Z",
+    "canceled_at": null,
+    "created_at": "2026-10-29T11:05:40.920Z",
+    "updated_at": "2026-10-29T11:05:41.158Z",
+    "metadata": {
+      "packId": "atelier_max",
+      "userId": "11111111-2222-4333-8444-555555555555",
+      "credits": "1000"
+    },
+    "mode": "test"
+  },
+  "id": "evt_4OCfyD7LstBVufdizMW2jQ",
+  "created_at": 1793271942801
+}

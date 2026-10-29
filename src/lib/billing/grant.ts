@@ -30,7 +30,7 @@ export interface CreditGrant {
   credits: number;
   /** Stable key stored in credit_transactions.stripe_payment_id (unique index). */
   idempotencyKey: string;
-  source: 'checkout_session' | 'invoice';
+  source: 'checkout_session' | 'invoice' | 'creem_checkout' | 'creem_subscription';
 }
 
 export type GrantResolution =

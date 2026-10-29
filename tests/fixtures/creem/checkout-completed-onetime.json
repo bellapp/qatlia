@@ -1,0 +1,75 @@
+{
+  "eventType": "checkout.completed",
+  "object": {
+    "id": "ch_2GXdkHWCKUz6c8RCd4uTT5",
+    "object": "checkout",
+    "request_id": "probe-one-1",
+    "order": {
+      "object": "order",
+      "id": "ord_D4wgXbO4tU0QzvgDJKOWw",
+      "customer": "cust_hajr3SwJOUR7g5jSS2oDU",
+      "product": "prod_3GauWfIWgKNQEdIsdf2Zbs",
+      "amount": 299,
+      "currency": "USD",
+      "sub_total": 299,
+      "tax_amount": 0,
+      "amount_due": 299,
+      "amount_paid": 299,
+      "status": "paid",
+      "type": "onetime",
+      "transaction": "tran_48snEslB1mlyd6lloScKD7",
+      "created_at": "2026-10-29T11:06:04.625Z",
+      "updated_at": "2026-10-29T11:07:39.481Z",
+      "mode": "test"
+    },
+    "product": {
+      "id": "prod_3GauWfIWgKNQEdIsdf2Zbs",
+      "object": "product",
+      "name": "QatliA - Pack Découverte",
+      "description": "10 crédits",
+      "price": 299,
+      "currency": "USD",
+      "billing_type": "onetime",
+      "billing_period": "once",
+      "recurring_interval": null,
+      "recurring_interval_count": null,
+      "trial_period_days": null,
+      "trial_price": null,
+      "status": "active",
+      "tax_mode": "inclusive",
+      "business_net_pricing": false,
+      "tax_category": "saas",
+      "default_success_url": null,
+      "created_at": "2026-10-29T10:59:05.258Z",
+      "updated_at": "2026-10-29T10:59:05.258Z",
+      "mode": "test"
+    },
+    "units": 1,
+    "success_url": "https://example.com/credits/success",
+    "customer": {
+      "id": "cust_hajr3SwJOUR7g5jSS2oDU",
+      "object": "customer",
+      "email": "probe@example.com",
+      "name": "Probe Test",
+      "metadata": {
+        "packId": "starter",
+        "userId": "11111111-2222-4333-8444-555555555555",
+        "credits": "10"
+      },
+      "country": "MA",
+      "external_id": null,
+      "created_at": "2026-10-29T11:05:36.290Z",
+      "updated_at": "2026-10-29T11:07:36.237Z",
+      "mode": "test"
+    },
+    "status": "completed",
+    "metadata": {
+      "packId": "starter",
+      "userId": "11111111-2222-4333-8444-555555555555",
+      "credits": "10"
+    },
+    "mode": "test"
+  },
+  "id": "evt_1m8jImNTcb4pREC7TmIgxN",
+  "created_at": 1793272061211
+}
