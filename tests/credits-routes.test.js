@@ -403,7 +403,7 @@ test('a paid Dahlia subscription invoice grants the monthly credits exactly once
       },
     },
   });
-  state.admin.rpcResult = () => ({ data: { success: true, balance: 1000 }, error: null });
+  state.admin.rpcResult = () => ({ data: { success: true, balance: 200 }, error: null });
 
   await withEnv(CONFIGURED, async () => {
     const { POST } = loadTsModule('src/app/api/credits/webhook/route.ts');
@@ -415,7 +415,7 @@ test('a paid Dahlia subscription invoice grants the monthly credits exactly once
     const call = state.admin.rpcCalls[0];
     assert.equal(call.name, 'add_credits');
     assert.equal(call.args.p_user_id, UUID);
-    assert.equal(call.args.p_credits, 1000, 'the renewal tops the balance up by the catalog amount');
+    assert.equal(call.args.p_credits, 200, 'the renewal tops the balance up by the catalog amount');
     assert.equal(call.args.p_pack_id, 'atelier_max');
     assert.ok(call.args.p_stripe_payment_id.includes('in_dahlia_1'));
   });

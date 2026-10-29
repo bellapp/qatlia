@@ -623,6 +623,9 @@ export const en: Catalog = {
     chooseAria: 'Choose the {pack}',
     redirecting: 'Redirecting to payment…',
     securePayment: 'Payment secured by {provider} — Visa / Mastercard, charged in dirhams ({currency})',
+    securePaymentInternational:
+      'Payment secured by {provider} — international cards, Apple Pay and Google Pay, charged in dollars ({currency})',
+    cardPrice: 'By card: {price}',
     invoiceNote: 'Invoice and receipt emailed instantly',
     manual: {
       button: 'Pay cash / bank transfer',

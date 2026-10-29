@@ -4,13 +4,14 @@ import React, { useEffect, useState } from 'react';
 import { Sparkles, Check, Zap, ArrowLeft, ShieldCheck, CreditCard, Landmark } from 'lucide-react';
 import Link from 'next/link';
 import { createClient } from '@/lib/supabase/client';
-import { CREDIT_PACKS, PACK_IDS, formatMAD, BILLING_CURRENCY } from '@/lib/billing/catalog';
+import { CREDIT_PACKS, PACK_IDS, formatMAD, formatUSD, BILLING_CURRENCY, CARD_CURRENCY } from '@/lib/billing/catalog';
 import { LocaleSwitcher, useLocale } from '@/components/LocaleProvider';
 import { SupportContact } from '@/components/SupportContact';
 import { checkoutErrorKey, creditPackLabelKeys } from '@/i18n/domain';
 
-/** The payment provider is a proper noun, so it is interpolated, not translated. */
-const PAYMENT_PROVIDER = 'Stripe';
+/** Payment providers are proper nouns, so they are interpolated, not translated. */
+const PAYMENT_PROVIDER_NAMES = { creem: 'Creem', stripe: 'Stripe' } as const;
+type CardProvider = keyof typeof PAYMENT_PROVIDER_NAMES;
 
 export default function CreditsPage() {
   const { t, tn, n } = useLocale();
@@ -18,8 +19,24 @@ export default function CreditsPage() {
   const [checkoutError, setCheckoutError] = useState<string | null>(null);
   // null until the real balance is known — never a hardcoded placeholder.
   const [credits, setCredits] = useState<number | null>(null);
+  // Creem charges the USD price, Stripe the MAD one: the card price is only
+  // shown once the server has said which provider will take the payment.
+  const [cardProvider, setCardProvider] = useState<CardProvider | null>(null);
 
   const packs = PACK_IDS.map((id) => CREDIT_PACKS[id]);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch('/api/credits/checkout');
+        if (!res.ok) return;
+        const data = await res.json();
+        if (!cancelled && (data?.provider === 'creem' || data?.provider === 'stripe')) setCardProvider(data.provider);
+      } catch { /* the cards keep their MAD price */ }
+    })();
+    return () => { cancelled = true; };
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -120,9 +137,11 @@ export default function CreditsPage() {
   const [headlineBefore, headlineAfter = ''] = t('creditsPage.headline', {
     count: CREDIT_PACKS.starter.credits,
   }).split('{price}');
-  const [secureBefore, secureAfter = ''] = t('creditsPage.securePayment', {
-    currency: BILLING_CURRENCY,
-  }).split('{provider}');
+  const [secureBefore, secureAfter = ''] = (
+    cardProvider === 'creem'
+      ? t('creditsPage.securePaymentInternational', { currency: CARD_CURRENCY })
+      : t('creditsPage.securePayment', { currency: BILLING_CURRENCY })
+  ).split('{provider}');
 
   return (
     <div className="min-h-screen bg-studio-panel text-slate-700 dark:text-slate-200 font-sans antialiased p-6 md:p-10">
@@ -320,6 +339,12 @@ export default function CreditsPage() {
                     </>
                   )}
                 </button>
+                {cardProvider === 'creem' && (
+                  <p className="mt-1.5 text-center text-[11px] font-semibold text-slate-600 dark:text-slate-400">
+                    <span dir="ltr">{t('creditsPage.cardPrice', { price: formatUSD(p.priceUSD) })}</span>
+                    {p.monthly ? ` ${t('creditsPage.perMonth')}` : ''}
+                  </p>
+                )}
                 <button
                   onClick={() => handleManualOrder(p.id)}
                   disabled={loadingPack === `manual-${p.id}`}
@@ -340,7 +365,7 @@ export default function CreditsPage() {
             <ShieldCheck className="w-4 h-4 text-sky-400" aria-hidden="true" />
             <span>
               {secureBefore}
-              <strong>{PAYMENT_PROVIDER}</strong>
+              <strong>{PAYMENT_PROVIDER_NAMES[cardProvider ?? 'stripe']}</strong>
               {secureAfter}
             </span>
           </div>

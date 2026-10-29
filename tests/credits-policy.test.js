@@ -25,7 +25,7 @@ const EXPECTED_PACKS = {
   starter: { credits: 10, priceMAD: 10, monthly: false },
   standard: { credits: 50, priceMAD: 40, monthly: false },
   pro: { credits: 100, priceMAD: 70, monthly: false },
-  atelier_max: { credits: 1000, priceMAD: 99, monthly: true },
+  atelier_max: { credits: 200, priceMAD: 99, monthly: true },
 };
 
 const MONTHLY_PACK_ID = 'atelier_max';
@@ -135,7 +135,7 @@ test('every pack displays exactly the number of credits it grants', () => {
   }
 });
 
-test('the monthly plan is named honestly and grants 1000 credits per month', () => {
+test('the monthly plan is named honestly and grants 200 credits per month', () => {
   const { CREDIT_PACKS, PACK_IDS } = loadTsModule('src/lib/billing/catalog.ts');
 
   const monthly = PACK_IDS.map((id) => CREDIT_PACKS[id]).filter((pack) => pack.monthly);
@@ -144,7 +144,7 @@ test('the monthly plan is named honestly and grants 1000 credits per month', () 
   const plan = monthly[0];
   assert.equal(plan.id, MONTHLY_PACK_ID);
   assert.match(plan.name, /Atelier Max/, 'the plan must be sold under its honest name');
-  assert.equal(plan.credits, 1000);
+  assert.equal(plan.credits, 200);
   assert.match(plan.badge, /99 DH/);
 });
 

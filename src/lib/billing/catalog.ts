@@ -1,9 +1,10 @@
 /**
  * Single source of truth for what QatlIA sells and at what price.
  *
- * QatlIA settles in Moroccan dirham. Every displayed price, every Stripe line
- * item and every credit grant is derived from this table, so the customer can
- * never be shown one currency/amount and charged another.
+ * QatlIA settles in Moroccan dirham, except international card payments
+ * through Creem, which settle in US dollars (`priceUSD`). Every displayed price,
+ * every Stripe line item and every credit grant is derived from this table, so
+ * the customer can never be shown one currency/amount and charged another.
  *
  * Pure module: no Stripe SDK, no env vars, no network. Safe to import from a
  * client component, a route handler or a plain Node test.
@@ -32,6 +33,12 @@ export interface CreditPack {
    */
   displayCredits: string;
   priceMAD: number;
+  /**
+   * What an international card payment through Creem charges, in US dollars.
+   * Creem bills the price stored on its own product, so this must equal that
+   * product's price: it is what the card button shows before the redirect.
+   */
+  priceUSD: number;
   monthly: boolean;
   badge: string;
   highlight: boolean;
@@ -47,6 +54,7 @@ export const CREDIT_PACKS: Record<PackId, CreditPack> = {
     credits: 10,
     displayCredits: '10',
     priceMAD: 20,
+    priceUSD: 2.99,
     monthly: false,
     badge: '20 DH',
     highlight: false,
@@ -58,6 +66,7 @@ export const CREDIT_PACKS: Record<PackId, CreditPack> = {
     credits: 50,
     displayCredits: '50',
     priceMAD: 40,
+    priceUSD: 4.99,
     monthly: false,
     badge: 'Populaire (40 DH)',
     highlight: true,
@@ -69,6 +78,7 @@ export const CREDIT_PACKS: Record<PackId, CreditPack> = {
     credits: 100,
     displayCredits: '100',
     priceMAD: 70,
+    priceUSD: 7.99,
     monthly: false,
     badge: 'Économique (70 DH)',
     highlight: false,
@@ -76,18 +86,21 @@ export const CREDIT_PACKS: Record<PackId, CreditPack> = {
   atelier_max: {
     id: 'atelier_max',
     // Previously sold as "Abonnement Mensuel — Illimité". It never was: the
-    // implementation grants a finite 1000 credits a month through the same
-    // atomic consume_credit path as the one-off packs, and the 1001st analysis
-    // is refused. The plan is now named and priced for what it actually is.
+    // implementation grants a finite monthly allowance through the same atomic
+    // consume_credit path as the one-off packs, and the analysis past it is
+    // refused. The plan is now named and priced for what it actually is.
     name: 'Abonnement Atelier Max',
-    description: '1000 crédits par mois, pour les ateliers à très fort volume',
-    credits: 1000,
-    displayCredits: '1000',
+    // 200 a month (was 1000): at 1000 the plan cost ~8x less per credit than
+    // the Pro pack and made every one-off pack pointless.
+    description: '200 crédits par mois, pour les ateliers à très fort volume',
+    credits: 200,
+    displayCredits: '200',
     priceMAD: 99,
+    priceUSD: 9.99,
     monthly: true,
     badge: '99 DH / mois',
     highlight: false,
-    renewalNote: '1000 crédits ajoutés à votre solde chaque mois',
+    renewalNote: '200 crédits ajoutés à votre solde chaque mois',
   },
 };
 
@@ -131,6 +144,14 @@ export function toStripeMinorUnits(priceMAD: number): number {
     throw new Error(`INVALID_PRICE: ${String(priceMAD)}`);
   }
   return Math.round(priceMAD * STRIPE_MINOR_UNITS_PER_MAD);
+}
+
+/** International card payments (Creem) settle in US dollars. */
+export const CARD_CURRENCY = 'USD' as const;
+
+/** Customer-facing USD formatting ("$4.99"). */
+export function formatUSD(amount: number): string {
+  return `$${amount.toFixed(2)}`;
 }
 
 /** Customer-facing MAD formatting ("10 DH", "99,50 DH"). */
