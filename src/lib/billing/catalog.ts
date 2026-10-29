@@ -86,19 +86,21 @@ export const CREDIT_PACKS: Record<PackId, CreditPack> = {
   atelier_max: {
     id: 'atelier_max',
     // Previously sold as "Abonnement Mensuel — Illimité". It never was: the
-    // implementation grants a finite 1000 credits a month through the same
-    // atomic consume_credit path as the one-off packs, and the 1001st analysis
-    // is refused. The plan is now named and priced for what it actually is.
+    // implementation grants a finite monthly allowance through the same atomic
+    // consume_credit path as the one-off packs, and the analysis past it is
+    // refused. The plan is now named and priced for what it actually is.
     name: 'Abonnement Atelier Max',
-    description: '1000 crédits par mois, pour les ateliers à très fort volume',
-    credits: 1000,
-    displayCredits: '1000',
+    // 200 a month (was 1000): at 1000 the plan cost ~8x less per credit than
+    // the Pro pack and made every one-off pack pointless.
+    description: '200 crédits par mois, pour les ateliers à très fort volume',
+    credits: 200,
+    displayCredits: '200',
     priceMAD: 99,
     priceUSD: 9.99,
     monthly: true,
     badge: '99 DH / mois',
     highlight: false,
-    renewalNote: '1000 crédits ajoutés à votre solde chaque mois',
+    renewalNote: '200 crédits ajoutés à votre solde chaque mois',
   },
 };
 

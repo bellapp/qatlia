@@ -81,7 +81,7 @@ test('both events of a new subscription resolve to the same grant key', () => {
 
   assert.equal(fromSubscription.ok, true);
   assert.equal(fromSubscription.grant.packId, 'atelier_max');
-  assert.equal(fromSubscription.grant.credits, 1000);
+  assert.equal(fromSubscription.grant.credits, 200);
   assert.equal(fromCheckout.ok, true);
   // One transaction, one key: add_credits' unique index turns the second
   // delivery into a no-op instead of a second month of credits.
@@ -100,7 +100,7 @@ test('a renewal is keyed by its own transaction, so it credits again', () => {
   const second = resolveCreemGrant(renewal, PRODUCTS);
 
   assert.equal(second.ok, true);
-  assert.equal(second.grant.credits, 1000);
+  assert.equal(second.grant.credits, 200);
   assert.notEqual(second.grant.idempotencyKey, first.grant.idempotencyKey);
 });
 
