@@ -89,7 +89,7 @@ test.describe('Landing page localization', () => {
 
 async function openAtelier(page: Page) {
   await page.goto('/atelier', { waitUntil: 'domcontentloaded' });
-  await expect(page.getByRole('img', { name: 'QatlIA' })).toBeVisible({ timeout: 15000 });
+  await expect(page.getByRole('img', { name: 'QatliA' })).toBeVisible({ timeout: 15000 });
 }
 
 test.describe('Atelier localization', () => {

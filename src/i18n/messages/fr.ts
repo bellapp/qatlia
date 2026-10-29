@@ -606,8 +606,8 @@ export const fr = {
     needHelp: 'Besoin d’aide ? Écrivez-nous :',
     paymentHelp: 'Un souci avec un paiement ? Écrivez-nous avec votre numéro de commande :',
     /** Prefilled in WhatsApp / the email body so the first message is never blank. */
-    prefill: 'Bonjour QatlIA, ',
-    prefillOrder: 'Bonjour QatlIA, j’ai une question sur ma commande {orderNumber}.',
+    prefill: 'Bonjour QatliA, ',
+    prefillOrder: 'Bonjour QatliA, j’ai une question sur ma commande {orderNumber}.',
   },
   auth: {
     defaultTitle: 'Télécharger le rapport PDF',

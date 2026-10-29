@@ -547,8 +547,8 @@ export const ar: Catalog = {
     menuEntry: 'التواصل مع الدعم',
     needHelp: 'تحتاج مساعدة؟ راسلنا:',
     paymentHelp: 'مشكلة في الدفع؟ راسلنا مع رقم طلبك:',
-    prefill: 'السلام عليكم QatlIA، ',
-    prefillOrder: 'السلام عليكم QatlIA، عندي سؤال بخصوص طلبي رقم {orderNumber}.',
+    prefill: 'السلام عليكم QatliA، ',
+    prefillOrder: 'السلام عليكم QatliA، عندي سؤال بخصوص طلبي رقم {orderNumber}.',
   },
   auth: {
     defaultTitle: 'تحميل تقرير PDF',
