@@ -138,11 +138,14 @@ export default function CreditsPage() {
   const [headlineBefore, headlineAfter = ''] = t('creditsPage.headline', {
     count: CREDIT_PACKS.starter.credits,
   }).split('{price}');
-  const [secureBefore, secureAfter = ''] = (
-    cardProvider === 'creem'
-      ? t('creditsPage.securePaymentInternational', { currency: CARD_CURRENCY })
-      : t('creditsPage.securePayment', { currency: BILLING_CURRENCY })
-  ).split('{provider}');
+  // Without a card provider (none configured, or the server has not answered yet)
+  // only cash and bank transfer are offered, so no card brand may be named.
+  const [secureBefore, secureAfter = ''] = cardProvider
+    ? (cardProvider === 'creem'
+        ? t('creditsPage.securePaymentInternational', { currency: CARD_CURRENCY })
+        : t('creditsPage.securePayment', { currency: BILLING_CURRENCY })
+      ).split('{provider}')
+    : [];
 
   return (
     <div className="min-h-screen bg-studio-panel text-slate-700 dark:text-slate-200 font-sans antialiased p-6 md:p-10">
@@ -362,11 +365,15 @@ export default function CreditsPage() {
         <div className="p-4 rounded-2xl bg-studio-panel/40 border border-studio-border flex flex-wrap items-center justify-between text-xs text-slate-600 dark:text-slate-400 gap-4">
           <div className="flex items-center gap-2">
             <ShieldCheck className="w-4 h-4 text-sky-400" aria-hidden="true" />
-            <span>
-              {secureBefore}
-              <strong>{PAYMENT_PROVIDER_NAMES[cardProvider ?? 'stripe']}</strong>
-              {secureAfter}
-            </span>
+            {cardProvider ? (
+              <span>
+                {secureBefore}
+                <strong>{PAYMENT_PROVIDER_NAMES[cardProvider]}</strong>
+                {secureAfter}
+              </span>
+            ) : (
+              <span>{t('creditsPage.manualPaymentOnly', { currency: BILLING_CURRENCY })}</span>
+            )}
           </div>
           <span className="text-[11px] text-[#64748B]">{t('creditsPage.invoiceNote')}</span>
         </div>

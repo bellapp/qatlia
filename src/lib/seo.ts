@@ -1,9 +1,9 @@
 /**
  * What search engines and AI crawlers read about QatlIA: site URL, description and the
- * JSON-LD of the landing page.
+ * JSON-LD of the landing page, in French (/) and Arabic (/ar).
  *
  * Every fact is derived from the code that the product itself runs on (billing catalog,
- * signup policy, French FAQ copy), so the structured data can never claim a price, an
+ * signup policy, FAQ copy), so the structured data can never claim a price, an
  * allowance or an answer the visible page does not show.
  *
  * Pure module: no React, no env vars, no network.
@@ -12,6 +12,7 @@
 import { BILLING_CURRENCY, CREDIT_PACKS, PACK_IDS } from '@/lib/billing/catalog';
 import { ANALYSIS_WINDOW_HOURS, SIGNUP_FREE_CREDITS, VISION_CREDIT_COST } from '@/lib/billing/policy';
 import { fr } from '@/i18n/messages/fr';
+import { ar } from '@/i18n/messages/ar';
 import { SELECTABLE_LOCALES } from '@/i18n';
 import { SUPPORT_EMAIL, SUPPORT_PHONE_E164 } from '@/lib/support';
 
@@ -23,8 +24,24 @@ export const SITE_DESCRIPTION =
   `Photographiez votre fiche de débit : QatliA calcule le plan de découpe de vos panneaux et l’exporte en PDF. ` +
   `Pour menuisiers au Maroc, ${SIGNUP_FREE_CREDITS} crédits offerts.`;
 
+/** The Arabic landing page, served at /ar so search engines can index it. */
+export const AR_TITLE = 'QatliA | تحسين تقطيع الألواح للنجّارين';
+export const AR_DESCRIPTION =
+  `QatliA يحسب مخطط قطع الألواح من صورة ورقة التقطيع. تقرير PDF، تصدير DXF، ` +
+  `و${SIGNUP_FREE_CREDITS} رصيدًا مجانيًا عند التسجيل.`;
+
+/** Landing page URL per language. Each version lists both as hreflang alternates. */
+export const LANDING_PATHS = { fr: '/', ar: '/ar' } as const;
+export type LandingLocale = keyof typeof LANDING_PATHS;
+
+export const LANDING_ALTERNATES = {
+  fr: LANDING_PATHS.fr,
+  ar: LANDING_PATHS.ar,
+  'x-default': LANDING_PATHS.fr,
+};
+
 /** Public, indexable routes. Everything behind a login stays out of the sitemap. */
-export const PUBLIC_ROUTES = ['/', '/terms', '/privacy', '/refund'] as const;
+export const PUBLIC_ROUTES = [LANDING_PATHS.fr, LANDING_PATHS.ar, '/terms', '/privacy', '/refund'] as const;
 
 /** Routes crawlers have no reason to fetch: APIs, account and admin screens. */
 export const PRIVATE_ROUTES = ['/api/', '/admin', '/account', '/auth/', '/signup', '/history', '/credits/success'] as const;
@@ -41,7 +58,49 @@ export const SAME_AS = [
 
 const FAQ_KEYS = [1, 2, 3, 4, 5, 6] as const;
 
-export function landingJsonLd(): Record<string, unknown>[] {
+/** The FAQ is read from the same catalog the page renders, so the two cannot drift apart. */
+function faqJsonLd(locale: LandingLocale): Record<string, unknown> {
+  const catalog = locale === 'ar' ? ar : fr;
+  return {
+    '@context': 'https://schema.org',
+    '@type': 'FAQPage',
+    ...(locale === 'ar' ? { inLanguage: 'ar' } : {}),
+    mainEntity: FAQ_KEYS.map((i) => ({
+      '@type': 'Question',
+      name: catalog.faq2[`q${i}`],
+      acceptedAnswer: { '@type': 'Answer', text: catalog.faq2[`a${i}`] },
+    })),
+  };
+}
+
+/**
+ * JSON-LD of the Arabic landing page. Offers stay on the French page: their names and
+ * descriptions exist only in French, and an Arabic page should not mix the two.
+ */
+function arabicLandingJsonLd(organization: Record<string, unknown>): Record<string, unknown>[] {
+  const application = {
+    '@context': 'https://schema.org',
+    '@type': 'WebApplication',
+    '@id': `${SITE_URL}${LANDING_PATHS.ar}#app`,
+    name: SITE_NAME,
+    url: `${SITE_URL}${LANDING_PATHS.ar}`,
+    description: AR_DESCRIPTION,
+    applicationCategory: 'BusinessApplication',
+    operatingSystem: 'Web',
+    inLanguage: 'ar',
+    featureList: [
+      ar.features.scan.title,
+      ar.features.guillotine.title,
+      ar.features.report.title,
+      ar.features.waste.title,
+      ar.features.edges.title,
+    ],
+    publisher: { '@id': `${SITE_URL}/#organization` },
+  };
+  return [organization, application, faqJsonLd('ar')];
+}
+
+export function landingJsonLd(locale: LandingLocale = 'fr'): Record<string, unknown>[] {
   const organization = {
     '@context': 'https://schema.org',
     '@type': 'Organization',
@@ -59,6 +118,8 @@ export function landingJsonLd(): Record<string, unknown>[] {
       availableLanguage: [...SELECTABLE_LOCALES],
     },
   };
+
+  if (locale === 'ar') return arabicLandingJsonLd(organization);
 
   const offers = [
     {
@@ -104,15 +165,5 @@ export function landingJsonLd(): Record<string, unknown>[] {
     publisher: { '@id': `${SITE_URL}/#organization` },
   };
 
-  const faq = {
-    '@context': 'https://schema.org',
-    '@type': 'FAQPage',
-    mainEntity: FAQ_KEYS.map((i) => ({
-      '@type': 'Question',
-      name: fr.faq2[`q${i}`],
-      acceptedAnswer: { '@type': 'Answer', text: fr.faq2[`a${i}`] },
-    })),
-  };
-
-  return [organization, application, faq];
+  return [organization, application, faqJsonLd('fr')];
 }

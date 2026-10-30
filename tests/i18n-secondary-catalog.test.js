@@ -24,11 +24,11 @@ const PROJECT_ROOT = path.resolve(__dirname, '..');
 const SECONDARY_GROUPS = ['billing', 'creditsPage', 'creditsSuccess', 'historyPage', 'accountPage', 'loginPage'];
 
 const PAGES = {
-  credits: 'src/app/credits/page.tsx',
-  creditsSuccess: 'src/app/credits/success/page.tsx',
-  history: 'src/app/history/page.tsx',
-  account: 'src/app/account/page.tsx',
-  login: 'src/app/auth/login/page.tsx',
+  credits: 'src/app/(site)/credits/page.tsx',
+  creditsSuccess: 'src/app/(site)/credits/success/page.tsx',
+  history: 'src/app/(site)/history/page.tsx',
+  account: 'src/app/(site)/account/page.tsx',
+  login: 'src/app/(site)/auth/login/page.tsx',
 };
 
 /**

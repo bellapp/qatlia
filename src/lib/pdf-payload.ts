@@ -15,7 +15,7 @@ export interface PdfExportPayload {
   /**
    * The material actually selected for the active sheet, falling back to
    * 'mdf' exactly like the atelier's own selector does (see activeSheet.material
-   * in src/app/atelier/page.tsx). This must be top-level, matching
+   * in src/app/(site)/atelier/page.tsx). This must be top-level, matching
    * ExportSchema's top-level `material` field (see pdf-schema.ts) and what
    * route.ts destructures and renders (`material.toUpperCase()`) — nesting it
    * under `sheet` instead, as an earlier version of this payload did, meant

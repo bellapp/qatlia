@@ -162,7 +162,7 @@ test('the retired "unlimited" id resolves to nothing', () => {
 });
 
 test('the credits page shows the real credit count and no subscription copy', () => {
-  const source = read('src/app/credits/page.tsx');
+  const source = read('src/app/(site)/credits/page.tsx');
 
   // "exports gratuits et illimités" is a true statement about free features and
   // is allowed; a *credit allowance* of "Illimité" is not.
@@ -578,27 +578,27 @@ test('unhandled Stripe events resolve to no grant instead of throwing', () => {
 // ---------------------------------------------------------------------------
 
 test('the credits page makes no unsupported CMI/CashPlus payment claim', () => {
-  const source = read('src/app/credits/page.tsx');
+  const source = read('src/app/(site)/credits/page.tsx');
 
   assert.ok(!/CMI/.test(source), 'CMI is not an implemented payment method');
   assert.ok(!/CashPlus/i.test(source), 'CashPlus is not an implemented payment method');
 });
 
 test('the credits page reads the shared catalog and never hardcodes a credit balance', () => {
-  const source = read('src/app/credits/page.tsx');
+  const source = read('src/app/(site)/credits/page.tsx');
 
   assert.ok(/@\/lib\/billing\/catalog/.test(source), 'pack prices must come from the shared catalog');
   assert.ok(!/Solde actuel\s*:\s*5/.test(source), 'the balance must be the real user balance, not a hardcoded 5');
 });
 
 test('no client code calls /api/credits/consume: exports are free', () => {
-  for (const file of ['src/app/atelier/page.tsx', 'src/app/credits/page.tsx', 'src/app/account/page.tsx']) {
+  for (const file of ['src/app/(site)/atelier/page.tsx', 'src/app/(site)/credits/page.tsx', 'src/app/(site)/account/page.tsx']) {
     assert.ok(!/api\/credits\/consume/.test(read(file)), `${file} must not debit credits`);
   }
 });
 
 test('the atelier does not fabricate local credit transactions', () => {
-  const source = read('src/app/atelier/page.tsx');
+  const source = read('src/app/(site)/atelier/page.tsx');
 
   assert.ok(!/qatlia_credit_tx_v1/.test(source), 'the client must not invent credit ledger entries');
 });

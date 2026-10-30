@@ -696,6 +696,7 @@ export const fr = {
     redirecting: 'Redirection vers le paiement…',
     // Rendered around {provider} so the payment provider stays bold.
     securePayment: 'Paiement sécurisé par {provider} — cartes Visa / Mastercard, débitées en dirhams ({currency})',
+    manualPaymentOnly: 'Paiement par virement bancaire ou en espèces (CashPlus / Wafacash), en dirhams ({currency})',
     securePaymentInternational:
       'Paiement sécurisé par {provider} — cartes bancaires internationales, Apple Pay et Google Pay, débitées en dollars ({currency})',
     // Shown under the card button: the amount the card payment really charges.

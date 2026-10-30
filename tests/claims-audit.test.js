@@ -256,13 +256,20 @@ test('the landing page links to no methodology route that does not exist', () =>
   const source = read('src/app/landing-page.tsx');
   const hrefs = [...source.matchAll(/href="(\/[^"]*)"/g)].map((match) => match[1]);
   const appDir = path.resolve('src/app');
+  // Route groups such as `(site)` organise src/app without appearing in the URL.
+  const routeRoots = [
+    appDir,
+    ...fs.readdirSync(appDir, { withFileTypes: true })
+      .filter((entry) => entry.isDirectory() && /^\(.+\)$/.test(entry.name))
+      .map((entry) => path.join(appDir, entry.name)),
+  ];
 
   for (const href of hrefs) {
     const segments = href.split('/').filter(Boolean);
-    const routeFile = path.join(appDir, ...segments, 'page.tsx');
+    const candidates = routeRoots.map((root) => path.join(root, ...segments, 'page.tsx'));
     assert.ok(
-      fs.existsSync(routeFile),
-      `Landing page links to ${href}, but ${path.relative(path.resolve('.'), routeFile)} does not exist`
+      candidates.some((file) => fs.existsSync(file)),
+      `Landing page links to ${href}, but no page.tsx exists for it under src/app or a route group`
     );
   }
   assert.equal(source.includes('href="/docs'), false, 'Markdown docs are not a web route; do not link to them from the UI');

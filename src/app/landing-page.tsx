@@ -77,7 +77,8 @@ function PlanLine({ children, included = true }: { children: React.ReactNode; in
   );
 }
 
-export default function LandingPage() {
+/** `homeHref`: where the logo leads — the Arabic page links back to itself, not to /. */
+export default function LandingPage({ homeHref = '/' }: { homeHref?: string }) {
   const { t } = useLocale();
 
   return (
@@ -87,7 +88,7 @@ export default function LandingPage() {
           from `md` up, so the mobile two-row layout is untouched. */}
       <header className="sticky top-0 z-50 border-b border-studio-border/50 bg-studio-canvas/70 backdrop-blur-2xl">
         <div className="max-w-6xl mx-auto flex flex-wrap items-center gap-x-2 gap-y-1.5 px-3 sm:px-10 py-2.5 sm:py-0 sm:h-16">
-          <Link href="/" className="flex items-center gap-2 shrink-0 mr-auto md:mr-4" aria-label={t('nav.brandAria')}>
+          <Link href={homeHref} className="flex items-center gap-2 shrink-0 mr-auto md:mr-4" aria-label={t('nav.brandAria')}>
             <div className="text-brand-400"><QatlIALogo size="md" /></div>
             <span className="font-display font-extrabold text-lg tracking-tight text-slate-900 dark:text-white">QatliA</span>
           </Link>

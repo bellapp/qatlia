@@ -464,7 +464,7 @@ test('signing up with an address that already has an account is recognised, not 
   assert.equal(isExistingAccount(undefined), false);
   assert.equal(isExistingAccount({ id: 'u1' }), false);
 
-  for (const file of ['src/components/AuthModal.tsx', 'src/app/auth/login/page.tsx']) {
+  for (const file of ['src/components/AuthModal.tsx', 'src/app/(site)/auth/login/page.tsx']) {
     const source = fs.readFileSync(path.join(PROJECT_ROOT, file), 'utf8');
     assert.match(
       source,

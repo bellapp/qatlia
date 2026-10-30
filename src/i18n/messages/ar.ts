@@ -56,8 +56,8 @@ export const ar: Catalog = {
       desc: 'صوّر دفتر القياسات، ويستخرج الذكاء الاصطناعي الأبعاد تلقائياً.',
     },
     guillotine: {
-      title: 'قطع المقصلة',
-      desc: 'خوارزمية قطع مستقيم من طرف إلى طرف، وهي المعيار في ورش النجارة.',
+      title: 'القطع بالمنشار القاطع',
+      desc: 'خوارزمية قطع من طرف إلى طرف بالمنشار القاطع، وهي المعيار في ورش النجارة.',
     },
     report: {
       title: 'تقرير PDF احترافي',
@@ -415,7 +415,7 @@ export const ar: Catalog = {
       rightShort: 'يم',
       topShort: 'أع',
       bottomShort: 'أس',
-      title: 'حرف {side}',
+      title: 'حافة {side}',
       pickerAria: 'حواف {name} ({count} نشطة)',
       pickerTitle: 'حواف {name}',
     },
@@ -428,7 +428,7 @@ export const ar: Catalog = {
       black: 'أسود',
       walnut: 'جوز',
       price: ' ({price} MAD/m)',
-      selectAria: 'لون شريط الحرف',
+      selectAria: 'لون شريط الحافة',
     },
     quickAdd: {
       heightLabel: 'الارتفاع ({unit})',
@@ -462,9 +462,9 @@ export const ar: Catalog = {
       scaleMax: '10 mm',
     },
     priority: {
-      tooltip: 'خوارزمية التوزيع: المقصلة = قطع مستقيمة من طرف إلى طرف (معيار الورشة). أقل هدر = أفضل استغلال للمساحة.',
+      tooltip: 'خوارزمية التوزيع: المنشار القاطع = قطعات من طرف إلى طرف (معيار الورشة). أقل هدر = أفضل استغلال للمساحة.',
       aria: 'هدف التحسين',
-      linearGuillotine: 'قطع مقصلي مستقيم (الورشة)',
+      linearGuillotine: 'المنشار القاطع (الورشة)',
       minWaste: 'تقليل الهدر (%)',
       minSheets: 'تقليل عدد الألواح',
       balanced: 'متوازن (سهولة القطع)',
@@ -620,6 +620,7 @@ export const ar: Catalog = {
     chooseAria: 'اختيار {pack}',
     redirecting: 'إعادة التوجيه إلى الدفع…',
     securePayment: 'دفع مؤمَّن عبر {provider} — بطاقات Visa / Mastercard، ويُخصم بالدرهم ({currency})',
+    manualPaymentOnly: 'الدفع عبر تحويل بنكي أو نقداً (كاش بلوس / وفاكاش)، بالدرهم ({currency})',
     securePaymentInternational:
       'دفع مؤمَّن عبر {provider} — بطاقات بنكية دولية وApple Pay وGoogle Pay، ويُخصم بالدولار ({currency})',
     cardPrice: 'بالبطاقة: {price}',
