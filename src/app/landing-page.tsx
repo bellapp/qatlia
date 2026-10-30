@@ -7,7 +7,8 @@ import { QatlIALogo } from '@/components/QatlIALogo';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { LocaleSwitcher, useLocale } from '@/components/LocaleProvider';
 import { SELECTABLE_LOCALES } from '@/i18n';
-import { BILLING_CURRENCY, CREDIT_PACKS } from '@/lib/billing/catalog';
+import { BILLING_CURRENCY, CREDIT_PACKS, PACK_IDS } from '@/lib/billing/catalog';
+import { creditPackLabelKeys } from '@/i18n/domain';
 import { SIGNUP_FREE_CREDITS } from '@/lib/billing/policy';
 import { SUPPORT_EMAIL, supportMailto, supportWhatsAppUrl } from '@/lib/support';
 
@@ -16,11 +17,9 @@ const FREE_VISION_CREDITS = SIGNUP_FREE_CREDITS;
 
 /**
  * Every figure printed on this page is read from the code that enforces it:
- * the sign-up grant above, the billing catalog below, and the list of shipped
- * locales. Nothing here is a marketing round number.
+ * the sign-up grant above, the billing catalog (`CREDIT_PACKS`), and the list
+ * of shipped locales. Nothing here is a marketing round number.
  */
-const ARTISAN_PACK = CREDIT_PACKS.standard;
-const PRO_PACK = CREDIT_PACKS.pro;
 const MAX_PACK = CREDIT_PACKS.atelier_max;
 
 const STATS = ['waste', 'surface', 'time', 'credits'] as const;
@@ -298,73 +297,84 @@ export default function LandingPage({ homeHref = '/' }: { homeHref?: string }) {
           the checkout does not charge. No "priority exports" tier: every export
           is free on every plan. */}
       <section id="tarifs" className="bg-[#F8FAFC] dark:bg-[#0B1424] border-y border-studio-border/60 px-6 sm:px-10 py-20 sm:py-24">
-        <div className="max-w-5xl mx-auto">
+        <div className="max-w-6xl mx-auto">
           <SectionHeading eyebrow={t('pricing.eyebrow')} title={t('pricing.title', { count: FREE_VISION_CREDITS })} />
 
-          <div className="grid md:grid-cols-2 gap-6 sm:gap-8 max-w-4xl mx-auto">
-            {/* Free plan */}
-            <div className="flex flex-col p-8 sm:p-10 rounded-2xl bg-white dark:bg-studio-panel border border-studio-border shadow-sm">
+          {/* Free plan — the sign-up grant, as a band above the paid packs. */}
+          <div className="flex flex-col md:flex-row md:items-center gap-6 p-6 sm:p-8 rounded-2xl bg-white dark:bg-studio-panel border border-studio-border shadow-sm">
+            <div className="md:w-56 shrink-0">
               <h3 className="text-2xl font-black tracking-[-0.01em] text-slate-900 dark:text-white">{t('pricing.freeName')}</h3>
-              <p className="mt-2 text-sm text-slate-600 dark:text-slate-400">{t('pricing.freeDesc', { count: FREE_VISION_CREDITS })}</p>
-              <p className="mt-8 font-mono text-[40px] leading-none font-bold text-slate-900 dark:text-white" dir="ltr">
-                0 <span className="text-xl text-slate-500 dark:text-slate-400">{BILLING_CURRENCY}</span>
+              <p className="mt-1.5 text-sm text-slate-600 dark:text-slate-400">{t('pricing.freeDesc', { count: FREE_VISION_CREDITS })}</p>
+              <p className="mt-4 font-mono text-[32px] leading-none font-bold text-slate-900 dark:text-white" dir="ltr">
+                0 <span className="text-lg text-slate-500 dark:text-slate-400">{BILLING_CURRENCY}</span>
               </p>
-              <ul className="mt-8 mb-10 space-y-4 flex-grow text-sm">
-                <PlanLine>{t('pricing.freeOptimize')}</PlanLine>
-                <PlanLine>{t('pricing.freeExports')}</PlanLine>
-                {/* The free tier DOES include the sign-up credits (audit fix:
-                    'Scan IA désactivé' contradicted the hero offer). The figure
-                    comes from SIGNUP_FREE_CREDITS, never from the locale copy. */}
-                <PlanLine>{t('pricing.freeNoScan', { count: FREE_VISION_CREDITS })}</PlanLine>
-                <PlanLine>{t('pricing.freeCredits', { count: FREE_VISION_CREDITS })}</PlanLine>
-              </ul>
-              <Link
-                href="/signup"
-                className="mt-auto w-full text-center py-3 rounded-xl border border-studio-border hover:border-studio-border-hover text-slate-800 dark:text-slate-200 font-bold text-sm transition-colors"
-              >
-                {t('pricing.freeCta')}
-              </Link>
             </div>
-
-            {/* Artisan pack — the catalog's highlighted pack */}
-            <div className="relative flex flex-col p-8 sm:p-10 rounded-2xl bg-white dark:bg-studio-panel border-2 border-brand-400 shadow-xl shadow-brand-500/10">
-              <span className="absolute -top-3 end-8 px-3 py-1 rounded-full bg-brand-400 text-slate-950 font-mono text-[10px] font-bold uppercase tracking-[0.12em]">
-                {t('pricing.popular')}
-              </span>
-              <h3 className="text-2xl font-black tracking-[-0.01em] text-slate-900 dark:text-white">{t('billing.packs.standard.name')}</h3>
-              <p className="mt-2 text-sm text-slate-600 dark:text-slate-400">{t('billing.packs.standard.description')}</p>
-              <p className="mt-8 font-mono text-[40px] leading-none font-bold text-slate-900 dark:text-white" dir="ltr">
-                {ARTISAN_PACK.priceMAD} <span className="text-xl text-slate-500 dark:text-slate-400">{BILLING_CURRENCY}</span>
-              </p>
-              <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">
-                {t('pricing.packSuffix', { count: ARTISAN_PACK.displayCredits })}
-              </p>
-              <ul className="mt-8 mb-10 space-y-4 flex-grow text-sm">
-                <PlanLine>{t('pricing.packAllFree')}</PlanLine>
-                <PlanLine>{t('pricing.packScan')}</PlanLine>
-              </ul>
-              <Link
-                href="/credits"
-                className="mt-auto w-full text-center py-3 rounded-xl bg-brand-400 hover:bg-brand-500 text-slate-950 font-black text-sm transition-colors shadow-lg shadow-brand-500/20"
-              >
-                {t('pricing.packCta')}
-              </Link>
-            </div>
+            <ul className="flex-grow grid sm:grid-cols-2 gap-x-6 gap-y-3 text-sm">
+              <PlanLine>{t('pricing.freeOptimize')}</PlanLine>
+              <PlanLine>{t('pricing.freeExports')}</PlanLine>
+              {/* The free tier DOES include the sign-up credits (audit fix:
+                  'Scan IA désactivé' contradicted the hero offer). The figure
+                  comes from SIGNUP_FREE_CREDITS, never from the locale copy. */}
+              <PlanLine>{t('pricing.freeNoScan', { count: FREE_VISION_CREDITS })}</PlanLine>
+              <PlanLine>{t('pricing.freeCredits', { count: FREE_VISION_CREDITS })}</PlanLine>
+            </ul>
+            <Link
+              href="/signup"
+              className="md:w-56 shrink-0 text-center py-3 rounded-xl border border-studio-border hover:border-studio-border-hover text-slate-800 dark:text-slate-200 font-bold text-sm transition-colors"
+            >
+              {t('pricing.freeCta')}
+            </Link>
           </div>
 
-          <p className="mt-8 text-center text-xs text-slate-600 dark:text-slate-400 leading-relaxed">
-            {t('pricing.more', {
-              proName: t('billing.packs.pro.name'),
-              proPrice: PRO_PACK.priceMAD,
-              proCredits: PRO_PACK.displayCredits,
-              maxName: t('billing.packs.atelierMax.name'),
-              maxPrice: MAX_PACK.priceMAD,
-              maxCredits: MAX_PACK.displayCredits,
-            })}{' '}
-            <Link href="/credits" className="font-bold text-brand-500 dark:text-brand-400 hover:underline">
-              {t('pricing.moreLink')}
-            </Link>
-          </p>
+          {/* Every pack sold, in catalog order; the highlighted one is the
+              catalog's `highlight`, not a choice made here. */}
+          <div className="mt-6 grid sm:grid-cols-2 lg:grid-cols-4 gap-6">
+            {PACK_IDS.map((id) => {
+              const pack = CREDIT_PACKS[id];
+              const labels = creditPackLabelKeys(id);
+              return (
+                <div
+                  key={id}
+                  className={`relative flex flex-col p-6 rounded-2xl bg-white dark:bg-studio-panel ${
+                    pack.highlight
+                      ? 'border-2 border-brand-400 shadow-xl shadow-brand-500/10'
+                      : 'border border-studio-border shadow-sm'
+                  }`}
+                >
+                  {pack.highlight && (
+                    <span className="absolute -top-3 end-6 px-3 py-1 rounded-full bg-brand-400 text-slate-950 font-mono text-[10px] font-bold uppercase tracking-[0.12em]">
+                      {t('pricing.popular')}
+                    </span>
+                  )}
+                  <h3 className="text-lg font-black tracking-[-0.01em] text-slate-900 dark:text-white">{t(labels.name)}</h3>
+                  <p className="mt-1.5 text-sm text-slate-600 dark:text-slate-400">{t(labels.description, { count: pack.credits })}</p>
+                  <p className="mt-6 font-mono text-[36px] leading-none font-bold text-slate-900 dark:text-white" dir="ltr">
+                    {pack.priceMAD} <span className="text-lg text-slate-500 dark:text-slate-400">{BILLING_CURRENCY}</span>
+                    {pack.monthly && (
+                      <span className="text-sm font-sans text-slate-500 dark:text-slate-400"> {t('creditsPage.perMonth')}</span>
+                    )}
+                  </p>
+                  <p className="mt-2 text-sm text-slate-600 dark:text-slate-400">
+                    {t('pricing.packSuffix', { count: pack.displayCredits })}
+                  </p>
+                  <ul className="mt-6 mb-8 space-y-3 flex-grow text-sm">
+                    <PlanLine>{t('pricing.packAllFree')}</PlanLine>
+                    <PlanLine>{t('pricing.packScan')}</PlanLine>
+                  </ul>
+                  <Link
+                    href="/credits"
+                    className={`mt-auto w-full text-center py-3 rounded-xl font-black text-sm transition-colors ${
+                      pack.highlight
+                        ? 'bg-brand-400 hover:bg-brand-500 text-slate-950 shadow-lg shadow-brand-500/20'
+                        : 'border border-studio-border hover:border-brand-400 text-slate-800 dark:text-slate-200'
+                    }`}
+                  >
+                    {t('pricing.packCta')}
+                  </Link>
+                </div>
+              );
+            })}
+          </div>
         </div>
       </section>
 
