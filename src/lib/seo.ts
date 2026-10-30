@@ -10,7 +10,7 @@
  */
 
 import { BILLING_CURRENCY, CREDIT_PACKS, PACK_IDS } from '@/lib/billing/catalog';
-import { OPTIMIZE_CREDIT_COST, SIGNUP_FREE_CREDITS, VISION_CREDIT_COST } from '@/lib/billing/policy';
+import { ANALYSIS_WINDOW_HOURS, SIGNUP_FREE_CREDITS, VISION_CREDIT_COST } from '@/lib/billing/policy';
 import { fr } from '@/i18n/messages/fr';
 import { ar } from '@/i18n/messages/ar';
 import { SELECTABLE_LOCALES } from '@/i18n';
@@ -133,15 +133,11 @@ export function landingJsonLd(locale: LandingLocale = 'fr'): Record<string, unkn
       return {
         '@type': 'Offer',
         name: pack.name,
-        // Stated in credits, the unit the ledger grants. The marketing description counts
-        // « analyses », but one photo analysis costs VISION_CREDIT_COST credits.
-        description: `${pack.credits} crédits${pack.monthly ? ' par mois' : ''} — analyse photo ${VISION_CREDIT_COST} crédits, optimisation ${OPTIMIZE_CREDIT_COST} crédit, exports gratuits`,
+        // Stated in credits, the unit the ledger grants: one credit is one
+        // complete analysis (scan + re-optimizations for ANALYSIS_WINDOW_HOURS).
+        description: `${pack.credits} crédits — ${VISION_CREDIT_COST} crédit par analyse complète, recalculs gratuits pendant ${ANALYSIS_WINDOW_HOURS} h, exports gratuits`,
         price: pack.priceMAD,
         priceCurrency: BILLING_CURRENCY,
-        ...(pack.monthly
-          ? { priceSpecification: { '@type': 'UnitPriceSpecification', price: pack.priceMAD,
-              priceCurrency: BILLING_CURRENCY, unitText: 'mois' } }
-          : {}),
       };
     }),
   ];

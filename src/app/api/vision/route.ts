@@ -4,6 +4,7 @@ import { createClient } from '@/lib/supabase/server';
 import { createClient as createAdminClient, type SupabaseClient } from '@supabase/supabase-js';
 import { getSupabaseAdminConfig, isPlaceholder, isProductionEnv } from '@/lib/billing/config';
 import { VISION_CREDIT_COST } from '@/lib/billing/policy';
+import { analysisPassSecret, issueAnalysisPass } from '@/lib/billing/analysis-pass';
 import { createRateLimiter, VISION_RATE_LIMIT } from '@/lib/rate-limit';
 
 const MAX_IMAGE_DATA_URL_LENGTH = 8 * 1024 * 1024;
@@ -404,9 +405,14 @@ Règles impératives :
       );
     }
 
+    // The scan opens the analysis: re-optimizing this list is free for the
+    // window (see src/lib/billing/analysis-pass.ts).
+    const analysisPass = issueAnalysisPass(analysisPassSecret(), user.id);
+
     return NextResponse.json({
       success: true,
       extractionId: 'ext_' + Date.now(),
+      ...(analysisPass ? { analysisPass } : {}),
       pieces,
       creditsCharged: VISION_CREDIT_COST,
       ...(outcome.balance !== null ? { creditsRemaining: outcome.balance } : {}),

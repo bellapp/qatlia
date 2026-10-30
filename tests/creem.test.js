@@ -9,8 +9,8 @@ const { stubModule } = require('./helpers/stub-module');
 // Creem (Merchant of Record) payments:
 //   * the webhook only grants for a verified signature over the raw body;
 //   * the pack comes from the signed product id, the credits from the catalog;
-//   * a subscription's first period arrives as subscription.paid AND
-//     checkout.completed for one transaction, and must credit exactly once.
+//   * only one-off packs are sold: a subscription event never credits (the
+//     subscription fixtures stay to prove it).
 //
 // The fixtures are real test-mode payloads captured with `creem listen`.
 
@@ -69,39 +69,21 @@ test('a paid one-time checkout grants the catalog credits keyed by its transacti
   assert.equal(resolved.ok, true);
   assert.equal(resolved.grant.userId, UUID);
   assert.equal(resolved.grant.packId, 'starter');
-  assert.equal(resolved.grant.credits, 10);
+  assert.equal(resolved.grant.credits, 30);
   assert.equal(resolved.grant.idempotencyKey, `creem:${ONE_TIME.object.order.transaction}`);
 });
 
-test('both events of a new subscription resolve to the same grant key', () => {
+test('subscription events never credit: no pack renews any more', () => {
   const { resolveCreemGrant } = loadTsModule('src/lib/billing/creem.ts');
 
-  const fromSubscription = resolveCreemGrant(SUB_PAID, PRODUCTS);
-  const fromCheckout = resolveCreemGrant(SUB_CHECKOUT, PRODUCTS);
+  // A paid recurring checkout means a store product was set up as a
+  // subscription by mistake: surfaced (retryable), never credited.
+  assert.deepEqual(resolveCreemGrant(SUB_CHECKOUT, PRODUCTS), { ok: false, reason: 'SUBSCRIPTION_NOT_SOLD', retryable: true });
 
-  assert.equal(fromSubscription.ok, true);
-  assert.equal(fromSubscription.grant.packId, 'atelier_max');
-  assert.equal(fromSubscription.grant.credits, 200);
-  assert.equal(fromCheckout.ok, true);
-  // One transaction, one key: add_credits' unique index turns the second
-  // delivery into a no-op instead of a second month of credits.
-  assert.equal(fromCheckout.grant.idempotencyKey, fromSubscription.grant.idempotencyKey);
-  assert.equal(fromSubscription.grant.idempotencyKey, `creem:${SUB_PAID.object.last_transaction_id}`);
-});
-
-test('a renewal is keyed by its own transaction, so it credits again', () => {
-  const { resolveCreemGrant } = loadTsModule('src/lib/billing/creem.ts');
-  const renewal = structuredClone(SUB_PAID);
-  renewal.id = 'evt_renewal';
-  renewal.object.last_transaction_id = 'tran_next_month';
-  renewal.object.last_transaction = { ...renewal.object.last_transaction, id: 'tran_next_month' };
-
-  const first = resolveCreemGrant(SUB_PAID, PRODUCTS);
-  const second = resolveCreemGrant(renewal, PRODUCTS);
-
-  assert.equal(second.ok, true);
-  assert.equal(second.grant.credits, 200);
-  assert.notEqual(second.grant.idempotencyKey, first.grant.idempotencyKey);
+  const paid = resolveCreemGrant(SUB_PAID, PRODUCTS);
+  assert.equal(paid.ok, false);
+  assert.match(paid.reason, /UNHANDLED_EVENT/);
+  assert.equal(paid.retryable, false);
 });
 
 test('metadata can neither inflate the credits nor relabel the product bought', () => {
@@ -111,7 +93,7 @@ test('metadata can neither inflate the credits nor relabel the product bought', 
   inflated.object.metadata.credits = '999999';
   const resolvedInflated = resolveCreemGrant(inflated, PRODUCTS);
   assert.equal(resolvedInflated.ok, true);
-  assert.equal(resolvedInflated.grant.credits, 10, 'credits come from the catalog, not metadata');
+  assert.equal(resolvedInflated.grant.credits, 30, 'credits come from the catalog, not metadata');
 
   const relabelled = structuredClone(ONE_TIME);
   relabelled.object.metadata.packId = 'atelier_max';
@@ -158,7 +140,7 @@ test('the Creem checkout body bills the session user and lets Creem own the succ
 
   assert.equal(body.product_id, PRODUCTS.pro);
   assert.equal(body.success_url, 'https://qatlia.example/credits/success');
-  assert.deepEqual(body.metadata, { userId: UUID, packId: 'pro', credits: '100' });
+  assert.deepEqual(body.metadata, { userId: UUID, packId: 'pro', credits: '200' });
   assert.deepEqual(body.customer, { email: 'artisan@example.com' });
   assert.throws(() => buildCreemCheckoutBody({ pack: CREDIT_PACKS.pro, productId: PRODUCTS.pro, userId: 'anonymous', origin: 'https://qatlia.example', requestId: 'r' }), /INVALID_USER_ID/);
 });
@@ -187,9 +169,13 @@ test('every pack advertises the USD price its Creem product charges', () => {
   for (const id of PACK_IDS) {
     assert.ok(CREDIT_PACKS[id].priceUSD > 0, `${id} needs a USD price`);
   }
-  // Creem amounts are in cents; the captured products are the test store's.
-  assert.equal(ONE_TIME.object.product.price, Math.round(CREDIT_PACKS.starter.priceUSD * 100));
-  assert.equal(SUB_PAID.object.product.price, Math.round(CREDIT_PACKS.atelier_max.priceUSD * 100));
+  // Creem bills the price stored on its own product, so the live products must
+  // be created at exactly these amounts. The fixtures were captured before
+  // pricing v3 and their product prices are no longer the catalog's.
+  assert.deepEqual(
+    PACK_IDS.map((id) => CREDIT_PACKS[id].priceUSD),
+    [4.99, 9.99, 19.99, 29.99]
+  );
 });
 
 // ---------------------------------------------------------------------------
@@ -356,31 +342,23 @@ test('a verified one-time Creem purchase grants its credits through add_credits'
     const call = state.rpcCalls[0];
     assert.equal(call.name, 'add_credits');
     assert.equal(call.args.p_user_id, UUID);
-    assert.equal(call.args.p_credits, 10);
+    assert.equal(call.args.p_credits, 30);
     assert.equal(call.args.p_pack_id, 'starter');
     assert.equal(call.args.p_stripe_payment_id, `creem:${ONE_TIME.object.order.transaction}`);
   });
 });
 
-test('a new subscription delivered as two events is offered to the ledger under one key', async () => {
+test('subscription deliveries never reach the ledger', async () => {
   resetState();
-  // The real unique index answers the second insert as a duplicate.
-  const seen = new Set();
-  state.rpcResult = (name, args) => {
-    const duplicate = seen.has(args.p_stripe_payment_id);
-    seen.add(args.p_stripe_payment_id);
-    return { data: { success: true, duplicate }, error: null };
-  };
 
   await withEnv(CONFIGURED, async () => {
     const { POST } = loadTsModule('src/app/api/credits/creem-webhook/route.ts');
-    const first = await (await POST(webhookRequest(SUB_PAID))).json();
-    const second = await (await POST(webhookRequest(SUB_CHECKOUT))).json();
+    const renewal = await POST(webhookRequest(SUB_PAID));
+    const recurringCheckout = await POST(webhookRequest(SUB_CHECKOUT));
 
-    assert.equal(state.rpcCalls.length, 2);
-    assert.equal(state.rpcCalls[0].args.p_stripe_payment_id, state.rpcCalls[1].args.p_stripe_payment_id);
-    assert.equal(first.duplicate, false);
-    assert.equal(second.duplicate, true, 'the first month is credited once');
+    assert.equal(renewal.status, 200, 'not ours to credit, so not retried forever');
+    assert.equal(recurringCheckout.status, 500, 'money taken for a product we do not sell must be surfaced');
+    assert.equal(state.rpcCalls.length, 0);
   });
 });
 

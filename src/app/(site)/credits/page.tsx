@@ -260,9 +260,7 @@ export default function CreditsPage() {
             const packName = t(labels.name);
             // The allowance stays bold, so the line is rendered in two parts
             // around its {count} rather than interpolated into a flat string.
-            const [analysesBefore, analysesAfter = ''] = t(
-              p.monthly ? 'creditsPage.packAnalysesMonthly' : 'creditsPage.packAnalyses'
-            ).split('{count}');
+            const [analysesBefore, analysesAfter = ''] = t('creditsPage.packAnalyses').split('{count}');
             // The highlighted card sits on navy in both themes, so its text is
             // always light; the others follow the theme.
             const tone = p.highlight
@@ -292,7 +290,7 @@ export default function CreditsPage() {
                       {n(p.priceMAD)}
                     </span>
                     <span className={`text-sm font-bold ${tone.muted}`}>
-                      {t('creditsPage.currency')} {p.monthly ? t('creditsPage.perMonth') : ''}
+                      {t('creditsPage.currency')}
                     </span>
                   </div>
                   <p className={`text-xs leading-relaxed mb-6 ${tone.muted}`}>
@@ -308,12 +306,6 @@ export default function CreditsPage() {
                         {analysesAfter}
                       </span>
                     </div>
-                    {labels.renewalNote && p.renewalNote && (
-                      <div className={`flex items-center gap-2 ${tone.muted}`}>
-                        <Check className={`w-4 h-4 shrink-0 ${p.highlight ? 'text-emerald-400' : 'text-emerald-600 dark:text-emerald-400'}`} aria-hidden="true" />
-                        <span>{t(labels.renewalNote, { count: p.credits })}</span>
-                      </div>
-                    )}
                     <div className={`flex items-center gap-2 ${tone.muted}`}>
                       <Check className={`w-4 h-4 shrink-0 ${p.highlight ? 'text-emerald-400' : 'text-emerald-600 dark:text-emerald-400'}`} aria-hidden="true" />
                       <span>{t('creditsPage.freePlans')}</span>
@@ -351,7 +343,6 @@ export default function CreditsPage() {
                 {cardProvider === 'creem' && (
                   <p className={`mt-1.5 text-center text-[11px] font-semibold ${tone.muted}`}>
                     <span dir="ltr">{t('creditsPage.cardPrice', { price: formatUSD(p.priceUSD) })}</span>
-                    {p.monthly ? ` ${t('creditsPage.perMonth')}` : ''}
                   </p>
                 )}
                 <button

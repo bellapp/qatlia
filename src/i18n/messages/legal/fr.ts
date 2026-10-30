@@ -50,9 +50,8 @@ export const legalFr = {
       s4: {
         title: 'Les crédits',
         body:
-          'Certaines actions consomment des crédits :\n' +
-          '- une analyse de photo réussie : {visionCost} crédits ;\n' +
-          '- un calcul d’optimisation : {optimizeCost} crédit ;\n' +
+          'Les crédits paient les analyses :\n' +
+          '- une analyse complète coûte {visionCost} crédit. Elle comprend le scan de la photo (ou, pour une liste saisie à la main, son premier calcul d’optimisation) et tous les recalculs de la liste pendant {windowHours} heures ;\n' +
           '- les exports et les devis sont gratuits.\n\n' +
           'Chaque nouveau compte reçoit {freeCredits} crédits offerts. Une analyse qui échoue n’est pas décomptée.\n\n' +
           'Les crédits restent sur votre solde tant que votre compte est ouvert. Ils n’ont pas de valeur monétaire : ils ne sont ni échangeables contre de l’argent (hors remboursement prévu par notre politique), ni transférables à un autre compte.',
@@ -66,10 +65,9 @@ export const legalFr = {
           'Nous ne voyons ni ne conservons jamais vos données de carte bancaire.',
       },
       s6: {
-        title: 'Abonnement Atelier Max',
+        title: 'Achats uniques, sans abonnement',
         body:
-          'Le pack Atelier Max est un abonnement mensuel : il est renouvelé et facturé automatiquement chaque mois, et ses crédits sont ajoutés à votre solde à chaque renouvellement.\n\n' +
-          'Vous pouvez le résilier à tout moment, depuis le lien de gestion reçu par e-mail avec votre reçu Creem ou en nous écrivant. La résiliation arrête les renouvellements suivants ; les crédits déjà reçus restent utilisables.',
+          'Chaque pack est payé une seule fois. QatliA ne vend aucun abonnement : rien n’est renouvelé ni prélevé automatiquement après votre achat.',
       },
       s7: {
         title: 'Remboursement',
@@ -220,12 +218,6 @@ export const legalFr = {
           '- les crédits offerts à l’inscription ;\n' +
           '- une demande faite plus de {days} jours après le paiement ;\n' +
           '- les crédits obtenus par fraude ou en violation de nos conditions générales.',
-      },
-      s4: {
-        title: 'Abonnement Atelier Max',
-        body:
-          'Vous pouvez résilier l’abonnement à tout moment : la résiliation arrête les renouvellements suivants.\n\n' +
-          'Le dernier mois facturé est remboursable selon la même règle : dans les {days} jours qui suivent ce prélèvement, au prorata des crédits de ce mois non utilisés. Les mois précédents ne sont pas remboursables.',
       },
       s5: {
         title: 'Un crédit décompté par erreur',

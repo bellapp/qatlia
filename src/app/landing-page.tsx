@@ -350,9 +350,6 @@ export default function LandingPage({ homeHref = '/' }: { homeHref?: string }) {
                   <p className="mt-1.5 text-sm text-slate-600 dark:text-slate-400">{t(labels.description, { count: pack.credits })}</p>
                   <p className="mt-6 font-mono text-[36px] leading-none font-bold text-slate-900 dark:text-white" dir="ltr">
                     {pack.priceMAD} <span className="text-lg text-slate-500 dark:text-slate-400">{BILLING_CURRENCY}</span>
-                    {pack.monthly && (
-                      <span className="text-sm font-sans text-slate-500 dark:text-slate-400"> {t('creditsPage.perMonth')}</span>
-                    )}
                   </p>
                   <p className="mt-2 text-sm text-slate-600 dark:text-slate-400">
                     {t('pricing.packSuffix', { count: pack.displayCredits })}

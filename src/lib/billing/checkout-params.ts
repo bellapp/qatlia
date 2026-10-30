@@ -18,14 +18,13 @@ export interface CheckoutMetadata {
 }
 
 export interface CheckoutParams {
-  mode: 'payment' | 'subscription';
+  mode: 'payment';
   payment_method_types: ['card'];
   line_items: Array<{
     price_data: {
       currency: typeof STRIPE_CURRENCY;
       product_data: { name: string; description: string };
       unit_amount: number;
-      recurring?: { interval: 'month' };
     };
     quantity: number;
   }>;
@@ -34,7 +33,6 @@ export interface CheckoutParams {
   metadata: CheckoutMetadata;
   client_reference_id: string;
   customer_email?: string;
-  subscription_data?: { metadata: CheckoutMetadata };
 }
 
 export interface CheckoutInput {
@@ -108,8 +106,6 @@ export function buildCheckoutParams({ pack, userId, userEmail, origin }: Checkou
 
   const email = typeof userEmail === 'string' && userEmail.trim() !== '' ? userEmail.trim() : '';
 
-  // Mirrored verbatim onto the subscription so that recurring invoices resolve
-  // the same grant as the initial checkout session.
   const metadata: CheckoutMetadata = {
     userId,
     userEmail: email,
@@ -118,7 +114,7 @@ export function buildCheckoutParams({ pack, userId, userEmail, origin }: Checkou
   };
 
   const params: CheckoutParams = {
-    mode: pack.monthly ? 'subscription' : 'payment',
+    mode: 'payment',
     payment_method_types: ['card'],
     line_items: [
       {
@@ -126,12 +122,9 @@ export function buildCheckoutParams({ pack, userId, userEmail, origin }: Checkou
           currency: STRIPE_CURRENCY,
           product_data: {
             name: `QatliA — ${pack.name}`,
-            description: pack.monthly
-              ? `${pack.displayCredits} crédits par mois`
-              : `${pack.displayCredits} crédits`,
+            description: `${pack.displayCredits} crédits`,
           },
           unit_amount: toStripeMinorUnits(pack.priceMAD),
-          ...(pack.monthly ? { recurring: { interval: 'month' as const } } : {}),
         },
         quantity: 1,
       },
@@ -143,7 +136,6 @@ export function buildCheckoutParams({ pack, userId, userEmail, origin }: Checkou
   };
 
   if (email) params.customer_email = email;
-  if (pack.monthly) params.subscription_data = { metadata };
 
   return params;
 }

@@ -11,7 +11,7 @@
  */
 
 import type { Metadata } from 'next';
-import { OPTIMIZE_CREDIT_COST, SIGNUP_FREE_CREDITS, VISION_CREDIT_COST } from '@/lib/billing/policy';
+import { ANALYSIS_WINDOW_HOURS, SIGNUP_FREE_CREDITS, VISION_CREDIT_COST } from '@/lib/billing/policy';
 import { SUPPORT_EMAIL, SUPPORT_PHONE_E164 } from '@/lib/support';
 import { fr } from '@/i18n/messages/fr';
 import type { TranslationVars } from '@/i18n';
@@ -27,7 +27,7 @@ export const LEGAL_ROUTES: Record<LegalDoc, string> = {
 };
 
 /** Shown as « Dernière mise à jour ». Bump it with every change of substance. */
-export const LEGAL_UPDATED_AT = '2026-10-29';
+export const LEGAL_UPDATED_AT = '2026-10-30';
 
 /**
  * Days after a payment during which its unused credits can be refunded. Seven
@@ -43,7 +43,7 @@ export function legalVars(): TranslationVars {
     freeCredits: SIGNUP_FREE_CREDITS,
     days: REFUND_WINDOW_DAYS,
     visionCost: VISION_CREDIT_COST,
-    optimizeCost: OPTIMIZE_CREDIT_COST,
+    windowHours: ANALYSIS_WINDOW_HOURS,
   };
 }
 

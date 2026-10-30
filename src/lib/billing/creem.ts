@@ -10,12 +10,11 @@
  *   * the pack is resolved from the *signed* product id through the configured
  *     product map, and the credit count from the catalog — never from metadata;
  *   * metadata only names the buyer (a canonical UUID) and cross-checks the pack;
- *   * every grant is keyed on Creem's transaction id. A new subscription emits
- *     both `subscription.paid` (`last_transaction_id`) and `checkout.completed`
- *     (`order.transaction`) for the *same* first-period transaction, so both
- *     events map to one key and the unique index in add_credits absorbs the
- *     second. Either event alone is enough, so losing one cannot leave a paying
- *     subscriber without credits;
+ *   * every grant is keyed on Creem's transaction id, so a redelivered
+ *     `checkout.completed` maps to the same key and the unique index in
+ *     add_credits absorbs it;
+ *   * only one-off packs are sold. A recurring order means a store product was
+ *     set up as a subscription by mistake: it is surfaced, never credited;
  *   * a paid event we recognise but cannot act on is `retryable`, exactly as
  *     for Stripe (see grant.ts).
  */
@@ -129,7 +128,7 @@ function buildGrant(
   productId: string | null,
   transactionId: string | null,
   products: Record<PackId, string>,
-  source: 'creem_checkout' | 'creem_subscription'
+  source: 'creem_checkout'
 ): GrantResolution {
   const userId = metadata.userId;
   if (!isUuid(userId)) {
@@ -172,27 +171,18 @@ export function resolveCreemGrant(event: CreemEventLike, products: Record<PackId
       return { ok: false, reason: 'ORDER_NOT_PAID', retryable: false };
     }
     const transactionId = readId(order.transaction);
-    // A subscription's first payment is also credited by subscription.paid
-    // under the same transaction id, so its checkout carries no extra duty.
-    if (!transactionId && order.type === 'recurring') {
-      return { ok: false, reason: 'SUBSCRIPTION_GRANTED_VIA_SUBSCRIPTION_PAID', retryable: false };
+    // Paid, but for a subscription this app does not sell: retryable, so the
+    // failed delivery shows up in the Creem dashboard instead of the buyer
+    // silently getting nothing.
+    if (order.type === 'recurring') {
+      return { ok: false, reason: 'SUBSCRIPTION_NOT_SOLD', retryable: true };
     }
     return buildGrant(
-      firstMetadata(object.metadata, asRecord(object.subscription)?.metadata),
+      firstMetadata(object.metadata),
       readId(object.product) ?? readId(order.product),
       transactionId,
       products,
       'creem_checkout'
-    );
-  }
-
-  if (event?.eventType === 'subscription.paid') {
-    return buildGrant(
-      firstMetadata(object.metadata),
-      readId(object.product),
-      readId(object.last_transaction_id) ?? readId(object.last_transaction),
-      products,
-      'creem_subscription'
     );
   }
 

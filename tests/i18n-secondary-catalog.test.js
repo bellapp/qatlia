@@ -132,7 +132,7 @@ test('every Arabic secondary string is actually written in Arabic script', () =>
   }
 });
 
-test('every credit pack sold maps to translated name, description, badge and renewal copy', () => {
+test('every credit pack sold maps to translated name, description and badge', () => {
   const { CREDIT_PACK_LABEL_KEYS, creditPackLabelKeys } = loadDomain();
   const { CREDIT_PACKS, PACK_IDS } = loadBillingCatalog();
   const { LOCALES, translate } = loadI18n();
@@ -147,13 +147,6 @@ test('every credit pack sold maps to translated name, description, badge and ren
         const copy = translate(locale, keys[field], { count: pack.credits, price: pack.priceMAD });
         assert.notEqual(copy, keys[field], `${locale} has no ${field} for pack "${id}"`);
         assert.ok(!/\{\w+\}/.test(copy), `${locale}.${keys[field]} left a placeholder unresolved: "${copy}"`);
-      }
-      if (pack.renewalNote) {
-        assert.ok(keys.renewalNote, `pack "${id}" renews monthly but has no renewal key`);
-        const copy = translate(locale, keys.renewalNote, { count: pack.credits });
-        assert.notEqual(copy, keys.renewalNote, `${locale} has no renewal copy for pack "${id}"`);
-      } else {
-        assert.equal(keys.renewalNote, null, `pack "${id}" does not renew but carries renewal copy`);
       }
     }
   }
@@ -175,9 +168,6 @@ test('the French pack copy still reads exactly as the billing catalog states it'
     assert.equal(translate('fr', keys.name, vars), pack.name, `pack "${id}" was renamed by the catalog`);
     assert.equal(translate('fr', keys.description, vars), pack.description, `pack "${id}" description drifted`);
     assert.equal(translate('fr', keys.badge, vars), pack.badge, `pack "${id}" badge drifted`);
-    if (pack.renewalNote) {
-      assert.equal(translate('fr', keys.renewalNote, vars), pack.renewalNote, `pack "${id}" renewal note drifted`);
-    }
   }
 });
 
@@ -193,9 +183,9 @@ test('pack copy interpolates MAD amounts and credit counts instead of hardcoding
       // A badge always states the price, and states it as a placeholder.
       assert.ok(flat[keys.badge].includes('{price}'), `${locale}.${keys.badge} must interpolate the price`);
       const pack = CREDIT_PACKS[id];
-      // The monthly allowance is the ledger's figure, never a number typed into
-      // a translation: no locale may promise a different number of analyses.
-      for (const key of [keys.description, keys.renewalNote].filter(Boolean)) {
+      // The allowance is the ledger's figure, never a number typed into a
+      // translation: no locale may promise a different number of analyses.
+      for (const key of [keys.description]) {
         const value = flat[key];
         assert.ok(
           !new RegExp(`\\b${pack.credits}\\b`).test(value),
