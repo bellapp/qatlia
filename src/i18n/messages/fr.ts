@@ -127,8 +127,6 @@ export const fr = {
     packAllFree: 'Fonctions complètes incluses',
     packScan: 'Scan IA — 2 crédits par analyse',
     packCta: 'Voir les crédits',
-    more: 'Besoin de plus ? {proName} — {proPrice} MAD pour {proCredits} crédits · {maxName} — {maxPrice} MAD par mois pour {maxCredits} crédits.',
-    moreLink: 'Voir tous les packs',
   },
   faq2: {
     eyebrow: 'Questions fréquentes',

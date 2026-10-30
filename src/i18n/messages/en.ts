@@ -106,8 +106,6 @@ export const en: Catalog = {
     packAllFree: 'All features included',
     packScan: 'AI scan — 2 credits per analysis',
     packCta: 'See the credit packs',
-    more: 'Need more? {proName} — {proPrice} MAD for {proCredits} credits · {maxName} — {maxPrice} MAD a month for {maxCredits} credits.',
-    moreLink: 'See every pack',
   },
   faq2: {
     eyebrow: 'FAQ',
