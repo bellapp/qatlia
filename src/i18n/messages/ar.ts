@@ -623,6 +623,7 @@ export const ar: Catalog = {
     chooseAria: 'اختيار {pack}',
     redirecting: 'إعادة التوجيه إلى الدفع…',
     securePayment: 'دفع مؤمَّن عبر {provider} — بطاقات Visa / Mastercard، ويُخصم بالدرهم ({currency})',
+    manualPaymentOnly: 'الدفع عبر تحويل بنكي أو نقداً (كاش بلوس / وفاكاش)، بالدرهم ({currency})',
     securePaymentInternational:
       'دفع مؤمَّن عبر {provider} — بطاقات بنكية دولية وApple Pay وGoogle Pay، ويُخصم بالدولار ({currency})',
     cardPrice: 'بالبطاقة: {price}',
