@@ -46,7 +46,7 @@ export const ar: Catalog = {
     waste: { title: 'هدر محسوب', label: 'نسبة الهدر تأتي من مخططك، لا من متوسط موعود.' },
     surface: { title: 'مساحة مستغلة محسوبة', label: 'محسوبة انطلاقاً من القطع الموضوعة فعلاً على ألواحك.' },
     time: { title: 'مخطط في ثوانٍ', label: 'من قائمة القطع إلى مخطط القطع، في ثوانٍ.' },
-    credits: { title: '{count} أرصدة مجانية', label: 'تحليلات صور تُمنح عند التسجيل.' },
+    credits: { title: '{count} أرصدة مجانية', label: 'تحليل الصورة برصيدين، والتحسين برصيد واحد.' },
   },
   features: {
     eyebrow: 'الميزات',
@@ -56,8 +56,8 @@ export const ar: Catalog = {
       desc: 'صوّر دفتر القياسات، ويستخرج الذكاء الاصطناعي الأبعاد تلقائياً.',
     },
     guillotine: {
-      title: 'قطع المقصلة',
-      desc: 'خوارزمية قطع مستقيم من طرف إلى طرف، وهي المعيار في ورش النجارة.',
+      title: 'القطع بالمنشار القاطع',
+      desc: 'خوارزمية قطع من طرف إلى طرف بالمنشار القاطع، وهي المعيار في ورش النجارة.',
     },
     report: {
       title: 'تقرير PDF احترافي',
@@ -415,7 +415,7 @@ export const ar: Catalog = {
       rightShort: 'يم',
       topShort: 'أع',
       bottomShort: 'أس',
-      title: 'حرف {side}',
+      title: 'حافة {side}',
       pickerAria: 'حواف {name} ({count} نشطة)',
       pickerTitle: 'حواف {name}',
     },
@@ -428,7 +428,7 @@ export const ar: Catalog = {
       black: 'أسود',
       walnut: 'جوز',
       price: ' ({price} MAD/m)',
-      selectAria: 'لون شريط الحرف',
+      selectAria: 'لون شريط الحافة',
     },
     quickAdd: {
       heightLabel: 'الارتفاع ({unit})',
@@ -462,9 +462,9 @@ export const ar: Catalog = {
       scaleMax: '10 mm',
     },
     priority: {
-      tooltip: 'خوارزمية التوزيع: المقصلة = قطع مستقيمة من طرف إلى طرف (معيار الورشة). أقل هدر = أفضل استغلال للمساحة.',
+      tooltip: 'خوارزمية التوزيع: المنشار القاطع = قطعات من طرف إلى طرف (معيار الورشة). أقل هدر = أفضل استغلال للمساحة.',
       aria: 'هدف التحسين',
-      linearGuillotine: 'قطع مقصلي مستقيم (الورشة)',
+      linearGuillotine: 'المنشار القاطع (الورشة)',
       minWaste: 'تقليل الهدر (%)',
       minSheets: 'تقليل عدد الألواح',
       balanced: 'متوازن (سهولة القطع)',

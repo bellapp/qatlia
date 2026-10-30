@@ -39,7 +39,7 @@ test('each legal document has a page, a sitemap entry and a footer link', () => 
   const landing = read('src/app/landing-page.tsx');
   for (const doc of legal.LEGAL_DOCS) {
     const route = legal.LEGAL_ROUTES[doc];
-    const pageFile = path.join('src/app', route, 'page.tsx');
+    const pageFile = path.join('src/app/(site)', route, 'page.tsx');
     assert.ok(fs.existsSync(path.join(PROJECT_ROOT, pageFile)), `${pageFile} is missing`);
     assert.match(read(pageFile), new RegExp(`doc="${doc}"`), `${pageFile} renders the wrong document`);
     assert.ok(seo.PUBLIC_ROUTES.includes(route), `${route} is not in the sitemap`);
@@ -49,7 +49,7 @@ test('each legal document has a page, a sitemap entry and a footer link', () => 
 });
 
 test('the credits page links the legal documents next to the pay buttons', () => {
-  const source = read('src/app/credits/page.tsx');
+  const source = read('src/app/(site)/credits/page.tsx');
   assert.match(source, /legal\.checkoutNotice/);
   assert.match(source, /LEGAL_DOCS\.map/);
 });
