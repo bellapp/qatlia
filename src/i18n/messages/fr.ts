@@ -4,6 +4,8 @@
  * else until the translations follow. Keep the tree shallow and grouped by the
  * surface that renders it.
  */
+import { legalFr } from './legal/fr';
+
 export const fr = {
   nav: {
     brandAria: 'QatliA — accueil',
@@ -153,9 +155,8 @@ export const fr = {
     brand: 'QatliA',
     tagline: 'Maroc · MAD · Optimisation de découpe pour menuisiers',
     /**
-     * Only routes that exist. Terms and privacy pages are deliberately absent
-     * rather than linked to a 404. `features`/`pricing`/`login` reuse the header
-     * wording (`nav.*`).
+     * Only routes that exist. `features`/`pricing`/`login` reuse the header
+     * wording (`nav.*`), and the legal links reuse `legal.nav.*`.
      */
     links: {
       credits: 'Crédits',
@@ -901,6 +902,7 @@ export const fr = {
     },
     closeAria: 'Fermer',
   },
+  legal: legalFr,
 };
 
 export type Catalog = typeof fr;

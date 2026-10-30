@@ -16,12 +16,14 @@ const config: Config = {
       colors: {
         background: "var(--background)",
         foreground: "var(--foreground)",
+        // Channels + <alpha-value>, so `bg-studio-panel/60` and friends compile.
+        // A bare `var(--…)` color silently drops every opacity variant.
         studio: {
-          canvas: 'var(--color-canvas)',
-          panel: 'var(--color-panel)',
-          field: 'var(--color-field)',
-          border: 'var(--color-border)',
-          'border-hover': 'var(--color-border-hover)',
+          canvas: 'rgb(var(--color-canvas) / <alpha-value>)',
+          panel: 'rgb(var(--color-panel) / <alpha-value>)',
+          field: 'rgb(var(--color-field) / <alpha-value>)',
+          border: 'rgb(var(--color-border) / <alpha-value>)',
+          'border-hover': 'rgb(var(--color-border-hover) / <alpha-value>)',
         },
         brand: {
           // QatlIA MIX per Stitch DESIGN.md: amber-500 #F5A623 is THE primary;

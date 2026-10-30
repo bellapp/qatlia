@@ -8,11 +8,13 @@
   :root {
     /* Light mode — QatlIA MIX per Stitch DESIGN.md: pure white canvas,
        near-white alt surfaces, amber hover #D9860F, amber tint #FEF3E2 */
-    --color-canvas: #FFFFFF;
-    --color-panel: #FFFFFF;
-    --color-field: #F1F5F9;
-    --color-border: #E2E8F0;
-    --color-border-hover: #CBD5E1;
+    /* Studio surfaces are RGB channels, not hex, so Tailwind can apply an
+       opacity modifier (`bg-studio-panel/60`); see tailwind.config.ts. */
+    --color-canvas: 255 255 255;   /* #FFFFFF */
+    --color-panel: 255 255 255;    /* #FFFFFF */
+    --color-field: 241 245 249;    /* #F1F5F9 */
+    --color-border: 226 232 240;   /* #E2E8F0 */
+    --color-border-hover: 203 213 225; /* #CBD5E1 */
     --text-primary: #0F172A;
     --text-secondary: #475569;
     --text-muted: #94A3B8;
@@ -28,11 +30,11 @@
 
   .dark {
     /* Dark mode */
-    --color-canvas: #060B14;
-    --color-panel: #0B1424;
-    --color-field: #0F1A2E;
-    --color-border: #1A2744;
-    --color-border-hover: #243356;
+    --color-canvas: 6 11 20;       /* #060B14 */
+    --color-panel: 11 20 36;       /* #0B1424 */
+    --color-field: 15 26 46;       /* #0F1A2E */
+    --color-border: 26 39 68;      /* #1A2744 */
+    --color-border-hover: 36 51 86; /* #243356 */
     --text-primary: #F8FAFC;
     --text-secondary: #94A3B8;
     --text-muted: #64748B;

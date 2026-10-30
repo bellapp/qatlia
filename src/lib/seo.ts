@@ -41,7 +41,7 @@ export const LANDING_ALTERNATES = {
 };
 
 /** Public, indexable routes. Everything behind a login stays out of the sitemap. */
-export const PUBLIC_ROUTES = [LANDING_PATHS.fr, LANDING_PATHS.ar] as const;
+export const PUBLIC_ROUTES = [LANDING_PATHS.fr, LANDING_PATHS.ar, '/terms', '/privacy', '/refund'] as const;
 
 /** Routes crawlers have no reason to fetch: APIs, account and admin screens. */
 export const PRIVATE_ROUTES = ['/api/', '/admin', '/account', '/auth/', '/signup', '/history', '/credits/success'] as const;

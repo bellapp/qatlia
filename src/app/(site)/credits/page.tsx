@@ -8,6 +8,7 @@ import { CREDIT_PACKS, PACK_IDS, formatMAD, formatUSD, BILLING_CURRENCY, CARD_CU
 import { LocaleSwitcher, useLocale } from '@/components/LocaleProvider';
 import { SupportContact } from '@/components/SupportContact';
 import { checkoutErrorKey, creditPackLabelKeys } from '@/i18n/domain';
+import { LEGAL_DOCS, LEGAL_ROUTES } from '@/lib/legal';
 
 /** Payment providers are proper nouns, so they are interpolated, not translated. */
 const PAYMENT_PROVIDER_NAMES = { creem: 'Creem', stripe: 'Stripe' } as const;
@@ -371,6 +372,19 @@ export default function CreditsPage() {
           </div>
           <span className="text-[11px] text-[#64748B]">{t('creditsPage.invoiceNote')}</span>
         </div>
+
+        {/* Shown next to every pay button: paying is accepting these. */}
+        <p className="text-center text-[11px] text-slate-600 dark:text-slate-400">
+          {t('legal.checkoutNotice')}{' '}
+          {LEGAL_DOCS.map((doc, i) => (
+            <React.Fragment key={doc}>
+              {i > 0 && ' · '}
+              <Link href={LEGAL_ROUTES[doc]} className="font-semibold underline hover:text-slate-900 dark:hover:text-white">
+                {t(`legal.nav.${doc}`)}
+              </Link>
+            </React.Fragment>
+          ))}
+        </p>
       </div>
     </div>
   );
