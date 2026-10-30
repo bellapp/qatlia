@@ -165,7 +165,7 @@ export function quotationErrorKey(code: unknown): TranslationKey {
 
 /**
  * Wording for one credit pack. The figures are never here: the MAD price and
- * the monthly allowance stay in `src/lib/billing/catalog.ts` and are
+ * the credit allowance stay in `src/lib/billing/catalog.ts` and are
  * interpolated as `{price}` / `{count}`, so a translation cannot change what is
  * sold or what is charged.
  */
@@ -173,8 +173,6 @@ export interface CreditPackLabelKeys {
   name: TranslationKey;
   description: TranslationKey;
   badge: TranslationKey;
-  /** Recurring packs only; `null` for the one-off packs, which state no renewal. */
-  renewalNote: TranslationKey | null;
 }
 
 export const CREDIT_PACK_LABEL_KEYS: Record<PackId, CreditPackLabelKeys> = {
@@ -182,25 +180,21 @@ export const CREDIT_PACK_LABEL_KEYS: Record<PackId, CreditPackLabelKeys> = {
     name: 'billing.packs.starter.name',
     description: 'billing.packs.starter.description',
     badge: 'billing.packs.starter.badge',
-    renewalNote: null,
   },
   standard: {
     name: 'billing.packs.standard.name',
     description: 'billing.packs.standard.description',
     badge: 'billing.packs.standard.badge',
-    renewalNote: null,
   },
   pro: {
     name: 'billing.packs.pro.name',
     description: 'billing.packs.pro.description',
     badge: 'billing.packs.pro.badge',
-    renewalNote: null,
   },
   atelier_max: {
     name: 'billing.packs.atelierMax.name',
     description: 'billing.packs.atelierMax.description',
     badge: 'billing.packs.atelierMax.badge',
-    renewalNote: 'billing.packs.atelierMax.renewal',
   },
 };
 

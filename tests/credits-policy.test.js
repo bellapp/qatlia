@@ -20,15 +20,14 @@ const read = (relativePath) => fs.readFileSync(path.join(PROJECT_ROOT, relativeP
 const UUID = '11111111-2222-4333-8444-555555555555';
 const OTHER_UUID = '99999999-8888-4777-8666-555555555555';
 
-// Prices the customer sees on /credits. Charged minor units must equal these * 100.
+// Prices the customer sees on /credits (pricing v3, 2026-10-30: four one-off
+// packs, no subscription). Charged minor units must equal priceMAD * 100.
 const EXPECTED_PACKS = {
-  starter: { credits: 10, priceMAD: 10, monthly: false },
-  standard: { credits: 50, priceMAD: 40, monthly: false },
-  pro: { credits: 100, priceMAD: 70, monthly: false },
-  atelier_max: { credits: 200, priceMAD: 99, monthly: true },
+  starter: { credits: 30, priceMAD: 50, priceUSD: 4.99 },
+  standard: { credits: 80, priceMAD: 100, priceUSD: 9.99 },
+  pro: { credits: 200, priceMAD: 200, priceUSD: 19.99 },
+  atelier_max: { credits: 400, priceMAD: 300, priceUSD: 29.99 },
 };
-
-const MONTHLY_PACK_ID = 'atelier_max';
 
 // ---------------------------------------------------------------------------
 // Catalog
@@ -43,10 +42,8 @@ test('catalog prices and credit counts match the advertised packs exactly', () =
     const pack = CREDIT_PACKS[id];
     assert.ok(pack, `pack ${id} must exist in the catalog`);
     assert.equal(pack.priceMAD, expected.priceMAD, `${id} price must be ${expected.priceMAD} MAD`);
-    assert.equal(pack.monthly, expected.monthly, `${id} monthly flag`);
-    if (expected.credits !== undefined) {
-      assert.equal(pack.credits, expected.credits, `${id} must grant ${expected.credits} credits`);
-    }
+    assert.equal(pack.priceUSD, expected.priceUSD, `${id} card price must be $${expected.priceUSD}`);
+    assert.equal(pack.credits, expected.credits, `${id} must grant ${expected.credits} credits`);
   }
 });
 
@@ -135,59 +132,45 @@ test('every pack displays exactly the number of credits it grants', () => {
   }
 });
 
-test('the monthly plan is named honestly and grants 200 credits per month', () => {
+test('every pack is a one-off purchase: the catalog carries no subscription', () => {
   const { CREDIT_PACKS, PACK_IDS } = loadTsModule('src/lib/billing/catalog.ts');
 
-  const monthly = PACK_IDS.map((id) => CREDIT_PACKS[id]).filter((pack) => pack.monthly);
-  assert.equal(monthly.length, 1, 'there is exactly one recurring plan');
-
-  const plan = monthly[0];
-  assert.equal(plan.id, MONTHLY_PACK_ID);
-  assert.match(plan.name, /Atelier Max/, 'the plan must be sold under its honest name');
-  assert.equal(plan.credits, 200);
-  assert.match(plan.badge, /99 DH/);
+  for (const id of PACK_IDS) {
+    const pack = CREDIT_PACKS[id];
+    assert.equal('monthly' in pack, false, `${id} must not carry a recurring flag`);
+    assert.equal('renewalNote' in pack, false, `${id} must not describe a renewal`);
+    assert.ok(
+      !/mois|month|abonnement/i.test(`${pack.name} ${pack.description} ${pack.badge}`),
+      `${id} copy must not sell a monthly plan`
+    );
+  }
 });
 
-test('the monthly copy says credits are added each month, never reset', () => {
-  const { CREDIT_PACKS } = loadTsModule('src/lib/billing/catalog.ts');
-  const plan = CREDIT_PACKS[MONTHLY_PACK_ID];
-
-  const copy = deaccent(`${plan.description} ${plan.renewalNote || ''}`).toLowerCase();
-
-  assert.match(copy, /ajout/, 'the renewal must be described as credits being added to the balance');
-  assert.ok(
-    !/(remis a zero|reinitialis|remise a zero|reset)/.test(copy),
-    'a monthly grant tops the balance up; it must never be described as a reset'
-  );
-  assert.match(copy, /mois/, 'the cadence must be stated');
-});
-
-test('the retired "unlimited" id is gone from the catalog but still resolves for existing subscriptions', () => {
+test('the retired "unlimited" id resolves to nothing', () => {
   const { PACK_IDS, isPackId, normalizePackId } = loadTsModule('src/lib/billing/catalog.ts');
 
   assert.ok(!PACK_IDS.includes('unlimited'), 'the dishonest id must not be sellable any more');
   assert.equal(isPackId('unlimited'), false, 'checkout must refuse the retired id');
-
-  // Subscriptions created before the rename carry packId=unlimited in their
-  // Stripe metadata; refusing them would stop crediting paying customers.
-  assert.equal(normalizePackId('unlimited'), MONTHLY_PACK_ID);
-  assert.equal(normalizePackId(MONTHLY_PACK_ID), MONTHLY_PACK_ID);
+  // No subscription was ever sold under it, and atelier_max is now a 400-credit
+  // one-off pack: mapping a stray replay onto it would over-credit.
+  assert.equal(normalizePackId('unlimited'), null);
+  assert.equal(normalizePackId('atelier_max'), 'atelier_max');
   assert.equal(normalizePackId('starter'), 'starter');
   assert.equal(normalizePackId('nonexistent'), null);
   assert.equal(normalizePackId(null), null);
   assert.equal(normalizePackId(42), null);
 });
 
-test('the credits page states the monthly renewal without an unlimited claim', () => {
+test('the credits page shows the real credit count and no subscription copy', () => {
   const source = read('src/app/credits/page.tsx');
 
-  assert.ok(/renewalNote/.test(source), 'the monthly renewal note must actually be rendered');
   // "exports gratuits et illimités" is a true statement about free features and
   // is allowed; a *credit allowance* of "Illimité" is not.
   assert.ok(
     !/displayCredits[\s\S]{0,80}Illimit/i.test(source),
     'the credit allowance shown on the card must be the real number'
   );
+  assert.ok(!/renewalNote|perMonth|\.monthly/.test(source), 'no pack renews, so no renewal copy is rendered');
 });
 
 test('isPackId narrows only to known pack ids', () => {
@@ -205,26 +188,35 @@ test('isPackId narrows only to known pack ids', () => {
 // Credit policy
 // ---------------------------------------------------------------------------
 
-test('only a successful Vision analysis costs a credit; every export path is free', () => {
-  const { CREDIT_POLICY, creditCostFor, isFreeAction, FREE_ACTIONS, CHARGED_ACTIONS, VISION_CREDIT_COST } =
-    loadTsModule('src/lib/billing/policy.ts');
+test('one credit buys a complete analysis; every export path is free', () => {
+  const {
+    CREDIT_POLICY,
+    creditCostFor,
+    isFreeAction,
+    FREE_ACTIONS,
+    CHARGED_ACTIONS,
+    VISION_CREDIT_COST,
+    OPTIMIZE_CREDIT_COST,
+    ANALYSIS_WINDOW_HOURS,
+  } = loadTsModule('src/lib/billing/policy.ts');
 
+  // A scan opens the analysis; an optimization outside an open analysis (a
+  // list typed by hand) opens one too. Re-runs inside it are covered by the
+  // analysis pass, not by a zero in this table.
   assert.equal(VISION_CREDIT_COST, 1);
+  assert.equal(OPTIMIZE_CREDIT_COST, 1);
+  assert.equal(ANALYSIS_WINDOW_HOURS, 24);
   assert.equal(creditCostFor('vision'), 1);
-  assert.equal(isFreeAction('vision'), false);
+  assert.equal(creditCostFor('optimize'), 1);
 
-  for (const action of ['optimize', 'pdf', 'dxf', 'json', 'png', 'quotation']) {
+  for (const action of ['pdf', 'dxf', 'json', 'png', 'quotation']) {
     assert.equal(creditCostFor(action), 0, `${action} must cost 0 credits`);
     assert.equal(isFreeAction(action), true, `${action} must be free`);
     assert.equal(CREDIT_POLICY[action], 0);
   }
 
-  assert.deepEqual([...CHARGED_ACTIONS], ['vision'], 'vision is the only charged action');
-  assert.deepEqual(
-    [...FREE_ACTIONS].sort(),
-    ['dxf', 'json', 'optimize', 'pdf', 'png', 'quotation'],
-    'the free-action list must enumerate every non-vision action'
-  );
+  assert.deepEqual([...CHARGED_ACTIONS].sort(), ['optimize', 'vision']);
+  assert.deepEqual([...FREE_ACTIONS].sort(), ['dxf', 'json', 'pdf', 'png', 'quotation']);
 });
 
 test('an unknown action is rejected rather than defaulting to free or to a charge', () => {
@@ -262,36 +254,17 @@ test('displayed MAD price equals the charged Stripe amount and currency for ever
   }
 });
 
-test('the monthly pack is a recurring subscription and mirrors its grant metadata', () => {
-  const { CREDIT_PACKS } = loadTsModule('src/lib/billing/catalog.ts');
+test('every pack checks out in payment mode with no recurring price and no subscription metadata', () => {
+  const { CREDIT_PACKS, PACK_IDS } = loadTsModule('src/lib/billing/catalog.ts');
   const { buildCheckoutParams } = loadTsModule('src/lib/billing/checkout-params.ts');
 
-  const params = buildCheckoutParams({
-    pack: CREDIT_PACKS.atelier_max,
-    userId: UUID,
-    userEmail: 'artisan@example.ma',
-    origin: 'https://qatlia.example',
-  });
+  for (const id of PACK_IDS) {
+    const params = buildCheckoutParams({ pack: CREDIT_PACKS[id], userId: UUID, origin: 'https://qatlia.example' });
 
-  assert.equal(params.mode, 'subscription');
-  assert.deepEqual(params.line_items[0].price_data.recurring, { interval: 'month' });
-  assert.ok(params.subscription_data, 'subscription metadata must be mirrored onto the subscription');
-  assert.deepEqual(
-    params.subscription_data.metadata,
-    params.metadata,
-    'invoice-driven grants read subscription metadata, so it must match the session metadata'
-  );
-});
-
-test('one-off packs are payment mode with no recurring price and no subscription metadata', () => {
-  const { CREDIT_PACKS } = loadTsModule('src/lib/billing/catalog.ts');
-  const { buildCheckoutParams } = loadTsModule('src/lib/billing/checkout-params.ts');
-
-  const params = buildCheckoutParams({ pack: CREDIT_PACKS.standard, userId: UUID, origin: 'https://qatlia.example' });
-
-  assert.equal(params.mode, 'payment');
-  assert.equal(params.line_items[0].price_data.recurring, undefined);
-  assert.equal(params.subscription_data, undefined);
+    assert.equal(params.mode, 'payment', `${id} must be a one-off payment`);
+    assert.equal(params.line_items[0].price_data.recurring, undefined);
+    assert.equal(params.subscription_data, undefined);
+  }
 });
 
 test('checkout metadata carries the authenticated user, email, pack and credits', () => {
@@ -467,7 +440,7 @@ test('a paid one-off checkout session grants the catalog credit count for its pa
   assert.equal(resolved.ok, true);
   assert.equal(resolved.grant.userId, UUID);
   assert.equal(resolved.grant.packId, 'standard');
-  assert.equal(resolved.grant.credits, 50);
+  assert.equal(resolved.grant.credits, 80);
 });
 
 test('tampered metadata cannot inflate the granted credit count', () => {
@@ -476,7 +449,7 @@ test('tampered metadata cannot inflate the granted credit count', () => {
   const resolved = resolveGrant(paidSession({ userId: UUID, packId: 'starter', credits: '999999' }));
 
   assert.equal(resolved.ok, true);
-  assert.equal(resolved.grant.credits, 10, 'credits must come from the server-side catalog, not from metadata');
+  assert.equal(resolved.grant.credits, 30, 'credits must come from the server-side catalog, not from metadata');
 });
 
 test('a grant is refused without a valid UUID user id', () => {
@@ -509,29 +482,25 @@ test('an unpaid checkout session grants nothing', () => {
   assert.equal(resolved.ok, false);
 });
 
-test('a subscription checkout session defers to the invoice so the first month is not granted twice', () => {
+test('a subscription checkout session is not something we sell, so it grants nothing', () => {
   const { resolveGrant } = loadTsModule('src/lib/billing/grant.ts');
 
-  const resolved = resolveGrant(paidSession({ userId: UUID, packId: MONTHLY_PACK_ID }, { mode: 'subscription' }));
+  const resolved = resolveGrant(paidSession({ userId: UUID, packId: 'atelier_max' }, { mode: 'subscription' }));
 
   assert.equal(resolved.ok, false);
-  assert.match(resolved.reason, /INVOICE/);
+  assert.match(resolved.reason, /SUBSCRIPTION_NOT_SOLD/);
   assert.equal(resolved.retryable, false, 'this is a deliberate skip, not a delivery to retry');
 });
 
-// The Stripe client is pinned to apiVersion '2026-07-29.dahlia' (see
-// src/lib/billing/stripe-client.ts). Dahlia moved the subscription metadata
-// that the monthly grant depends on from `invoice.subscription_details` to
-// `invoice.parent.subscription_details`, so reading only the old location made
-// every renewal resolve to "no grant" — a paying subscriber silently receiving
-// nothing.
-function dahliaInvoice(metadata, overrides = {}) {
+// Only subscriptions produce invoices, and none is sold any more: a paid
+// invoice must not mint credits.
+function paidInvoice(metadata, overrides = {}) {
   return {
-    id: 'evt_dahlia',
+    id: 'evt_invoice',
     type: 'invoice.payment_succeeded',
     data: {
       object: {
-        id: 'in_test_dahlia',
+        id: 'in_test_1',
         status: 'paid',
         parent: { type: 'subscription_details', subscription_details: { metadata } },
         ...overrides,
@@ -540,85 +509,19 @@ function dahliaInvoice(metadata, overrides = {}) {
   };
 }
 
-test('a Dahlia invoice grants credits from invoice.parent.subscription_details.metadata', () => {
-  const { CREDIT_PACKS } = loadTsModule('src/lib/billing/catalog.ts');
+test('a paid invoice is not credited: no pack renews any more', () => {
   const { resolveGrant } = loadTsModule('src/lib/billing/grant.ts');
 
-  const resolved = resolveGrant(dahliaInvoice({ userId: UUID, packId: MONTHLY_PACK_ID }));
+  const resolved = resolveGrant(paidInvoice({ userId: UUID, packId: 'atelier_max' }));
 
-  assert.equal(resolved.ok, true, resolved.reason);
-  assert.equal(resolved.grant.userId, UUID);
-  assert.equal(resolved.grant.packId, MONTHLY_PACK_ID);
-  assert.equal(resolved.grant.credits, CREDIT_PACKS[MONTHLY_PACK_ID].credits);
-  assert.equal(resolved.grant.source, 'invoice');
-  assert.ok(resolved.grant.idempotencyKey.includes('in_test_dahlia'));
-});
-
-test('a Dahlia invoice still honours a subscription sold under the retired "unlimited" pack id', () => {
-  const { CREDIT_PACKS } = loadTsModule('src/lib/billing/catalog.ts');
-  const { resolveGrant } = loadTsModule('src/lib/billing/grant.ts');
-
-  const resolved = resolveGrant(dahliaInvoice({ userId: UUID, packId: 'unlimited' }));
-
-  assert.equal(resolved.ok, true, 'renaming the plan must not strand existing subscribers');
-  assert.equal(resolved.grant.packId, MONTHLY_PACK_ID, 'the legacy id is normalised to the current pack');
-  assert.equal(resolved.grant.credits, CREDIT_PACKS[MONTHLY_PACK_ID].credits);
-});
-
-test('a pre-Dahlia invoice shape is still accepted as a fallback', () => {
-  const { CREDIT_PACKS } = loadTsModule('src/lib/billing/catalog.ts');
-  const { resolveGrant } = loadTsModule('src/lib/billing/grant.ts');
-
-  const resolved = resolveGrant({
-    id: 'evt_1',
-    type: 'invoice.payment_succeeded',
-    data: {
-      object: {
-        id: 'in_test_9',
-        status: 'paid',
-        subscription_details: { metadata: { userId: UUID, packId: MONTHLY_PACK_ID } },
-      },
-    },
-  });
-
-  assert.equal(resolved.ok, true);
-  assert.equal(resolved.grant.userId, UUID);
-  assert.equal(resolved.grant.credits, CREDIT_PACKS[MONTHLY_PACK_ID].credits);
-});
-
-test('the Dahlia location wins over a stale legacy one on the same invoice', () => {
-  const { resolveGrant } = loadTsModule('src/lib/billing/grant.ts');
-
-  const resolved = resolveGrant(
-    dahliaInvoice(
-      { userId: UUID, packId: 'pro' },
-      { subscription_details: { metadata: { userId: OTHER_UUID, packId: 'starter' } } }
-    )
-  );
-
-  assert.equal(resolved.ok, true);
-  assert.equal(resolved.grant.userId, UUID, 'the current API shape is authoritative');
-  assert.equal(resolved.grant.packId, 'pro');
+  assert.equal(resolved.ok, false);
+  assert.match(resolved.reason, /UNHANDLED_EVENT/);
+  assert.equal(resolved.retryable, false);
 });
 
 // ---------------------------------------------------------------------------
 // Retryability — a paid event we cannot act on must not be silently swallowed
 // ---------------------------------------------------------------------------
-
-test('a paid invoice whose grant metadata is missing is retryable, not a silent no-grant', () => {
-  const { resolveGrant } = loadTsModule('src/lib/billing/grant.ts');
-
-  for (const metadata of [{}, { packId: MONTHLY_PACK_ID }, { userId: UUID }, { userId: 'anonymous', packId: 'pro' }]) {
-    const resolved = resolveGrant(dahliaInvoice(metadata));
-
-    assert.equal(resolved.ok, false);
-    assert.equal(
-      resolved.retryable,
-      true,
-      `a paid invoice with metadata ${JSON.stringify(metadata)} is money taken with no credit granted — it must be retried and surfaced`
-    );
-  }
-});
 
 test('a paid checkout session with unusable metadata is retryable', () => {
   const { resolveGrant } = loadTsModule('src/lib/billing/grant.ts');
@@ -638,8 +541,8 @@ test('events we deliberately do not credit are never marked retryable', () => {
     resolveGrant({ id: 'evt_x', type: 'customer.created', data: { object: {} } }),
     resolveGrant({ id: 'evt_y', type: 'charge.refunded', data: { object: { id: 'ch_1' } } }),
     resolveGrant(paidSession({ userId: UUID, packId: 'pro' }, { payment_status: 'unpaid' })),
-    resolveGrant(dahliaInvoice({ userId: UUID, packId: MONTHLY_PACK_ID }, { status: 'draft' })),
-    resolveGrant(paidSession({ userId: UUID, packId: MONTHLY_PACK_ID }, { mode: 'subscription' })),
+    resolveGrant(paidInvoice({ userId: UUID, packId: 'atelier_max' })),
+    resolveGrant(paidSession({ userId: UUID, packId: 'atelier_max' }, { mode: 'subscription' })),
   ];
 
   for (const resolved of ignored) {

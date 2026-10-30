@@ -42,7 +42,7 @@ export const fr = {
       'Scannez vos fiches de débit, optimisez le placement, exportez votre plan en PDF avec plan de coupe, cotes et nomenclature. Le taux de chute affiché est celui calculé sur votre plan.',
     ctaPrimary: 'Essayer gratuitement',
     ctaSecondary: 'J’ai déjà un compte',
-    note: '{count} crédits d’analyse photo offerts à l’inscription · Analyse IA 2 crédits, optimisation 1 crédit · Sans carte bancaire',
+    note: '{count} crédits gratuits à l’inscription · 1 crédit par analyse complète · Sans carte bancaire',
     screenshotAlt: 'Plan de découpe optimisé dans l\'atelier QatliA : visualiseur 2D, métriques de récupération et chutes',
     // Labels of the four figures in the navy band. The figures themselves are
     // never written here: they come from the sign-up grant, the billing catalog
@@ -51,7 +51,7 @@ export const fr = {
     stats: {
       credits: 'crédits offerts à l’inscription',
       free: 'exports PDF, DXF et PNG gratuits',
-      max: 'crédits / mois (pack max)',
+      max: 'crédits (pack max)',
       langs: 'langues — FR · EN · AR',
     },
   },
@@ -61,7 +61,7 @@ export const fr = {
     waste: { title: 'Chutes mesurées', label: 'Le taux de chute vient de votre plan, pas d’une moyenne annoncée.' },
     surface: { title: 'Surface utile calculée', label: 'Calculée à partir des pièces réellement placées sur vos panneaux.' },
     time: { title: 'Plan en quelques secondes', label: 'De la liste de pièces au plan de coupe en quelques secondes.' },
-    credits: { title: '{count} crédits offerts', label: 'Analyse photo 2 crédits, optimisation 1 crédit.' },
+    credits: { title: '{count} crédits offerts', label: '1 crédit par analyse complète, recalculs gratuits 24 h.' },
   },
   features: {
     eyebrow: 'Fonctionnalités',
@@ -118,14 +118,14 @@ export const fr = {
     popular: 'Populaire',
     freeName: 'Gratuit',
     freeDesc: 'Créez un compte, testez avec vos {count} crédits.',
-    freeOptimize: '1 crédit par optimisation',
+    freeOptimize: '1 crédit par analyse complète',
     freeExports: 'Exports PDF, CSV, DXF et JSON inclus',
     freeNoScan: 'Scan IA inclus avec les crédits offerts, puis par crédits',
-    freeCredits: '{count} crédits offerts à l’inscription — analyse IA 2 crédits, optimisation 1 crédit. Échec = non débité.',
+    freeCredits: '{count} crédits offerts à l’inscription — 1 crédit par analyse complète (scan IA + optimisation). Échec = non débité.',
     freeCta: 'Créer un compte gratuit',
     packSuffix: '/ {count} crédits',
     packAllFree: 'Fonctions complètes incluses',
-    packScan: 'Scan IA — 2 crédits par analyse',
+    packScan: 'Scan IA + optimisation — 1 crédit par analyse',
     packCta: 'Voir les crédits',
   },
   faq2: {
@@ -298,7 +298,7 @@ export const fr = {
     },
     optimize: {
       authRequired: 'Connectez-vous pour lancer une optimisation.',
-      noCredits: 'Crédits épuisés — 1 crédit par optimisation.',
+      noCredits: 'Crédits épuisés — 1 crédit par analyse complète.',
       failed: 'L’optimisation a échoué. Réessayez.',
       tooLarge: 'Plan trop volumineux : {max} pièces maximum par optimisation. Découpez le projet en plusieurs lots — aucun crédit n’a été débité.',
       network: 'Erreur réseau. Vérifiez votre connexion.',
@@ -654,7 +654,7 @@ export const fr = {
     packs: {
       starter: {
         name: 'Pack Découverte',
-        description: 'Idéal pour tester ou pour 1 petit chantier',
+        description: 'Idéal pour tester ou pour quelques chantiers',
         badge: '{price} DH',
       },
       standard: {
@@ -668,10 +668,9 @@ export const fr = {
         badge: 'Économique ({price} DH)',
       },
       atelierMax: {
-        name: 'Abonnement Atelier Max',
-        description: '{count} crédits par mois, pour les ateliers à très fort volume',
-        badge: '{price} DH / mois',
-        renewal: '{count} crédits ajoutés à votre solde chaque mois',
+        name: 'Pack Atelier Max',
+        description: 'Le meilleur prix par analyse, pour les ateliers à très fort volume',
+        badge: 'Meilleur prix ({price} DH)',
       },
     },
   },
@@ -684,15 +683,13 @@ export const fr = {
     // read from the billing catalog.
     headline: '{price} = {count} crédits',
     policy:
-      'Une analyse photo réussie coûte 2 crédits, une optimisation 1 crédit. Tous les exports (PDF, DXF, JSON, PNG, devis) sont gratuits et illimités.',
+      'Une analyse complète coûte 1 crédit : le scan photo et tous les recalculs de la fiche pendant 24 h. Tous les exports (PDF, DXF, JSON, PNG, devis) sont gratuits et illimités.',
     recommended: 'Recommandé',
     /** Dirham symbol as printed on the cards; identical in every locale. */
     currency: 'DH',
-    perMonth: '/mois',
     // Rendered in two parts around {count} so the allowance stays bold.
     packAnalyses: '{count} crédits',
-    packAnalysesMonthly: '{count} crédits par mois',
-    freePlans: '1 crédit par schéma de coupe',
+    freePlans: 'Recalculs gratuits pendant 24 h',
     freeExports: 'Exports PDF, DXF, JSON et PNG inclus',
     choose: 'Choisir ce pack',
     chooseAria: 'Choisir le {pack}',
@@ -782,7 +779,7 @@ export const fr = {
     creditsRemaining: 'crédits restants',
     ledgerAria: 'Mouvements de crédits',
     noMovements:
-      'Aucun mouvement pour l’instant. Une analyse photo réussie coûte 2 crédits, une optimisation 1 crédit ; les exports sont gratuits.',
+      'Aucun mouvement pour l’instant. Une analyse complète coûte 1 crédit ; les exports sont gratuits.',
     /** Shown only for a ledger row saved without its own description. */
     txDebit: 'Analyse photo IA',
     txCredit: 'Achat de crédits',

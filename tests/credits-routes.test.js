@@ -192,7 +192,7 @@ test('checkout ignores a client-supplied userId and bills the session user in MA
     assert.equal(params.metadata.userId, UUID, 'the session user must win over the request body');
     assert.equal(params.metadata.userEmail, 'artisan@example.ma');
     assert.equal(params.line_items[0].price_data.currency, 'mad');
-    assert.equal(params.line_items[0].price_data.unit_amount, 4000);
+    assert.equal(params.line_items[0].price_data.unit_amount, 10000);
   });
 });
 
@@ -320,11 +320,11 @@ test('a verified paid checkout session grants credits through the idempotent RPC
         id: 'cs_test_abc',
         mode: 'payment',
         payment_status: 'paid',
-        metadata: { userId: UUID, packId: 'pro', credits: '100' },
+        metadata: { userId: UUID, packId: 'pro', credits: '200' },
       },
     },
   });
-  state.admin.rpcResult = () => ({ data: { success: true, balance: 100, duplicate: false }, error: null });
+  state.admin.rpcResult = () => ({ data: { success: true, balance: 200, duplicate: false }, error: null });
 
   await withEnv(CONFIGURED, async () => {
     const { POST } = loadTsModule('src/app/api/credits/webhook/route.ts');
@@ -336,7 +336,7 @@ test('a verified paid checkout session grants credits through the idempotent RPC
     const call = state.admin.rpcCalls[0];
     assert.equal(call.name, 'add_credits');
     assert.equal(call.args.p_user_id, UUID);
-    assert.equal(call.args.p_credits, 100);
+    assert.equal(call.args.p_credits, 200);
     assert.equal(call.args.p_pack_id, 'pro');
     assert.ok(call.args.p_stripe_payment_id.includes('cs_test_abc'), 'the RPC must be keyed by a stable payment id');
   });
@@ -364,37 +364,14 @@ test('a paid session whose metadata cannot identify the buyer fails loudly inste
   });
 });
 
-test('a paid Dahlia subscription invoice with unusable metadata is retried, not acknowledged', async () => {
-  resetState();
-  state.stripe.constructEvent = () => ({
-    id: 'evt_2b',
-    type: 'invoice.payment_succeeded',
-    data: {
-      object: {
-        id: 'in_x',
-        status: 'paid',
-        parent: { type: 'subscription_details', subscription_details: { metadata: {} } },
-      },
-    },
-  });
-
-  await withEnv(CONFIGURED, async () => {
-    const { POST } = loadTsModule('src/app/api/credits/webhook/route.ts');
-    const res = await POST(jsonRequest('https://qatlia.example/api/credits/webhook', {}, { 'stripe-signature': 'ok' }));
-
-    assert.equal(res.status, 500);
-    assert.equal(state.admin.rpcCalls.length, 0);
-  });
-});
-
-test('a paid Dahlia subscription invoice grants the monthly credits exactly once', async () => {
+test('a paid subscription invoice is acknowledged without a grant: no pack renews any more', async () => {
   resetState();
   state.stripe.constructEvent = () => ({
     id: 'evt_2c',
     type: 'invoice.payment_succeeded',
     data: {
       object: {
-        id: 'in_dahlia_1',
+        id: 'in_1',
         status: 'paid',
         parent: {
           type: 'subscription_details',
@@ -403,21 +380,15 @@ test('a paid Dahlia subscription invoice grants the monthly credits exactly once
       },
     },
   });
-  state.admin.rpcResult = () => ({ data: { success: true, balance: 200 }, error: null });
 
   await withEnv(CONFIGURED, async () => {
     const { POST } = loadTsModule('src/app/api/credits/webhook/route.ts');
     const res = await POST(jsonRequest('https://qatlia.example/api/credits/webhook', {}, { 'stripe-signature': 'ok' }));
+    const body = await res.json();
 
     assert.equal(res.status, 200);
-    assert.equal(state.admin.rpcCalls.length, 1);
-
-    const call = state.admin.rpcCalls[0];
-    assert.equal(call.name, 'add_credits');
-    assert.equal(call.args.p_user_id, UUID);
-    assert.equal(call.args.p_credits, 200, 'the renewal tops the balance up by the catalog amount');
-    assert.equal(call.args.p_pack_id, 'atelier_max');
-    assert.ok(call.args.p_stripe_payment_id.includes('in_dahlia_1'));
+    assert.equal(body.granted, false);
+    assert.equal(state.admin.rpcCalls.length, 0);
   });
 });
 
@@ -619,6 +590,7 @@ test('a successful Vision analysis consumes exactly one credit and returns the r
       assert.equal(consumes.length, 1, 'exactly one atomic debit per successful analysis');
       assert.equal(consumes[0].args.p_user_id, UUID);
       assert.equal(consumes[0].args.p_amount, 1);
+      assert.equal(typeof body.analysisPass, 'string', 'a paid scan opens the analysis');
     });
   } finally {
     restore();
@@ -828,5 +800,100 @@ test('the legacy consume endpoint no longer debits credits', async () => {
     assert.equal(res.status, 410);
     assert.equal(state.admin.rpcCalls.length, 0);
     assert.equal(state.admin.fromCalls.length, 0, 'no direct table write may bypass the atomic RPC');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// /api/optimize — one credit per complete analysis
+// ---------------------------------------------------------------------------
+
+const OPTIMIZE_BODY = {
+  sheet: { width: 244, height: 122, kerf: 0.3, material: 'mdf' },
+  pieces: [{ id: 'p1', name: 'Côté', width: 60, height: 40, quantity: 2, rotatable: true }],
+  options: { kerfWidth: 0.3 },
+};
+
+function optimizeRequest(body) {
+  return jsonRequest('https://qatlia.example/api/optimize', body);
+}
+
+function chargedRpc(name) {
+  return name === 'consume_credit' ? { data: { success: true, balance: 9 }, error: null } : defaultRpcResult(name);
+}
+
+test('an optimization without a pass is charged one credit and opens an analysis', async () => {
+  resetState();
+  state.user = { id: UUID, email: 'artisan@example.ma' };
+  state.admin.rpcResult = chargedRpc;
+
+  await withEnv(CONFIGURED, async () => {
+    const { POST } = loadTsModule('src/app/api/optimize/route.ts');
+    const res = await POST(optimizeRequest(OPTIMIZE_BODY));
+    const body = await res.json();
+
+    assert.equal(res.status, 200, JSON.stringify(body));
+    assert.equal(body.creditsCharged, 1);
+    assert.equal(body.creditsRemaining, 9);
+    assert.equal(typeof body.analysisPass, 'string');
+    assert.equal(rpcCallsNamed('consume_credit').length, 1);
+  });
+});
+
+test('a re-optimization inside an open analysis is free', async () => {
+  resetState();
+  state.user = { id: UUID, email: 'artisan@example.ma' };
+  state.admin.rpcResult = chargedRpc;
+
+  await withEnv(CONFIGURED, async () => {
+    const { POST } = loadTsModule('src/app/api/optimize/route.ts');
+    const first = await (await POST(optimizeRequest(OPTIMIZE_BODY))).json();
+    state.admin.rpcCalls = [];
+
+    const res = await POST(optimizeRequest({ ...OPTIMIZE_BODY, analysisPass: first.analysisPass }));
+    const body = await res.json();
+
+    assert.equal(res.status, 200);
+    assert.equal(body.creditsCharged, 0);
+    assert.equal(body.analysisPass, undefined, 'a covered run does not extend the window');
+    assert.equal(state.admin.rpcCalls.length, 0, 'nothing is debited or refunded');
+  });
+});
+
+test('another user\'s pass does not cover the run', async () => {
+  resetState();
+  state.user = { id: UUID, email: 'artisan@example.ma' };
+  state.admin.rpcResult = chargedRpc;
+
+  await withEnv(CONFIGURED, async () => {
+    const { issueAnalysisPass } = loadTsModule('src/lib/billing/analysis-pass.ts');
+    const foreign = issueAnalysisPass(CONFIGURED.SUPABASE_SERVICE_ROLE_KEY, '99999999-8888-4777-8666-555555555555');
+    const { POST } = loadTsModule('src/app/api/optimize/route.ts');
+    const body = await (await POST(optimizeRequest({ ...OPTIMIZE_BODY, analysisPass: foreign }))).json();
+
+    assert.equal(body.creditsCharged, 1);
+    assert.equal(rpcCallsNamed('consume_credit').length, 1);
+  });
+});
+
+test('an invalid body is refunded only when it was charged', async () => {
+  resetState();
+  state.user = { id: UUID, email: 'artisan@example.ma' };
+  state.admin.rpcResult = chargedRpc;
+  const invalid = { ...OPTIMIZE_BODY, sheet: undefined, sheets: undefined };
+
+  await withEnv(CONFIGURED, async () => {
+    const { POST } = loadTsModule('src/app/api/optimize/route.ts');
+
+    const charged = await POST(optimizeRequest(invalid));
+    assert.equal(charged.status, 400);
+    assert.equal(rpcCallsNamed('consume_credit').length, 1);
+    assert.equal(rpcCallsNamed('add_credits').length, 1, 'the debit is given back');
+
+    const { issueAnalysisPass } = loadTsModule('src/lib/billing/analysis-pass.ts');
+    const pass = issueAnalysisPass(CONFIGURED.SUPABASE_SERVICE_ROLE_KEY, UUID);
+    state.admin.rpcCalls = [];
+    const covered = await POST(optimizeRequest({ ...invalid, analysisPass: pass }));
+    assert.equal(covered.status, 400);
+    assert.equal(state.admin.rpcCalls.length, 0, 'a covered run must never mint a refund credit');
   });
 });

@@ -58,6 +58,7 @@ import { deriveQuotationPanels, deriveQuotationPieces } from '@/lib/quotation-it
 import { buildPdfPayload } from '@/lib/pdf-payload';
 import { buildPersistedProjectPayload } from '@/lib/projects/persistence-payload';
 import { downscaleDataUrl } from '@/lib/image-downscale';
+import { readAnalysisPass, storeAnalysisPass } from '@/lib/billing/analysis-pass-store';
 import {
   type DisplayUnit,
   DEFAULT_DISPLAY_UNIT,
@@ -486,10 +487,10 @@ const commitPanelName = () => {
     setIsOptimizing(true);
     setOptimizeError(null);
     try {
-      // Credit-metered run: the server debits 1 credit atomically before
-      // computing (pricing decision 2026-09: 1 crédit par optimisation,
-      // 2 pour un scan IA). The client-side optimizer remains only as a
-      // display fallback and is no longer the paid path.
+      // Credit-metered run: 1 credit per complete analysis. The server debits
+      // atomically before computing unless the stored analysis pass (from the
+      // scan or the last paid run) still covers this re-optimization. The
+      // client-side optimizer remains only as a display fallback.
       const res = await fetch('/api/optimize', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -499,6 +500,7 @@ const commitPanelName = () => {
           pieces,
           options,
           cutMode,
+          analysisPass: readAnalysisPass() ?? undefined,
         }),
       });
       const data = await res.json().catch(() => null);
@@ -517,6 +519,7 @@ const commitPanelName = () => {
         return;
       }
 
+      storeAnalysisPass(data.analysisPass);
       const optResult = data.result as OptimizationResult;
       setResult(optResult);
       setActiveSheetIndex(0);
@@ -591,6 +594,7 @@ const commitPanelName = () => {
             };
           });
           setPieces(normalizePiecesWithColors(newPieces));
+          storeAnalysisPass(data.analysisPass);
           // The server is the only authority on the balance; it is echoed back
           // only when a credit was actually debited.
           if (typeof data.creditsRemaining === 'number') setUserCredits(data.creditsRemaining);

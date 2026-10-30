@@ -6,9 +6,9 @@
  *     metadata (metadata is attacker-influenceable if a session is ever created
  *     outside this app);
  *   * a grant requires a canonical UUID user id — "anonymous" grants are refused;
- *   * a *subscription* checkout session grants nothing, because Stripe also emits
- *     `invoice.payment_succeeded` for the first period; granting on both would
- *     double-credit every new subscriber;
+ *   * only one-off payments are sold. A *subscription* checkout session is not
+ *     something this app creates, so it grants nothing, and invoices (which
+ *     only subscriptions produce) are not handled;
  *   * the idempotency key is derived from the payment object id only, so a
  *     redelivered event maps to the same key and the DB unique index absorbs it;
  *   * a *paid* event we recognise but cannot act on is `retryable`: the customer
@@ -30,7 +30,7 @@ export interface CreditGrant {
   credits: number;
   /** Stable key stored in credit_transactions.stripe_payment_id (unique index). */
   idempotencyKey: string;
-  source: 'checkout_session' | 'invoice' | 'creem_checkout' | 'creem_subscription';
+  source: 'checkout_session' | 'creem_checkout';
 }
 
 export type GrantResolution =
@@ -45,7 +45,7 @@ export type GrantResolution =
        * customer who paid and was silently given nothing.
        *
        * False for events we deliberately do not credit (other event types,
-       * unpaid sessions, subscription sessions credited by their invoice).
+       * unpaid sessions, subscription sessions this app never creates).
        * Failing those would make Stripe retry them forever.
        */
       retryable: boolean;
@@ -68,29 +68,6 @@ function readMetadata(...candidates: Metadata[]): Record<string, unknown> {
   return {};
 }
 
-/**
- * Every location a paid invoice may carry the subscription metadata mirrored by
- * buildCheckoutParams, current shape first.
- *
- * The Stripe client is pinned to `2026-07-29.dahlia`, which nests the
- * subscription metadata under `invoice.parent.subscription_details`. Reading
- * only the pre-Dahlia `invoice.subscription_details` made every renewal resolve
- * to "no grant" while the customer kept being charged. The older locations are
- * kept as fallbacks so an invoice replayed at an older API version still works.
- */
-function invoiceMetadata(object: Record<string, unknown>): Record<string, unknown> {
-  const parent = object.parent as { subscription_details?: { metadata?: Metadata } } | undefined;
-  const legacy = object.subscription_details as { metadata?: Metadata } | undefined;
-  const lines = object.lines as { data?: Array<{ metadata?: Metadata }> } | undefined;
-
-  return readMetadata(
-    parent?.subscription_details?.metadata,
-    legacy?.metadata,
-    lines?.data?.[0]?.metadata,
-    object.metadata as Metadata
-  );
-}
-
 function buildGrant(
   metadata: Record<string, unknown>,
   paymentId: unknown,
@@ -102,8 +79,6 @@ function buildGrant(
     return { ok: false, reason: 'INVALID_USER', retryable: true };
   }
 
-  // Accepts ids retired by a rename, so a subscription sold under an older name
-  // keeps renewing.
   const packId = normalizePackId(metadata.packId);
   if (!packId) {
     return { ok: false, reason: 'UNKNOWN_PACK', retryable: true };
@@ -131,19 +106,12 @@ export function resolveGrant(event: StripeEventLike): GrantResolution {
 
   if (event?.type === 'checkout.session.completed') {
     if (object.mode === 'subscription') {
-      return { ok: false, reason: 'SUBSCRIPTION_GRANTED_VIA_INVOICE', retryable: false };
+      return { ok: false, reason: 'SUBSCRIPTION_NOT_SOLD', retryable: false };
     }
     if (object.payment_status !== 'paid') {
       return { ok: false, reason: 'SESSION_NOT_PAID', retryable: false };
     }
     return buildGrant(readMetadata(object.metadata as Metadata), object.id, 'checkout_session', 'cs');
-  }
-
-  if (event?.type === 'invoice.payment_succeeded') {
-    if (object.status !== 'paid') {
-      return { ok: false, reason: 'INVOICE_NOT_PAID', retryable: false };
-    }
-    return buildGrant(invoiceMetadata(object), object.id, 'invoice', 'in');
   }
 
   return { ok: false, reason: `UNHANDLED_EVENT:${String(event?.type)}`, retryable: false };

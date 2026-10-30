@@ -40,9 +40,8 @@ export const legalEn: LegalCatalog = {
       s4: {
         title: 'Credits',
         body:
-          'Some actions use credits:\n' +
-          '- a successful photo analysis: {visionCost} credits;\n' +
-          '- an optimization run: {optimizeCost} credit;\n' +
+          'Credits pay for analyses:\n' +
+          '- a complete analysis costs {visionCost} credit. It covers the photo scan (or, for a list typed by hand, its first optimization run) and every re-run of that list for {windowHours} hours;\n' +
           '- exports and quotes are free.\n\n' +
           'Every new account receives {freeCredits} free credits. A failed analysis is not charged.\n\n' +
           'Credits stay on your balance for as long as your account is open. They have no cash value: they cannot be exchanged for money (except for a refund under our refund policy) or transferred to another account.',
@@ -56,10 +55,9 @@ export const legalEn: LegalCatalog = {
           'We never see or store your card details.',
       },
       s6: {
-        title: 'Atelier Max subscription',
+        title: 'One-off purchases, no subscription',
         body:
-          'The Atelier Max pack is a monthly subscription: it renews and is billed automatically every month, and its credits are added to your balance at each renewal.\n\n' +
-          'You can cancel at any time, from the management link sent by email with your Creem receipt or by writing to us. Cancelling stops the following renewals; credits already received stay usable.',
+          'Every pack is paid for once. QatliA sells no subscription: nothing renews or is charged automatically after your purchase.',
       },
       s7: {
         title: 'Refunds',
@@ -210,12 +208,6 @@ export const legalEn: LegalCatalog = {
           '- the free sign-up credits;\n' +
           '- a request made more than {days} days after the payment;\n' +
           '- credits obtained through fraud or in breach of our terms of service.',
-      },
-      s4: {
-        title: 'Atelier Max subscription',
-        body:
-          'You can cancel the subscription at any time: cancelling stops the following renewals.\n\n' +
-          'The last billed month is refundable under the same rule: within {days} days of that charge, in proportion to that month’s unused credits. Earlier months are not refundable.',
       },
       s5: {
         title: 'A credit charged by mistake',

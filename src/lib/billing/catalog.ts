@@ -25,7 +25,7 @@ export interface CreditPack {
   id: PackId;
   name: string;
   description: string;
-  /** Credits granted per successful payment (per month for recurring packs). */
+  /** Credits granted per successful payment. One credit is one complete analysis. */
   credits: number;
   /**
    * The allowance as shown on screen. It is always `String(credits)`: the plan
@@ -39,95 +39,78 @@ export interface CreditPack {
    * product's price: it is what the card button shows before the redirect.
    */
   priceUSD: number;
-  monthly: boolean;
   badge: string;
   highlight: boolean;
-  /** Recurring packs only: how the monthly grant behaves, stated on the card. */
-  renewalNote?: string;
-}
+};
 
+// Pricing v3 (user decision 2026-10-30): four one-off packs from 50 DH, no
+// subscription. The cheapest pack used to be 20 DH, where Creem's fixed
+// $0.40 per payment took ~17% of the sale; from 50 DH it takes ~12%, falling
+// to ~5% on the largest pack. `atelier_max` keeps its id (and its
+// CREEM_PRODUCT_ATELIER_MAX env var) but is now a one-off pack like the others.
 export const CREDIT_PACKS: Record<PackId, CreditPack> = {
   starter: {
     id: 'starter',
     name: 'Pack Découverte',
-    description: 'Idéal pour tester ou pour 1 petit chantier',
-    credits: 10,
-    displayCredits: '10',
-    priceMAD: 20,
-    priceUSD: 2.99,
-    monthly: false,
-    badge: '20 DH',
+    description: 'Idéal pour tester ou pour quelques chantiers',
+    credits: 30,
+    displayCredits: '30',
+    priceMAD: 50,
+    priceUSD: 4.99,
+    badge: '50 DH',
     highlight: false,
   },
   standard: {
     id: 'standard',
     name: 'Pack Artisan',
     description: 'Le choix populaire des menuisiers actifs',
-    credits: 50,
-    displayCredits: '50',
-    priceMAD: 40,
-    priceUSD: 4.99,
-    monthly: false,
-    badge: 'Populaire (40 DH)',
+    credits: 80,
+    displayCredits: '80',
+    priceMAD: 100,
+    priceUSD: 9.99,
+    badge: 'Populaire (100 DH)',
     highlight: true,
   },
   pro: {
     id: 'pro',
     name: 'Pack Atelier Pro',
     description: 'Pour les ateliers à fort volume de débit',
-    credits: 100,
-    displayCredits: '100',
-    priceMAD: 70,
-    priceUSD: 7.99,
-    monthly: false,
-    badge: 'Économique (70 DH)',
+    credits: 200,
+    displayCredits: '200',
+    priceMAD: 200,
+    priceUSD: 19.99,
+    badge: 'Économique (200 DH)',
     highlight: false,
   },
   atelier_max: {
     id: 'atelier_max',
-    // Previously sold as "Abonnement Mensuel — Illimité". It never was: the
-    // implementation grants a finite monthly allowance through the same atomic
-    // consume_credit path as the one-off packs, and the analysis past it is
-    // refused. The plan is now named and priced for what it actually is.
-    name: 'Abonnement Atelier Max',
-    // 200 a month (was 1000): at 1000 the plan cost ~8x less per credit than
-    // the Pro pack and made every one-off pack pointless.
-    description: '200 crédits par mois, pour les ateliers à très fort volume',
-    credits: 200,
-    displayCredits: '200',
-    priceMAD: 99,
-    priceUSD: 9.99,
-    monthly: true,
-    badge: '99 DH / mois',
+    name: 'Pack Atelier Max',
+    description: 'Le meilleur prix par analyse, pour les ateliers à très fort volume',
+    credits: 400,
+    displayCredits: '400',
+    priceMAD: 300,
+    priceUSD: 29.99,
+    badge: 'Meilleur prix (300 DH)',
     highlight: false,
-    renewalNote: '200 crédits ajoutés à votre solde chaque mois',
   },
 };
 
 export const PACK_IDS: readonly PackId[] = ['starter', 'standard', 'pro', 'atelier_max'];
-
-/**
- * Pack ids that are no longer sold but still appear in the Stripe metadata of
- * subscriptions and payments created before the rename. Refusing them would
- * stop crediting customers who are still being charged.
- */
-const RETIRED_PACK_IDS: Record<string, PackId> = {
-  unlimited: 'atelier_max',
-};
 
 export function isPackId(value: unknown): value is PackId {
   return typeof value === 'string' && (PACK_IDS as readonly string[]).includes(value);
 }
 
 /**
- * Resolve any pack id ever written into Stripe metadata to a currently sold
- * pack, or null if it names nothing. Use this when reading a webhook payload;
- * use `isPackId` when validating what a customer may buy today.
+ * Resolve a pack id read from webhook metadata to a currently sold pack, or
+ * null if it names nothing. The retired subscription id `unlimited` no longer
+ * resolves: no subscription was ever sold under it, and mapping it to today's
+ * 400-credit `atelier_max` pack would over-credit any stray replay.
  */
 export function normalizePackId(value: unknown): PackId | null {
   if (typeof value !== 'string') return null;
   if (isPackId(value)) return value;
-  return RETIRED_PACK_IDS[value] ?? null;
+  return null;
 }
 
 export function getPack(id: PackId): CreditPack {
