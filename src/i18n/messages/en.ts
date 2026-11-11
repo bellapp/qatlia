@@ -536,6 +536,7 @@ export const en: Catalog = {
     menuAria: 'Account menu {email}',
     sectionTitle: 'Workshop account',
     myAccount: 'My account',
+    buyCredits: 'Buy credits',
     creditsUsage: 'Credit usage',
     changePassword: 'Change password',
     logout: 'Sign out',

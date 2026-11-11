@@ -537,6 +537,7 @@ export const ar: Catalog = {
     menuAria: 'قائمة حساب {email}',
     sectionTitle: 'حساب الورشة',
     myAccount: 'حسابي',
+    buyCredits: 'شراء الأرصدة',
     creditsUsage: 'استعمال الأرصدة',
     changePassword: 'تغيير كلمة المرور',
     logout: 'تسجيل الخروج',
