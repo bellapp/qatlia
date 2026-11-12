@@ -106,6 +106,11 @@ test('fusion triée par date décroissante, emails résolus', async () => {
     ['creem', 'manual', 'manual']
   );
   assert.ok(r.payments.every((p) => p.email === 'chaima@bois.ma'));
+  assert.deepEqual(fake.ops('credit_transactions', 'like'), [
+    ['stripe_payment_id', 'creem:%'],
+    ['stripe_payment_id', 'cs:%'],
+  ]);
+  assert.deepEqual(fake.ops('credit_transactions', 'or'), [], 'no .or() filter string');
 });
 
 test('source carte : aucune lecture des commandes manuelles', async () => {
