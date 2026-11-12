@@ -115,6 +115,20 @@ function safeFinitePositive(value: unknown, fallback: number): number {
   return Number.isFinite(n) && n > 0 ? n : fallback;
 }
 
+/** The edge sides /api/vision read for a scanned piece, or undefined when it
+ *  has none. Only literal `true` counts, so a malformed reply bands nothing. */
+function scannedEdges(piece: unknown): Piece['edges'] | undefined {
+  const edges = (piece as { edges?: Record<string, unknown> } | null)?.edges;
+  if (!edges || typeof edges !== 'object') return undefined;
+  const sides = {
+    left: edges.left === true,
+    right: edges.right === true,
+    top: edges.top === true,
+    bottom: edges.bottom === true,
+  };
+  return sides.left || sides.right || sides.top || sides.bottom ? sides : undefined;
+}
+
 function normalizePiecesWithColors(sourcePieces: Piece[]): Piece[] {
   return sourcePieces.map((piece, index) => ({
     ...piece,
@@ -695,6 +709,9 @@ const commitPanelName = () => {
               quantity,
               material: (p.material as MaterialType) || (activeSheet.material || 'mdf'),
               rotatable: true,
+              // Chants read from the sheet's edge column, like a manual
+              // toggle: sides only, no banding type chosen yet.
+              ...(scannedEdges(p) ? { edges: scannedEdges(p) } : {}),
               color: getResolvedPieceColor({
                 color: p.color,
                 id: `ext_${Date.now()}_${i}`,
