@@ -165,7 +165,18 @@ export interface ClientDetail {
   projects: ProjectSummary[];
   panelPresetCount: number;
   note: ClientNote | null;
+  /** The 50 latest admin actions on this client, newest first. */
+  audit: ClientAuditEntry[];
 }
+
+export interface ClientAuditEntry {
+  action: string;
+  details: Record<string, unknown>;
+  createdAt: string;
+  adminId: string;
+}
+
+const AUDIT_LIMIT = 50;
 
 export type ClientDetailResult = { status: 'ok'; client: ClientDetail } | { status: 'not_found' } | { status: 'error' };
 
@@ -215,7 +226,7 @@ export async function getClientDetail(db: SupabaseClient, userId: string): Promi
   const user = authData?.user;
   if (!user) return { status: 'not_found' };
 
-  const [profile, ledger, orders, projects, presets, note] = await Promise.all([
+  const [profile, ledger, orders, projects, presets, note, audit] = await Promise.all([
     db.from('profiles').select('full_name, locale, credits, updated_at').eq('id', userId).maybeSingle(),
     db
       .from('credit_transactions')
@@ -236,6 +247,12 @@ export async function getClientDetail(db: SupabaseClient, userId: string): Promi
       .limit(PROJECT_LIMIT),
     db.from('panel_presets').select('id').eq('user_id', userId).limit(500),
     db.from('admin_client_notes').select('phone, tags, note, updated_at').eq('user_id', userId).maybeSingle(),
+    db
+      .from('admin_audit_log')
+      .select('action, details, created_at, admin_id')
+      .eq('target_user_id', userId)
+      .order('created_at', { ascending: false })
+      .limit(AUDIT_LIMIT),
   ]);
 
   // Without the ledger or the projects every figure on the page would be
@@ -281,6 +298,18 @@ export async function getClientDetail(db: SupabaseClient, userId: string): Promi
       projects: (Array.isArray(projects.data) ? projects.data : []).map((row) => summarizeProject(row as ProjectRow)),
       panelPresetCount: presets.error || !Array.isArray(presets.data) ? 0 : presets.data.length,
       note: clientNote,
+      audit:
+        audit.error || !Array.isArray(audit.data)
+          ? []
+          : audit.data.map((row) => {
+              const record = row as Record<string, unknown>;
+              return {
+                action: String(record.action ?? ''),
+                details: asRecord(record.details) ?? {},
+                createdAt: String(record.created_at ?? ''),
+                adminId: String(record.admin_id ?? ''),
+              };
+            }),
     },
   };
 }

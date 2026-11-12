@@ -188,6 +188,21 @@ test('getClientDetail : table des notes ou des panneaux absente ne casse pas la 
   assert.deepEqual([r.client.note, r.client.panelPresetCount, r.client.orders], [null, 0, []]);
 });
 
+test('getClientDetail renvoie les dernières actions admin, [] si la table manque', async () => {
+  const { client, state, ops } = freshDb();
+  state.tables.admin_audit_log = [
+    { action: 'credits_adjusted', details: { delta: 5, reason: 'Geste', balance: 25 }, created_at: '2026-11-12T10:00:00Z', admin_id: 'a' },
+    { action: 'note_updated', details: null, created_at: '2026-11-11T10:00:00Z', admin_id: 'a' },
+  ];
+  const r = await getClientDetail(client, UUID);
+  assert.deepEqual(r.client.audit[0], { action: 'credits_adjusted', details: { delta: 5, reason: 'Geste', balance: 25 }, createdAt: '2026-11-12T10:00:00Z', adminId: 'a' });
+  assert.deepEqual(r.client.audit[1].details, {});
+  assert.deepEqual(ops('admin_audit_log', 'limit'), [[50]]);
+
+  state.tableErrors = { admin_audit_log: { code: 'PGRST205', message: 'missing' } };
+  assert.deepEqual((await getClientDetail(client, UUID)).client.audit, []);
+});
+
 test('getClientDetail : échec du grand livre donne error (les chiffres seraient faux)', async () => {
   const { client, state } = freshDb();
   state.tableErrors = { credit_transactions: { code: '57014', message: 'timeout' } };

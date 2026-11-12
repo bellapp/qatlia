@@ -18,6 +18,7 @@ import {
   packLabel,
 } from '@/lib/admin/format';
 import { Badge, EmptyRow, Field, Notice, Section, Stat, td, th } from '../../ui';
+import { ClientNoteForm, CreditAdjustForm } from './ClientActions';
 
 export const dynamic = 'force-dynamic';
 
@@ -139,6 +140,10 @@ export default async function ClientPage({ params }: { params: { id: string } })
           <Stat label="Dernière activité" value={formatRelativeDays(lastActivity, now)} hint={formatDate(lastActivity)} />
           <Stat label="Projets / panneaux" value={`${client.projects.length} / ${client.panelPresetCount}`} hint="enregistrés" />
         </div>
+      </Section>
+
+      <Section title="Ajuster les crédits">
+        <CreditAdjustForm userId={identity.userId} balance={client.balance} />
       </Section>
 
       <Section title="Commandes manuelles" aside={`${client.orders.length} commande${client.orders.length > 1 ? 's' : ''}`}>
@@ -270,9 +275,56 @@ export default async function ClientPage({ params }: { params: { id: string } })
         )}
       </Section>
 
-      <Section title="Note" aside={client.note?.updatedAt ? `modifiée le ${formatDateTime(client.note.updatedAt)}` : undefined}>
-        <p className="text-sm text-slate-300 whitespace-pre-wrap break-words">{client.note?.note || 'Aucune note.'}</p>
+      <Section title="Note, téléphone, étiquettes" aside={client.note?.updatedAt ? `modifiée le ${formatDateTime(client.note.updatedAt)}` : undefined}>
+        <ClientNoteForm
+          userId={identity.userId}
+          initial={{ phone: client.note?.phone ?? null, tags: client.note?.tags ?? [], note: client.note?.note ?? null }}
+        />
+      </Section>
+
+      <Section title="Actions admin" aside={client.audit.length > 0 ? `${client.audit.length} dernière${client.audit.length > 1 ? 's' : ''}` : undefined}>
+        {client.audit.length === 0 ? (
+          <p className="text-xs text-slate-500">Aucune action admin sur ce client.</p>
+        ) : (
+          <ul className="divide-y divide-white/5">
+            {client.audit.map((entry, index) => (
+              <li key={`${entry.createdAt}-${index}`} className="py-2 flex flex-wrap items-baseline justify-between gap-2">
+                <span className="text-xs text-slate-200">
+                  <strong>{AUDIT_LABELS[entry.action] ?? entry.action}</strong>
+                  <span className="text-slate-400"> {describeAudit(entry.action, entry.details)}</span>
+                </span>
+                <span className="text-[11px] text-slate-500 whitespace-nowrap">{formatDateTime(entry.createdAt)}</span>
+              </li>
+            ))}
+          </ul>
+        )}
       </Section>
     </>
   );
+}
+
+const AUDIT_LABELS: Record<string, string> = {
+  payment_granted: 'Paiement validé',
+  payment_refused: 'Paiement refusé',
+  credits_adjusted: 'Crédits ajustés',
+  note_updated: 'Note modifiée',
+};
+
+const FIELD_LABELS: Record<string, string> = { phone: 'téléphone', tags: 'étiquettes', note: 'note' };
+
+function describeAudit(action: string, details: Record<string, unknown>): string {
+  if (action === 'credits_adjusted') {
+    const delta = Number(details.delta);
+    const sign = delta > 0 ? `+${delta}` : String(delta);
+    return `${sign} cr${typeof details.reason === 'string' ? ` — ${details.reason}` : ''}${details.balance !== null && details.balance !== undefined ? ` (solde ${details.balance})` : ''}`;
+  }
+  if (action === 'payment_granted' || action === 'payment_refused') {
+    return [details.order_number, details.amount_mad !== undefined ? formatMad(Number(details.amount_mad)) : null, details.operator_note]
+      .filter((part) => typeof part === 'string' && part !== '')
+      .join(' · ');
+  }
+  if (action === 'note_updated' && Array.isArray(details.fields)) {
+    return details.fields.map((field) => FIELD_LABELS[String(field)] ?? String(field)).join(', ');
+  }
+  return '';
 }
