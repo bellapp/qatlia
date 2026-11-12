@@ -31,6 +31,16 @@ test('la décision sur une commande refuse un appel sans session', async ({ requ
   expect(res.status()).toBe(401);
 });
 
+test('les actions sur un client refusent un appel sans session', async ({ request }) => {
+  const id = '11111111-2222-4333-8444-555555555555';
+  const credits = await request.post(`/api/admin/clients/${id}/credits`, {
+    data: { delta: 10, reason: 'test', requestId: '22222222-3333-4444-8555-666666666666' },
+  });
+  expect(credits.status()).toBe(401);
+  const note = await request.put(`/api/admin/clients/${id}/note`, { data: { phone: null, tags: [], note: 'x' } });
+  expect(note.status()).toBe(401);
+});
+
 test("une fiche client n'est pas lisible sans session", async ({ page }) => {
   await page.goto('/admin/clients/11111111-2222-4333-8444-555555555555');
   await expect(page).toHaveURL(/\/auth\/login\?redirect=%2Fadmin%2Fclients%2F11111111-2222-4333-8444-555555555555$/);
