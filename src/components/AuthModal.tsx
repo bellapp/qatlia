@@ -89,11 +89,26 @@ export function isExistingAccount(user: { identities?: unknown[] } | null | unde
   return !!user && Array.isArray(user.identities) && user.identities.length === 0;
 }
 
+/**
+ * What the visitor was doing when sign-in was asked for. The wording says it,
+ * and for a scan or an optimization it promises the work is kept and resumes
+ * right after sign-in (see src/lib/pending-work.ts).
+ */
+export type AuthPurpose = 'pdf' | 'scan' | 'optimize';
+
+const PURPOSE_KEYS: Record<AuthPurpose, { title: TranslationKey; subtitle: TranslationKey; loginSubtitle: TranslationKey; submitLogin: TranslationKey }> = {
+  pdf: { title: 'auth.defaultTitle', subtitle: 'auth.defaultSubtitle', loginSubtitle: 'auth.loginSubtitle', submitLogin: 'auth.submitLogin' },
+  scan: { title: 'auth.scan.title', subtitle: 'auth.scan.subtitle', loginSubtitle: 'auth.scan.loginSubtitle', submitLogin: 'auth.scan.submitLogin' },
+  optimize: { title: 'auth.optimize.title', subtitle: 'auth.optimize.subtitle', loginSubtitle: 'auth.optimize.loginSubtitle', submitLogin: 'auth.optimize.submitLogin' },
+};
+
 interface AuthModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSuccess: () => void;
   initialMode?: 'login' | 'signup';
+  /** What sign-in is for; picks the wording. Defaults to the PDF export. */
+  purpose?: AuthPurpose;
   /** Overrides the localized default heading (used by callers with their own context). */
   title?: string;
   subtitle?: string;
@@ -115,10 +130,12 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   onClose,
   onSuccess,
   initialMode = 'signup',
+  purpose = 'pdf',
   title,
   subtitle,
 }) => {
   const { t } = useLocale();
+  const keys = PURPOSE_KEYS[purpose];
   const [isLogin, setIsLogin] = useState(initialMode === 'login');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -128,6 +145,8 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   const [loading, setLoading] = useState(false);
   const [oauthLoading, setOauthLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  /** Shown after a sign-up that still needs its email confirmed. */
+  const [infoMsg, setInfoMsg] = useState<string | null>(null);
   /** Ties `aria-labelledby` to the heading, and stays the same for the life of the modal. */
   const headingId = useId();
   const dialogRef = useRef<HTMLDivElement>(null);
@@ -182,9 +201,12 @@ export const AuthModal: React.FC<AuthModalProps> = ({
     const supabase = createClient();
     try {
       const origin = typeof window !== 'undefined' ? window.location.origin : 'https://qatlia.vercel.app';
+      // Back to the page the visitor was on (the atelier keeps their work),
+      // not the home page.
+      const back = typeof window !== 'undefined' ? window.location.pathname : '/';
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
-        options: { redirectTo: `${origin}/auth/callback` },
+        options: { redirectTo: `${origin}/auth/callback?redirect=${encodeURIComponent(back)}` },
       });
       if (error) throw error;
     } catch (err: unknown) {
@@ -201,6 +223,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
     }
     setLoading(true);
     setErrorMsg(null);
+    setInfoMsg(null);
     const supabase = createClient();
     try {
       if (isLogin) {
@@ -216,6 +239,15 @@ export const AuthModal: React.FC<AuthModalProps> = ({
         if (isExistingAccount(data.user)) {
           setErrorMsg(t('auth.errors.alreadyRegistered'));
           setIsLogin(true);
+          return;
+        }
+        // Email confirmation is on: the account exists but nobody is signed
+        // in yet. Say so instead of closing as if it had worked.
+        if (!data.session) {
+          setInfoMsg(t('auth.checkEmail', { email }));
+          setIsLogin(true);
+          setPassword('');
+          setConfirmPassword('');
           return;
         }
       }
@@ -242,21 +274,24 @@ export const AuthModal: React.FC<AuthModalProps> = ({
 
         <div className="space-y-2 pe-8">
           <div className="text-brand-400"><QatlIALogo size="md" /></div>
-          <h2 id={headingId} className="text-xl font-black text-slate-900 dark:text-white">{title ?? t('auth.defaultTitle')}</h2>
+          <h2 id={headingId} className="text-xl font-black text-slate-900 dark:text-white">{title ?? t(keys.title)}</h2>
           <p className="text-sm text-slate-600 dark:text-slate-400">
             {isLogin
-              ? t('auth.loginSubtitle')
-              : subtitle ?? t('auth.defaultSubtitle', { count: FREE_VISION_CREDITS })}
+              ? t(keys.loginSubtitle)
+              : subtitle ?? t(keys.subtitle, { count: FREE_VISION_CREDITS })}
           </p>
         </div>
 
-        <div className="flex items-center gap-2 p-2.5 rounded-xl bg-brand-400/10 border border-brand-500/20 text-brand-300 text-xs font-medium">
+        <div className="flex items-center gap-2 p-2.5 rounded-xl bg-brand-400/10 border border-brand-500/20 text-brand-600 dark:text-brand-300 text-xs font-semibold">
           <Gift className="w-4 h-4 text-brand-400 shrink-0" />
           {t('auth.perk', { count: FREE_VISION_CREDITS })}
         </div>
 
         {errorMsg && (
           <div role="alert" className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-700 dark:text-rose-300 text-xs">{errorMsg}</div>
+        )}
+        {infoMsg && (
+          <div role="status" className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-700 dark:text-emerald-300 text-xs">{infoMsg}</div>
         )}
 
         <button
@@ -347,7 +382,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
             disabled={loading || oauthLoading}
             className="w-full py-3 rounded-xl bg-brand-400 hover:bg-brand-500 text-slate-950 font-black text-sm flex items-center justify-center gap-2 disabled:opacity-50"
           >
-            {isLogin ? t('auth.submitLogin') : t('auth.submitSignup')}
+            {isLogin ? t(keys.submitLogin) : t('auth.submitSignup')}
             <ArrowRight className="w-4 h-4 rtl:-scale-x-100" aria-hidden="true" />
           </button>
         </form>
