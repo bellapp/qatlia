@@ -131,24 +131,35 @@ export async function listPayments(db: SupabaseClient, filters: PaymentFilters):
         return query;
       })()
     : null;
-  const cardQuery = wantCard
-    ? db
-        .from('credit_transactions')
-        .select('*')
-        .or(`stripe_payment_id.like.${LEDGER_KEY_PREFIXES.creem}%,stripe_payment_id.like.${LEDGER_KEY_PREFIXES.stripe}%`)
-        .order('created_at', { ascending: false })
-        .limit(LIST_LIMIT)
-    : null;
+  // One plain LIKE query per provider prefix (rather than an .or() filter
+  // string, whose ':' would need PostgREST escaping).
+  const cardQuery = (prefix: string) =>
+    db
+      .from('credit_transactions')
+      .select('*')
+      .like('stripe_payment_id', `${prefix}%`)
+      .order('created_at', { ascending: false })
+      .limit(LIST_LIMIT);
 
-  const [manual, card] = await Promise.all([manualQuery, cardQuery]);
-  if (manual?.error || card?.error) {
-    console.error('admin payments list failed:', (manual?.error || card?.error)?.message);
+  const [manual, creem, stripe] = await Promise.all([
+    manualQuery,
+    wantCard ? cardQuery(LEDGER_KEY_PREFIXES.creem) : null,
+    wantCard ? cardQuery(LEDGER_KEY_PREFIXES.stripe) : null,
+  ]);
+  const failure = manual?.error || creem?.error || stripe?.error;
+  if (failure) {
+    console.error('admin payments list failed:', failure.message);
     return { status: 'error' };
+  }
+
+  const cardRows = new Map<string, LedgerRow & { user_id: string }>();
+  for (const row of [...((creem?.data as (LedgerRow & { user_id: string })[] | null) ?? []), ...((stripe?.data as (LedgerRow & { user_id: string })[] | null) ?? [])]) {
+    cardRows.set(row.id, row);
   }
 
   const payments: PaymentView[] = [
     ...((manual?.data as Record<string, unknown>[] | null) ?? []).map(toManualPaymentView),
-    ...((card?.data as (LedgerRow & { user_id: string })[] | null) ?? [])
+    ...Array.from(cardRows.values())
       .map(toCardPaymentView)
       .filter((p): p is PaymentView => p !== null),
   ];
