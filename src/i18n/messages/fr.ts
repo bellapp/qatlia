@@ -214,7 +214,7 @@ export const fr = {
       navOptimization: 'Optimisation',
       navMaterials: 'Matériaux',
       navQuotation: 'Chiffrage & Devis',
-      navCutSettings: 'Trait de scie & Chants',
+      navCutSettings: 'Réglages de coupe',
     },
     /**
      * Name given to the project saved after an optimization. `{material}` is the
@@ -224,8 +224,8 @@ export const fr = {
     project: {
       nameBars: 'Barres {material} — {count} pcs',
       nameSheets: 'Débit {material} — {count} pcs',
-      defaultTitle: 'Projet de débit',
-      nameAria: 'Nommer le projet',
+      nameLabel: 'Nom de l’affaire (optionnel)',
+      namePlaceholder: 'Ex. : Cuisine M. Alami',
       optimized: 'Optimisation réussie',
       rerun: 'Relancer l’optimisation',
     },

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useLayoutEffect, useMemo } from 'react';
+import React, { useState, useEffect, useLayoutEffect, useMemo, useRef } from 'react';
 import Link from 'next/link';
 import { createClient } from '@/lib/supabase/client';
 import {
@@ -161,6 +161,16 @@ export default function Dashboard() {
   // Never client-guessed; only ever set from a successful save response.
   const [lastSavedProjectId, setLastSavedProjectId] = useState<string | null>(null);
   const [showAdvancedOptions, setShowAdvancedOptions] = useState<boolean>(false);
+  const advancedOptionsRef = useRef<HTMLDivElement>(null);
+
+  /** Opens the cutting-settings panel and scrolls it into view. */
+  const openAdvancedOptions = () => {
+    setShowAdvancedOptions(true);
+    // Wait one frame so the panel is rendered before measuring where to scroll.
+    requestAnimationFrame(() => {
+      advancedOptionsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+  };
   const [displayUnit, setDisplayUnit] = useState<DisplayUnit>(DEFAULT_DISPLAY_UNIT);
   // True while the restored/current project still owes its next save an
   // explicit unit-metadata rewrite (legacy project with no metadata at all).
@@ -958,10 +968,12 @@ const commitPanelName = () => {
                 <FileText className="w-4 h-4" />
                 {t('atelier.sidebar.navQuotation')}
               </button>
+              {/* The settings panel sits under the pieces list, far below the
+                  fold: this entry opens it and brings it into view, never
+                  toggles it shut out of sight. */}
               <button
                 type="button"
-                onClick={() => setShowAdvancedOptions(!showAdvancedOptions)}
-                aria-expanded={showAdvancedOptions}
+                onClick={openAdvancedOptions}
                 aria-controls="advanced-cutting-options"
                 className="inline-flex shrink-0 items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-bold transition-colors text-slate-600 dark:text-slate-300 hover:bg-studio-panel hover:text-slate-900 dark:hover:text-white"
               >
@@ -995,16 +1007,22 @@ const commitPanelName = () => {
               <span className="w-8 h-8 rounded-lg bg-brand-400/10 border border-brand-500/25 flex items-center justify-center">
                 <ClipboardList className="w-4 h-4 text-brand-500 dark:text-brand-400" />
               </span>
-              <div className="min-w-0">
+              {/* The job name is saved as the project's name in history, so it
+                  reads as a labelled field rather than a title nobody edits. */}
+              <div className="min-w-0 flex-1 sm:flex-none">
+                <label htmlFor="project-name-input" className="block text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                  {t('atelier.project.nameLabel')}
+                </label>
                 <input
+                  id="project-name-input"
                   value={projectNameDraft}
                   onChange={(e) => setProjectNameDraft(e.target.value)}
                   onBlur={commitProjectName}
                   onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur(); }}
-                  placeholder={activeSheet.label?.trim() || t('atelier.project.defaultTitle')}
-                  aria-label={t('atelier.project.nameAria')}
+                  placeholder={t('atelier.project.namePlaceholder')}
+                  maxLength={120}
                   data-testid="project-name-input"
-                  className="block w-full max-w-[260px] bg-transparent text-sm font-black text-slate-900 dark:text-white outline-none border-none p-0 focus:ring-0 placeholder:text-slate-400 dark:placeholder:text-slate-500 truncate"
+                  className="mt-0.5 block w-full sm:w-[260px] rounded-lg bg-studio-field border border-studio-border px-2.5 py-1.5 text-sm font-bold text-slate-900 dark:text-white outline-none focus:border-brand-500/60 focus:ring-2 focus:ring-brand-500/20 placeholder:font-normal placeholder:text-slate-400 dark:placeholder:text-slate-500"
                 />
                 {/* Same figures as the cut-list chip: pieces are quantities summed,
                     lines are rows (counting distinct names merged same-named rows). */}
@@ -1336,8 +1354,9 @@ const commitPanelName = () => {
               />
             </div>
 
-            {/* Collapsible Advanced Options */}
-            <div className="rounded-xl overflow-hidden">
+            {/* Collapsible Advanced Options. scroll-mt clears the sticky header
+                and the section nav when the nav entry scrolls here. */}
+            <div ref={advancedOptionsRef} className="rounded-xl overflow-hidden scroll-mt-32">
               <button
                 type="button"
                 onClick={() => setShowAdvancedOptions(!showAdvancedOptions)}
