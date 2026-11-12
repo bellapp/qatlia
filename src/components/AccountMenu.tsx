@@ -4,7 +4,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
-import { ChevronDown, KeyRound, LogOut, MessageCircle, Receipt, User } from 'lucide-react';
+import { ChevronDown, KeyRound, LogOut, MessageCircle, Receipt, User, Zap } from 'lucide-react';
 import { useLocale } from '@/components/LocaleProvider';
 import { supportWhatsAppUrl } from '@/lib/support';
 
@@ -57,6 +57,16 @@ export function AccountMenu({ email }: AccountMenuProps) {
             <p className="text-[10px] uppercase tracking-wider text-slate-500 dark:text-slate-400 font-semibold">{t('account.sectionTitle')}</p>
             <p className="text-xs text-slate-800 dark:text-slate-200 truncate mt-0.5">{email}</p>
           </div>
+          {/* Buying is the entry artisans look for, so it comes first and carries
+              the same accent and bolt as the balance badge. */}
+          <Link
+            href="/credits"
+            onClick={() => setOpen(false)}
+            className="flex items-center gap-2 mx-1.5 my-1 px-2.5 py-2 rounded-lg bg-brand-400/10 border border-brand-500/25 text-xs font-bold text-brand-400 hover:bg-brand-500/15 transition-colors"
+          >
+            <Zap className="w-3.5 h-3.5 fill-brand-400 text-brand-400" aria-hidden="true" />
+            {t('account.buyCredits')}
+          </Link>
           <Link
             href="/account"
             onClick={() => setOpen(false)}

@@ -594,6 +594,7 @@ export const fr = {
     menuAria: 'Menu du compte {email}',
     sectionTitle: 'Compte atelier',
     myAccount: 'Mon compte',
+    buyCredits: 'Acheter des crédits',
     creditsUsage: 'Usage des crédits',
     changePassword: 'Changer le mot de passe',
     logout: 'Déconnexion',
