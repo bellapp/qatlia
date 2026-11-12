@@ -121,4 +121,22 @@ test('013 : colonnes ajoutées sans toucher aux fonctions existantes', () => {
   assertNoExistingFunctionTouched(SQL_013);
 });
 
+// ─── 014 ────────────────────────────────────────────────────────────────────
+
+const SQL_014 = read('014_admin_actions.sql');
+
+test('014 : admin_adjust_credits est SECURITY DEFINER, search_path figé, service_role seul', () => {
+  assertServiceRoleFunction(SQL_014, 'admin_adjust_credits', '(UUID, INT, TEXT)');
+});
+
+test('014 : verrou, clé idempotente admin:, refus du solde négatif', () => {
+  const fn = flat(SQL_014).find((s) => /CREATE OR REPLACE FUNCTION public\.admin_adjust_credits/i.test(s));
+  assert.match(fn, /FOR UPDATE/);
+  assert.ok(fn.includes(`'${LEDGER_KEY_PREFIXES.admin}'`));
+  assert.match(fn, /ON CONFLICT \(stripe_payment_id\)/);
+  assert.match(fn, /'INSUFFICIENT_CREDITS'/);
+  assert.match(fn, /'INVALID_DELTA'/);
+  assertNoExistingFunctionTouched(SQL_014);
+});
+
 module.exports = { assertClosedTable, assertServiceRoleFunction, assertNoExistingFunctionTouched, read, flat };
