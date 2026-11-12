@@ -4,6 +4,7 @@ import { createClient } from '@/lib/supabase/server';
 import { createClient as createAdminClient, type SupabaseClient } from '@supabase/supabase-js';
 import { getSupabaseAdminConfig } from '@/lib/billing/config';
 import { CompanyIdentitySchema, ClientIdentitySchema, QUOTATION_LOCALES } from '@/lib/quotation';
+import { sanitizePdfGeneratedAt } from '@/lib/projects/history-metadata';
 
 /**
  * `GET /api/projects/[id]` — read-only, ownership-checked access to a single
@@ -99,17 +100,24 @@ export async function GET(_req: Request, context: { params: { id: string } }) {
 
 
 /**
- * `PATCH /api/projects/[id]` — rename a saved project. Ownership-checked:
- * the row only updates when it belongs to the signed-in artisan, and
- * "doesn't exist" / "belongs to someone else" answer identically (the same
- * enumeration-protection convention as the GET handler).
+ * `PATCH /api/projects/[id]` — rename a saved project, or record that its
+ * PDF was generated. Ownership-checked: the row only updates when it belongs
+ * to the signed-in artisan, and "doesn't exist" / "belongs to someone else"
+ * answer identically (the same enumeration-protection convention as the GET
+ * handler).
+ *
+ * The PDF marker is merged into `options_json` (read, then written back with
+ * every other key kept — quotation metadata included), so exporting a PDF no
+ * longer saves the whole project a second time as a duplicate history entry.
  *
  * Local-only projects (never synced to the cloud `projects` table) cannot be
- * renamed here — the client renames those directly in localStorage.
+ * updated here — the client renames those directly in localStorage.
  */
 const RenameSchema = z.object({
   name: z.string().trim().min(1, 'EMPTY_NAME').max(80, 'NAME_TOO_LONG'),
 });
+
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 export async function PATCH(
   req: Request,
@@ -124,15 +132,54 @@ export async function PATCH(
       return NextResponse.json({ error: 'AUTH_REQUIRED' }, { status: 401 });
     }
 
-    const parsed = RenameSchema.safeParse(await req.json());
+    const body = (await req.json().catch(() => null)) as Record<string, unknown> | null;
+    const isPdfMarker = !!body && typeof body === 'object' && 'pdfGeneratedAt' in body && !('name' in body);
+
+    // UUID guard: a non-UUID id can never be a cloud row; refuse early.
+    const { id } = await params;
+
+    if (isPdfMarker) {
+      const pdfGeneratedAt = sanitizePdfGeneratedAt(body.pdfGeneratedAt);
+      if (!pdfGeneratedAt) {
+        return NextResponse.json({ error: 'INVALID_PDF_DATE' }, { status: 400 });
+      }
+      if (!UUID_PATTERN.test(id)) {
+        return NextResponse.json({ error: 'NOT_FOUND' }, { status: 404 });
+      }
+      const db = createDbClient();
+      const { data: row, error: lookupError } = await db
+        .from('projects')
+        .select('id, user_id, options_json')
+        .eq('id', id)
+        .eq('user_id', user.id)
+        .maybeSingle();
+      if (lookupError) {
+        console.error('project pdf marker lookup failed:', lookupError.message);
+        return NextResponse.json({ error: 'PROJECT_LOOKUP_FAILED' }, { status: 503 });
+      }
+      if (!row) {
+        return NextResponse.json({ error: 'NOT_FOUND' }, { status: 404 });
+      }
+      const existing = row.options_json && typeof row.options_json === 'object' ? (row.options_json as Record<string, unknown>) : {};
+      const { error: updateError } = await db
+        .from('projects')
+        .update({ options_json: { ...existing, pdfGeneratedAt } })
+        .eq('id', id)
+        .eq('user_id', user.id);
+      if (updateError) {
+        console.error('project pdf marker update failed:', updateError.message);
+        return NextResponse.json({ error: 'PROJECT_UPDATE_FAILED' }, { status: 503 });
+      }
+      return NextResponse.json({ success: true, id, pdfGeneratedAt });
+    }
+
+    const parsed = RenameSchema.safeParse(body);
     if (!parsed.success) {
       return NextResponse.json({ error: 'INVALID_NAME' }, { status: 400 });
     }
     const { name } = parsed.data;
 
-    // UUID guard: a non-UUID id can never be a cloud row; refuse early.
-    const { id } = await params;
-    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)) {
+    if (!UUID_PATTERN.test(id)) {
       return NextResponse.json({ error: 'NOT_FOUND' }, { status: 404 });
     }
 
@@ -150,7 +197,7 @@ export async function PATCH(
     }
     return NextResponse.json({ success: true, id: data.id, name: data.name });
   } catch (err) {
-    console.error('project rename failed:', err);
+    console.error('project update failed:', err);
     return NextResponse.json({ error: 'SERVER_ERROR' }, { status: 500 });
   }
 }
