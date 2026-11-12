@@ -10,6 +10,6 @@ test('un visiteur non connecté est renvoyé vers la connexion', async ({ page }
 
 test("une fiche client n'est pas lisible sans session", async ({ page }) => {
   await page.goto('/admin/clients/11111111-2222-4333-8444-555555555555');
-  await expect(page).toHaveURL(/\/auth\/login/);
+  await expect(page).toHaveURL(/\/auth\/login\?redirect=%2Fadmin%2Fclients%2F11111111-2222-4333-8444-555555555555$/);
   await expect(page.getByText('11111111-2222-4333-8444-555555555555')).toHaveCount(0);
 });
