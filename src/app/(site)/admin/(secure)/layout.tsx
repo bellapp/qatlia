@@ -11,7 +11,7 @@ import { AdminNav } from './AdminNav';
 export const dynamic = 'force-dynamic';
 
 export default async function SecureAdminLayout({ children }: { children: React.ReactNode }) {
-  const admin = await requireAdminPage('/admin/clients');
+  const admin = await requireAdminPage('/admin');
 
   return (
     <div className="min-h-screen bg-[#0B1220] text-slate-200 font-sans antialiased px-4 py-5 md:px-8 md:py-8">

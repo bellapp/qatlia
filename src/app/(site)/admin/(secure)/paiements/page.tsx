@@ -49,14 +49,16 @@ export default async function PaymentsPage({ searchParams }: { searchParams: Rec
       </p>
 
       <div className="flex flex-wrap items-center gap-3">
-        <div className="flex flex-wrap gap-1.5" aria-label="Statut">
+        <div className="flex flex-wrap items-center gap-1.5" aria-label="Statut">
+          <span className="text-[10px] font-bold uppercase tracking-widest text-slate-500 me-1">Statut</span>
           {(Object.keys(STATUS_LABELS) as PaymentFilters['status'][]).map((status) => (
             <Link key={status} href={hrefWith(filters, { status })} aria-current={filters.status === status ? 'true' : undefined} className={pill(filters.status === status)}>
               {STATUS_LABELS[status]}
             </Link>
           ))}
         </div>
-        <div className="flex flex-wrap gap-1.5" aria-label="Moyen de paiement">
+        <div className="flex flex-wrap items-center gap-1.5" aria-label="Moyen de paiement">
+          <span className="text-[10px] font-bold uppercase tracking-widest text-slate-500 me-1">Moyen</span>
           {(Object.keys(SOURCE_LABELS) as PaymentFilters['source'][]).map((source) => (
             <Link key={source} href={hrefWith(filters, { source })} aria-current={filters.source === source ? 'true' : undefined} className={pill(filters.source === source)}>
               {SOURCE_LABELS[source]}
