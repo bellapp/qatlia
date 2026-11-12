@@ -413,7 +413,10 @@ const commitPanelName = () => {
 
   const persistProject = async (
     nextResult: OptimizationResult,
-    source: 'optimize' | 'pdf'
+    source: 'optimize' | 'pdf',
+    // Values set in this same event handler, which the state above does not
+    // carry yet (React applies setState on the next render).
+    overrides: { pdfGeneratedAt?: string } = {}
   ) => {
     // The persisted historical marker stays true forever once true: either
     // this save is itself the rewrite of a legacy record (pendingUnitMigration),
@@ -428,7 +431,7 @@ const commitPanelName = () => {
       name: derivedProjectName,
       projectName: projectName.trim() || undefined,
       scanThumb: scanThumb || undefined,
-      pdfGeneratedAt: pdfGeneratedAt || undefined,
+      pdfGeneratedAt: overrides.pdfGeneratedAt || pdfGeneratedAt || undefined,
       sheets,
       sheet: activeSheet,
       pieces,
@@ -491,6 +494,30 @@ const commitPanelName = () => {
       options_json: payload as unknown as LocalHistoryItem['options_json'],
     });
     }
+  };
+
+  /**
+   * Marks the saved project as having a PDF. When the plan was already saved
+   * (by the optimization, or reopened from history), only that project's
+   * marker is updated: saving the whole project again would add a duplicate
+   * entry to the history. A new save remains the fallback when there is no
+   * saved project to update.
+   */
+  const recordPdfGenerated = async (generatedAt: string) => {
+    if (!result) return;
+    if (lastSavedProjectId) {
+      try {
+        const res = await fetch(`/api/projects/${lastSavedProjectId}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ pdfGeneratedAt: generatedAt }),
+        });
+        if (res.ok) return;
+      } catch (err) {
+        console.error('Erreur enregistrement PDF dans l’historique:', err);
+      }
+    }
+    await persistProject(result, 'pdf', { pdfGeneratedAt: generatedAt });
   };
 
   const handleRunOptimization = async () => {
@@ -569,10 +596,12 @@ const commitPanelName = () => {
 
         const data = await res.json();
         if (data.success && Array.isArray(data.pieces) && data.pieces.length > 0) {
-          // The thumbnail is rendered at 12x12 — the downscaled bytes are
-          // indistinguishable there and keep the full-res photo out of state.
+          // The thumbnail is saved with the project and shown in history:
+          // 600px keeps the cut list readable while staying well under the
+          // server's size cap (SCAN_THUMB_MAX_CHARS), since the history page
+          // loads every project's thumbnail at once.
           setPreviewImage(scanImage);
-          void downscaleDataUrl(scanImage).then(setScanThumb);
+          void downscaleDataUrl(scanImage, 600, 0.7).then(setScanThumb);
           const newPieces: Piece[] = data.pieces.map((p: { name?: string; width?: number | string; height?: number | string; quantity?: number | string; material?: string; color?: string }, i: number) => {
             // /api/vision always extracts and returns canonical centimetres
             // (see its prompt), so no magnitude-based mm heuristic is applied
@@ -786,8 +815,9 @@ const commitPanelName = () => {
       });
 
       if (res.ok) {
-        setPdfGeneratedAt(new Date().toISOString());
-        await persistProject(result, 'pdf');
+        const generatedAt = new Date().toISOString();
+        setPdfGeneratedAt(generatedAt);
+        await recordPdfGenerated(generatedAt);
 
         const blob = await res.blob();
         const url = window.URL.createObjectURL(blob);

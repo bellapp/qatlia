@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { createClient as createAdminClient } from '@supabase/supabase-js';
 import { resolveRequestUnitMetadata, type RequestUnitMetadataInput } from '@/lib/projects/unit-metadata';
+import { pickProjectHistoryMetadata } from '@/lib/projects/history-metadata';
 
 async function getSessionAndDb() {
   const supabase = createClient();
@@ -78,6 +79,9 @@ export async function POST(request: Request) {
     // strings/booleans as-is; narrow them through the same legacy-safe gate
     // resolveProjectUnitMetadata uses (missing/garbage -> cm/cm/migratedFromLegacyUnit=true).
     const unitMetadata = resolveRequestUnitMetadata(body as RequestUnitMetadataInput);
+    // Job name, scan thumbnail, PDF marker and stock sheets: what the history
+    // page and the atelier restore read back. Validated, never stored raw.
+    const historyMetadata = pickProjectHistoryMetadata(body);
 
     await db.from('profiles').upsert(
       {
@@ -101,7 +105,7 @@ export async function POST(request: Request) {
 
     let insert = await db
       .from('projects')
-      .insert({ ...baseRow, options_json: { options, pieces, sheet, result, ...unitMetadata } })
+      .insert({ ...baseRow, options_json: { options, pieces, sheet, result, ...unitMetadata, ...historyMetadata } })
       .select('id')
       .single();
 
