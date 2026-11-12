@@ -1,6 +1,7 @@
 'use client';
 
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import {
   Search,
   Plus,
@@ -39,12 +40,24 @@ const EDGE_SIDES: readonly EdgeSide[] = ['left', 'right', 'top', 'bottom'];
 /** Amber stroke color for active edges, matching the brand accent used elsewhere for edge state. */
 const EDGE_ACTIVE_STROKE = '#f59e0b';
 
+/** Popover footprint (w-36 and its rendered height), used to place it before it paints. */
+const EDGE_POPOVER_WIDTH = 144;
+const EDGE_POPOVER_HEIGHT = 140;
+const EDGE_POPOVER_GAP = 4;
+const VIEWPORT_MARGIN = 8;
+
+type EdgePopoverPosition = { top: number; left: number };
+
 /**
  * Compact "piece from above" diagram: a row button that always reflects the
  * current edge state, and a popover with 4 clickable zones to toggle each
  * side. The square's left/right/top/bottom map to the piece's physical sides
  * (not the UI's logical start/end), so the diagram stays geometrically
  * correct in RTL — only the popover's own placement follows text direction.
+ *
+ * The popover is portalled to <body> with fixed positioning: the pieces list
+ * scrolls inside a 340px box, which clipped an absolute popover on its last
+ * rows. It opens upward when the space below the button is too short.
  */
 function EdgePickerButton({
   name,
@@ -55,15 +68,47 @@ function EdgePickerButton({
   edges: EdgeBandingConfig;
   onToggle: (side: EdgeSide) => void;
 }) {
-  const { t } = useLocale();
+  const { t, dir } = useLocale();
   const [open, setOpen] = useState(false);
-  const containerRef = useRef<HTMLDivElement>(null);
+  const [position, setPosition] = useState<EdgePopoverPosition | null>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
+  const popoverRef = useRef<HTMLDivElement>(null);
+
+  useLayoutEffect(() => {
+    if (!open) {
+      setPosition(null);
+      return;
+    }
+    const place = () => {
+      const trigger = triggerRef.current;
+      if (!trigger) return;
+      const r = trigger.getBoundingClientRect();
+      const viewportWidth = document.documentElement.clientWidth;
+      const fitsBelow = window.innerHeight - r.bottom >= EDGE_POPOVER_HEIGHT + EDGE_POPOVER_GAP + VIEWPORT_MARGIN;
+      const top = fitsBelow
+        ? r.bottom + EDGE_POPOVER_GAP
+        : Math.max(VIEWPORT_MARGIN, r.top - EDGE_POPOVER_GAP - EDGE_POPOVER_HEIGHT);
+      const centered = r.left + r.width / 2 - EDGE_POPOVER_WIDTH / 2;
+      const left = Math.min(Math.max(VIEWPORT_MARGIN, centered), viewportWidth - EDGE_POPOVER_WIDTH - VIEWPORT_MARGIN);
+      setPosition({ top, left });
+    };
+    place();
+    window.addEventListener('resize', place);
+    // Capture phase: the pieces list scrolls on its own, not only the window.
+    window.addEventListener('scroll', place, true);
+    return () => {
+      window.removeEventListener('resize', place);
+      window.removeEventListener('scroll', place, true);
+    };
+  }, [open]);
 
   useEffect(() => {
     if (!open) return;
     const handlePointerDown = (event: MouseEvent) => {
-      if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
+      // The popover lives in a portal, outside the trigger's subtree, so both
+      // are checked: a click on an edge zone must not count as outside.
+      const target = event.target as Node;
+      if (!triggerRef.current?.contains(target) && !popoverRef.current?.contains(target)) {
         setOpen(false);
       }
     };
@@ -87,7 +132,7 @@ function EdgePickerButton({
     `absolute rounded-sm transition-colors ${active ? 'bg-brand-400' : 'bg-transparent hover:bg-studio-border'}`;
 
   return (
-    <div ref={containerRef} className="relative">
+    <div className="relative">
       <button
         ref={triggerRef}
         type="button"
@@ -117,12 +162,15 @@ function EdgePickerButton({
         </svg>
       </button>
 
-      {open && (
+      {open && position && createPortal(
         <div
+          ref={popoverRef}
           data-testid="edge-picker-popover"
           role="dialog"
+          dir={dir}
           aria-label={t('pieces.edge.pickerTitle', { name })}
-          className="absolute z-50 top-full mt-1 left-1/2 -translate-x-1/2 w-36 rounded-lg border border-studio-border bg-studio-panel shadow-lg p-2.5"
+          style={{ top: position.top, left: position.left, width: EDGE_POPOVER_WIDTH }}
+          className="fixed z-[100] rounded-lg border border-studio-border bg-studio-panel shadow-lg p-2.5"
         >
           <p className="text-[10px] font-semibold text-slate-700 dark:text-slate-200 truncate mb-2" dir="auto">
             {t('pieces.edge.pickerTitle', { name })}
@@ -165,7 +213,8 @@ function EdgePickerButton({
               </span>
             ))}
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );
