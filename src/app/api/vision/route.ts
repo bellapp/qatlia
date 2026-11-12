@@ -291,6 +291,7 @@ Règles impératives :
    - "edgesWidth" = nombre de chants le long de la LARGEUR (côtés de la deuxième cote) : "—" = 1, "=" = 2 ;
    - un rectangle "□" = 4 chants : edgesHeight 2 et edgesWidth 2 ; "⊐" ou "[" = 3 chants : edgesHeight 1 et edgesWidth 2 ;
    - case vide, marque illisible, ou fiche sans colonne de chants : edgesHeight 0 et edgesWidth 0. Les lignes du quadrillage ne sont jamais des chants. N'invente jamais de chant.
+   - SEULES les marques écrites DANS la colonne des chants comptent. Un signe « = » écrit sur la ligne des cotes, entre les dimensions et la quantité (ex: "88 x 32 = 4"), est un signe égal qui sépare la quantité : ce n'est JAMAIS un chant. De même, un « x », « × », « - » ou « / » entre deux cotes n'est jamais un chant.
 5. Retourne STRICTEMENT un objet JSON :
 {
   "pieces": [

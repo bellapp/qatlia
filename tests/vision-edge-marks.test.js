@@ -120,6 +120,13 @@ test('the model is asked for the chants column and the quantity column takes pre
   assert.match(prompt, /un trait dans une colonne de chants n'est jamais une quantité/);
 });
 
+test('an equals sign between the dimensions and the quantity is declared a separator, not edges', async () => {
+  await scan(JSON.stringify({ pieces: [{ name: '', height: 88, width: 32, quantity: 4 }] }));
+  const prompt = state.fetchBodies[0].messages[0].content;
+  assert.match(prompt, /SEULES les marques écrites DANS la colonne des chants comptent/);
+  assert.match(prompt, /"88 x 32 = 4"\), est un signe égal qui sépare la quantité : ce n'est JAMAIS un chant/);
+});
+
 test('the user\'s sheet: a stroke gives a left edge, a rectangle all four, quantities untouched', async () => {
   const { status, body } = await scan(JSON.stringify({
     pieces: [
