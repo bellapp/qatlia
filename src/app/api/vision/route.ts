@@ -6,6 +6,7 @@ import { getSupabaseAdminConfig, isPlaceholder, isProductionEnv } from '@/lib/bi
 import { VISION_CREDIT_COST } from '@/lib/billing/policy';
 import { analysisPassSecret, issueAnalysisPass } from '@/lib/billing/analysis-pass';
 import { createRateLimiter, VISION_RATE_LIMIT } from '@/lib/rate-limit';
+import { edgesFromCounts } from '@/lib/pieces/edge-marks';
 
 const MAX_IMAGE_DATA_URL_LENGTH = 8 * 1024 * 1024;
 const VisionSchema = z.object({
@@ -283,16 +284,22 @@ Tu dois analyser attentivement l'image et extraire les dimensions EXACTES de cha
 
 Règles impératives :
 1. Extrais les cotes en centimètres (cm). Si l'image contient des millimètres (ex: 2300 x 1200 ou 418.00 x 380.00), convertis en centimètres (ex: 230 x 120, 41.8 x 38).
-2. La quantité est le nombre à droite (ex: "418 x 380   7" -> height: 41.8, width: 38, quantity: 7).
+2. La quantité est le nombre à droite (ex: "418 x 380   7" -> height: 41.8, width: 38, quantity: 7). Si la fiche a une colonne de quantité (العدد, Qté, Nb), la quantité est TOUJOURS le nombre de cette colonne : un trait dans une colonne de chants n'est jamais une quantité, même s'il ressemble à un "1".
 3. "name" : le libellé écrit sur la ligne (ex: "Côté G"), recopié tel quel. Si la ligne n'en a pas, mets "" : n'invente jamais de nom.
-4. Retourne STRICTEMENT un objet JSON :
+4. Chants (bandes de chant) : UNIQUEMENT si la fiche a une colonne dédiée aux chants (en-tête حواف, تسفيط, Chants ou équivalent). Pour chaque ligne, compte les chants marqués dans cette colonne :
+   - "edgesHeight" = nombre de chants le long de la HAUTEUR (côtés de la première cote) : "|" = 1, "||" = 2 ;
+   - "edgesWidth" = nombre de chants le long de la LARGEUR (côtés de la deuxième cote) : "—" = 1, "=" = 2 ;
+   - un rectangle "□" = 4 chants : edgesHeight 2 et edgesWidth 2 ; "⊐" ou "[" = 3 chants : edgesHeight 1 et edgesWidth 2 ;
+   - case vide, marque illisible, ou fiche sans colonne de chants : edgesHeight 0 et edgesWidth 0. Les lignes du quadrillage ne sont jamais des chants. N'invente jamais de chant.
+   - SEULES les marques écrites DANS la colonne des chants comptent. Un signe « = » écrit sur la ligne des cotes, entre les dimensions et la quantité (ex: "88 x 32 = 4"), est un signe égal qui sépare la quantité : ce n'est JAMAIS un chant. De même, un « x », « × », « - » ou « / » entre deux cotes n'est jamais un chant.
+5. Retourne STRICTEMENT un objet JSON :
 {
   "pieces": [
-    { "name": "", "height": 230, "width": 120, "quantity": 2 },
-    { "name": "", "height": 118, "width": 48, "quantity": 1 },
-    { "name": "Côté G", "height": 41.8, "width": 38, "quantity": 7 },
-    { "name": "", "height": 53.1, "width": 48, "quantity": 4 },
-    { "name": "", "height": 51.3, "width": 48, "quantity": 2 }
+    { "name": "", "height": 230, "width": 120, "quantity": 2, "edgesHeight": 0, "edgesWidth": 0 },
+    { "name": "", "height": 118, "width": 48, "quantity": 1, "edgesHeight": 1, "edgesWidth": 0 },
+    { "name": "Côté G", "height": 41.8, "width": 38, "quantity": 7, "edgesHeight": 2, "edgesWidth": 0 },
+    { "name": "", "height": 53.1, "width": 48, "quantity": 4, "edgesHeight": 0, "edgesWidth": 1 },
+    { "name": "", "height": 51.3, "width": 48, "quantity": 2, "edgesHeight": 2, "edgesWidth": 2 }
   ]
 }`;
 
@@ -372,14 +379,20 @@ Règles impératives :
 
     // Normalisation des pièces (toujours en centimètres canoniques)
     const rawPieces = parsedJson.pieces || [];
-    const pieces = rawPieces.map((p: { name?: string; height?: number | string; width?: number | string; quantity?: number | string }) => ({
-      // An unnamed line comes back with an empty name: the atelier numbers it in
-      // the artisan's own language. A generic "Pièce 3" invented by the model counts as unnamed.
-      name: p.name && !/^pi[eè]ce\s*\d+$/i.test(String(p.name).trim()) ? String(p.name).trim() : '',
-      height: Math.abs(parseFloat(String(p.height || 10))),
-      width: Math.abs(parseFloat(String(p.width || 10))),
-      quantity: Math.max(1, parseInt(String(p.quantity || 1), 10) || 1),
-    }));
+    const pieces = rawPieces.map((p: { name?: string; height?: number | string; width?: number | string; quantity?: number | string; edgesHeight?: unknown; edgesWidth?: unknown }) => {
+      // Edge marks read from the chants column; absent when the line has none,
+      // so a piece without edges keeps exactly the shape it had before.
+      const edges = edgesFromCounts(p.edgesHeight, p.edgesWidth);
+      return {
+        // An unnamed line comes back with an empty name: the atelier numbers it in
+        // the artisan's own language. A generic "Pièce 3" invented by the model counts as unnamed.
+        name: p.name && !/^pi[eè]ce\s*\d+$/i.test(String(p.name).trim()) ? String(p.name).trim() : '',
+        height: Math.abs(parseFloat(String(p.height || 10))),
+        width: Math.abs(parseFloat(String(p.width || 10))),
+        quantity: Math.max(1, parseInt(String(p.quantity || 1), 10) || 1),
+        ...(edges ? { edges } : {}),
+      };
+    });
 
     // A valid, successfully parsed analysis is the only thing that costs a credit.
     const outcome = await consumeVisionCredit(supabaseAdmin, user.id);

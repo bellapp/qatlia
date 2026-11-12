@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useLayoutEffect, useMemo } from 'react';
+import React, { useState, useEffect, useLayoutEffect, useMemo, useRef } from 'react';
 import Link from 'next/link';
 import { createClient } from '@/lib/supabase/client';
 import {
@@ -39,10 +39,30 @@ import {
   CutMode,
 } from '@/lib/cutting/binpacking';
 import { PIECE_COLOR_PALETTE, getResolvedPieceColor } from '@/lib/pieces/catalog';
-import { BUILT_IN_PRESETS, loadSavedPresets, savePreset, deletePreset, findDuplicatePreset, type PanelPreset } from '@/lib/panel-presets';
+import {
+  BUILT_IN_PRESETS,
+  loadSavedPresets,
+  savePreset,
+  deletePreset,
+  findDuplicatePreset,
+  fetchAccountPresets,
+  createAccountPresets,
+  deleteAccountPreset,
+  importDevicePresetsOnce,
+  type PanelPreset,
+} from '@/lib/panel-presets';
 import { OptionsPanel } from '@/components/OptionsPanel';
 import { PiecesManager } from '@/components/PiecesManager';
 import { AuthModal } from '@/components/AuthModal';
+import {
+  savePendingWork,
+  loadPendingWork,
+  isFromThisTab,
+  shouldOfferPendingWork,
+  clearPendingWork,
+  type PendingAction,
+  type PendingWork,
+} from '@/lib/pending-work';
 import { QuotationDialog } from '@/components/QuotationDialog';
 import { EmptyState } from '@/components/EmptyState';
 import { AccountMenu } from '@/components/AccountMenu';
@@ -104,6 +124,20 @@ function safeFinitePositive(value: unknown, fallback: number): number {
   return Number.isFinite(n) && n > 0 ? n : fallback;
 }
 
+/** The edge sides /api/vision read for a scanned piece, or undefined when it
+ *  has none. Only literal `true` counts, so a malformed reply bands nothing. */
+function scannedEdges(piece: unknown): Piece['edges'] | undefined {
+  const edges = (piece as { edges?: Record<string, unknown> } | null)?.edges;
+  if (!edges || typeof edges !== 'object') return undefined;
+  const sides = {
+    left: edges.left === true,
+    right: edges.right === true,
+    top: edges.top === true,
+    bottom: edges.bottom === true,
+  };
+  return sides.left || sides.right || sides.top || sides.bottom ? sides : undefined;
+}
+
 function normalizePiecesWithColors(sourcePieces: Piece[]): Piece[] {
   return sourcePieces.map((piece, index) => ({
     ...piece,
@@ -153,7 +187,16 @@ export default function Dashboard() {
   const [isAuthModalOpen, setIsAuthModalOpen] = useState<boolean>(false);
   // Which action opened the (shared) auth modal, so its onSuccess handler
   // resumes the right one instead of always re-triggering the PDF export.
-  const [pendingAuthAction, setPendingAuthAction] = useState<'pdf' | 'quotation' | null>(null);
+  const [pendingAuthAction, setPendingAuthAction] = useState<'pdf' | 'quotation' | PendingAction | null>(null);
+  // Work kept across a sign-in (src/lib/pending-work.ts): offered with a
+  // button when it comes back in another tab, and the action to run once the
+  // kept state is back on screen.
+  const [resumeOffer, setResumeOffer] = useState<PendingWork | null>(null);
+  const [resumeRequest, setResumeRequest] = useState<{ action: PendingAction; image?: string; resumed: boolean } | null>(null);
+  // A resumed scan or run spends a credit: at most one per page load.
+  const resumingRef = useRef(false);
+  // A project opened from history wins over older kept work.
+  const openedFromHistoryRef = useRef(false);
   const [isDownloadingPdf, setIsDownloadingPdf] = useState<boolean>(false);
   const [isQuotationDialogOpen, setIsQuotationDialogOpen] = useState<boolean>(false);
   // The id /api/projects last confirmed saving, if any — the quotation
@@ -161,6 +204,16 @@ export default function Dashboard() {
   // Never client-guessed; only ever set from a successful save response.
   const [lastSavedProjectId, setLastSavedProjectId] = useState<string | null>(null);
   const [showAdvancedOptions, setShowAdvancedOptions] = useState<boolean>(false);
+  const advancedOptionsRef = useRef<HTMLDivElement>(null);
+
+  /** Opens the cutting-settings panel and scrolls it into view. */
+  const openAdvancedOptions = () => {
+    setShowAdvancedOptions(true);
+    // Wait one frame so the panel is rendered before measuring where to scroll.
+    requestAnimationFrame(() => {
+      advancedOptionsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+  };
   const [displayUnit, setDisplayUnit] = useState<DisplayUnit>(DEFAULT_DISPLAY_UNIT);
   // True while the restored/current project still owes its next save an
   // explicit unit-metadata rewrite (legacy project with no metadata at all).
@@ -181,12 +234,35 @@ export default function Dashboard() {
   // this `true` forever even after its pending rewrite is done. Fresh
   // projects (no restore) start false.
   const [migratedFromLegacyUnit, setMigratedFromLegacyUnit] = useState<boolean>(false);
-  // Panel presets: artisan-saved stock sizes (localStorage) + management UI state.
+  // Panel presets: artisan-saved stock panels + management UI state. A
+  // signed-in artisan's list lives in their account; the device list is for
+  // anonymous use and is the fallback while the account store is unavailable.
   const [savedPresets, setSavedPresets] = useState<PanelPreset[]>([]);
+  const [presetSource, setPresetSource] = useState<'device' | 'account'>('device');
   const [isPresetManageOpen, setIsPresetManageOpen] = useState(false);
 
   useEffect(() => {
+    let cancelled = false;
     setSavedPresets(loadSavedPresets());
+    (async () => {
+      try {
+        const { data: { user } } = await createClient().auth.getUser();
+        if (!user) return;
+        let account = await fetchAccountPresets();
+        if (account === null) return;
+        // First signed-in visit on this device: copy its presets into the
+        // account so nothing saved before is lost.
+        if (await importDevicePresetsOnce(user.id)) account = (await fetchAccountPresets()) ?? account;
+        if (cancelled) return;
+        setSavedPresets(account);
+        setPresetSource('account');
+      } catch {
+        /* the device list stays in use */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   const allPresets = [...BUILT_IN_PRESETS, ...savedPresets];
@@ -199,6 +275,7 @@ export default function Dashboard() {
   // Custom project name (audit feature): empty means auto-name fallback.
   const [projectName, setProjectName] = useState<string>('');
   const [projectNameDraft, setProjectNameDraft] = useState<string>('');  const [presetNameDraft, setPresetNameDraft] = useState<string>('');
+  const [presetColorDraft, setPresetColorDraft] = useState<string>('');
   const [presetFeedback, setPresetFeedback] = useState<{ tone: 'success' | 'warning'; text: string } | null>(null);
 
   useEffect(() => {
@@ -219,31 +296,70 @@ const commitPanelName = () => {
     setPresetFeedback(null);
   };
 
-  /** Saves the current stock panel as a reusable named preset, rejecting
-   *  duplicates (same dimensions + material already saved). */
-  const handleSavePreset = () => {
+  /** Saves the current stock panel as a reusable named preset. Panels of the
+   *  same size are distinct when their material, colour or grain differ; only
+   *  an identical panel is refused (see src/lib/panel-preset-rules.ts). */
+  const handleSavePreset = async () => {
     const name = presetNameDraft.trim()
       || `${formatDisplayValue(activeSheet.height, displayUnit)}×${formatDisplayValue(activeSheet.width, displayUnit)} ${displayUnit}`;
-    const duplicate = findDuplicatePreset(
-      { height: activeSheet.height, width: activeSheet.width, material: activeSheet.material ?? undefined },
-      savedPresets,
-    );
+    const preset = {
+      name,
+      height: activeSheet.height,
+      width: activeSheet.width,
+      material: activeSheet.material ?? undefined,
+      color: presetColorDraft.trim() || undefined,
+      hasGrain: !!activeSheet.hasGrain,
+      grainOrientation: activeSheet.hasGrain ? (activeSheet.grainOrientation ?? 'vertical') : undefined,
+    };
+    const duplicate = findDuplicatePreset(preset, savedPresets);
     if (duplicate) {
       setPresetFeedback({ tone: 'warning', text: t('atelier.stock.presetDuplicate', { name: duplicate.name }) });
       return;
     }
-    savePreset({ name, height: activeSheet.height, width: activeSheet.width, material: activeSheet.material ?? undefined });
-    setSavedPresets(loadSavedPresets());
+    if (presetSource === 'account') {
+      const saved = await createAccountPresets([preset]);
+      if (!saved.ok) {
+        setPresetFeedback({ tone: 'warning', text: t(saved.error === 'PRESET_LIMIT' ? 'atelier.stock.presetLimit' : 'atelier.stock.presetSaveFailed') });
+        return;
+      }
+      if (saved.duplicates.length > 0) {
+        setPresetFeedback({ tone: 'warning', text: t('atelier.stock.presetDuplicate', { name: saved.duplicates[0].existingName }) });
+        return;
+      }
+      setSavedPresets((current) => [...current, ...saved.created]);
+    } else {
+      savePreset(preset);
+      setSavedPresets(loadSavedPresets());
+    }
     setPresetNameDraft('');
+    setPresetColorDraft('');
     setPresetFeedback({ tone: 'success', text: t('atelier.stock.presetSavedOk', { name }) });
   };
 
   /** Removes a saved panel preset from the workshop's list. */
-  const handleDeletePreset = (id: string) => {
-    deletePreset(id);
-    setSavedPresets(loadSavedPresets());
+  const handleDeletePreset = async (id: string) => {
+    if (presetSource === 'account') {
+      if (!(await deleteAccountPreset(id))) {
+        setPresetFeedback({ tone: 'warning', text: t('atelier.stock.presetSaveFailed') });
+        return;
+      }
+      setSavedPresets((current) => current.filter((p) => p.id !== id));
+    } else {
+      deletePreset(id);
+      setSavedPresets(loadSavedPresets());
+    }
     setPresetFeedback({ tone: 'success', text: t('atelier.stock.presetDeleted') });
   };
+
+  /** Colour and grain next to a saved preset's name, so two panels of the
+   *  same size can be told apart in the list. */
+  const presetDetails = (p: PanelPreset) =>
+    [
+      p.color?.trim(),
+      p.hasGrain ? t(p.grainOrientation === 'horizontal' ? 'atelier.stock.grainHorizontal' : 'atelier.stock.grainVertical') : null,
+    ]
+      .filter(Boolean)
+      .join(' · ');
 
 
   const { theme } = useTheme();
@@ -327,6 +443,7 @@ const commitPanelName = () => {
     setDisplayUnit(readStoredDisplayUnit(window.localStorage));
 
     const savedProj = sessionStorage.getItem('qatlia_saved_project');
+    openedFromHistoryRef.current = !!savedProj;
     // Set alongside 'qatlia_saved_project' when a project is opened from
     // history (see history/page.tsx's handleLoadProject) — without this,
     // QuotationDialog only ever knew about the *last auto-saved* project
@@ -403,7 +520,10 @@ const commitPanelName = () => {
 
   const persistProject = async (
     nextResult: OptimizationResult,
-    source: 'optimize' | 'pdf'
+    source: 'optimize' | 'pdf',
+    // Values set in this same event handler, which the state above does not
+    // carry yet (React applies setState on the next render).
+    overrides: { pdfGeneratedAt?: string } = {}
   ) => {
     // The persisted historical marker stays true forever once true: either
     // this save is itself the rewrite of a legacy record (pendingUnitMigration),
@@ -418,7 +538,7 @@ const commitPanelName = () => {
       name: derivedProjectName,
       projectName: projectName.trim() || undefined,
       scanThumb: scanThumb || undefined,
-      pdfGeneratedAt: pdfGeneratedAt || undefined,
+      pdfGeneratedAt: overrides.pdfGeneratedAt || pdfGeneratedAt || undefined,
       sheets,
       sheet: activeSheet,
       pieces,
@@ -483,7 +603,83 @@ const commitPanelName = () => {
     }
   };
 
-  const handleRunOptimization = async () => {
+  /**
+   * Marks the saved project as having a PDF. When the plan was already saved
+   * (by the optimization, or reopened from history), only that project's
+   * marker is updated: saving the whole project again would add a duplicate
+   * entry to the history. A new save remains the fallback when there is no
+   * saved project to update.
+   */
+  const recordPdfGenerated = async (generatedAt: string) => {
+    if (!result) return;
+    if (lastSavedProjectId) {
+      try {
+        const res = await fetch(`/api/projects/${lastSavedProjectId}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ pdfGeneratedAt: generatedAt }),
+        });
+        if (res.ok) return;
+      } catch (err) {
+        console.error('Erreur enregistrement PDF dans l’historique:', err);
+      }
+    }
+    await persistProject(result, 'pdf', { pdfGeneratedAt: generatedAt });
+  };
+
+  /**
+   * A signed-out visitor asked for a scan or a run: keep their work (photo,
+   * pieces, panel, settings) and ask them to sign in. The action resumes on
+   * its own right after, even through the Google round trip.
+   */
+  const askSignInKeepingWork = (action: PendingAction, image?: string) => {
+    try {
+      savePendingWork(window.localStorage, window.sessionStorage, {
+        action,
+        image,
+        pieces,
+        sheets,
+        options: options as unknown as Record<string, unknown>,
+        cutMode,
+        projectName: projectName.trim() || undefined,
+      });
+    } catch {
+      /* the modal still opens; only the automatic resume is lost */
+    }
+    // Nothing was spent: the resume after this sign-in may run.
+    resumingRef.current = false;
+    setPendingAuthAction(action);
+    setIsAuthModalOpen(true);
+  };
+
+  /** Puts kept work back on screen. */
+  const applyPendingWork = (work: PendingWork) => {
+    if (work.pieces.length > 0) setPieces(normalizePiecesWithColors(work.pieces as Piece[]));
+    if (work.sheets.length > 0) setSheets(work.sheets as Sheet[]);
+    if (work.options) setOptions((prev) => ({ ...prev, ...(work.options as Partial<OptimizationOptions>) }));
+    if (work.cutMode) setCutMode(work.cutMode);
+    if (work.projectName) {
+      setProjectName(work.projectName);
+      setProjectNameDraft(work.projectName);
+    }
+    // The photo is not put in the scan preview: that card reads "analysed",
+    // and it has not been yet. The resume banner shows it instead.
+  };
+
+  /**
+   * Runs the kept action. The entry is cleared before anything is sent, and
+   * a ref allows one resume per page, so a credit is never spent twice.
+   */
+  const resumePendingWork = (work: PendingWork, { resumed }: { resumed: boolean }) => {
+    if (resumingRef.current) return;
+    resumingRef.current = true;
+    clearPendingWork(window.localStorage, window.sessionStorage);
+    setResumeOffer(null);
+    applyPendingWork(work);
+    setResumeRequest({ action: work.action, image: work.image, resumed });
+  };
+
+  const handleRunOptimization = async ({ resumed = false }: { resumed?: boolean } = {}) => {
     setIsOptimizing(true);
     setOptimizeError(null);
     try {
@@ -506,7 +702,10 @@ const commitPanelName = () => {
       const data = await res.json().catch(() => null);
 
       if (!res.ok || !data?.success) {
-        if (res.status === 401) {
+        if (res.status === 401 && !resumed) {
+          // Keep the pieces and run again right after sign-in.
+          askSignInKeepingWork('optimize');
+        } else if (res.status === 401) {
           setOptimizeError(t('atelier.optimize.authRequired'));
         } else if (res.status === 402) {
           setOptimizeError(t('atelier.optimize.noCredits'));
@@ -535,6 +734,8 @@ const commitPanelName = () => {
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+    // Lets the same photo be picked again, which onChange would otherwise ignore.
+    e.target.value = '';
 
     setIsProcessingVision(true);
     setVisionError(null);
@@ -548,73 +749,157 @@ const commitPanelName = () => {
         // scan on a workshop connection. A failed downscale (no canvas, exotic
         // codec) must never block a scan: fall back to the original bytes.
         const scanImage = (await downscaleDataUrl(base64, 1600, 0.8)) ?? base64;
-        const res = await fetch('/api/vision', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            imageBase64: scanImage,
-            sheetMaterial: activeSheet.material || 'mdf',
-          }),
-        });
-
-        const data = await res.json();
-        if (data.success && Array.isArray(data.pieces) && data.pieces.length > 0) {
-          // The thumbnail is rendered at 12x12 — the downscaled bytes are
-          // indistinguishable there and keep the full-res photo out of state.
-          setPreviewImage(scanImage);
-          void downscaleDataUrl(scanImage).then(setScanThumb);
-          const newPieces: Piece[] = data.pieces.map((p: { name?: string; width?: number | string; height?: number | string; quantity?: number | string; material?: string; color?: string }, i: number) => {
-            // /api/vision always extracts and returns canonical centimetres
-            // (see its prompt), so no magnitude-based mm heuristic is applied
-            // here — a legitimate 600 cm bar must survive untouched. Only a
-            // finite, strictly positive number is trusted (see
-            // `safeFinitePositive`); anything else (missing, NaN, Infinity,
-            // <= 0) falls back deterministically instead of reaching
-            // `Math.round` with a non-finite value.
-            const h = safeFinitePositive(p.height, 10);
-            const w = safeFinitePositive(p.width, 10);
-            const quantity = Math.max(1, Math.round(safeFinitePositive(p.quantity, 1)));
-            return {
-              id: `ext_${Date.now()}_${i}`,
-              name: p.name || t('pieces.defaultName', { index: i + 1 }),
-              height: Math.round(h * 10) / 10,
-              width: Math.round(w * 10) / 10,
-              quantity,
-              material: (p.material as MaterialType) || (activeSheet.material || 'mdf'),
-              rotatable: true,
-              color: getResolvedPieceColor({
-                color: p.color,
-                id: `ext_${Date.now()}_${i}`,
-                name: p.name,
-                height: h,
-                width: w,
-                quantity,
-                index: i,
-              }),
-            };
-          });
-          setPieces(normalizePiecesWithColors(newPieces));
-          storeAnalysisPass(data.analysisPass);
-          // The server is the only authority on the balance; it is echoed back
-          // only when a credit was actually debited.
-          if (typeof data.creditsRemaining === 'number') setUserCredits(data.creditsRemaining);
-        } else {
-          if (res.status === 401) setIsAuthModalOpen(true);
-          if (typeof data.creditsRemaining === 'number') setUserCredits(data.creditsRemaining);
-          // The route's own `message` stays French for non-browser callers; the
-          // workshop renders the artisan's language from the `error` code, and a
-          // code this build does not know degrades to the generic message.
-          setVisionError(visionErrorKey(data.error));
-        }
+        await runScan(scanImage);
       } catch (err) {
         setVisionError('atelier.visionError.network');
-        console.error(err);
-      } finally {
         setIsProcessingVision(false);
+        console.error(err);
       }
     };
     reader.readAsDataURL(file);
   };
+
+  /**
+   * Analyses a (downscaled) cut-list photo. A signed-out visitor is asked to
+   * sign in first, with the photo kept; `resumed` marks the automatic run
+   * after that sign-in, which never asks again.
+   */
+  const runScan = async (scanImage: string, { resumed = false }: { resumed?: boolean } = {}) => {
+    setIsProcessingVision(true);
+    setVisionError(null);
+    try {
+      if (!resumed) {
+        const { data: { user } } = await createClient().auth.getUser();
+        if (!user) {
+          askSignInKeepingWork('scan', scanImage);
+          return;
+        }
+      }
+      const res = await fetch('/api/vision', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          imageBase64: scanImage,
+          sheetMaterial: activeSheet.material || 'mdf',
+        }),
+      });
+
+      const data = await res.json();
+      if (data.success && Array.isArray(data.pieces) && data.pieces.length > 0) {
+        // The thumbnail is saved with the project and shown in history:
+        // 600px keeps the cut list readable while staying well under the
+        // server's size cap (SCAN_THUMB_MAX_CHARS), since the history page
+        // loads every project's thumbnail at once.
+        setPreviewImage(scanImage);
+        void downscaleDataUrl(scanImage, 600, 0.7).then(setScanThumb);
+        const newPieces: Piece[] = data.pieces.map((p: { name?: string; width?: number | string; height?: number | string; quantity?: number | string; material?: string; color?: string }, i: number) => {
+          // /api/vision always extracts and returns canonical centimetres
+          // (see its prompt), so no magnitude-based mm heuristic is applied
+          // here — a legitimate 600 cm bar must survive untouched. Only a
+          // finite, strictly positive number is trusted (see
+          // `safeFinitePositive`); anything else (missing, NaN, Infinity,
+          // <= 0) falls back deterministically instead of reaching
+          // `Math.round` with a non-finite value.
+          const h = safeFinitePositive(p.height, 10);
+          const w = safeFinitePositive(p.width, 10);
+          const quantity = Math.max(1, Math.round(safeFinitePositive(p.quantity, 1)));
+          return {
+            id: `ext_${Date.now()}_${i}`,
+            name: p.name || t('pieces.defaultName', { index: i + 1 }),
+            height: Math.round(h * 10) / 10,
+            width: Math.round(w * 10) / 10,
+            quantity,
+            material: (p.material as MaterialType) || (activeSheet.material || 'mdf'),
+            rotatable: true,
+            // Chants read from the sheet's edge column, like a manual
+            // toggle: sides only, no banding type chosen yet.
+            ...(scannedEdges(p) ? { edges: scannedEdges(p) } : {}),
+            color: getResolvedPieceColor({
+              color: p.color,
+              id: `ext_${Date.now()}_${i}`,
+              name: p.name,
+              height: h,
+              width: w,
+              quantity,
+              index: i,
+            }),
+          };
+        });
+        setPieces(normalizePiecesWithColors(newPieces));
+        storeAnalysisPass(data.analysisPass);
+        // The server is the only authority on the balance; it is echoed back
+        // only when a credit was actually debited.
+        if (typeof data.creditsRemaining === 'number') setUserCredits(data.creditsRemaining);
+      } else {
+        if (res.status === 401 && !resumed) {
+          // Signed out since the check above: keep the photo, ask again.
+          askSignInKeepingWork('scan', scanImage);
+          return;
+        }
+        if (typeof data.creditsRemaining === 'number') setUserCredits(data.creditsRemaining);
+        // The route's own `message` stays French for non-browser callers; the
+        // workshop renders the artisan's language from the `error` code, and a
+        // code this build does not know degrades to the generic message.
+        setVisionError(visionErrorKey(data.error));
+      }
+    } catch (err) {
+      setVisionError('atelier.visionError.network');
+      console.error(err);
+    } finally {
+      setIsProcessingVision(false);
+    }
+  };
+
+  // Runs a resumed action once the kept pieces and panel are on screen.
+  useEffect(() => {
+    if (!resumeRequest) return;
+    const request = resumeRequest;
+    setResumeRequest(null);
+    if (request.action === 'scan' && request.image) void runScan(request.image, { resumed: request.resumed });
+    else if (request.action === 'optimize') void handleRunOptimization({ resumed: request.resumed });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [resumeRequest]);
+
+  // Work kept before a sign-in. Back in the tab that asked for it (Google
+  // round trip, reload): resume on its own once signed in. In another tab
+  // (the email-confirmation link): show it once and offer a button, since a
+  // resumed action spends a credit.
+  useEffect(() => {
+    if (openedFromHistoryRef.current) return;
+    const work = loadPendingWork(window.localStorage);
+    if (!work) return;
+    let cancelled = false;
+    const sameTab = isFromThisTab(window.sessionStorage, work);
+    (async () => {
+      let signedIn = false;
+      try {
+        const { data: { user } } = await createClient().auth.getUser();
+        signedIn = !!user;
+      } catch {
+        /* treated as signed out */
+      }
+      if (cancelled) return;
+      if (sameTab) {
+        if (signedIn) {
+          resumePendingWork(work, { resumed: true });
+        } else {
+          // Came back without signing in: the work is shown with its button,
+          // which asks for the sign-in again; signing in finishes it.
+          applyPendingWork(work);
+          setPendingAuthAction(work.action);
+          setResumeOffer(work);
+        }
+        return;
+      }
+      if (!shouldOfferPendingWork(window.localStorage, window.sessionStorage, work)) return;
+      applyPendingWork(work);
+      setResumeOffer(work);
+    })();
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const handleDownloadJson = () => {
     if (!result) return;
@@ -776,8 +1061,9 @@ const commitPanelName = () => {
       });
 
       if (res.ok) {
-        setPdfGeneratedAt(new Date().toISOString());
-        await persistProject(result, 'pdf');
+        const generatedAt = new Date().toISOString();
+        setPdfGeneratedAt(generatedAt);
+        await recordPdfGenerated(generatedAt);
 
         const blob = await res.blob();
         const url = window.URL.createObjectURL(blob);
@@ -958,10 +1244,12 @@ const commitPanelName = () => {
                 <FileText className="w-4 h-4" />
                 {t('atelier.sidebar.navQuotation')}
               </button>
+              {/* The settings panel sits under the pieces list, far below the
+                  fold: this entry opens it and brings it into view, never
+                  toggles it shut out of sight. */}
               <button
                 type="button"
-                onClick={() => setShowAdvancedOptions(!showAdvancedOptions)}
-                aria-expanded={showAdvancedOptions}
+                onClick={openAdvancedOptions}
                 aria-controls="advanced-cutting-options"
                 className="inline-flex shrink-0 items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-bold transition-colors text-slate-600 dark:text-slate-300 hover:bg-studio-panel hover:text-slate-900 dark:hover:text-white"
               >
@@ -995,16 +1283,22 @@ const commitPanelName = () => {
               <span className="w-8 h-8 rounded-lg bg-brand-400/10 border border-brand-500/25 flex items-center justify-center">
                 <ClipboardList className="w-4 h-4 text-brand-500 dark:text-brand-400" />
               </span>
-              <div className="min-w-0">
+              {/* The job name is saved as the project's name in history, so it
+                  reads as a labelled field rather than a title nobody edits. */}
+              <div className="min-w-0 flex-1 sm:flex-none">
+                <label htmlFor="project-name-input" className="block text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                  {t('atelier.project.nameLabel')}
+                </label>
                 <input
+                  id="project-name-input"
                   value={projectNameDraft}
                   onChange={(e) => setProjectNameDraft(e.target.value)}
                   onBlur={commitProjectName}
                   onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur(); }}
-                  placeholder={activeSheet.label?.trim() || t('atelier.project.defaultTitle')}
-                  aria-label={t('atelier.project.nameAria')}
+                  placeholder={t('atelier.project.namePlaceholder')}
+                  maxLength={120}
                   data-testid="project-name-input"
-                  className="block w-full max-w-[260px] bg-transparent text-sm font-black text-slate-900 dark:text-white outline-none border-none p-0 focus:ring-0 placeholder:text-slate-400 dark:placeholder:text-slate-500 truncate"
+                  className="mt-0.5 block w-full sm:w-[260px] rounded-lg bg-studio-field border border-studio-border px-2.5 py-1.5 text-sm font-bold text-slate-900 dark:text-white outline-none focus:border-brand-500/60 focus:ring-2 focus:ring-brand-500/20 placeholder:font-normal placeholder:text-slate-400 dark:placeholder:text-slate-500"
                 />
                 {/* Same figures as the cut-list chip: pieces are quantities summed,
                     lines are rows (counting distinct names merged same-named rows). */}
@@ -1030,6 +1324,36 @@ const commitPanelName = () => {
               visualizer keeps the wider stage at 7 cols. */}
           <div className="lg:col-span-5 space-y-4">
             
+            {/* Work kept across a sign-in, back in another tab: one explicit
+                click resumes it (it spends a credit), or it is dismissed. */}
+            {resumeOffer && (
+              <div role="status" className="flex flex-wrap items-center gap-3 p-3.5 rounded-xl bg-brand-400/10 border border-brand-500/30">
+                {resumeOffer.image && (
+                  <img src={resumeOffer.image} alt="" className="w-12 h-12 object-cover rounded-lg border border-studio-border" />
+                )}
+                <p className="flex-1 min-w-[140px] text-xs font-bold text-slate-800 dark:text-slate-100">
+                  {t(resumeOffer.action === 'scan' ? 'atelier.resume.scan' : 'atelier.resume.optimize')}
+                </p>
+                <button
+                  type="button"
+                  onClick={() => resumePendingWork(resumeOffer, { resumed: false })}
+                  className="px-3 py-2 rounded-lg bg-brand-400 hover:bg-brand-500 text-slate-950 text-xs font-black transition-colors"
+                >
+                  {t(resumeOffer.action === 'scan' ? 'atelier.resume.runScan' : 'atelier.resume.runOptimize')}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    clearPendingWork(window.localStorage, window.sessionStorage);
+                    setResumeOffer(null);
+                  }}
+                  className="px-2.5 py-2 rounded-lg text-xs font-bold text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition-colors"
+                >
+                  {t('atelier.resume.dismiss')}
+                </button>
+              </div>
+            )}
+
             {/* Quick Actions: Hero Cards */}
             <div className="grid grid-cols-2 gap-3">
               {/* Take Photo Card */}
@@ -1217,7 +1541,12 @@ const commitPanelName = () => {
                     onChange={(e) => {
                       const preset = allPresets.find((p) => p.id === e.target.value);
                       if (!preset) return;
-                      setSheets([{ ...activeSheet, height: preset.height, width: preset.width, material: (preset.material as MaterialType) || activeSheet.material }]);
+                      // A saved panel brings its grain back; a standard size
+                      // leaves the current grain setting alone.
+                      const grain = preset.builtIn
+                        ? {}
+                        : { hasGrain: !!preset.hasGrain, grainOrientation: preset.hasGrain ? preset.grainOrientation ?? 'vertical' : undefined };
+                      setSheets([{ ...activeSheet, height: preset.height, width: preset.width, material: (preset.material as MaterialType) || activeSheet.material, ...grain }]);
                       setActiveSheetIndex(0);
                     }}
                     className="w-full appearance-none bg-studio-field border border-studio-border hover:border-studio-border-hover rounded-lg py-2 ps-8 pe-3 text-xs font-semibold text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-brand-500/50 cursor-pointer transition-colors [&>option]:bg-white [&>option]:text-slate-900 dark:[&>option]:bg-slate-900 dark:[&>option]:text-slate-100"
@@ -1230,9 +1559,12 @@ const commitPanelName = () => {
                     </optgroup>
                     {savedPresets.length > 0 && (
                       <optgroup label={t('atelier.stock.presetSaved')}>
-                        {savedPresets.map((p) => (
-                          <option key={p.id} value={p.id}>{p.name}</option>
-                        ))}
+                        {savedPresets.map((p) => {
+                          const details = presetDetails(p);
+                          return (
+                            <option key={p.id} value={p.id}>{details ? `${p.name} — ${details}` : p.name}</option>
+                          );
+                        })}
                       </optgroup>
                     )}
                   </select>
@@ -1242,7 +1574,7 @@ const commitPanelName = () => {
                 </div>
                 <button
                   type="button"
-                  onClick={handleSavePreset}
+                  onClick={() => void handleSavePreset()}
                   aria-label={t('atelier.stock.savePresetAria')}
                   className="px-3 py-2 rounded-lg bg-studio-field border border-studio-border hover:border-brand-500/50 text-[11px] font-bold text-slate-600 dark:text-slate-300 hover:text-brand-500 dark:hover:text-brand-400 flex items-center gap-1.5 transition-colors"
                 >
@@ -1294,6 +1626,20 @@ const commitPanelName = () => {
                     className="w-full px-2.5 py-1.5 rounded-lg bg-studio-field border border-studio-border text-slate-800 dark:text-slate-200 text-xs outline-none focus:border-brand-500/50 focus:ring-1 focus:ring-brand-500/20 transition-all"
                   />
                 </div>
+                <div className="flex-1 min-w-[160px] space-y-1">
+                  <label htmlFor="preset-color-input" className="text-[9px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 block">
+                    {t('atelier.stock.presetColorLabel')}
+                  </label>
+                  <input
+                    id="preset-color-input"
+                    type="text"
+                    value={presetColorDraft}
+                    onChange={(e) => setPresetColorDraft(e.target.value)}
+                    maxLength={60}
+                    placeholder={t('atelier.stock.presetColorPlaceholder')}
+                    className="w-full px-2.5 py-1.5 rounded-lg bg-studio-field border border-studio-border text-slate-800 dark:text-slate-200 text-xs outline-none focus:border-brand-500/50 focus:ring-1 focus:ring-brand-500/20 transition-all"
+                  />
+                </div>
               </div>
 
               {presetFeedback && (
@@ -1309,10 +1655,13 @@ const commitPanelName = () => {
                       <span className="text-[11px] font-semibold text-slate-700 dark:text-slate-200">
                         {p.name}
                         <span className="ms-2 font-mono text-[10px] text-slate-500" dir="ltr">{formatDisplayValue(p.height, displayUnit)}×{formatDisplayValue(p.width, displayUnit)} {displayUnit}</span>
+                        {presetDetails(p) && (
+                          <span className="ms-2 text-[10px] font-normal text-slate-500 dark:text-slate-400">{presetDetails(p)}</span>
+                        )}
                       </span>
                       <button
                         type="button"
-                        onClick={() => handleDeletePreset(p.id)}
+                        onClick={() => void handleDeletePreset(p.id)}
                         aria-label={t('atelier.stock.deletePresetAria')}
                         className="p-1 rounded-md text-slate-400 hover:text-rose-400 transition-colors"
                       >
@@ -1336,8 +1685,9 @@ const commitPanelName = () => {
               />
             </div>
 
-            {/* Collapsible Advanced Options */}
-            <div className="rounded-xl overflow-hidden">
+            {/* Collapsible Advanced Options. scroll-mt clears the sticky header
+                and the section nav when the nav entry scrolls here. */}
+            <div ref={advancedOptionsRef} className="rounded-xl overflow-hidden scroll-mt-32">
               <button
                 type="button"
                 onClick={() => setShowAdvancedOptions(!showAdvancedOptions)}
@@ -1376,7 +1726,7 @@ const commitPanelName = () => {
             )}
             {/* Primary CTA Button */}
             <button
-              onClick={handleRunOptimization}
+              onClick={() => void handleRunOptimization()}
               disabled={isOptimizing || pieces.length === 0}
               className="w-full py-3.5 rounded-xl bg-brand-400 hover:bg-brand-500 text-slate-950 font-bold text-sm tracking-[0.08em] uppercase shadow-xl shadow-brand-500/30 ring-1 ring-brand-600/40 transition-all flex items-center justify-center gap-2.5 disabled:opacity-30 disabled:shadow-none disabled:ring-0 active:scale-[0.98]"
             >
@@ -1854,7 +2204,7 @@ const commitPanelName = () => {
                       untouched; these two are quick top-level shortcuts. */}
                   <div className="flex flex-wrap items-center gap-2.5">
                     <button
-                      onClick={handleRunOptimization}
+                      onClick={() => void handleRunOptimization()}
                       disabled={isOptimizing || pieces.length === 0}
                       className="flex-1 min-w-[200px] py-3.5 rounded-xl bg-brand-400 hover:bg-brand-500 text-slate-950 font-bold text-sm flex items-center justify-center gap-2 disabled:opacity-30 transition-all"
                     >
@@ -1880,6 +2230,7 @@ const commitPanelName = () => {
       <AuthModal
         isOpen={isAuthModalOpen}
         onClose={() => setIsAuthModalOpen(false)}
+        purpose={pendingAuthAction === 'scan' || pendingAuthAction === 'optimize' ? pendingAuthAction : 'pdf'}
         title={pendingAuthAction === 'quotation' ? t('quotation.title') : undefined}
         subtitle={pendingAuthAction === 'quotation' ? t('quotation.authRequired') : undefined}
         onSuccess={() => {
@@ -1889,6 +2240,11 @@ const commitPanelName = () => {
             if (user) {
               setUserEmail(user.email || null);
               if (pendingAuthAction === 'pdf') handleDownloadPdf();
+              // A kept scan or run picks up where the visitor left it.
+              if (pendingAuthAction === 'scan' || pendingAuthAction === 'optimize') {
+                const work = loadPendingWork(window.localStorage);
+                if (work) resumePendingWork(work, { resumed: true });
+              }
               // 'quotation': the dialog itself stays open with the artisan's
               // filled-in fields intact — they just click "Generate" again.
             }

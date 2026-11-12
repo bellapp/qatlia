@@ -214,7 +214,7 @@ export const fr = {
       navOptimization: 'Optimisation',
       navMaterials: 'Matériaux',
       navQuotation: 'Chiffrage & Devis',
-      navCutSettings: 'Trait de scie & Chants',
+      navCutSettings: 'Réglages de coupe',
     },
     /**
      * Name given to the project saved after an optimization. `{material}` is the
@@ -224,8 +224,8 @@ export const fr = {
     project: {
       nameBars: 'Barres {material} — {count} pcs',
       nameSheets: 'Débit {material} — {count} pcs',
-      defaultTitle: 'Projet de débit',
-      nameAria: 'Nommer le projet',
+      nameLabel: 'Nom de l’affaire (optionnel)',
+      namePlaceholder: 'Ex. : Cuisine M. Alami',
       optimized: 'Optimisation réussie',
       rerun: 'Relancer l’optimisation',
     },
@@ -276,7 +276,11 @@ export const fr = {
       presetNameLabel: 'Nom pour la sauvegarde',
       presetNamePlaceholder: 'Ex : Chêne 244×122',
       nameDuplicate: 'Ce nom est déjà utilisé par un autre panneau.',
-      presetDuplicate: 'Ce panneau est déjà sauvegardé sous « {name} ».',
+      presetColorLabel: 'Couleur / décor (optionnel)',
+      presetColorPlaceholder: 'Ex : Blanc, Noyer',
+      presetDuplicate: 'Ce panneau (mêmes dimensions, matériau, couleur et ramage) est déjà sauvegardé sous « {name} ».',
+      presetSaveFailed: 'La liste de panneaux n’a pas pu être mise à jour. Réessayez.',
+      presetLimit: 'Vous avez atteint le nombre maximum de panneaux sauvegardés. Supprimez-en un pour en ajouter un autre.',
       presetSavedOk: 'Panneau « {name} » sauvegardé.',
       presetDeleted: 'Panneau supprimé de la liste.',
       grainToggle: 'Panneau avec ramage',
@@ -292,6 +296,14 @@ export const fr = {
       lengthAria: 'Longueur {unit}',
       materialLabel: 'Matériau',
       materialAria: 'Matériau du panneau',
+    },
+    /** Offered when work kept across a sign-in comes back in another tab. */
+    resume: {
+      scan: 'Votre photo de fiche vous attend.',
+      optimize: 'Vos pièces vous attendent.',
+      runScan: 'Analyser ma fiche',
+      runOptimize: 'Lancer l’optimisation',
+      dismiss: 'Ignorer',
     },
     advanced: {
       toggle: 'Réglages de coupe avancés',
@@ -641,6 +653,20 @@ export const fr = {
     showPassword: 'Afficher le mot de passe',
     hidePassword: 'Masquer le mot de passe',
     submitLogin: 'Se connecter & exporter',
+    checkEmail: 'Compte créé. Ouvrez le lien envoyé à {email} pour confirmer votre adresse, puis connectez-vous ici : votre travail vous attend.',
+    /** Wording when sign-in interrupts a scan or an optimization: the work is kept and resumes. */
+    scan: {
+      title: 'Analysez votre fiche de débit',
+      subtitle: 'Créez votre compte gratuit ({count} crédits offerts) : votre photo est gardée et sera analysée dès que vous serez connecté.',
+      loginSubtitle: 'Connectez-vous : votre photo est gardée et sera analysée juste après.',
+      submitLogin: 'Se connecter et analyser',
+    },
+    optimize: {
+      title: 'Lancez votre optimisation',
+      subtitle: 'Créez votre compte gratuit ({count} crédits offerts) : vos pièces sont gardées et l’optimisation se lancera dès que vous serez connecté.',
+      loginSubtitle: 'Connectez-vous : vos pièces sont gardées et l’optimisation se lancera juste après.',
+      submitLogin: 'Se connecter et optimiser',
+    },
     submitSignup: 'Créer le compte',
     switchToSignup: 'Créer un compte (+ {count} crédits)',
     switchToLogin: 'Déjà un compte ? Se connecter',
