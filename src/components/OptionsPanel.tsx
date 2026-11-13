@@ -4,21 +4,16 @@ import React from 'react';
 import {
   OptimizationOptions,
   OPTIMIZATION_PRIORITY_VALUES,
-  MaterialType,
   MAX_EDGE_MARGIN_MM,
-  PRICED_EDGE_IDS,
   EDGEBANDING_PRESETS,
-  type EdgePriceMap,
 } from '@/lib/cutting/binpacking';
-import type { LaborPricing, StockPricing } from '@/lib/costing';
+import type { LaborPricing } from '@/lib/costing';
 import { Frame, Gauge, Layers3, Lock, ScanLine, Scissors, Coins } from 'lucide-react';
 import { Tooltip } from '@/components/Tooltip';
 import { useLocale } from '@/components/LocaleProvider';
 import {
   LABOR_PRICING_MODE_KEYS,
   OPTIMIZATION_PRIORITY_LABEL_KEYS,
-  STOCK_PRICING_MODE_KEYS,
-  edgeBandingLabelKey,
 } from '@/i18n/domain';
 
 interface OptionsPanelProps {
@@ -28,10 +23,10 @@ interface OptionsPanelProps {
   /** Margin kept clear along every edge of the panel, in mm. */
   edgeMarginMm?: number;
   onEdgeMarginChange?: (marginMm: number) => void;
-  /** The artisan's price per metre for each edge-banding colour; absent ones use the catalog. */
-  edgePrices?: EdgePriceMap;
-  /** A price typed for one colour (null: back to the catalog price). */
-  onEdgePriceChange?: (edgeId: string, price: number | null) => void;
+  /** The artisan's price per metre of edge banding, every colour; null: catalog prices. */
+  edgePrice?: number | null;
+  /** A price typed (null: back to the catalog prices). */
+  onEdgePriceChange?: (price: number | null) => void;
   /** The last price could not be saved in the account. */
   edgePriceSaveFailed?: boolean;
 }
@@ -80,9 +75,9 @@ function Switch({
 }
 
 // Compact pricing controls default to today's behavior when a caller never
-// touches them: fixed MAD 0 labor, and the material-library per_m2 stock
-// price (no override at all) — see OPTIONS_DEFAULTS/DEFAULT_LABOR_PRICING in
-// src/lib/cutting/binpacking.ts, which this UI must never drift from.
+// touches them: fixed MAD 0 labor — see OPTIONS_DEFAULTS/DEFAULT_LABOR_PRICING
+// in src/lib/cutting/binpacking.ts, which this UI must never drift from. The
+// panel price is set on the stock panel itself (atelier), not here.
 const DEFAULT_LABOR_PRICING: LaborPricing = { mode: 'fixed', value: 0 };
 
 export const OptionsPanel: React.FC<OptionsPanelProps> = ({
@@ -91,7 +86,7 @@ export const OptionsPanel: React.FC<OptionsPanelProps> = ({
   disabled = false,
   edgeMarginMm = 0,
   onEdgeMarginChange,
-  edgePrices = {},
+  edgePrice = null,
   onEdgePriceChange,
   edgePriceSaveFailed = false,
 }) => {
@@ -102,17 +97,11 @@ export const OptionsPanel: React.FC<OptionsPanelProps> = ({
   const kerfPercent = ((options.kerfWidth || 0) / 10) * 100;
   const marginPercent = Math.min(100, (edgeMarginMm / MAX_EDGE_MARGIN_MM) * 100);
 
-  const defaultMaterial: MaterialType = options.defaultMaterial || 'mdf';
   const laborPricing: LaborPricing = options.laborPricing ?? DEFAULT_LABOR_PRICING;
-  const stockOverride: StockPricing | undefined = options.stockPricingOverrides?.[defaultMaterial];
-
   const updateLaborPricing = (next: LaborPricing) => updateField('laborPricing', next);
-  const updateStockOverride = (next: StockPricing | undefined) => {
-    const overrides = { ...(options.stockPricingOverrides || {}) };
-    if (next) overrides[defaultMaterial] = next;
-    else delete overrides[defaultMaterial];
-    updateField('stockPricingOverrides', Object.keys(overrides).length > 0 ? overrides : undefined);
-  };
+  // Catalog prices per metre still differ by colour; the hint shows their range.
+  const catalogEdgePrices = EDGEBANDING_PRESETS.filter((e) => e.id !== 'none').map((e) => e.pricePerM);
+  const catalogEdgeRange = `${Math.min(...catalogEdgePrices)}–${Math.max(...catalogEdgePrices)}`;
 
   return (
     <div className="space-y-5 text-xs">
@@ -223,78 +212,36 @@ export const OptionsPanel: React.FC<OptionsPanelProps> = ({
             </div>
           </div>
 
-          <div className="space-y-1.5">
-            <label className="flex items-center gap-2 text-[10px] text-slate-500 cursor-pointer">
-              <input type="checkbox" disabled={disabled} checked={!!stockOverride}
-                onChange={(e) => updateStockOverride(e.target.checked ? { mode: 'per_m2', value: 0 } : undefined)}
-                className="rounded border-studio-border" />
-              {t('options.pricing.stockOverride')}
-            </label>
-            {stockOverride && (
-              <div className="flex gap-1.5">
-                <select disabled={disabled} value={stockOverride.mode}
-                  aria-label={t('options.pricing.stockModeAria')}
-                  onChange={(e) => updateStockOverride({ mode: e.target.value as StockPricing['mode'], value: stockOverride.value })}
-                  style={{ colorScheme: 'light dark' }}
-                  className="px-2 py-1.5 rounded-lg bg-studio-field border border-studio-border text-slate-700 dark:text-slate-200 text-[11px] outline-none disabled:opacity-50 [&>option]:bg-white [&>option]:text-slate-900 dark:[&>option]:bg-slate-900 dark:[&>option]:text-slate-100">
-                  <option value="per_m2">{t(STOCK_PRICING_MODE_KEYS.per_m2)}</option>
-                  <option value="per_sheet">{t(STOCK_PRICING_MODE_KEYS.per_sheet)}</option>
-                </select>
-                <input type="number" min={0} step="1" disabled={disabled} value={stockOverride.value}
-                  dir="ltr"
-                  aria-label={t('options.pricing.stockValueAria')}
-                  onChange={(e) => updateStockOverride({ mode: stockOverride.mode, value: Math.max(0, parseFloat(e.target.value) || 0) })}
-                  className="w-20 px-2 py-1.5 rounded-lg bg-studio-field border border-studio-border text-slate-200 text-[11px] outline-none disabled:opacity-50" />
-              </div>
-            )}
-          </div>
-        </div>
-      </Tooltip>
-
-      {onEdgePriceChange && (
-        <div data-testid="edge-prices" className="p-4 rounded-xl bg-studio-panel/50 border border-studio-border/70 space-y-2.5">
-          <div>
-            <span className="block text-[11px] font-semibold text-slate-900 dark:text-white">{t('options.pricing.edgeTitle')}</span>
-            <span className="block text-[10px] text-slate-500">{t('options.pricing.edgeHint')}</span>
-          </div>
-          <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-            {PRICED_EDGE_IDS.map((edgeId) => {
-              const preset = EDGEBANDING_PRESETS.find((e) => e.id === edgeId)!;
-              const own = edgePrices[edgeId];
-              const label = t(edgeBandingLabelKey(edgeId));
-              return (
-                <label key={edgeId} className="flex items-center gap-1.5 text-[11px] text-slate-600 dark:text-slate-300">
-                  <span aria-hidden="true" className="h-3 w-3 rounded-full border border-studio-border shrink-0" style={{ backgroundColor: preset.color }} />
-                  <span className="flex-1 truncate">{label}</span>
-                  <input
-                    key={`${edgeId}-${own ?? ''}`}
-                    type="text"
-                    inputMode="decimal"
-                    dir="ltr"
-                    disabled={disabled}
-                    defaultValue={typeof own === 'number' ? String(own) : ''}
-                    placeholder={String(preset.pricePerM)}
-                    aria-label={t('options.pricing.edgePriceAria', { color: label })}
-                    onBlur={(e) => {
-                      const price = parseEdgePrice(e.target.value);
-                      if (price === undefined) {
-                        e.target.value = typeof own === 'number' ? String(own) : '';
-                        return;
-                      }
-                      if ((price ?? undefined) !== own) onEdgePriceChange(edgeId, price);
-                    }}
-                    onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur(); }}
-                    className="w-14 px-1.5 py-1 rounded-md bg-studio-field border border-studio-border text-slate-800 dark:text-slate-200 text-[11px] font-mono text-end outline-none focus:border-brand-500/50 disabled:opacity-50"
-                  />
-                </label>
-              );
-            })}
-          </div>
-          {edgePriceSaveFailed && (
-            <p role="alert" className="text-[10px] font-semibold text-amber-600 dark:text-amber-300">{t('options.pricing.edgeSaveFailed')}</p>
+          {onEdgePriceChange && (
+            <div data-testid="edge-price" className="space-y-1.5">
+              <label htmlFor="edge-price-input" className="block text-[10px] text-slate-500">{t('options.pricing.edgeLabel')}</label>
+              <input
+                id="edge-price-input"
+                key={edgePrice ?? 'catalog'}
+                type="text"
+                inputMode="decimal"
+                dir="ltr"
+                disabled={disabled}
+                defaultValue={edgePrice === null ? '' : String(edgePrice)}
+                placeholder={t('options.pricing.edgePlaceholder', { range: catalogEdgeRange })}
+                onBlur={(e) => {
+                  const price = parseEdgePrice(e.target.value);
+                  if (price === undefined) {
+                    e.target.value = edgePrice === null ? '' : String(edgePrice);
+                    return;
+                  }
+                  if (price !== edgePrice) onEdgePriceChange(price);
+                }}
+                onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur(); }}
+                className="w-full px-2 py-1.5 rounded-lg bg-studio-field border border-studio-border text-slate-800 dark:text-slate-200 text-[11px] font-mono outline-none focus:border-brand-500/50 disabled:opacity-50"
+              />
+              {edgePriceSaveFailed && (
+                <p role="alert" className="text-[10px] font-semibold text-amber-600 dark:text-amber-300">{t('options.pricing.edgeSaveFailed')}</p>
+              )}
+            </div>
           )}
         </div>
-      )}
+      </Tooltip>
     </div>
   );
 };

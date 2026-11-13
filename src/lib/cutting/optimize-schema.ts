@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { MATERIAL_TYPE_VALUES, OPTIMIZATION_PRIORITY_VALUES, PRICED_EDGE_IDS } from './binpacking';
+import { MATERIAL_TYPE_VALUES, OPTIMIZATION_PRIORITY_VALUES } from './binpacking';
 
 // Reasonable upper bounds on request geometry/cardinality so a malformed or
 // abusive payload fails fast at the API boundary (a clear 400) instead of
@@ -99,13 +99,10 @@ export const OptimizeSchema = z.object({
     // OPTIONS_DEFAULTS/DEFAULT_LABOR_PRICING in binpacking.ts.
     stockPricingOverrides: z.partialRecord(z.enum(MATERIAL_TYPE_VALUES), StockPricingSchema).optional(),
     laborPricing: LaborPricingSchema.optional(),
-    // The artisan's price per metre for each edge-banding colour (MAD/m).
-    edgePricesPerM: z
-      .record(z.string(), z.number().finite().min(0).max(MAX_UNIT_PRICE))
-      .refine((prices) => Object.keys(prices).every((id) => PRICED_EDGE_IDS.includes(id)), {
-        message: 'unknown edge-banding colour',
-      })
-      .optional(),
+    // The artisan's price per metre of edge banding, every colour (MAD/m).
+    // A page still open from before carries a price per colour
+    // (`edgePricesPerM`): it passes through and is ignored.
+    edgeBandPricePerM: z.number().finite().min(0).max(MAX_UNIT_PRICE).optional(),
   }).passthrough().optional(),
 }).refine((data) => data.sheet !== undefined || (data.sheets !== undefined && data.sheets.length > 0), {
   message: 'Either `sheet` or a non-empty `sheets` array must be provided',

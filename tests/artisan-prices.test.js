@@ -4,8 +4,9 @@ const { loadTsModule } = require('./helpers/load-ts-module');
 const { stubModule } = require('./helpers/stub-module');
 
 // The artisan's own prices (user request, 2026-11-13): a price per panel on
-// the stock panel and its saved presets, a price per metre for each
-// edge-banding colour, kept in the account. Without them, nothing changes.
+// the stock panel and its saved presets, one price per metre of edge banding
+// for every colour, kept in the account. Without them, the catalog prices
+// apply, the panel's as a price per panel.
 
 const binpacking = () => loadTsModule('src/lib/cutting/binpacking.ts');
 const costing = () => loadTsModule('src/lib/costing.ts');
@@ -18,22 +19,39 @@ const SHEET = { id: 's1', height: 244, width: 122, kerf: 0.3, material: 'melamin
 
 // ─── Pricing rules ──────────────────────────────────────────────────────────
 
-test('a panel is priced by its own price, else the per-material override, else the catalog per m²', () => {
-  const { sheetPricing } = binpacking();
-  const overrides = { melamine: { mode: 'per_m2', value: 170 } };
-  assert.deepEqual(sheetPricing({ material: 'melamine', pricePerSheet: 450 }, overrides), { mode: 'per_sheet', value: 450 });
-  assert.deepEqual(sheetPricing({ material: 'melamine' }, overrides), { mode: 'per_m2', value: 170 });
-  assert.deepEqual(sheetPricing({ material: 'melamine' }), { mode: 'per_m2', value: 150 });
+test('a panel is priced by its own price, else the catalog price of that whole panel', () => {
+  const { sheetPricing, catalogPanelPrice } = binpacking();
+  const panel = { material: 'melamine', width: 122, height: 244 };
+  assert.deepEqual(sheetPricing({ ...panel, pricePerSheet: 450 }), { mode: 'per_sheet', value: 450 });
+  // 150 MAD/m² × 2,9768 m² = 446,52 MAD the panel.
+  assert.equal(catalogPanelPrice('melamine', 122, 244), 446.52);
+  assert.deepEqual(sheetPricing(panel), { mode: 'per_sheet', value: 446.52 });
+  // 120 MAD/m² × 2,9768 m² = 357,216, to the cent.
+  assert.deepEqual(sheetPricing({ material: 'mdf', width: 122, height: 244 }), { mode: 'per_sheet', value: 357.22 });
   // A free panel (supplied by the client) is a real price, not "no price".
-  assert.deepEqual(sheetPricing({ material: 'melamine', pricePerSheet: 0 }), { mode: 'per_sheet', value: 0 });
+  assert.deepEqual(sheetPricing({ ...panel, pricePerSheet: 0 }), { mode: 'per_sheet', value: 0 });
+  // An API caller's per-material override still applies.
+  assert.deepEqual(sheetPricing(panel, { melamine: { mode: 'per_m2', value: 170 } }), { mode: 'per_m2', value: 170 });
 });
 
-test("an edge colour is priced at the artisan's rate, else the catalog's; « Aucun » is never charged", () => {
+test("every edge colour is priced at the artisan's one rate, else its catalog rate; « Aucun » is never charged", () => {
   const { edgePricePerM } = binpacking();
-  assert.equal(edgePricePerM('white', { white: 9.5 }), 9.5);
-  assert.equal(edgePricePerM('oak', { white: 9.5 }), 12);
-  assert.equal(edgePricePerM('none', { none: 5 }), 0);
-  assert.equal(edgePricePerM('white', { white: -1 }), 8);
+  assert.equal(edgePricePerM('white', 9.5), 9.5);
+  assert.equal(edgePricePerM('oak', 9.5), 9.5);
+  assert.equal(edgePricePerM('oak'), 12);
+  assert.equal(edgePricePerM('none', 5), 0);
+  assert.equal(edgePricePerM('white', -1), 8);
+});
+
+test('a panel price once set in the cut settings becomes the panel price when the work is reopened', () => {
+  const { withLegacyStockPrice } = binpacking();
+  const panel = { material: 'mdf', width: 122, height: 244 };
+  assert.equal(withLegacyStockPrice(panel, { mdf: { mode: 'per_sheet', value: 400 } }).pricePerSheet, 400);
+  assert.equal(withLegacyStockPrice(panel, { mdf: { mode: 'per_m2', value: 100 } }).pricePerSheet, 297.68);
+  assert.equal(withLegacyStockPrice({ ...panel, pricePerSheet: 380 }, { mdf: { mode: 'per_sheet', value: 400 } }).pricePerSheet, 380);
+  assert.equal(withLegacyStockPrice(panel, { melamine: { mode: 'per_sheet', value: 400 } }), panel);
+  assert.equal(withLegacyStockPrice(panel, undefined), panel);
+  assert.equal(withLegacyStockPrice(panel, { mdf: { mode: 'per_sheet', value: -3 } }), panel);
 });
 
 // ─── The optimizer ──────────────────────────────────────────────────────────
@@ -52,10 +70,10 @@ test("the plan uses the panel's own price and the artisan's edge rates", () => {
   const result = optimizeCutting2D(
     PIECES,
     [{ ...SHEET, color: 'Blanc', pricePerSheet: 420 }],
-    { kerfWidth: 3, edgePricesPerM: { white: 10, oak: 15 } }
+    { kerfWidth: 3, edgeBandPricePerM: 10 }
   );
   assert.equal(result.costBreakdown.materialCost, 840);
-  assert.equal(result.costBreakdown.edgeCost, 162); // 6,3 × 10 + 6,6 × 15
+  assert.equal(result.costBreakdown.edgeCost, 129); // (6,3 + 6,6) × 10
   assert.equal(result.costingInput.material.sheets[0].color, 'Blanc');
   assert.deepEqual(result.costingInput.material.sheets[0].pricing, { mode: 'per_sheet', value: 420 });
 });
@@ -67,14 +85,17 @@ test('a new price updates the plan on screen without a new optimization', () => 
   const { computeCostBreakdown } = costing();
   const plan = optimizeCutting2D(PIECES, [SHEET], { kerfWidth: 3 });
   const repriced = repriceCostingInput(plan.costingInput, {
-    edgePricesPerM: { white: 10 },
+    edgeBandPricePerM: 10,
     sheet: { ...SHEET, color: 'Blanc', pricePerSheet: 420 },
   });
   const fresh = optimizeCutting2D(PIECES, [{ ...SHEET, color: 'Blanc', pricePerSheet: 420 }], {
     kerfWidth: 3,
-    edgePricesPerM: { white: 10 },
+    edgeBandPricePerM: 10,
   });
   assert.deepEqual(computeCostBreakdown(repriced), fresh.costBreakdown);
+  // Clearing both prices goes back to the catalog: the plan as first priced.
+  const back = repriceCostingInput(repriced, { sheet: SHEET });
+  assert.deepEqual(computeCostBreakdown(back), plan.costBreakdown);
 });
 
 test('repricing leaves alone a panel of another size and a line saved before lines were named', () => {
@@ -91,7 +112,7 @@ test('repricing leaves alone a panel of another size and a line saved before lin
     labor: { pricing: { mode: 'fixed', value: 0 } },
   };
   const repriced = repriceCostingInput(input, {
-    edgePricesPerM: { white: 20 },
+    edgeBandPricePerM: 20,
     sheet: { material: 'mdf', width: 122, height: 244, pricePerSheet: 999 },
   });
   assert.deepEqual(repriced, input);
@@ -99,23 +120,27 @@ test('repricing leaves alone a panel of another size and a line saved before lin
 
 // ─── What /api/optimize accepts ─────────────────────────────────────────────
 
-test('the optimize request keeps the panel price, its colour and the edge rates', () => {
+test('the optimize request keeps the panel price, its colour and the edge rate', () => {
   const { OptimizeSchema } = loadTsModule('src/lib/cutting/optimize-schema.ts');
   const parsed = OptimizeSchema.parse({
     sheets: [{ ...SHEET, color: 'Blanc', pricePerSheet: 420 }],
     pieces: PIECES,
-    options: { edgePricesPerM: { white: 10, oak: 15 } },
+    options: { edgeBandPricePerM: 10 },
   });
   assert.equal(parsed.sheets[0].pricePerSheet, 420);
   assert.equal(parsed.sheets[0].color, 'Blanc');
-  assert.deepEqual(parsed.options.edgePricesPerM, { white: 10, oak: 15 });
+  assert.equal(parsed.options.edgeBandPricePerM, 10);
 });
 
-test('the optimize request refuses a negative price and an unknown edge colour', () => {
+test('the optimize request refuses a negative price, and a page open from before is not refused', () => {
   const { OptimizeSchema } = loadTsModule('src/lib/cutting/optimize-schema.ts');
   assert.equal(OptimizeSchema.safeParse({ sheets: [{ ...SHEET, pricePerSheet: -1 }], pieces: PIECES }).success, false);
-  assert.equal(OptimizeSchema.safeParse({ sheets: [SHEET], pieces: PIECES, options: { edgePricesPerM: { gold: 5 } } }).success, false);
-  assert.equal(OptimizeSchema.safeParse({ sheets: [SHEET], pieces: PIECES, options: { edgePricesPerM: { white: Infinity } } }).success, false);
+  assert.equal(OptimizeSchema.safeParse({ sheets: [SHEET], pieces: PIECES, options: { edgeBandPricePerM: -1 } }).success, false);
+  assert.equal(OptimizeSchema.safeParse({ sheets: [SHEET], pieces: PIECES, options: { edgeBandPricePerM: Infinity } }).success, false);
+  // Prices per colour, sent by a page loaded before this change, are ignored.
+  const { optimizeCutting2D } = binpacking();
+  const old = OptimizeSchema.parse({ sheets: [SHEET], pieces: PIECES, options: { kerfWidth: 3, edgePricesPerM: { white: 10 } } });
+  assert.equal(optimizeCutting2D(PIECES, [SHEET], old.options).costBreakdown.edgeCost, 129.6);
 });
 
 // ─── Account storage (routes over a stubbed Supabase) ───────────────────────
@@ -193,6 +218,7 @@ function table(name) {
     update: (values) => ((action = { kind: 'update', values }), query),
     upsert: (rows) => ((action = { kind: 'upsert', rows }), query),
     delete: () => ((action = { kind: 'delete' }), query),
+    maybeSingle: () => Promise.resolve(run()).then(({ data, error }) => ({ data: Array.isArray(data) ? data[0] ?? null : data, error })),
     then: (resolve, reject) => Promise.resolve(run()).then(resolve, reject),
   };
   return query;
@@ -276,37 +302,51 @@ test('before migration 015, saved panels are still listed and saved, without a p
   assert.equal((await itemRoute().PATCH(...patchPrice(PRESET_ID, 450))).status, 503);
 });
 
-test('edge prices are kept per account: set some colours, reset one, read them back', async () => {
+test('the edge price is kept per account: set it, change it, clear it', async () => {
   resetState();
-  let res = await edgeRoute().PUT(json('PUT', '/api/edge-prices', { prices: { white: 9.5, oak: 13 } }));
+  // A price per colour saved before this change is no longer read.
+  state.edgePrices = [{ user_id: UUID, edge_id: 'oak', price_per_m: '13.00' }];
+  assert.equal((await (await edgeRoute().GET()).json()).price, null);
+
+  let res = await edgeRoute().PUT(json('PUT', '/api/edge-prices', { price: 9.5 }));
   assert.equal(res.status, 200);
-  res = await edgeRoute().PUT(json('PUT', '/api/edge-prices', { prices: { oak: null } }));
+  res = await edgeRoute().PUT(json('PUT', '/api/edge-prices', { price: 10.456 }));
   assert.equal(res.status, 200);
-  const data = await (await edgeRoute().GET()).json();
-  assert.deepEqual(data.prices, { white: 9.5 });
+  let data = await (await edgeRoute().GET()).json();
+  assert.equal(data.price, 10.46);
+  assert.equal(state.edgePrices.filter((row) => row.edge_id === 'all').length, 1);
   assert.ok(state.edgePrices.every((row) => row.user_id === UUID));
+
+  res = await edgeRoute().PUT(json('PUT', '/api/edge-prices', { price: null }));
+  assert.equal(res.status, 200);
+  data = await (await edgeRoute().GET()).json();
+  assert.equal(data.price, null);
 });
 
-test('edge prices: an unknown colour or a negative price is refused, and a visitor must sign in', async () => {
+test('edge price: a negative or missing price is refused, and a visitor must sign in', async () => {
   resetState();
-  assert.equal((await edgeRoute().PUT(json('PUT', '/api/edge-prices', { prices: { gold: 5 } }))).status, 400);
-  assert.equal((await edgeRoute().PUT(json('PUT', '/api/edge-prices', { prices: { white: -1 } }))).status, 400);
-  assert.equal((await edgeRoute().PUT(json('PUT', '/api/edge-prices', { prices: {} }))).status, 400);
+  assert.equal((await edgeRoute().PUT(json('PUT', '/api/edge-prices', { price: -1 }))).status, 400);
+  assert.equal((await edgeRoute().PUT(json('PUT', '/api/edge-prices', {}))).status, 400);
+  assert.equal((await edgeRoute().PUT(json('PUT', '/api/edge-prices', { prices: { white: 9 } }))).status, 400);
   state.user = null;
   assert.equal((await edgeRoute().GET()).status, 401);
+  assert.equal((await edgeRoute().PUT(json('PUT', '/api/edge-prices', { price: 9 }))).status, 401);
   assert.equal(state.edgePrices.length, 0);
 });
 
-test('before migration 015, the edge prices stay on the device', async () => {
+test('before migration 015, the edge price stays on the device', async () => {
   resetState();
   state.edgeTableMissing = true;
   const data = await (await edgeRoute().GET()).json();
   assert.equal(data.note, 'cloud_not_ready');
-  assert.equal((await edgeRoute().PUT(json('PUT', '/api/edge-prices', { prices: { white: 9 } }))).status, 503);
+  assert.equal((await edgeRoute().PUT(json('PUT', '/api/edge-prices', { price: 9 }))).status, 503);
 });
 
-test('the device copy of edge prices keeps only known colours with a usable price', () => {
-  const { cleanEdgePrices } = loadTsModule('src/lib/edge-prices.ts');
-  assert.deepEqual(cleanEdgePrices({ white: 9.456, gold: 4, oak: -2, black: 'x', none: 3 }), { white: 9.46 });
-  assert.deepEqual(cleanEdgePrices(null), {});
+test('the device copy of the edge price keeps only a usable price, to the cent', () => {
+  const { cleanEdgePrice } = loadTsModule('src/lib/edge-prices.ts');
+  assert.equal(cleanEdgePrice(9.456), 9.46);
+  assert.equal(cleanEdgePrice(0), 0);
+  assert.equal(cleanEdgePrice(-2), null);
+  assert.equal(cleanEdgePrice('9'), null);
+  assert.equal(cleanEdgePrice({ white: 9 }), null);
 });

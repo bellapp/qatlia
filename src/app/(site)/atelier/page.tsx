@@ -38,16 +38,16 @@ import {
   DEFAULT_STOCK_SHEET,
   MaterialType,
   CutMode,
-  getMaterialDef,
+  catalogPanelPrice,
   repriceCostingInput,
-  type EdgePriceMap,
+  withLegacyStockPrice,
 } from '@/lib/cutting/binpacking';
 import { computeCostBreakdown } from '@/lib/costing';
 import {
-  loadDeviceEdgePrices,
-  saveDeviceEdgePrices,
-  fetchAccountEdgePrices,
-  saveAccountEdgePrices,
+  loadDeviceEdgePrice,
+  saveDeviceEdgePrice,
+  fetchAccountEdgePrice,
+  saveAccountEdgePrice,
 } from '@/lib/edge-prices';
 import { isSamePanel } from '@/lib/panel-preset-rules';
 import { PIECE_COLOR_PALETTE, getResolvedPieceColor } from '@/lib/pieces/catalog';
@@ -116,6 +116,16 @@ const DEFAULT_SHEETS: Sheet[] = [DEFAULT_STOCK_SHEET];
 const LEGACY_DEFAULT_PANEL_LABEL = 'Panneau standard 278×208';
 const withoutLegacyPanelLabel = (sheet: Sheet): Sheet =>
   sheet.label === LEGACY_DEFAULT_PANEL_LABEL ? { ...sheet, label: undefined } : sheet;
+
+/**
+ * The cut settings no longer carry a panel price: the panel has its own
+ * (see withLegacyStockPrice, which moves an old one onto the panel).
+ */
+const optionsWithoutStockOverride = (options: OptimizationOptions): OptimizationOptions => {
+  const { stockPricingOverrides: _legacy, ...rest } = options;
+  void _legacy;
+  return rest;
+};
 
 /**
  * The stock materials offered in the workshop's quick selector. These are the
@@ -281,29 +291,29 @@ export default function Dashboard() {
 
   const allPresets = [...BUILT_IN_PRESETS, ...savedPresets];
 
-  // The artisan's price per metre for each edge-banding colour: in the
-  // account when signed in (migration 015), on the device otherwise. A colour
-  // without one keeps the catalog price.
-  const [edgePrices, setEdgePrices] = useState<EdgePriceMap>({});
+  // The artisan's one price per metre of edge banding: in the account when
+  // signed in (migration 015), on the device otherwise. Null: each colour
+  // keeps its catalog price.
+  const [edgePrice, setEdgePrice] = useState<number | null>(null);
   const [edgePriceSource, setEdgePriceSource] = useState<'device' | 'account'>('device');
   const [edgePriceSaveFailed, setEdgePriceSaveFailed] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
-    setEdgePrices(loadDeviceEdgePrices());
+    setEdgePrice(loadDeviceEdgePrice());
     (async () => {
       try {
         const { data: { user } } = await createClient().auth.getUser();
         if (!user) return;
-        let account = await fetchAccountEdgePrices();
-        if (account === null) return;
-        // First signed-in use: the prices set on this device become the account's.
-        const device = loadDeviceEdgePrices();
-        if (Object.keys(account).length === 0 && Object.keys(device).length > 0) {
-          if (await saveAccountEdgePrices(device as Record<string, number>)) account = device;
+        let account = await fetchAccountEdgePrice();
+        if (account === undefined) return;
+        // First signed-in use: the price set on this device becomes the account's.
+        const device = loadDeviceEdgePrice();
+        if (account === null && device !== null) {
+          if (await saveAccountEdgePrice(device)) account = device;
         }
         if (cancelled) return;
-        setEdgePrices(account);
+        setEdgePrice(account);
         setEdgePriceSource('account');
       } catch {
         /* the device prices stay in use */
@@ -419,13 +429,13 @@ const commitPanelName = () => {
    * optimization: same pieces, same panels, new rates (see
    * repriceCostingInput). The PDF and the quote read this same result.
    */
-  const repriceResult = (next: { sheet?: Sheet; edgePrices?: EdgePriceMap }) => {
+  const repriceResult = (next: { sheet?: Sheet; edgePrice?: number | null }) => {
     setResult((current) => {
       if (!current?.costingInput) return current;
+      const ownEdgePrice = next.edgePrice !== undefined ? next.edgePrice : edgePrice;
       const costingInput = repriceCostingInput(current.costingInput, {
-        edgePricesPerM: next.edgePrices ?? edgePrices,
+        edgeBandPricePerM: ownEdgePrice ?? undefined,
         sheet: next.sheet ?? activeSheet,
-        stockPricingOverrides: options.stockPricingOverrides,
       });
       return { ...current, costingInput, costBreakdown: computeCostBreakdown(costingInput) };
     });
@@ -454,17 +464,14 @@ const commitPanelName = () => {
     repriceResult({ sheet: nextSheet });
   };
 
-  /** Sets (or, with null, resets to the catalog) the price per metre of one edge colour. */
-  const handleEdgePriceChange = async (edgeId: string, price: number | null) => {
-    const next: EdgePriceMap = { ...edgePrices };
-    if (price === null) delete next[edgeId];
-    else next[edgeId] = price;
-    setEdgePrices(next);
-    repriceResult({ edgePrices: next });
+  /** Sets (or, with null, resets to the catalog prices) the price per metre of edge banding. */
+  const handleEdgePriceChange = async (price: number | null) => {
+    setEdgePrice(price);
+    repriceResult({ edgePrice: price });
     if (edgePriceSource === 'account') {
-      setEdgePriceSaveFailed(!(await saveAccountEdgePrices({ [edgeId]: price })));
+      setEdgePriceSaveFailed(!(await saveAccountEdgePrice(price)));
     } else {
-      saveDeviceEdgePrices(next);
+      saveDeviceEdgePrice(price);
     }
   };
 
@@ -598,8 +605,11 @@ const commitPanelName = () => {
     if (savedProj) {
       try {
         const parsed = JSON.parse(savedProj);
-        if (parsed.sheet) setSheets([withoutLegacyPanelLabel(parsed.sheet)]);
-        if (Array.isArray(parsed.sheets)) setSheets(parsed.sheets.map(withoutLegacyPanelLabel));
+        // A panel price once set in the cut settings becomes the panel's own price.
+        const legacyStockPrices = parsed.options?.stockPricingOverrides;
+        const restoreSheet = (sheet: Sheet) => withLegacyStockPrice(withoutLegacyPanelLabel(sheet), legacyStockPrices);
+        if (parsed.sheet) setSheets([restoreSheet(parsed.sheet)]);
+        if (Array.isArray(parsed.sheets)) setSheets(parsed.sheets.map(restoreSheet));
         if (Array.isArray(parsed.pieces)) setPieces(normalizePiecesWithColors(parsed.pieces));
         if (typeof parsed.projectName === 'string' && parsed.projectName.trim()) {
           setProjectName(parsed.projectName.trim());
@@ -607,7 +617,7 @@ const commitPanelName = () => {
         }
         setScanThumb(typeof parsed.scanThumb === 'string' ? parsed.scanThumb : null);
         setPdfGeneratedAt(typeof parsed.pdfGeneratedAt === 'string' ? parsed.pdfGeneratedAt : null);
-        if (parsed.options) setOptions((prev) => ({ ...prev, ...parsed.options }));
+        if (parsed.options) setOptions((prev) => optionsWithoutStockOverride({ ...prev, ...parsed.options }));
         if (restoredProjectId) setLastSavedProjectId(restoredProjectId);
         // Legacy saved projects carry no unit metadata at all; they predate
         // this feature and were always canonical cm. `resolveProjectUnitMetadata`
@@ -797,8 +807,9 @@ const commitPanelName = () => {
   /** Puts kept work back on screen. */
   const applyPendingWork = (work: PendingWork) => {
     if (work.pieces.length > 0) setPieces(normalizePiecesWithColors(work.pieces as Piece[]));
-    if (work.sheets.length > 0) setSheets(work.sheets as Sheet[]);
-    if (work.options) setOptions((prev) => ({ ...prev, ...(work.options as Partial<OptimizationOptions>) }));
+    const legacyStockPrices = (work.options as Partial<OptimizationOptions> | undefined)?.stockPricingOverrides;
+    if (work.sheets.length > 0) setSheets((work.sheets as Sheet[]).map((sheet) => withLegacyStockPrice(sheet, legacyStockPrices)));
+    if (work.options) setOptions((prev) => optionsWithoutStockOverride({ ...prev, ...(work.options as Partial<OptimizationOptions>) }));
     if (work.cutMode) setCutMode(work.cutMode);
     if (work.projectName) {
       setProjectName(work.projectName);
@@ -836,7 +847,7 @@ const commitPanelName = () => {
           sheet: { ...activeSheet, kerf: options.kerfWidth },
           sheets,
           pieces,
-          options: { ...options, edgePricesPerM: edgePrices },
+          options: { ...optionsWithoutStockOverride(options), ...(edgePrice !== null ? { edgeBandPricePerM: edgePrice } : {}) },
           cutMode,
           analysisPass: readAnalysisPass() ?? undefined,
         }),
@@ -1819,7 +1830,7 @@ const commitPanelName = () => {
                       onChange={(e) => setPanelPriceDraft(e.target.value)}
                       onBlur={commitPanelPrice}
                       onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur(); }}
-                      placeholder={t('atelier.stock.panelPricePlaceholder', { price: n(getMaterialDef(activeSheet.material).pricePerM2) })}
+                      placeholder={t('atelier.stock.panelPricePlaceholder', { price: detailMoney(catalogPanelPrice(activeSheet.material, activeSheet.width, activeSheet.height)) })}
                       className="w-full px-2.5 py-1.5 rounded-lg bg-studio-field border border-studio-border text-slate-800 dark:text-slate-200 text-xs font-mono outline-none focus:border-brand-500/50 focus:ring-1 focus:ring-brand-500/20 transition-all"
                     />
                   </div>
@@ -1881,7 +1892,6 @@ const commitPanelName = () => {
                 displayUnit={displayUnit}
                 showMaterialCol={options.considerMaterial}
                 disabled={isOptimizing}
-                edgePrices={edgePrices}
               />
             </div>
 
@@ -1912,8 +1922,8 @@ const commitPanelName = () => {
                     disabled={isOptimizing}
                     edgeMarginMm={Math.round((activeSheet.margin ?? 0) * 100) / 10}
                     onEdgeMarginChange={handleEdgeMarginChange}
-                    edgePrices={edgePrices}
-                    onEdgePriceChange={(edgeId, price) => void handleEdgePriceChange(edgeId, price)}
+                    edgePrice={edgePrice}
+                    onEdgePriceChange={(price) => void handleEdgePriceChange(price)}
                     edgePriceSaveFailed={edgePriceSaveFailed}
                   />
                 </div>

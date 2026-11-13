@@ -1,6 +1,7 @@
 import {
   computeCostBreakdown,
   resolveEdgeRatePerMeter,
+  roundCurrency,
   type CostBreakdown,
   type CostBreakdownInput,
   type LaborPricing,
@@ -47,40 +48,64 @@ export const EDGEBANDING_PRESETS: EdgeBandingPreset[] = [
 
 // ─── The artisan's own prices (user request, 2026-11-13) ──────────────────
 // Panel and edge-banding prices vary from one supplier to the next, so the
-// artisan can set them: a price per panel on the stock panel itself, and a
-// price per metre for each edge-banding colour. Without one, the catalog
-// price above applies, exactly as before.
-
-/** Edge-banding colours whose price per metre an artisan can set ('none' is never banded). */
-export const PRICED_EDGE_IDS: readonly string[] = EDGEBANDING_PRESETS.filter((e) => e.id !== 'none').map((e) => e.id);
-
-/** MAD per metre, keyed by edge-banding preset id. Only the colours the artisan priced. */
-export type EdgePriceMap = Partial<Record<string, number>>;
+// artisan can set them: a price per panel on the stock panel itself, and one
+// price per metre of edge banding. Without one, the catalog price applies.
 
 function isPrice(value: unknown): value is number {
   return typeof value === 'number' && Number.isFinite(value) && value >= 0;
 }
 
-/** MAD per metre for an edge-banding colour: the artisan's own price, else the catalog's. */
-export function edgePricePerM(edgeId: string, edgePrices?: EdgePriceMap): number {
+/**
+ * MAD per metre for an edge-banding colour. The artisan sets one price for
+ * every colour (user request, 2026-11-13: a price per colour was too much
+ * detail); without it each colour keeps its catalog price.
+ */
+export function edgePricePerM(edgeId: string, ownPricePerM?: number): number {
   const preset = EDGEBANDING_PRESETS.find((e) => e.id === edgeId) || EDGEBANDING_PRESETS[0];
   if (preset.id === 'none') return 0;
-  const own = edgePrices?.[preset.id];
-  return isPrice(own) ? own : preset.pricePerM;
+  return isPrice(ownPricePerM) ? ownPricePerM : preset.pricePerM;
 }
 
 /**
- * How one stock panel is priced: the artisan's price per panel when set,
- * else a per-material override (Réglages de coupe), else the catalog price
- * per m² of its material.
+ * The catalog price of one whole panel: its material's price per m² times
+ * its area, to the cent. Artisans buy and price panels by the panel, so the
+ * catalog default is a price per panel too (user request, 2026-11-13).
+ */
+export function catalogPanelPrice(material: MaterialType | null | undefined, widthCm: number, heightCm: number): number {
+  return roundCurrency(getMaterialDef((material || 'mdf') as MaterialType).pricePerM2 * ((widthCm * heightCm) / 10000));
+}
+
+/**
+ * How one stock panel is priced, always per panel from the atelier: the
+ * artisan's price when set, else the catalog price of that panel. A
+ * per-material override still applies for callers of the API that send one
+ * (the atelier no longer does; see `withLegacyStockPrice`).
  */
 export function sheetPricing(
-  sheet: { material?: MaterialType | null; pricePerSheet?: number },
+  sheet: { material?: MaterialType | null; pricePerSheet?: number; width: number; height: number },
   overrides?: Partial<Record<MaterialType, StockPricing>>
 ): StockPricing {
   if (isPrice(sheet.pricePerSheet)) return { mode: 'per_sheet', value: sheet.pricePerSheet };
   const material = (sheet.material || 'mdf') as MaterialType;
-  return overrides?.[material] ?? { mode: 'per_m2', value: getMaterialDef(material).pricePerM2 };
+  return overrides?.[material] ?? { mode: 'per_sheet', value: catalogPanelPrice(material, sheet.width, sheet.height) };
+}
+
+/**
+ * Work saved while the cut settings still had their own panel price
+ * (« Remplacer le prix catalogue du panneau ») gets that price back as the
+ * panel's own price, so reopening it keeps the same amount and shows it in
+ * the panel price field.
+ */
+export function withLegacyStockPrice<T extends { material?: MaterialType | null; pricePerSheet?: number; width: number; height: number }>(
+  sheet: T,
+  overrides: unknown
+): T {
+  if (isPrice(sheet.pricePerSheet) || !overrides || typeof overrides !== 'object') return sheet;
+  const override = (overrides as Record<string, unknown>)[sheet.material || 'mdf'] as Partial<StockPricing> | undefined;
+  if (!override || !isPrice(override.value)) return sheet;
+  if (override.mode === 'per_sheet') return { ...sheet, pricePerSheet: roundCurrency(override.value) };
+  if (override.mode === 'per_m2') return { ...sheet, pricePerSheet: roundCurrency(override.value * ((sheet.width * sheet.height) / 10000)) };
+  return sheet;
 }
 
 export interface Piece {
@@ -131,8 +156,8 @@ export interface OptimizationOptions {
    * invented per-meter estimate.
    */
   laborPricing?: LaborPricing;
-  /** The artisan's own price per metre for each edge-banding colour (see `edgePricePerM`). */
-  edgePricesPerM?: EdgePriceMap;
+  /** The artisan's price per metre of edge banding, every colour (see `edgePricePerM`). */
+  edgeBandPricePerM?: number;
   /**
    * Per-material stock price override fed into the shared cost calculator.
    * A material absent from this map keeps using the material library's
@@ -263,9 +288,8 @@ export interface OptimizationResult {
 export function repriceCostingInput(
   input: CostBreakdownInput,
   prices: {
-    edgePricesPerM?: EdgePriceMap;
+    edgeBandPricePerM?: number;
     sheet?: Pick<Sheet, 'material' | 'width' | 'height' | 'color' | 'pricePerSheet'>;
-    stockPricingOverrides?: Partial<Record<MaterialType, StockPricing>>;
   }
 ): CostBreakdownInput {
   const { sheet } = prices;
@@ -283,13 +307,13 @@ export function repriceCostingInput(
         const { color: _previousColor, ...rest } = line;
         void _previousColor;
         const color = sheet.color?.trim().slice(0, 60);
-        return { ...rest, pricing: sheetPricing(sheet, prices.stockPricingOverrides), ...(color ? { color } : {}) };
+        return { ...rest, pricing: sheetPricing(sheet), ...(color ? { color } : {}) };
       }),
     },
     edge: {
       ...input.edge,
       segments: input.edge.segments.map((segment) =>
-        segment.edgeId ? { ...segment, pricePerMeter: edgePricePerM(segment.edgeId, prices.edgePricesPerM) } : segment
+        segment.edgeId ? { ...segment, pricePerMeter: edgePricePerM(segment.edgeId, prices.edgeBandPricePerM) } : segment
       ),
     },
   };
@@ -1858,9 +1882,9 @@ export function optimizeCutting2D(
   );
   const totalM = Math.round((totalCutLengthCm / 100) * 10) / 10;
 
-  // Material cost: one line per physical sheet actually used, priced per m²
-  // from the material library unless the caller supplied an explicit
-  // per-material override. This is 'measured' because it is derived from
+  // Material cost: one line per physical sheet actually used, priced per
+  // panel (the artisan's price, else the catalog price of that panel; see
+  // `sheetPricing`). This is 'measured' because it is derived from
   // the real plan (finalPlan.sheets), not a pre-optimization guess.
   const sheetCostLines: SheetCostLine[] = finalPlan.sheets.map((sheet) => ({
     areaM2: (sheet.width * sheet.height) / 10000,
@@ -1888,7 +1912,7 @@ export function optimizeCutting2D(
     const pricePerMeter = resolveEdgeRatePerMeter(
       placed.edges.pricePerM !== undefined
         ? { kind: 'explicit', pricePerMeter: placed.edges.pricePerM }
-        : { kind: 'preset', preset: { id: preset.id, pricePerMeter: edgePricePerM(preset.id, mergedOptions.edgePricesPerM) } }
+        : { kind: 'preset', preset: { id: preset.id, pricePerMeter: edgePricePerM(preset.id, mergedOptions.edgeBandPricePerM) } }
     );
     if (pricePerMeter <= 0) continue;
     // Edge flags (top/bottom/left/right) refer to the piece's own labeled
