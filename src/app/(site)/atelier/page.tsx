@@ -1867,7 +1867,7 @@ const commitPanelName = () => {
                           aria-label={t('atelier.stock.presetPriceAria', { name: p.name })}
                           className="w-20 px-2 py-1 rounded-md bg-studio-panel border border-studio-border text-[11px] font-mono text-slate-800 dark:text-slate-200 outline-none focus:border-brand-500/50"
                         />
-                        <span className="text-[10px] text-slate-500">{t('atelier.cost.currency')}</span>
+                        <span className="text-[10px] text-slate-500" translate="no">{t('atelier.cost.currency')}</span>
                       </span>
                       <button
                         type="button"
@@ -1975,7 +1975,9 @@ const commitPanelName = () => {
                   <div className="relative flex flex-wrap items-center justify-between gap-4">
                     <div>
                       <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-brand-400 mb-1 font-mono">{t('atelier.cost.bannerLabel')}</p>
-                      <p className="text-3xl font-black font-mono text-white tracking-tight" dir="ltr">
+                      {/* translate="no": Chrome's page translation turned "MAD" into
+                          "UAE dirham" on an Arabic-language phone. */}
+                      <p data-testid="cost-banner-total" className="text-3xl font-black font-mono text-white tracking-tight" dir="ltr" translate="no">
                         {result.costBreakdown ? n(result.costBreakdown.subtotal) : '—'} <span className="text-brand-400">{t('atelier.cost.currency')}</span>
                       </p>
                       <p className="text-[11px] text-slate-400 mt-1">
@@ -2304,19 +2306,19 @@ const commitPanelName = () => {
                     <div className="grid grid-cols-4 gap-2 text-xs">
                       <div className="p-2 rounded-lg bg-studio-field text-center">
                         <span className="text-[9px] text-slate-500 block uppercase">{t('atelier.cost.panels')}</span>
-                        <span className="font-mono font-black text-slate-900 dark:text-white" dir="ltr">{t('atelier.cost.amount', { value: n(result.costBreakdown?.materialCost ?? 0) })}</span>
+                        <span className="font-mono font-black text-slate-900 dark:text-white" dir="ltr" translate="no">{t('atelier.cost.amount',{ value: n(result.costBreakdown?.materialCost ?? 0) })}</span>
                       </div>
                       <div className="p-2 rounded-lg bg-studio-field text-center">
                         <span className="text-[9px] text-slate-500 block uppercase">{t('atelier.cost.edges')}</span>
-                        <span className="font-mono font-black text-slate-900 dark:text-white" dir="ltr">{t('atelier.cost.amount', { value: n(result.costBreakdown?.edgeCost ?? 0) })}</span>
+                        <span className="font-mono font-black text-slate-900 dark:text-white" dir="ltr" translate="no">{t('atelier.cost.amount',{ value: n(result.costBreakdown?.edgeCost ?? 0) })}</span>
                       </div>
                       <div className="p-2 rounded-lg bg-studio-field text-center">
                         <span className="text-[9px] text-slate-500 block uppercase">{t('atelier.cost.labor')}</span>
-                        <span className="font-mono font-black text-slate-900 dark:text-white" dir="ltr">{t('atelier.cost.amount', { value: n(result.costBreakdown?.laborCost ?? 0) })}</span>
+                        <span className="font-mono font-black text-slate-900 dark:text-white" dir="ltr" translate="no">{t('atelier.cost.amount',{ value: n(result.costBreakdown?.laborCost ?? 0) })}</span>
                       </div>
                       <div className="p-2 rounded-lg bg-studio-field text-center">
                         <span className="text-[9px] text-slate-500 block uppercase">{t('atelier.cost.total')}</span>
-                        <span className="font-mono font-black text-brand-400" dir="ltr">{t('atelier.cost.amount', { value: n(result.costBreakdown?.subtotal ?? 0) })}</span>
+                        <span className="font-mono font-black text-brand-400" dir="ltr" translate="no">{t('atelier.cost.amount',{ value: n(result.costBreakdown?.subtotal ?? 0) })}</span>
                       </div>
                     </div>
                     {costDetail && (costDetail.panels.length > 0 || costDetail.edges.length > 0) && (
@@ -2337,12 +2339,12 @@ const commitPanelName = () => {
                                 </span>
                               </span>
                               <span className="ms-auto flex items-baseline gap-3">
-                                <span className="font-mono text-[10px] text-slate-500 dark:text-slate-400" dir="ltr">
+                                <span className="font-mono text-[10px] text-slate-500 dark:text-slate-400" dir="ltr" translate="no">
                                   {panel.pricing.mode === 'per_sheet'
                                     ? t('atelier.cost.detail.perPanel', { count: panel.count, price: detailMoney(panel.pricing.value) })
                                     : t('atelier.cost.detail.perM2', { count: panel.count, area: detailNumber(panel.areaM2, 4), price: detailNumber(panel.pricing.value, 2) })}
                                 </span>
-                                <span className="font-mono font-bold text-slate-900 dark:text-white tabular-nums" dir="ltr">{t('atelier.cost.amount', { value: detailMoney(panel.total) })}</span>
+                                <span className="font-mono font-bold text-slate-900 dark:text-white tabular-nums" dir="ltr" translate="no">{t('atelier.cost.amount',{ value: detailMoney(panel.total) })}</span>
                               </span>
                             </li>
                           ))}
@@ -2352,10 +2354,10 @@ const commitPanelName = () => {
                                 {edge.edgeId ? `${t('atelier.cost.detail.edge')} · ${t(edgeBandingLabelKey(edge.edgeId))}` : t('atelier.cost.detail.edge')}
                               </span>
                               <span className="ms-auto flex items-baseline gap-3">
-                                <span className="font-mono text-[10px] text-slate-500 dark:text-slate-400" dir="ltr">
+                                <span className="font-mono text-[10px] text-slate-500 dark:text-slate-400" dir="ltr" translate="no">
                                   {t('atelier.cost.detail.perMeter', { length: detailNumber(edge.lengthM, 2), price: detailNumber(edge.pricePerMeter, 2) })}
                                 </span>
-                                <span className="font-mono font-bold text-slate-900 dark:text-white tabular-nums" dir="ltr">{t('atelier.cost.amount', { value: detailMoney(edge.total) })}</span>
+                                <span className="font-mono font-bold text-slate-900 dark:text-white tabular-nums" dir="ltr" translate="no">{t('atelier.cost.amount',{ value: detailMoney(edge.total) })}</span>
                               </span>
                             </li>
                           ))}
@@ -2366,11 +2368,11 @@ const commitPanelName = () => {
                               </span>
                               <span className="ms-auto flex items-baseline gap-3">
                                 {costDetail.labor.pricing.mode === 'per_meter' && (
-                                  <span className="font-mono text-[10px] text-slate-500 dark:text-slate-400" dir="ltr">
+                                  <span className="font-mono text-[10px] text-slate-500 dark:text-slate-400" dir="ltr" translate="no">
                                     {t('atelier.cost.detail.perMeter', { length: detailNumber(costDetail.labor.cutLengthM ?? 0, 2), price: detailNumber(costDetail.labor.pricing.value, 2) })}
                                   </span>
                                 )}
-                                <span className="font-mono font-bold text-slate-900 dark:text-white tabular-nums" dir="ltr">{t('atelier.cost.amount', { value: detailMoney(costDetail.labor.total) })}</span>
+                                <span className="font-mono font-bold text-slate-900 dark:text-white tabular-nums" dir="ltr" translate="no">{t('atelier.cost.amount',{ value: detailMoney(costDetail.labor.total) })}</span>
                               </span>
                             </li>
                           )}
