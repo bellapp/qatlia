@@ -984,6 +984,63 @@ function packSheetWithStrategy(
   return packSheetWithFreeRects(items, sheet, strategy, sheetIndex, nextPieceNumber);
 }
 
+// ─── Keeping the rest of a panel whole ─────────────────────────────
+//
+// A job rarely fills its last panel. What is left of it is worth far more as
+// one piece running the panel's full length than as the same area in scattered
+// rectangles: the workshop can put it back on the rack and cut long parts from
+// it later (customer report, 2026-11-13: a competing plan used a 91 cm strip of
+// the fourth panel and left the rest whole, ours spread four pieces across it).
+//
+// A strip limit keeps every piece of one panel within `extent` cm of its
+// origin edge along one axis; the rest of the panel, one saw pass further, is
+// left untouched.
+interface StripLimit {
+  /** Position of the limited panel in the plan. */
+  sheetIndex: number;
+  /** 'width': pieces stay within `extent` of the left edge; 'height': of the top edge. */
+  axis: 'width' | 'height';
+  /** Usable extent of the strip in cm, margins excluded. */
+  extent: number;
+  /** How many panels the plan may use in all. */
+  sheetCount: number;
+}
+
+function packSheetWithinStrip(
+  items: ExpandedPiece[],
+  sheet: Sheet,
+  strip: StripLimit,
+  strategy: PackingStrategy,
+  sheetIndex: number,
+  nextPieceNumber: number
+): SheetPackingCandidate {
+  const margin = Math.max(0, sheet.margin || 0);
+  const kerf = Math.max(0, sheet.kerf || 0);
+  const usableWidth = Math.max(0, sheet.width - (margin * 2));
+  const usableHeight = Math.max(0, sheet.height - (margin * 2));
+  const narrowed: Sheet = strip.axis === 'width'
+    ? { ...sheet, width: Math.min(sheet.width, strip.extent + (margin * 2)) }
+    : { ...sheet, height: Math.min(sheet.height, strip.extent + (margin * 2)) };
+  const candidate = packSheetWithStrategy(items, narrowed, strategy, sheetIndex, nextPieceNumber);
+  if (candidate.pieces.length === 0) return candidate;
+
+  const rest: FreeRect = strip.axis === 'width'
+    ? { x: margin + strip.extent + kerf, y: margin, width: usableWidth - strip.extent - kerf, height: usableHeight }
+    : { x: margin, y: margin + strip.extent + kerf, width: usableWidth, height: usableHeight - strip.extent - kerf };
+  if (rest.width <= 1e-9 || rest.height <= 1e-9) return candidate;
+
+  // The pass that frees the strip from the rest of the panel comes first at
+  // the saw, so it is first in the list; it runs the panel's full usable span.
+  const separation: SplitCut = strip.axis === 'width'
+    ? { axis: 'vertical', lengthCm: usableHeight }
+    : { axis: 'horizontal', lengthCm: usableWidth };
+  const cuts = [separation, ...candidate.cuts].map((cut, position) => ({
+    id: `sheet${sheetIndex}_cut_${position}`, sheetIndex, axis: cut.axis, lengthCm: cut.lengthCm,
+  }));
+
+  return { ...candidate, freeRects: [...candidate.freeRects, rest], cuts };
+}
+
 // Round to a fixed cm precision so IDs/areas are stable across floating-point noise.
 function roundTo(value: number, decimals: number): number {
   const factor = 10 ** decimals;
@@ -1047,21 +1104,45 @@ function buildSheetResult(sheet: Sheet, sheetIndex: number, defaultMaterial: Mat
   };
 }
 
+/** Where one plan search stood before packing the panel at a given position. */
+interface PlanSearchCheckpoint { frontier: PartialPlanCandidate[]; completed: PartialPlanCandidate[]; }
+
+interface PlanSearchControls {
+  /** Keeps one panel's pieces within a strip (see `StripLimit`). */
+  strip?: StripLimit;
+  /**
+   * Indexed by panel position. A search without a strip fills it in; a strip
+   * search of the same strategy reads it to skip the panels before its strip.
+   */
+  checkpoints?: PlanSearchCheckpoint[];
+  /** Counts the packing work done, one unit per piece offered to a panel. */
+  meter?: { work: number };
+}
+
 function simulatePlanForStrategy(
   items: ExpandedPiece[],
   sheets: Sheet[],
   strategy: PackingStrategy,
   mergedOptions: OptimizationOptions,
-  defaultMaterial: MaterialType
+  defaultMaterial: MaterialType,
+  search: PlanSearchControls = {}
 ): PlanCandidate {
+  const { strip, checkpoints, meter } = search;
   const stockSequence = getStockSequence(sheets);
-    const candidateStrategies = [
-      strategy,
-      ...PACKING_STRATEGIES.filter((candidate) => candidate.id !== strategy.id),
-    ];
+  const candidateStrategies = [
+    strategy,
+    ...PACKING_STRATEGIES.filter((candidate) => candidate.id !== strategy.id),
+  ];
+  // A strip search already knows how many panels the job takes: a plan that
+  // needs one more is of no use to it, so it stops there instead of opening
+  // panel after panel.
+  const maxSheets = strip ? strip.sheetCount : Number.POSITIVE_INFINITY;
   const maxSheetArea = sheets.reduce((max, sheet) => Math.max(max, sheet.width * sheet.height), 0);
   const beamWidth = 6;
-  let frontier: PartialPlanCandidate[] = [{
+  // Every panel before the strip is packed exactly as in the search that left
+  // the checkpoints, so a strip search picks up from the one at its panel.
+  const resumeFrom = strip && checkpoints ? checkpoints[strip.sheetIndex] : undefined;
+  let frontier: PartialPlanCandidate[] = resumeFrom ? resumeFrom.frontier : [{
     sheets: [],
     placedPieces: [],
     unplacedPieces: items,
@@ -1070,7 +1151,7 @@ function simulatePlanForStrategy(
     remaining: items,
     nextPieceNumber: 1,
   }];
-  const completed: PartialPlanCandidate[] = [];
+  const completed: PartialPlanCandidate[] = resumeFrom ? [...resumeFrom.completed] : [];
 
   const rankPartialPlan = (plan: PartialPlanCandidate): [number, number, number, number] => {
     const remainingArea = plan.remaining.reduce((sum, piece) => sum + (piece.width * piece.height), 0);
@@ -1085,9 +1166,10 @@ function simulatePlanForStrategy(
 
   while (frontier.length > 0) {
     const nextFrontier: PartialPlanCandidate[] = [];
+    if (checkpoints && !strip) checkpoints[frontier[0].sheets.length] = { frontier, completed: [...completed] };
 
     for (const plan of frontier) {
-      if (plan.remaining.length === 0 || (mergedOptions.singleSheetOnly && plan.sheets.length >= 1)) {
+      if (plan.remaining.length === 0 || (mergedOptions.singleSheetOnly && plan.sheets.length >= 1) || plan.sheets.length >= maxSheets) {
         completed.push(plan);
         continue;
       }
@@ -1097,7 +1179,10 @@ function simulatePlanForStrategy(
       let producedCandidate = false;
 
       for (const candidateStrategy of candidateStrategies) {
-        const candidate = packSheetWithStrategy(plan.remaining, sheet, candidateStrategy, sheetIndex, plan.nextPieceNumber);
+        if (meter) meter.work += plan.remaining.length;
+        const candidate = strip && strip.sheetIndex === sheetIndex
+          ? packSheetWithinStrip(plan.remaining, sheet, strip, candidateStrategy, sheetIndex, plan.nextPieceNumber)
+          : packSheetWithStrategy(plan.remaining, sheet, candidateStrategy, sheetIndex, plan.nextPieceNumber);
         if (candidate.pieces.length === 0) continue;
 
         producedCandidate = true;
@@ -1305,7 +1390,9 @@ function buildActiveConstraints(options: OptimizationOptions, sheetsUsed: number
 interface StrategySearchOutcome { plan: PlanCandidate; candidatesEvaluated: number; }
 
 // Runs every packing strategy against one homogeneous set of items/stock and
-// keeps the best plan per the active `optimizationPriority` scoring policy.
+// keeps the best plan per the active `optimizationPriority` scoring policy,
+// then gives that plan a second pass to keep its largest offcut whole (see
+// `keepLargestRemnantWhole`).
 function runStrategySearch(
   items: ExpandedPiece[],
   candidateSheets: Sheet[],
@@ -1313,16 +1400,234 @@ function runStrategySearch(
   defaultMaterial: MaterialType
 ): StrategySearchOutcome {
   let bestPlan: PlanCandidate | null = null;
+  // Left by the first strategy's search for the second pass, which runs that
+  // same strategy again with a strip on one panel.
+  const checkpoints: PlanSearchCheckpoint[] = [];
 
   for (const strategy of PACKING_STRATEGIES) {
-    const candidate = simulatePlanForStrategy(items, candidateSheets, strategy, mergedOptions, defaultMaterial);
+    const candidate = simulatePlanForStrategy(items, candidateSheets, strategy, mergedOptions, defaultMaterial, strategy === PACKING_STRATEGIES[0] ? { checkpoints } : {});
     bestPlan = chooseBetterPlan(bestPlan, candidate, mergedOptions.optimizationPriority);
   }
 
+  if (!bestPlan) {
+    return {
+      plan: { sheets: [], placedPieces: [], unplacedPieces: items, totalAreaUsed: 0, totalAreaAvailable: 0 },
+      candidatesEvaluated: PACKING_STRATEGIES.length,
+    };
+  }
+
+  if (!remnantPassEnabled) return { plan: bestPlan, candidatesEvaluated: PACKING_STRATEGIES.length };
+  const second = keepLargestRemnantWhole(items, candidateSheets, bestPlan, checkpoints, mergedOptions, defaultMaterial);
+  return { plan: second.plan, candidatesEvaluated: PACKING_STRATEGIES.length + second.candidatesEvaluated };
+}
+
+// ─── Second pass: the largest offcut, in one piece ────────────────
+//
+// Every plan that places the same pieces on the same number of panels wastes
+// the same area, so the first search has nothing to tell them apart but
+// sawing effort. The workshop does: what is left of the last panel goes back
+// on the rack, and one large offcut can be cut again where the same area in
+// scattered rectangles cannot (customer report, 2026-11-13).
+//
+// This pass takes the finished plan and asks for the same pieces on the same
+// number of panels, with one panel's pieces held in a strip (`StripLimit`).
+// It narrows that strip as far as the job still fits, on each panel position
+// in turn and along both axes (which pieces end up sharing the strip decides
+// how narrow it can get), and keeps the plan whose largest reusable offcut is
+// worth most, provided it is worth clearly more than the first plan's. A plan is only ever replaced by one that places as many pieces,
+// on no more panels, with as much area used: sheet count and waste cannot get
+// worse here.
+
+// Tests compare a plan with the one the first search alone gives; nothing in
+// the app turns the pass off.
+let remnantPassEnabled = true;
+function withoutRemnantPass<T>(run: () => T): T {
+  remnantPassEnabled = false;
+  try {
+    return run();
+  } finally {
+    remnantPassEnabled = true;
+  }
+}
+
+// An offcut that still runs the panel's full length can take any part the
+// panel itself could, long ones included; a wider but shorter one cannot. So
+// at equal area the full-length offcut is the better one to keep, and it is
+// counted as worth a quarter more than its area. The figure is a judgment,
+// not a measurement: it makes a full-length offcut win unless the other is
+// clearly larger.
+const FULL_LENGTH_REMNANT_WORTH = 1.25;
+
+// The first plan is the one chosen for the least sawing, with pieces of one
+// width on the same saw line. It is only given up for an offcut worth at least
+// a quarter more than the one it already leaves: a plan that already keeps a
+// good offcut is not rearranged for a few centimetres. Like the weight above,
+// the figure is a judgment.
+const REMNANT_GAIN_WORTH_A_NEW_PLAN = 1.25;
+
+// How finely the strip is narrowed, in cm.
+const STRIP_SEARCH_PRECISION_CM = 1;
+
+// Ceiling on the second pass's packing work, in the unit of
+// `PlanSearchControls.meter` (one per piece offered to a panel). It is a count,
+// not a duration, so the same job always gets the same plan. A job of some
+// seventy pieces on four panels tries every position well within it; a job of
+// hundreds of pieces reaches it after its last few panels, which are the
+// cheap ones to retry and the ones a job leaves partly empty.
+const REMNANT_SEARCH_WORK_BUDGET = 400_000;
+
+function usableSpan(sheet: Sheet): { margin: number; kerf: number; width: number; height: number } {
+  const margin = Math.max(0, sheet.margin || 0);
   return {
-    plan: bestPlan || { sheets: [], placedPieces: [], unplacedPieces: items, totalAreaUsed: 0, totalAreaAvailable: 0 },
-    candidatesEvaluated: PACKING_STRATEGIES.length,
+    margin,
+    kerf: Math.max(0, sheet.kerf || 0),
+    width: Math.max(0, sheet.width - (margin * 2)),
+    height: Math.max(0, sheet.height - (margin * 2)),
   };
+}
+
+/** What the largest reusable offcut of a plan is worth: its area in cm², weighted up when it runs a panel's full length. */
+function largestRemnantWorth(plan: PlanCandidate, stockSequence: Sheet[], sheets: Sheet[]): number {
+  let worth = 0;
+  for (const sheet of plan.sheets) {
+    const usable = usableSpan(getSheetForIndex(stockSequence, sheets, sheet.index));
+    const fullLength = Math.max(usable.width, usable.height);
+    for (const offcut of sheet.offcuts) {
+      if (!offcut.isReusable) continue;
+      const lengthwise = Math.max(
+        usable.height >= usable.width ? offcut.height : 0,
+        usable.width >= usable.height ? offcut.width : 0
+      );
+      const runsFullLength = lengthwise >= fullLength - 1e-6;
+      worth = Math.max(worth, offcut.width * offcut.height * (runsFullLength ? FULL_LENGTH_REMNANT_WORTH : 1));
+    }
+  }
+  return worth;
+}
+
+// The panel left part-used reads best at the end of the plan: full panels
+// first, then the one that goes back on the rack. Pieces, offcuts and cuts are
+// renumbered to follow the new order.
+function moveSheetLast(plan: PlanCandidate, from: number): PlanCandidate {
+  const order = [...plan.sheets.slice(0, from), ...plan.sheets.slice(from + 1), plan.sheets[from]];
+  let pieceNumber = 0;
+  const sheets = order.map((sheet, index) => ({
+    ...sheet,
+    index,
+    pieces: sheet.pieces.map((piece) => {
+      pieceNumber += 1;
+      return { ...piece, sheetIndex: index, pieceNumber };
+    }),
+    offcuts: sheet.offcuts.map((offcut) => ({
+      ...offcut,
+      sheetIndex: index,
+      id: buildOffcutId(index, offcut.x, offcut.y, offcut.width, offcut.height),
+    })),
+    cuts: sheet.cuts.map((cut, position) => ({ ...cut, sheetIndex: index, id: `sheet${index}_cut_${position}` })),
+  }));
+  return { ...plan, sheets, placedPieces: sheets.flatMap((sheet) => sheet.pieces) };
+}
+
+function keepLargestRemnantWhole(
+  items: ExpandedPiece[],
+  sheets: Sheet[],
+  basePlan: PlanCandidate,
+  checkpoints: PlanSearchCheckpoint[],
+  mergedOptions: OptimizationOptions,
+  defaultMaterial: MaterialType
+): StrategySearchOutcome {
+  const sheetCount = basePlan.sheets.length;
+  const strategy = PACKING_STRATEGIES[0];
+  if (sheetCount === 0 || !strategy) return { plan: basePlan, candidatesEvaluated: 0 };
+
+  const stockSequence = getStockSequence(sheets);
+  const meter = { work: 0 };
+  let best = basePlan;
+  let bestStripIndex = -1;
+  // What a plan's largest offcut must be worth to replace the best so far.
+  let worthToBeat = largestRemnantWorth(basePlan, stockSequence, sheets) * REMNANT_GAIN_WORTH_A_NEW_PLAN;
+  let probes = 0;
+
+  const probe = (strip: StripLimit): PlanCandidate | null => {
+    probes += 1;
+    const candidate = simulatePlanForStrategy(items, sheets, strategy, mergedOptions, defaultMaterial, { strip, checkpoints, meter });
+    const keepsThePlan = candidate.unplacedPieces.length <= basePlan.unplacedPieces.length
+      && candidate.sheets.length <= sheetCount
+      && candidate.totalAreaUsed >= basePlan.totalAreaUsed - 1e-6;
+    return keepsThePlan ? candidate : null;
+  };
+
+  // How far the pieces of the limited panel actually reach along the strip axis.
+  const reachOf = (plan: PlanCandidate, strip: StripLimit, margin: number): number => {
+    const sheet = plan.sheets[strip.sheetIndex];
+    if (!sheet) return 0;
+    return sheet.pieces.reduce((reach, piece) => Math.max(
+      reach,
+      strip.axis === 'width' ? piece.x + piece.width - margin : piece.y + piece.height - margin
+    ), 0);
+  };
+
+  const finish = (): StrategySearchOutcome => {
+    // Moving a panel is only safe among panels cut from the same stock entry:
+    // a panel's position decides which stock panel (size, price) it stands for.
+    const stockAt = (index: number) => getSheetForIndex(stockSequence, sheets, index);
+    const movable = bestStripIndex >= 0 && bestStripIndex < best.sheets.length - 1
+      && best.sheets.every((sheet) => sheet.index <= bestStripIndex || stockAt(sheet.index) === stockAt(bestStripIndex));
+    return { plan: movable ? moveSheetLast(best, bestStripIndex) : best, candidatesEvaluated: probes };
+  };
+
+  // Last panel first: it is the one a job leaves partly empty, and the
+  // cheapest to retry since every panel before it is already packed.
+  for (let sheetIndex = sheetCount - 1; sheetIndex >= 0; sheetIndex -= 1) {
+    const usable = usableSpan(getSheetForIndex(stockSequence, sheets, sheetIndex));
+    // The axis whose strip leaves a full-length offcut goes first.
+    const axes: StripLimit['axis'][] = usable.height >= usable.width ? ['width', 'height'] : ['height', 'width'];
+
+    for (const axis of axes) {
+      const along = axis === 'width' ? usable.width : usable.height;
+      const across = axis === 'width' ? usable.height : usable.width;
+      if (along <= 0 || across <= 0) continue;
+      const restWorthPerCm = across * (across >= along ? FULL_LENGTH_REMNANT_WORTH : 1);
+
+      // `low` is the widest strip known not to work, `high` the narrowest
+      // known to work. Before any probe `high` is the widest strip whose
+      // offcut would still be worth enough, and it is tried first: if the
+      // job does not fit there, this panel and axis have nothing to offer.
+      let low = 0;
+      let high = along - usable.kerf - (worthToBeat / restWorthPerCm) - 1e-6;
+      let forced: number | null = high;
+      let fits = false;
+
+      while (forced !== null || high - low > STRIP_SEARCH_PRECISION_CM) {
+        if (meter.work >= REMNANT_SEARCH_WORK_BUDGET) return finish();
+        const extent: number = forced ?? (low + high) / 2;
+        forced = null;
+        if (extent <= low) break;
+        const strip: StripLimit = { sheetIndex, axis, extent, sheetCount };
+        const plan = probe(strip);
+        if (!plan) {
+          if (!fits) break;
+          low = extent;
+          continue;
+        }
+        fits = true;
+        high = extent;
+        const worth = largestRemnantWorth(plan, stockSequence, sheets);
+        if (worth > worthToBeat) {
+          best = plan;
+          bestStripIndex = sheetIndex;
+          worthToBeat = worth;
+        }
+        // The pieces may stop short of the limit: the strip is tried at
+        // exactly their reach next, so no sliver is left between them and
+        // the cut that frees the offcut.
+        const reach = reachOf(plan, strip, usable.margin);
+        if (reach < extent - 1e-3 && reach > low + 1e-3) forced = reach;
+      }
+    }
+  }
+
+  return finish();
 }
 
 // Re-assigns sheet indexes, piece numbers, and offcut IDs so a plan produced
@@ -1626,4 +1931,5 @@ export const GuillotinePacker = {
   strategies: PACKING_STRATEGIES,
   pruneFreeRects,
   chooseBetterPlan,
+  withoutRemnantPass,
 };
