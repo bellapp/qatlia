@@ -1,68 +1,62 @@
 'use client';
 
 /**
- * The artisan's price per metre for each edge-banding colour.
+ * The artisan's one price per metre of edge banding, for every colour.
  *
- * Signed in, they live in the account (`/api/edge-prices`, table
- * `edge_band_prices`, migration 015) and follow the artisan to any device.
- * Anonymous, or while the account store is not set up, they stay on the
- * device. A colour with no price of its own keeps the catalog price
- * (`edgePricePerM` in src/lib/cutting/binpacking.ts).
+ * Signed in, it lives in the account (`/api/edge-prices`, migration 015)
+ * and follows the artisan to any device. Anonymous, or while the account
+ * store is not set up, it stays on the device. Without it, each colour keeps
+ * its catalog price (`edgePricePerM` in src/lib/cutting/binpacking.ts).
  */
 
-import { PRICED_EDGE_IDS, type EdgePriceMap } from '@/lib/cutting/binpacking';
+const STORAGE_KEY = 'qatlia-edge-price';
 
-const STORAGE_KEY = 'qatlia-edge-prices';
-
-/** Only known colours with a usable price; anything else is dropped. */
-export function cleanEdgePrices(value: unknown): EdgePriceMap {
-  if (!value || typeof value !== 'object' || Array.isArray(value)) return {};
-  const prices: EdgePriceMap = {};
-  for (const [id, price] of Object.entries(value as Record<string, unknown>)) {
-    if (PRICED_EDGE_IDS.includes(id) && typeof price === 'number' && Number.isFinite(price) && price >= 0 && price <= 1_000_000) {
-      prices[id] = Math.round(price * 100) / 100;
-    }
-  }
-  return prices;
+/** A usable price per metre, to the cent, or null. */
+export function cleanEdgePrice(value: unknown): number | null {
+  return typeof value === 'number' && Number.isFinite(value) && value >= 0 && value <= 1_000_000
+    ? Math.round(value * 100) / 100
+    : null;
 }
 
-export function loadDeviceEdgePrices(): EdgePriceMap {
-  if (typeof window === 'undefined') return {};
+export function loadDeviceEdgePrice(): number | null {
+  if (typeof window === 'undefined') return null;
   try {
-    return cleanEdgePrices(JSON.parse(window.localStorage.getItem(STORAGE_KEY) || '{}'));
-  } catch {
-    return {};
-  }
-}
-
-export function saveDeviceEdgePrices(prices: EdgePriceMap): void {
-  try {
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(cleanEdgePrices(prices)));
-  } catch {
-    /* storage full or blocked: the prices still apply to this session */
-  }
-}
-
-/** The account's prices, or null when the device list must be used instead. */
-export async function fetchAccountEdgePrices(): Promise<EdgePriceMap | null> {
-  try {
-    const res = await fetch('/api/edge-prices', { cache: 'no-store' });
-    if (!res.ok) return null;
-    const data = await res.json();
-    if (!data?.success || data.note === 'cloud_not_ready') return null;
-    return cleanEdgePrices(data.prices);
+    const raw = window.localStorage.getItem(STORAGE_KEY);
+    return raw === null ? null : cleanEdgePrice(JSON.parse(raw));
   } catch {
     return null;
   }
 }
 
-/** Sets the given colours (a null price resets one to the catalog price). */
-export async function saveAccountEdgePrices(changes: Record<string, number | null>): Promise<boolean> {
+export function saveDeviceEdgePrice(price: number | null): void {
+  try {
+    if (price === null) window.localStorage.removeItem(STORAGE_KEY);
+    else window.localStorage.setItem(STORAGE_KEY, JSON.stringify(cleanEdgePrice(price)));
+  } catch {
+    /* storage full or blocked: the price still applies to this session */
+  }
+}
+
+/** The account's price (null: none set), or undefined when the device price must be used instead. */
+export async function fetchAccountEdgePrice(): Promise<number | null | undefined> {
+  try {
+    const res = await fetch('/api/edge-prices', { cache: 'no-store' });
+    if (!res.ok) return undefined;
+    const data = await res.json();
+    if (!data?.success || data.note === 'cloud_not_ready') return undefined;
+    return cleanEdgePrice(data.price);
+  } catch {
+    return undefined;
+  }
+}
+
+/** Sets the account's price (null goes back to the catalog prices). */
+export async function saveAccountEdgePrice(price: number | null): Promise<boolean> {
   try {
     const res = await fetch('/api/edge-prices', {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ prices: changes }),
+      body: JSON.stringify({ price }),
     });
     return res.ok;
   } catch {

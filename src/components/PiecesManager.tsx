@@ -18,7 +18,7 @@ import {
   Copy,
   Palette,
 } from 'lucide-react';
-import { Piece, MaterialType, EdgeBandingConfig, MATERIAL_LIBRARY, EDGEBANDING_PRESETS, edgePricePerM, type EdgePriceMap } from '@/lib/cutting/binpacking';
+import { Piece, MaterialType, EdgeBandingConfig, MATERIAL_LIBRARY, EDGEBANDING_PRESETS } from '@/lib/cutting/binpacking';
 import { parsePiecesImport } from '@/lib/pieces/import-parser';
 import { createFurnitureTemplatePieces, FURNITURE_TEMPLATES, type TemplateName } from '@/lib/pieces/templates';
 import { ensureUniquePieceId, getResolvedPieceColor } from '@/lib/pieces/catalog';
@@ -228,8 +228,6 @@ interface PiecesManagerProps {
   displayUnit: DisplayUnit;
   showMaterialCol?: boolean;
   disabled?: boolean;
-  /** The artisan's price per metre per edge colour, shown next to each colour. */
-  edgePrices?: EdgePriceMap;
 }
 
 type ActivePanel = 'quick-add' | 'import' | 'template' | null;
@@ -269,7 +267,6 @@ export const PiecesManager: React.FC<PiecesManagerProps> = ({
   defaultMaterial,
   displayUnit,
   disabled = false,
-  edgePrices,
 }) => {
   const { t, tn } = useLocale();
   const [searchQuery, setSearchQuery] = useState('');
@@ -1286,7 +1283,6 @@ export const PiecesManager: React.FC<PiecesManagerProps> = ({
                   {EDGEBANDING_PRESETS.map((preset) => (
                     <option key={preset.id} value={preset.id}>
                       {t(edgeBandingLabelKey(preset.id))}
-                      {edgePricePerM(preset.id, edgePrices) > 0 ? t('pieces.edgeBanding.price', { price: edgePricePerM(preset.id, edgePrices) }) : ''}
                     </option>
                   ))}
                 </select>
