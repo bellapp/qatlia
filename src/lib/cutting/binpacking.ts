@@ -142,8 +142,19 @@ export interface OptimizationOptions {
   stockPricingOverrides?: Partial<Record<MaterialType, StockPricing>>;
 }
 const DEFAULT_LABOR_PRICING: LaborPricing = { mode: 'fixed', value: 0 };
+// The saw kerf and the edge margin both start at zero (user request,
+// 2026-11-13): a new job is laid out on the whole panel, and the artisan sets
+// the blade thickness and the edge trim to match the workshop. Three
+// millimetres of kerf and a centimetre of margin on every edge, applied
+// without being asked for, made plans look worse than a competing one that
+// counted neither.
+export const DEFAULT_STOCK_SHEET: Sheet = {
+  id: 's0', height: 278, width: 208, kerf: 0, margin: 0, grainDirection: false, material: 'mdf', quantity: 1,
+};
+/** Largest edge margin the atelier lets an artisan set, in mm. */
+export const MAX_EDGE_MARGIN_MM = 30;
 export const OPTIONS_DEFAULTS: OptimizationOptions = {
-  kerfWidth: 3, showLabels: true, singleSheetOnly: false, considerMaterial: false,
+  kerfWidth: 0, showLabels: true, singleSheetOnly: false, considerMaterial: false,
   edgeBanding: false, grainDirection: false, optimizationPriority: 'linear_guillotine', defaultMaterial: 'mdf',
   minReusableOffcutWidth: 15, minReusableOffcutHeight: 15, laborPricing: DEFAULT_LABOR_PRICING,
 };

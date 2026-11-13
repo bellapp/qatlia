@@ -534,12 +534,18 @@ export const fr = {
   options: {
     kerf: {
       chip: 'Kerf {value} mm',
-      tooltip: 'Épaisseur de matière retirée par le trait de scie entre chaque coupe. Standard : 3 mm pour lame carbure.',
+      tooltip: 'Épaisseur de matière retirée par le trait de scie entre chaque coupe. À 0, le plan ne la compte pas. Standard : 3 mm pour lame carbure.',
       title: 'Épaisseur de lame (Kerf)',
       desc: 'Trait de scie retiré entre chaque coupe',
       unit: 'mm',
       aria: 'Épaisseur de lame en millimètres',
       scaleMax: '10 mm',
+    },
+    margin: {
+      tooltip: 'Bande laissée libre le long des quatre bords du panneau, pour rafraîchir des chants abîmés. À 0, les pièces partent du bord.',
+      title: 'Marge de bord',
+      desc: 'Bande laissée libre sur chaque bord du panneau',
+      aria: 'Marge de bord en millimètres',
     },
     priority: {
       tooltip: 'Algorithme de placement : Guillotine = coupes droites traversantes (standard atelier). Min chutes = meilleur rendement surface.',
