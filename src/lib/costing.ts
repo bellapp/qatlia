@@ -63,6 +63,19 @@ export interface SheetCostLine {
   /** How many sheets of this exact spec/price were consumed. Non-negative integer. */
   quantity: number;
   pricing: StockPricing;
+  /**
+   * Display only: which panel this line is, so a price detail can name it
+   * (« MDF Blanc 244 × 122 »). Never read by the calculation, and absent from
+   * results saved before it existed.
+   */
+  material?: string;
+  /** The artisan's own name for the stock panel, when given. Display only. */
+  label?: string;
+  /** Panel colour or décor (« Blanc », « Noyer »). Display only. */
+  color?: string;
+  /** Canonical cm. Display only. */
+  widthCm?: number;
+  heightCm?: number;
 }
 
 export interface MaterialCostInput {
@@ -103,6 +116,8 @@ export interface EdgeSegmentCostLine {
   lengthM: number;
   /** Resolved MAD/metre rate — see `resolveEdgeRatePerMeter`. Must be >= 0. */
   pricePerMeter: number;
+  /** Display only: the edge-banding preset (« white », « oak »…) this length was banded with. */
+  edgeId?: string;
 }
 
 export interface EdgeCostInput {

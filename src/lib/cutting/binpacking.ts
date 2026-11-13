@@ -155,7 +155,11 @@ export interface Offcut { id: string; x: number; y: number; width: number; heigh
  * see `splitFreeRect` for where each instruction comes from.
  */
 export interface CutInstruction { id: string; sheetIndex: number; axis: 'horizontal' | 'vertical'; lengthCm: number; }
-export interface SheetResult { index: number; material: MaterialType; width: number; height: number; pieces: PlacedPiece[]; offcuts: Offcut[]; cuts: CutInstruction[]; usedArea: number; wasteRate: number; }
+export interface SheetResult {
+  index: number; material: MaterialType; width: number; height: number; pieces: PlacedPiece[]; offcuts: Offcut[]; cuts: CutInstruction[]; usedArea: number; wasteRate: number;
+  /** The artisan's name for the stock panel this sheet was cut from, when given. */
+  label?: string;
+}
 export interface MaterialStats { material: MaterialType; sheetsUsed: number; totalPieces: number; usedArea: number; wasteRate: number; }
 
 // Customer-safe summary of how a plan was chosen: what goal was pursued, which
@@ -941,6 +945,7 @@ function buildSheetResult(sheet: Sheet, sheetIndex: number, defaultMaterial: Mat
     material: (sheet.material || defaultMaterial) as MaterialType,
     width: sheet.width,
     height: sheet.height,
+    ...(sheet.label ? { label: sheet.label } : {}),
     pieces,
     offcuts: buildOffcutsForSheet(freeRects, sheet, sheetIndex, options),
     cuts,
@@ -1452,6 +1457,11 @@ export function optimizeCutting2D(
     areaM2: (sheet.width * sheet.height) / 10000,
     quantity: 1,
     pricing: mergedOptions.stockPricingOverrides?.[sheet.material] ?? { mode: 'per_m2', value: getMaterialDef(sheet.material).pricePerM2 },
+    // Which panel this is, for the price detail (src/lib/cost-detail.ts) only.
+    material: sheet.material,
+    ...(sheet.label ? { label: sheet.label.slice(0, 80) } : {}),
+    widthCm: sheet.width,
+    heightCm: sheet.height,
   }));
 
   // Edge banding cost: derived from the pieces the packer actually placed
@@ -1480,7 +1490,7 @@ export function optimizeCutting2D(
     if (placed.edges.left) lengthM += placed.originalHeight / 100;
     if (placed.edges.right) lengthM += placed.originalHeight / 100;
     if (lengthM === 0) continue;
-    edgeSegments.push({ lengthM, pricePerMeter });
+    edgeSegments.push({ lengthM, pricePerMeter, edgeId: preset.id });
   }
 
   // Built once, then handed to computeCostBreakdown *and* returned verbatim

@@ -72,7 +72,8 @@ import { useTheme } from '@/components/ThemeProvider';
 import { OnboardingTour } from '@/components/OnboardingTour';
 import { LocaleSwitcher, useLocale } from '@/components/LocaleProvider';
 import type { TranslationKey } from '@/i18n';
-import { materialLabelKey, visionErrorKey } from '@/i18n/domain';
+import { edgeBandingLabelKey, materialLabelKey, visionErrorKey } from '@/i18n/domain';
+import { buildCostDetail, hasLaborCharge } from '@/lib/cost-detail';
 import { writeLocalHistoryItem, type LocalHistoryItem } from '@/lib/history';
 import { deriveQuotationPanels, deriveQuotationPieces } from '@/lib/quotation-items';
 import { buildPdfPayload } from '@/lib/pdf-payload';
@@ -1094,6 +1095,13 @@ const commitPanelName = () => {
   } : null);
   const currentSheetPieces = currentSheet ? [...currentSheet.pieces].sort((a, b) => a.pieceNumber - b.pieceNumber) : [];
 
+  // What each cost total is made of, regrouped from the input the optimizer
+  // priced (src/lib/cost-detail.ts) — the same detail the PDF report prints.
+  const costDetail = result?.costingInput ? buildCostDetail(result.costingInput) : null;
+  /** At most `decimals` decimals, in the reader's locale (2,9768 ; 6,3 ; 8). */
+  const detailNumber = (value: number, decimals: number) => n(value, { maximumFractionDigits: decimals });
+  const detailMoney = (value: number) => n(value, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
   // Derived straight from the optimizer's own result (every sheet actually
   // used, every piece actually placed) — never from a user-editable total —
   // so the quotation's detail table can only ever show what the plan
@@ -2104,6 +2112,64 @@ const commitPanelName = () => {
                         <span className="font-mono font-black text-brand-400" dir="ltr">{t('atelier.cost.amount', { value: n(result.costBreakdown?.subtotal ?? 0) })}</span>
                       </div>
                     </div>
+                    {costDetail && (costDetail.panels.length > 0 || costDetail.edges.length > 0) && (
+                      <div data-testid="cost-detail" className="pt-1">
+                        <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1">{t('atelier.cost.detail.title')}</p>
+                        <ul className="divide-y divide-studio-border/50 text-[11px]">
+                          {costDetail.panels.map((panel, i) => (
+                            <li key={`panel-${i}`} className="flex flex-wrap items-baseline justify-between gap-x-3 py-1.5">
+                              <span className="text-slate-700 dark:text-slate-200 min-w-0">
+                                {[
+                                  t('atelier.cost.detail.panel'),
+                                  panel.label,
+                                  t(materialLabelKey(panel.material ?? activeSheet.material)),
+                                  panel.color,
+                                ].filter(Boolean).join(' · ')}
+                                <span className="ms-1.5 font-mono text-[10px] text-slate-500" dir="ltr">
+                                  {formatDisplayValue(panel.heightCm ?? activeSheet.height, displayUnit)} × {formatDisplayValue(panel.widthCm ?? activeSheet.width, displayUnit)} {displayUnit}
+                                </span>
+                              </span>
+                              <span className="ms-auto flex items-baseline gap-3">
+                                <span className="font-mono text-[10px] text-slate-500 dark:text-slate-400" dir="ltr">
+                                  {panel.pricing.mode === 'per_sheet'
+                                    ? t('atelier.cost.detail.perPanel', { count: panel.count, price: detailMoney(panel.pricing.value) })
+                                    : t('atelier.cost.detail.perM2', { count: panel.count, area: detailNumber(panel.areaM2, 4), price: detailNumber(panel.pricing.value, 2) })}
+                                </span>
+                                <span className="font-mono font-bold text-slate-900 dark:text-white tabular-nums" dir="ltr">{t('atelier.cost.amount', { value: detailMoney(panel.total) })}</span>
+                              </span>
+                            </li>
+                          ))}
+                          {costDetail.edges.map((edge, i) => (
+                            <li key={`edge-${i}`} className="flex flex-wrap items-baseline justify-between gap-x-3 py-1.5">
+                              <span className="text-slate-700 dark:text-slate-200">
+                                {edge.edgeId ? `${t('atelier.cost.detail.edge')} · ${t(edgeBandingLabelKey(edge.edgeId))}` : t('atelier.cost.detail.edge')}
+                              </span>
+                              <span className="ms-auto flex items-baseline gap-3">
+                                <span className="font-mono text-[10px] text-slate-500 dark:text-slate-400" dir="ltr">
+                                  {t('atelier.cost.detail.perMeter', { length: detailNumber(edge.lengthM, 2), price: detailNumber(edge.pricePerMeter, 2) })}
+                                </span>
+                                <span className="font-mono font-bold text-slate-900 dark:text-white tabular-nums" dir="ltr">{t('atelier.cost.amount', { value: detailMoney(edge.total) })}</span>
+                              </span>
+                            </li>
+                          ))}
+                          {hasLaborCharge(costDetail.labor) && (
+                            <li className="flex flex-wrap items-baseline justify-between gap-x-3 py-1.5">
+                              <span className="text-slate-700 dark:text-slate-200">
+                                {t(costDetail.labor.pricing.mode === 'per_meter' ? 'atelier.cost.detail.laborPerMeter' : 'atelier.cost.detail.laborFixed')}
+                              </span>
+                              <span className="ms-auto flex items-baseline gap-3">
+                                {costDetail.labor.pricing.mode === 'per_meter' && (
+                                  <span className="font-mono text-[10px] text-slate-500 dark:text-slate-400" dir="ltr">
+                                    {t('atelier.cost.detail.perMeter', { length: detailNumber(costDetail.labor.cutLengthM ?? 0, 2), price: detailNumber(costDetail.labor.pricing.value, 2) })}
+                                  </span>
+                                )}
+                                <span className="font-mono font-bold text-slate-900 dark:text-white tabular-nums" dir="ltr">{t('atelier.cost.amount', { value: detailMoney(costDetail.labor.total) })}</span>
+                              </span>
+                            </li>
+                          )}
+                        </ul>
+                      </div>
+                    )}
                   </div>
                 )}
               </>

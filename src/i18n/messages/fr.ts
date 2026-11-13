@@ -329,6 +329,16 @@ export const fr = {
       edges: 'Chants',
       labor: 'Main d’œuvre',
       total: 'Total',
+      detail: {
+        title: 'Détail du prix',
+        panel: 'Panneau',
+        edge: 'Chant',
+        laborFixed: 'Main d’œuvre (forfait)',
+        laborPerMeter: 'Main d’œuvre (au mètre de coupe)',
+        perPanel: '{count} × {price} MAD',
+        perM2: '{count} × {area} m² × {price} MAD/m²',
+        perMeter: '{length} m × {price} MAD/m',
+      },
     },
     metrics: {
       sheets: 'Feuilles',

@@ -48,6 +48,10 @@ const SHARED_TOKENS = new Set([
   'atelier.cutOrder.number',
   'pieces.columns.number',
   'pieces.edgeBanding.price',
+  // Quantity × price templates of the price detail: figures and units only.
+  'atelier.cost.detail.perPanel',
+  'atelier.cost.detail.perM2',
+  'atelier.cost.detail.perMeter',
   'options.kerf.unit',
   'options.kerf.scaleMax',
   'options.pricing.stockPerM2',

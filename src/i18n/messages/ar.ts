@@ -289,6 +289,16 @@ export const ar: Catalog = {
       edges: 'الحواف',
       labor: 'اليد العاملة',
       total: 'المجموع',
+      detail: {
+        title: 'تفاصيل الثمن',
+        panel: 'لوح',
+        edge: 'حافة',
+        laborFixed: 'اليد العاملة (مبلغ جزافي)',
+        laborPerMeter: 'اليد العاملة (بالمتر من القطع)',
+        perPanel: '{count} × {price} MAD',
+        perM2: '{count} × {area} m² × {price} MAD/m²',
+        perMeter: '{length} m × {price} MAD/m',
+      },
     },
     metrics: {
       sheets: 'الألواح',
