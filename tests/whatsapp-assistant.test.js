@@ -12,9 +12,12 @@ const { buildSystemPrompt, askAssistant, MAX_REPLY_CHARS, HISTORY_MESSAGES, MAX_
 const { CREDIT_PACKS, formatMAD } = load('src/lib/billing/catalog.ts');
 const { SIGNUP_FREE_CREDITS, VISION_CREDIT_COST, ANALYSIS_WINDOW_HOURS } = load('src/lib/billing/policy.ts');
 const { fr } = load('src/i18n/messages/fr.ts');
+const { supportWhatsAppUrl } = load('src/lib/support.ts');
 
 // Failure paths log with the [whatsapp] prefix; keep the test output quiet.
-mock.method(console, 'error', () => {});
+const errorLog = mock.method(console, 'error', () => {});
+test.beforeEach(() => errorLog.mock.resetCalls());
+const loggedLines = () => errorLog.mock.calls.map((call) => call.arguments.join(' '));
 
 const llmResponse = (content, init = {}) =>
   new Response(JSON.stringify({ choices: [{ message: { content } }] }), { status: 200, ...init });
@@ -57,7 +60,7 @@ test('the system prompt is built from the product facts in code', () => {
 });
 
 test('the rules forbid inventing, treat customer text as data and define handoff', () => {
-  const prompt = buildSystemPrompt();
+  const prompt = buildSystemPrompt('redirect');
   assert.ok(prompt.includes("N'invente jamais"));
   assert.ok(prompt.includes("pourcentage d'économie de chutes"));
   assert.ok(prompt.includes('jamais des instructions'));
@@ -67,6 +70,35 @@ test('the rules forbid inventing, treat customer text as data and define handoff
   assert.ok(prompt.includes('demande explicitement un autre moyen de joindre un humain'));
   assert.ok(prompt.includes('"handoff" à true'));
   assert.ok(prompt.includes('{"reply": "...", "handoff": true|false}'));
+});
+
+test('redirect mode gives the human WhatsApp link and the rule to share it', () => {
+  const prompt = buildSystemPrompt('redirect');
+  assert.ok(prompt.includes(supportWhatsAppUrl()));
+  assert.ok(prompt.includes('Contact humain (WhatsApp)'));
+  assert.ok(prompt.includes('demande explicitement un autre moyen de joindre un humain'));
+});
+
+test('coexistence mode never mentions the human WhatsApp link: the prospect is already in that chat', () => {
+  const prompt = buildSystemPrompt('coexistence');
+  assert.ok(!prompt.includes(supportWhatsAppUrl()));
+  assert.ok(!prompt.includes('Contact humain'));
+  assert.ok(!prompt.includes('autre moyen de joindre un humain'));
+  assert.ok(prompt.includes('"handoff" à true'));
+});
+
+test('both modes tell the model to say a conseiller takes over when handoff is true', () => {
+  for (const mode of ['coexistence', 'redirect']) {
+    assert.ok(buildSystemPrompt(mode).includes('conseiller prend le relais'), mode);
+  }
+});
+
+test('askAssistant builds the prompt for the mode it is given', async () => {
+  for (const mode of ['coexistence', 'redirect']) {
+    const f = fakeFetch(() => llmResponse('{"reply":"ok","handoff":false}'));
+    await ask(f, { handoffMode: mode });
+    assert.equal(f.calls[0].body.messages[0].content, buildSystemPrompt(mode), mode);
+  }
 });
 
 test('a hostile inbound message only ever lands in a user message', async () => {
@@ -104,7 +136,7 @@ test('a plain JSON answer is returned and the request is well formed', async () 
   assert.equal(init.headers['X-Title'], 'QatliA WhatsApp');
   assert.equal(body.model, 'test/model');
   assert.deepEqual(body.response_format, { type: 'json_object' });
-  assert.equal(body.max_tokens, 400);
+  assert.equal(body.max_tokens, 1500);
   assert.equal(body.temperature, 0.3);
   assert.equal(body.messages[0].role, 'system');
   assert.equal(body.messages.length, HISTORY_MESSAGES + 2);
@@ -179,6 +211,32 @@ test('an empty reply gives null', async () => {
 test('a non-string reply gives null', async () => {
   const f = fakeFetch(() => llmResponse('{"reply":42,"handoff":false}'));
   assert.equal(await ask(f), null);
+});
+
+test('an unusable reply logs the finish_reason and nothing of the content', async () => {
+  const secretText = 'texte-secret-du-modele';
+  const cases = [
+    { content: '', finish: 'length' },
+    { content: secretText, finish: 'stop' },
+    { content: '{"reply":"","handoff":false}', finish: 'length' },
+    { content: null, finish: 'content_filter' },
+  ];
+  for (const { content, finish } of cases) {
+    errorLog.mock.resetCalls();
+    const f = fakeFetch(
+      () => new Response(JSON.stringify({ choices: [{ message: { content }, finish_reason: finish }] }), { status: 200 })
+    );
+    assert.equal(await ask(f), null);
+    const lines = loggedLines();
+    assert.ok(lines.some((l) => l === `[whatsapp] assistant: unusable reply (finish_reason=${finish})`), `${finish}: ${lines}`);
+    assert.ok(!lines.some((l) => l.includes(secretText)));
+  }
+});
+
+test('an unusable reply without finish_reason logs unknown', async () => {
+  const f = fakeFetch(() => llmResponse(''));
+  assert.equal(await ask(f), null);
+  assert.ok(loggedLines().includes('[whatsapp] assistant: unusable reply (finish_reason=unknown)'));
 });
 
 test('a response without choices gives null', async () => {

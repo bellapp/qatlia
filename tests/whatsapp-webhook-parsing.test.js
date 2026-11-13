@@ -149,7 +149,9 @@ test('parseWebhook turns coexistence echoes into echo events addressed to the cu
       },
     ],
   };
-  assert.deepEqual(parseWebhook(payload, PHONE_ID), [{ type: 'echo', waId: '212611111111', text: 'Bonjour' }]);
+  assert.deepEqual(parseWebhook(payload, PHONE_ID), [
+    { type: 'echo', waId: '212611111111', text: 'Bonjour', wamid: 'wamid.e' },
+  ]);
   assert.deepEqual(parseWebhook(payload, 'another-id'), []);
 });
 
@@ -170,6 +172,44 @@ test('getWhatsAppConfig returns null when anything required is missing or a plac
   }
 });
 
+test('an echo without an id has a null wamid', () => {
+  const payload = {
+    entry: [
+      {
+        changes: [
+          {
+            field: 'smb_message_echoes',
+            value: {
+              metadata: { phone_number_id: PHONE_ID },
+              message_echoes: [{ to: '212611111111', type: 'text', text: { body: 'Bonjour' } }],
+            },
+          },
+        ],
+      },
+    ],
+  };
+  assert.deepEqual(parseWebhook(payload, PHONE_ID), [{ type: 'echo', waId: '212611111111', text: 'Bonjour', wamid: null }]);
+});
+
+test('getWhatsAppConfig accepts a secret that merely contains xxx or todo, and rejects exact placeholders', () => {
+  for (const key of Object.keys(FULL_ENV)) {
+    for (const value of ['abcXXXdef', 'tokTODOen', 'My-Xxx-Value']) {
+      assert.ok(getWhatsAppConfig({ ...FULL_ENV, [key]: value }), `${key}=${value}`);
+    }
+    for (const value of ['changeme', 'TODO', ' xxx ', 'Placeholder', 'your_token', '<token>', '   ']) {
+      assert.equal(getWhatsAppConfig({ ...FULL_ENV, [key]: value }), null, `${key}=${value}`);
+    }
+  }
+});
+
+test('getWhatsAppConfig reads the audience scope: ads by default, all only when asked', () => {
+  assert.equal(getWhatsAppConfig(FULL_ENV).scope, 'ads');
+  assert.equal(getWhatsAppConfig({ ...FULL_ENV, WHATSAPP_BOT_SCOPE: 'all' }).scope, 'all');
+  assert.equal(getWhatsAppConfig({ ...FULL_ENV, WHATSAPP_BOT_SCOPE: 'ads' }).scope, 'ads');
+  assert.equal(getWhatsAppConfig({ ...FULL_ENV, WHATSAPP_BOT_SCOPE: 'everyone' }).scope, 'ads');
+  assert.equal(getWhatsAppConfig({ ...FULL_ENV, WHATSAPP_BOT_SCOPE: 'ALL' }).scope, 'ads');
+});
+
 test('getWhatsAppConfig applies defaults and strict enabled/handoff parsing', () => {
   const base = getWhatsAppConfig(FULL_ENV);
   assert.equal(base.appSecret, 'secret-value');
@@ -179,6 +219,7 @@ test('getWhatsAppConfig applies defaults and strict enabled/handoff parsing', ()
   assert.equal(base.graphVersion, 'v23.0');
   assert.equal(base.enabled, false);
   assert.equal(base.handoffMode, 'coexistence');
+  assert.equal(base.scope, 'ads');
   assert.equal(base.model, 'google/gemini-3.7-flash');
   assert.equal(base.openrouterKey, null);
 

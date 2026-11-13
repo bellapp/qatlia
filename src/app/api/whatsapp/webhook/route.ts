@@ -16,24 +16,29 @@ import { getWhatsAppConfig, type WhatsAppConfig } from '@/lib/whatsapp/config';
 import { verifySignature } from '@/lib/whatsapp/signature';
 import { parseWebhook, type EchoEvent, type InboundEvent } from '@/lib/whatsapp/payload';
 import { COPY } from '@/lib/whatsapp/copy';
-import { HANDOFF_HOURS, decide, detectLang } from '@/lib/whatsapp/router';
+import { HANDOFF_HOURS, decide, detectLang, type Decision } from '@/lib/whatsapp/router';
 import { HISTORY_MESSAGES, askAssistant } from '@/lib/whatsapp/assistant';
 import { sendText } from '@/lib/whatsapp/send';
 import {
   WhatsAppTablesMissingError,
+  claimGreeting,
   claimInbound,
   countAssistantReplies,
+  countBotMessages,
   recentHistory,
   recordOutbound,
+  releaseGreeting,
   updateContact,
   upsertContact,
 } from '@/lib/whatsapp/store';
 
 export const dynamic = 'force-dynamic';
-export const maxDuration = 30;
+export const maxDuration = 60;
 
 const HOUR_MS = 60 * 60 * 1000;
 const DAY_MS = 24 * HOUR_MS;
+/** One fixed "send us a photo in the app" hint per contact in this window, however many photos they send. */
+const IMAGE_HINT_COOLDOWN_MINUTES = 10;
 
 const ok = () => new Response('ok', { status: 200 });
 
@@ -51,7 +56,7 @@ async function deliver(
   config: WhatsAppConfig,
   waId: string,
   body: string,
-  kind: 'fixed' | 'assistant',
+  kind: 'fixed' | 'assistant' | 'image_hint',
 ): Promise<boolean> {
   const wamid = await sendText(config, waId, body);
   if (wamid === null) return false;
@@ -64,8 +69,16 @@ async function handleEcho(db: SupabaseClient, config: WhatsAppConfig, event: Ech
   const now = new Date();
   // whatsapp_messages.wa_id references the contact, so the row must exist first.
   await upsertContact(db, { waId: event.waId, profileName: null, referral: null });
-  await recordOutbound(db, { waId: event.waId, wamid: null, direction: 'human', kind: 'echo', body: event.text });
-  if (config.handoffMode === 'coexistence') {
+  const recorded = await recordOutbound(db, {
+    waId: event.waId,
+    wamid: event.wamid,
+    direction: 'human',
+    kind: 'echo',
+    body: event.text,
+  });
+  // A redelivered echo, or the echo of a message the bot sent itself (its wamid is already stored),
+  // is not a human taking over.
+  if (recorded && config.handoffMode === 'coexistence') {
     await updateContact(db, event.waId, { handoffUntil: handoffDeadline(now) });
   }
 }
@@ -84,17 +97,41 @@ async function handleInbound(db: SupabaseClient, config: WhatsAppConfig, event: 
     contact = { ...contact, lang };
   }
 
+  // In coexistence the bot shares the support line with the owner: by default it only answers
+  // people who came from the ad, so existing customers keep getting the owner only.
+  if (config.handoffMode === 'coexistence' && config.scope === 'ads' && !contact.fromAd) return;
+
   if (!config.enabled) return;
 
   const assistantRepliesLast24h = await countAssistantReplies(db, waId, new Date(now.getTime() - DAY_MS));
-  const decision = decide({ event, contact, now, assistantRepliesLast24h, handoffMode: config.handoffMode });
+  const decideFor = (state: typeof contact): Decision =>
+    decide({ event, contact: state, now, assistantRepliesLast24h, handoffMode: config.handoffMode });
+  let decision = decideFor(contact);
+
+  // Meta delivers a burst concurrently: only the delivery that wins the conditional write greets.
+  let greetingClaimed = false;
+  if (decision.action === 'send' && decision.text === COPY.greeting) {
+    if (await claimGreeting(db, waId, now)) {
+      greetingClaimed = true;
+    } else {
+      decision = decideFor({ ...contact, greetedAt: now });
+    }
+  }
 
   if (decision.action === 'silent') return;
 
   if (decision.action === 'send') {
-    if (!(await deliver(db, config, waId, decision.text, 'fixed'))) return;
+    const isImageHint = event.kind === 'image' && decision.text === COPY.imageHint[lang];
+    if (isImageHint) {
+      const since = new Date(now.getTime() - IMAGE_HINT_COOLDOWN_MINUTES * 60 * 1000);
+      if ((await countBotMessages(db, waId, 'image_hint', since)) > 0) return;
+    }
+    if (!(await deliver(db, config, waId, decision.text, isImageHint ? 'image_hint' : 'fixed'))) {
+      if (greetingClaimed) await releaseGreeting(db, waId, now);
+      return;
+    }
     const patch: { greetedAt?: Date; handoffUntil?: Date } = {};
-    if (decision.markGreeted) patch.greetedAt = now;
+    if (decision.markGreeted && !greetingClaimed) patch.greetedAt = now;
     if (decision.handoff) patch.handoffUntil = handoffDeadline(now);
     if (Object.keys(patch).length > 0) await updateContact(db, waId, patch);
     return;
@@ -109,6 +146,7 @@ async function handleInbound(db: SupabaseClient, config: WhatsAppConfig, event: 
         message: event.text ?? '',
         model: config.model,
         apiKey: config.openrouterKey,
+        handoffMode: config.handoffMode,
       })
     : null;
 
@@ -130,7 +168,10 @@ async function handleInbound(db: SupabaseClient, config: WhatsAppConfig, event: 
 
 export async function GET(request: Request): Promise<Response> {
   const config = getWhatsAppConfig();
-  if (!config) return new Response('Not found', { status: 404 });
+  if (!config) {
+    console.error('[whatsapp] configuration absente');
+    return new Response('Not found', { status: 404 });
+  }
 
   const params = new URL(request.url).searchParams;
   const challenge = params.get('hub.challenge');

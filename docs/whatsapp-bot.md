@@ -9,7 +9,9 @@ Le bot répond aux messages WhatsApp reçus sur le numéro de QatliA (06 00 93 7
 - les choix 1, 2 et 3 reçoivent des réponses fixes (les mêmes textes que les réponses rapides) ;
 - le texte libre est traité par l'IA, qui s'appuie uniquement sur les informations du code de QatliA (prix, offres, FAQ) ;
 - les vocaux, vidéos, documents, localisations et contacts sont passés à un humain ;
-- le bot répond en français ou en arabe selon la langue du prospect.
+- le bot répond en français ou en arabe selon la langue du prospect ;
+- **en coexistence, le bot ne répond qu'aux personnes venues de la publicité** (Click-to-WhatsApp). Les clients existants qui écrivent à la ligne de support continuent de n'avoir que vous comme interlocuteur. Avec `WHATSAPP_BOT_SCOPE=all`, le bot répond à tout le monde ;
+- **chaque passage à un humain** (vocal, choix 3, réponse envoyée depuis l'app, question hors des informations de QatliA) fait taire le bot pour ce contact pendant 24 h.
 
 Le bot peut être éteint à tout moment avec la variable `WHATSAPP_BOT_ENABLED` : tant qu'elle n'est pas égale à `true`, il enregistre les messages entrants mais n'envoie rien.
 
@@ -35,6 +37,7 @@ Les noms ci-dessous sont exacts. Les valeurs ne doivent jamais être écrites da
 | `WHATSAPP_GRAPH_VERSION` | Version courante de l'API Graph (défaut `v23.0`, à confirmer à l'étape 4) |
 | `WHATSAPP_BOT_ENABLED` | `true` pour allumer le bot, toute autre valeur l'éteint |
 | `WHATSAPP_HANDOFF_MODE` | `coexistence` (défaut) ou `redirect` |
+| `WHATSAPP_BOT_SCOPE` | `ads` (par défaut) : en coexistence, le bot ne répond qu'aux contacts venus de la publicité. `all` : il répond à tout le monde. Sans effet en mode `redirect`, où le bot répond toujours à tout le monde |
 | `WHATSAPP_BOT_MODEL` | Facultative. Modèle IA utilisé (défaut : `OPENROUTER_MODEL`, puis `google/gemini-3.7-flash`) |
 | `OPENROUTER_API_KEY` | Existe déjà (utilisée aussi par le scan) : rien à faire |
 
@@ -70,6 +73,9 @@ Les noms ci-dessous sont exacts. Les valeurs ne doivent jamais être écrites da
 - [ ] **2. Fusionner et configurer le webhook.** Fusionner la PR, attendre le déploiement, puis configurer le webhook (étape 6 de la mise en place ci-dessus). Meta doit afficher « Vérifié ».
 - [ ] **3. Tester le bot éteint.** Avec `WHATSAPP_BOT_ENABLED=false`, envoyer un message depuis un autre numéro : une ligne apparaît dans la table `whatsapp_messages`, et rien n'est envoyé.
 - [ ] **4. Désactiver le message d'accueil et le message d'absence** de l'app WhatsApp Business (téléphone → Outils professionnels). Pourquoi : en coexistence, ces messages automatiques arrivent comme des échos, et le bot croirait qu'un humain a répondu et se tairait pendant 24 h.
-- [ ] **5. Allumer le bot.** Passer `WHATSAPP_BOT_ENABLED=true` dans Vercel et redéployer. Tester depuis un numéro neuf : accueil, puis `1`, `2`, une question libre en français, une question en darija, un vocal, puis `3`. Répondre depuis l'app et vérifier que le bot se tait.
+- [ ] **5. Allumer le bot.** Passer `WHATSAPP_BOT_ENABLED=true` dans Vercel et redéployer, puis tester depuis un autre téléphone. Le test commence en appuyant sur la publicité (Click-to-WhatsApp), sinon le bot ne répond pas en coexistence.
+  1. Vérifier dans Supabase que `whatsapp_contacts.referral` n'est pas vide pour ce contact. S'il est vide, Meta ne transmet pas la provenance de la publicité sur ce numéro : mettre `WHATSAPP_BOT_SCOPE=all` dans Vercel et redéployer.
+  2. Tester dans cet ordre, avec le même contact : l'accueil (via la publicité), `1`, `2`, une question libre en français, une question en darija.
+  3. Tester ensuite le passage à un humain **en dernier**, chaque fois depuis un numéro neuf (en appuyant de nouveau sur la publicité), car chaque passage à un humain fait taire le bot pour ce contact pendant 24 h : un vocal ; puis `3` ; puis, après l'accueil, une réponse envoyée depuis l'app et vérifier que le bot se tait.
 - [ ] **6. Retour arrière immédiat.** Mettre `WHATSAPP_BOT_ENABLED=false` dans Vercel, redéployer, puis réactiver le message d'accueil dans l'app WhatsApp Business.
 - [ ] **7. Où lire les conversations.** Dans Supabase, table `whatsapp_messages`. Une boîte de réception web est hors périmètre de la v1.

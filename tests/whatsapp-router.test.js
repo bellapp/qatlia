@@ -100,6 +100,16 @@ test('the demo video link comes before the site link', () => {
   }
 });
 
+test('the pricing copy derives its free-recalculation window from the policy and speaks of the same list', () => {
+  const { ANALYSIS_WINDOW_HOURS } = load('src/lib/billing/policy.ts');
+  assert.ok(COPY.pricing.fr.includes(`${ANALYSIS_WINDOW_HOURS} h`));
+  assert.ok(COPY.pricing.fr.includes('la même liste'));
+  assert.ok(!COPY.pricing.fr.includes('même projet'));
+  assert.ok(COPY.pricing.ar.includes(`${ANALYSIS_WINDOW_HOURS} ساعة`));
+  assert.ok(COPY.pricing.ar.includes('نفس اللائحة'));
+  assert.ok(!COPY.pricing.ar.includes('نفس المشروع'));
+});
+
 test('redirect texts are the literal wa.me message', () => {
   assert.equal(COPY.redirect.fr, `Écrivez directement à notre conseiller ici : ${WA_LINK}`);
   assert.equal(COPY.redirect.ar, `كتب للمستشار ديالنا مباشرة هنا: ${WA_LINK}`);

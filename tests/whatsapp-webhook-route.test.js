@@ -28,8 +28,14 @@ function resetState() {
   Object.assign(state, {
     contacts: new Map(),
     sent: [],
-    sendResult: () => 'wamid.OUT',
+    sendResult: (n) => (n === 1 ? 'wamid.OUT' : `wamid.OUT.${n}`),
     outbound: [],
+    storedWamids: new Set(),
+    greetingWon: () => true,
+    greetClaims: [],
+    greetReleases: [],
+    imageHintCount: 0,
+    countCalls: [],
     updates: [],
     claims: [],
     claimResult: () => true,
@@ -60,7 +66,11 @@ stubModule('@/lib/whatsapp/store', {
     if (!state.contacts.has(input.waId)) {
       state.contacts.set(input.waId, { waId: input.waId, lang: 'fr', greetedAt: null, handoffUntil: null });
     }
-    return { ...state.contacts.get(input.waId) };
+    // Like the real store: fromAd is true when a referral is stored or this event carries one.
+    const stored = state.contacts.get(input.waId);
+    const fromAd = stored.fromAd === true || input.referral !== null;
+    stored.fromAd = fromAd;
+    return { ...stored, fromAd };
   },
   claimInbound: async (db, input) => {
     if (state.claimError) throw state.claimError;
@@ -68,7 +78,26 @@ stubModule('@/lib/whatsapp/store', {
     return state.claimResult(input);
   },
   recordOutbound: async (db, input) => {
+    if (input.wamid && state.storedWamids.has(input.wamid)) return false;
+    if (input.wamid) state.storedWamids.add(input.wamid);
     state.outbound.push(input);
+    return true;
+  },
+  claimGreeting: async (db, waId, at) => {
+    state.greetClaims.push({ waId, at });
+    const won = state.greetingWon(waId);
+    const contact = state.contacts.get(waId);
+    if (won && contact) contact.greetedAt = at;
+    return won;
+  },
+  releaseGreeting: async (db, waId, at) => {
+    state.greetReleases.push({ waId, at });
+    const contact = state.contacts.get(waId);
+    if (contact && contact.greetedAt === at) contact.greetedAt = null;
+  },
+  countBotMessages: async (db, waId, kind, since) => {
+    state.countCalls.push({ waId, kind, since });
+    return state.imageHintCount;
   },
   updateContact: async (db, waId, patch) => {
     state.updates.push({ waId, patch });
@@ -106,6 +135,7 @@ const ENV_KEYS = [
   'WHATSAPP_GRAPH_VERSION',
   'WHATSAPP_BOT_ENABLED',
   'WHATSAPP_HANDOFF_MODE',
+  'WHATSAPP_BOT_SCOPE',
   'WHATSAPP_BOT_MODEL',
   'OPENROUTER_API_KEY',
   'OPENROUTER_MODEL',
@@ -113,7 +143,9 @@ const ENV_KEYS = [
   'SUPABASE_SERVICE_ROLE_KEY',
 ];
 
+// Scope 'all' keeps the routing tests independent of the ad gate; the gate has its own tests.
 const CONFIGURED = {
+  WHATSAPP_BOT_SCOPE: 'all',
   WHATSAPP_APP_SECRET: APP_SECRET,
   WHATSAPP_VERIFY_TOKEN: VERIFY_TOKEN,
   WHATSAPP_ACCESS_TOKEN: 'wa_access_token_5h1',
@@ -163,7 +195,9 @@ function messagesPayload(messages) {
   };
 }
 
-function echoPayload(to, body) {
+const imageMessage = (id, from) => ({ from, id, type: 'image', image: { id: `media-${id}` } });
+
+function echoPayload(to, body, id) {
   return {
     object: 'whatsapp_business_account',
     entry: [
@@ -174,7 +208,7 @@ function echoPayload(to, body) {
             field: 'smb_message_echoes',
             value: {
               metadata: { phone_number_id: PHONE_NUMBER_ID },
-              message_echoes: [{ to, type: 'text', text: { body } }],
+              message_echoes: [{ ...(id ? { id } : {}), to, type: 'text', text: { body } }],
             },
           },
         ],
@@ -218,9 +252,9 @@ async function quietly(fn) {
 
 const handoffUpdates = () => state.updates.filter((u) => u.patch.handoffUntil !== undefined);
 
-test('the route declares dynamic rendering and a 30 s budget', () => {
+test('the route declares dynamic rendering and a 60 s budget', () => {
   assert.equal(dynamic, 'force-dynamic');
-  assert.equal(maxDuration, 30);
+  assert.equal(maxDuration, 60);
 });
 
 test('GET answers the Meta handshake with the challenge as text/plain', async () => {
@@ -242,10 +276,13 @@ test('GET refuses a wrong verify token or mode with 403', async () => {
   });
 });
 
-test('GET is a 404 when the bot is not configured', async () => {
+test('GET is a 404 when the bot is not configured, and says so in the logs without any value', async () => {
   resetState();
-  await withEnv({}, async () => {
-    assert.equal((await GET(verifyRequest(VERIFY_OK))).status, 404);
+  await quietly(async (logged) => {
+    await withEnv({ WHATSAPP_APP_SECRET: 'secret-that-must-not-leak' }, async () => {
+      assert.equal((await GET(verifyRequest(VERIFY_OK))).status, 404);
+      assert.deepEqual(logged, ['[whatsapp] configuration absente']);
+    });
   });
 });
 
@@ -323,9 +360,9 @@ test('a new contact writing in Arabic gets the greeting once and is marked greet
       state.updates.find((u) => u.patch.lang === 'ar'),
       'the detected language is saved'
     );
-    const greeted = state.updates.find((u) => u.patch.greetedAt instanceof Date);
-    assert.ok(greeted, 'greetedAt is set');
-    assert.equal(greeted.patch.handoffUntil, undefined);
+    assert.equal(state.greetClaims.length, 1, 'greeted_at is set by the conditional claim');
+    assert.ok(state.contacts.get(WA_ID).greetedAt instanceof Date);
+    assert.equal(handoffUpdates().length, 0);
 
     assert.deepEqual(state.outbound, [
       { waId: WA_ID, wamid: 'wamid.OUT', direction: 'bot', kind: 'fixed', body: COPY.greeting },
@@ -530,4 +567,212 @@ test('a missing Supabase admin config is a logged 200 no-op', async () => {
       assert.ok(logged.some((line) => line.includes('[whatsapp] supabase admin non configuré')));
     });
   });
+});
+
+// --- I1: audience gate (coexistence only) ----------------------------------
+
+const AD_REFERRAL = { source_type: 'ad', source_id: 'ad-1' };
+const withReferral = (message, referral = AD_REFERRAL) => ({ ...message, referral });
+
+test('coexistence + scope ads: a new contact whose first message carries the ad referral gets the greeting', async () => {
+  resetState();
+  await withEnv({ ...CONFIGURED, WHATSAPP_BOT_SCOPE: 'ads' }, async () => {
+    await POST(signedPost(messagesPayload([withReferral(textMessage('wamid.a1', WA_ID, 'Bonjour'))])));
+    assert.equal(state.sent.length, 1);
+    assert.equal(state.sent[0].body, COPY.greeting);
+  });
+});
+
+test('coexistence + scope ads: a contact with a stored referral is answered later on', async () => {
+  resetState();
+  state.contacts.set(WA_ID, { waId: WA_ID, lang: 'fr', greetedAt: new Date(), handoffUntil: null, fromAd: true });
+  await withEnv({ ...CONFIGURED, WHATSAPP_BOT_SCOPE: 'ads' }, async () => {
+    await POST(signedPost(messagesPayload([textMessage('wamid.a2', WA_ID, '2')])));
+    assert.equal(state.sent.length, 1);
+    assert.equal(state.sent[0].body, COPY.pricing.fr);
+  });
+});
+
+test('coexistence + scope ads (also the default): a contact without a referral is recorded and gets no answer at all', async () => {
+  for (const scope of ['ads', undefined]) {
+    resetState();
+    await withEnv({ ...CONFIGURED, WHATSAPP_BOT_SCOPE: scope }, async () => {
+      for (const message of [
+        textMessage('wamid.b1', WA_ID, 'Bonjour'),
+        textMessage('wamid.b2', WA_ID, '3'),
+        imageMessage('wamid.b3', WA_ID),
+      ]) {
+        const res = await POST(signedPost(messagesPayload([message])));
+        assert.equal(res.status, 200);
+      }
+      assert.equal(state.claims.length, 3, 'the messages are still recorded');
+      assert.equal(state.sent.length, 0);
+      assert.equal(state.outbound.length, 0);
+      assert.equal(state.greetClaims.length, 0);
+      assert.equal(state.assistantCalls.length, 0);
+      assert.equal(
+        state.updates.filter((u) => u.patch.greetedAt !== undefined || u.patch.handoffUntil !== undefined).length,
+        0
+      );
+    });
+  }
+});
+
+test('the gate still lets echoes through: the owner writing to a non-ad contact opens a handoff', async () => {
+  resetState();
+  await withEnv({ ...CONFIGURED, WHATSAPP_BOT_SCOPE: 'ads' }, async () => {
+    await POST(signedPost(echoPayload(WA_ID, 'Bonjour, ici Hamid', 'wamid.echo1')));
+    assert.equal(handoffUpdates().length, 1);
+  });
+});
+
+test('scope all: a contact without a referral gets the greeting', async () => {
+  resetState();
+  await withEnv({ ...CONFIGURED, WHATSAPP_BOT_SCOPE: 'all' }, async () => {
+    await POST(signedPost(messagesPayload([textMessage('wamid.c1', WA_ID, 'Bonjour')])));
+    assert.equal(state.sent.length, 1);
+    assert.equal(state.sent[0].body, COPY.greeting);
+  });
+});
+
+test('redirect mode answers everyone, referral or not, even with scope ads', async () => {
+  resetState();
+  await withEnv({ ...CONFIGURED, WHATSAPP_HANDOFF_MODE: 'redirect', WHATSAPP_BOT_SCOPE: 'ads' }, async () => {
+    await POST(signedPost(messagesPayload([textMessage('wamid.d1', WA_ID, 'Bonjour')])));
+    assert.equal(state.sent.length, 1);
+    assert.equal(state.sent[0].body, COPY.greeting);
+  });
+});
+
+// --- I4: bursts ------------------------------------------------------------
+
+test('the greeting is claimed before it is sent, and not set a second time through updateContact', async () => {
+  resetState();
+  await withEnv(CONFIGURED, async () => {
+    await POST(signedPost(messagesPayload([textMessage('wamid.e1', WA_ID, 'Bonjour')])));
+    assert.equal(state.greetClaims.length, 1);
+    assert.equal(state.greetClaims[0].waId, WA_ID);
+    assert.ok(state.greetClaims[0].at instanceof Date);
+    assert.equal(state.sent.length, 1);
+    assert.equal(state.updates.filter((u) => u.patch.greetedAt !== undefined).length, 0);
+    assert.equal(state.greetReleases.length, 0);
+  });
+});
+
+test('a concurrent delivery that loses the greeting claim is handled as a follow-up: the assistant answers', async () => {
+  resetState();
+  state.greetingWon = () => false;
+  state.assistantResult = () => ({ reply: 'Le pack Artisan coûte 100 DH.', handoff: false });
+  await withEnv(CONFIGURED, async () => {
+    await POST(signedPost(messagesPayload([textMessage('wamid.f1', WA_ID, "c'est combien ?")])));
+    assert.equal(state.greetClaims.length, 1);
+    assert.deepEqual(
+      state.sent.map((m) => m.body),
+      ['Le pack Artisan coûte 100 DH.']
+    );
+    assert.ok(!state.sent.some((m) => m.body === COPY.greeting), 'no second greeting');
+    assert.equal(state.assistantCalls.length, 1);
+  });
+});
+
+test('a concurrent delivery that loses the greeting claim and sends a photo gets the image hint', async () => {
+  resetState();
+  state.greetingWon = () => false;
+  await withEnv(CONFIGURED, async () => {
+    await POST(signedPost(messagesPayload([imageMessage('wamid.f2', WA_ID)])));
+    assert.deepEqual(
+      state.sent.map((m) => m.body),
+      [COPY.imageHint.fr]
+    );
+  });
+});
+
+test('a failed greeting send releases the claim so the next message can greet again', async () => {
+  resetState();
+  state.sendResult = () => null;
+  await withEnv(CONFIGURED, async () => {
+    await POST(signedPost(messagesPayload([textMessage('wamid.g1', WA_ID, 'Bonjour')])));
+    assert.equal(state.greetClaims.length, 1);
+    assert.equal(state.greetReleases.length, 1);
+    assert.equal(state.greetReleases[0].waId, WA_ID);
+    assert.equal(state.greetReleases[0].at, state.greetClaims[0].at, 'releases exactly what it claimed');
+    assert.equal(state.contacts.get(WA_ID).greetedAt, null);
+    assert.equal(state.outbound.length, 0);
+  });
+});
+
+test('menu choices keep marking the contact greeted through updateContact, without a greeting claim', async () => {
+  resetState();
+  await withEnv(CONFIGURED, async () => {
+    await POST(signedPost(messagesPayload([textMessage('wamid.h1', WA_ID, '2')])));
+    assert.equal(state.greetClaims.length, 0);
+    assert.equal(state.updates.filter((u) => u.patch.greetedAt instanceof Date).length, 1);
+  });
+});
+
+test('two photos in a row get one image hint, recorded under its own kind', async () => {
+  resetState();
+  state.contacts.set(WA_ID, { waId: WA_ID, lang: 'fr', greetedAt: new Date(), handoffUntil: null });
+  await withEnv(CONFIGURED, async () => {
+    await POST(signedPost(messagesPayload([imageMessage('wamid.i1', WA_ID)])));
+    assert.equal(state.sent.length, 1);
+    assert.equal(state.sent[0].body, COPY.imageHint.fr);
+    assert.equal(state.outbound[0].kind, 'image_hint');
+    assert.equal(state.countCalls[0].kind, 'image_hint');
+    const windowMs = Date.now() - state.countCalls[0].since.getTime();
+    assert.ok(windowMs >= 10 * 60 * 1000 - 2000 && windowMs <= 10 * 60 * 1000 + 2000, 'a 10 minute cooldown');
+
+    // The second photo now sees the recorded hint.
+    state.imageHintCount = state.outbound.filter((o) => o.kind === 'image_hint').length;
+    await POST(signedPost(messagesPayload([imageMessage('wamid.i2', WA_ID)])));
+    assert.equal(state.sent.length, 1, 'no second hint');
+    assert.equal(state.claims.length, 2, 'the second photo is still recorded');
+  });
+});
+
+// --- M2: echo dedupe -------------------------------------------------------
+
+test('an echo passes its own id to recordOutbound', async () => {
+  resetState();
+  await withEnv(CONFIGURED, async () => {
+    await POST(signedPost(echoPayload(WA_ID, 'Bonjour', 'wamid.echoA')));
+    assert.deepEqual(state.outbound, [
+      { waId: WA_ID, wamid: 'wamid.echoA', direction: 'human', kind: 'echo', body: 'Bonjour' },
+    ]);
+  });
+});
+
+test('a redelivered echo starts the handoff only once', async () => {
+  resetState();
+  await withEnv(CONFIGURED, async () => {
+    await POST(signedPost(echoPayload(WA_ID, 'Bonjour', 'wamid.echoB')));
+    await POST(signedPost(echoPayload(WA_ID, 'Bonjour', 'wamid.echoB')));
+    assert.equal(state.outbound.length, 1);
+    assert.equal(handoffUpdates().length, 1);
+  });
+});
+
+test('the echo of a message the bot itself sent (same wamid) opens no handoff', async () => {
+  resetState();
+  await withEnv(CONFIGURED, async () => {
+    await POST(signedPost(messagesPayload([textMessage('wamid.j1', WA_ID, 'Bonjour')])));
+    assert.equal(state.sent.length, 1);
+    await POST(signedPost(echoPayload(WA_ID, COPY.greeting, 'wamid.OUT')));
+    assert.equal(handoffUpdates().length, 0);
+    assert.equal(state.outbound.filter((o) => o.direction === 'human').length, 0);
+  });
+});
+
+// --- M5: the assistant gets the handoff mode -------------------------------
+
+test('the route tells the assistant which handoff mode is active', async () => {
+  for (const mode of [undefined, 'redirect']) {
+    resetState();
+    state.contacts.set(WA_ID, { waId: WA_ID, lang: 'fr', greetedAt: new Date(), handoffUntil: null });
+    state.assistantResult = () => ({ reply: 'ok', handoff: false });
+    await withEnv({ ...CONFIGURED, WHATSAPP_HANDOFF_MODE: mode }, async () => {
+      await POST(signedPost(messagesPayload([textMessage('wamid.k1', WA_ID, 'Vous livrez ?')])));
+      assert.equal(state.assistantCalls[0].handoffMode, mode ?? 'coexistence');
+    });
+  }
 });

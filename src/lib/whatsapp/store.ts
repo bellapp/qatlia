@@ -51,12 +51,17 @@ function raise(error: DbError, action: string): never {
   throw new Error(`[whatsapp] store ${action} failed (${error.code ?? 'no code'}): ${error.message ?? 'unknown error'}`);
 }
 
-function toState(row: ContactRow): ContactState {
+/** What upsertContact reports: the routing state plus whether this contact came from the ad. */
+export type StoredContact = ContactState & { fromAd: boolean };
+
+function toState(row: ContactRow, eventReferral: Record<string, unknown> | null = null): StoredContact {
   return {
     waId: row.wa_id,
     lang: row.lang,
     greetedAt: row.greeted_at ? new Date(row.greeted_at) : null,
     handoffUntil: row.handoff_until ? new Date(row.handoff_until) : null,
+    // The row is the pre-patch one, so the first ad message counts through the event's own referral.
+    fromAd: row.referral !== null || eventReferral !== null,
   };
 }
 
@@ -69,12 +74,13 @@ async function selectContact(db: SupabaseClient, waId: string): Promise<ContactR
 /**
  * Creates the contact if absent, otherwise refreshes only the profile name
  * (when a different one is given) and fills a still-empty referral. Never
- * touches `greeted_at`, `handoff_until` or an existing referral.
+ * touches `greeted_at`, `handoff_until` or an existing referral. `fromAd` is
+ * true when a referral is stored or this very event carries one.
  */
 export async function upsertContact(
   db: SupabaseClient,
   input: { waId: string; profileName: string | null; referral: Record<string, unknown> | null },
-): Promise<ContactState> {
+): Promise<StoredContact> {
   let row = await selectContact(db, input.waId);
 
   if (!row) {
@@ -83,7 +89,7 @@ export async function upsertContact(
       .insert({ wa_id: input.waId, profile_name: input.profileName, referral: input.referral })
       .select(CONTACT_COLUMNS)
       .single();
-    if (!error) return toState(data as ContactRow);
+    if (!error) return toState(data as ContactRow, input.referral);
     if (error.code !== UNIQUE_VIOLATION) raise(error, 'create contact');
 
     // A concurrent delivery created it first: carry on with that row.
@@ -100,7 +106,7 @@ export async function upsertContact(
     const { error } = await db.from(CONTACTS).update(patch).eq('wa_id', input.waId);
     if (error) raise(error, 'update contact');
   }
-  return toState(row);
+  return toState(row, input.referral);
 }
 
 /**
@@ -123,11 +129,14 @@ export async function claimInbound(
   raise(error, 'claim inbound');
 }
 
-/** Logs a message sent by the bot or by a human. An already stored wamid is not an error. */
+/**
+ * Logs a message sent by the bot or by a human. An already stored wamid is not
+ * an error: it returns `false` (nothing inserted) instead of `true`.
+ */
 export async function recordOutbound(
   db: SupabaseClient,
   input: { waId: string; wamid: string | null; direction: 'bot' | 'human'; kind: string; body: string | null },
-): Promise<void> {
+): Promise<boolean> {
   const { error } = await db.from(MESSAGES).insert({
     wamid: input.wamid,
     wa_id: input.waId,
@@ -135,7 +144,35 @@ export async function recordOutbound(
     kind: input.kind,
     body: input.body,
   });
-  if (error && error.code !== UNIQUE_VIOLATION) raise(error, 'record outbound');
+  if (!error) return true;
+  if (error.code === UNIQUE_VIOLATION) return false;
+  raise(error, 'record outbound');
+}
+
+/**
+ * Marks the contact as greeted, but only if nobody did it yet. `true` when
+ * this call won (and must send the greeting), `false` when a concurrent
+ * delivery already greeted the contact.
+ */
+export async function claimGreeting(db: SupabaseClient, waId: string, at: Date): Promise<boolean> {
+  const { data, error } = await db
+    .from(CONTACTS)
+    .update({ greeted_at: at.toISOString(), updated_at: new Date().toISOString() })
+    .eq('wa_id', waId)
+    .is('greeted_at', null)
+    .select('wa_id');
+  if (error) raise(error, 'claim greeting');
+  return Array.isArray(data) && data.length > 0;
+}
+
+/** Undoes `claimGreeting(db, waId, at)` after a failed send; leaves a later greeted_at alone. */
+export async function releaseGreeting(db: SupabaseClient, waId: string, at: Date): Promise<void> {
+  const { error } = await db
+    .from(CONTACTS)
+    .update({ greeted_at: null, updated_at: new Date().toISOString() })
+    .eq('wa_id', waId)
+    .eq('greeted_at', at.toISOString());
+  if (error) raise(error, 'release greeting');
 }
 
 /** Applies the given fields only; `handoffUntil: null` clears the handoff. */
@@ -190,15 +227,20 @@ export async function recentHistory(
     .map((row) => ({ direction: row.direction, body: row.body as string }));
 }
 
-/** Number of assistant (free-form AI) replies sent to this contact since `since`. */
-export async function countAssistantReplies(db: SupabaseClient, waId: string, since: Date): Promise<number> {
+/** Number of bot messages of the given kind sent to this contact since `since`. */
+export async function countBotMessages(db: SupabaseClient, waId: string, kind: string, since: Date): Promise<number> {
   const { count, error } = await db
     .from(MESSAGES)
     .select('id', { count: 'exact', head: true })
     .eq('wa_id', waId)
     .eq('direction', 'bot')
-    .eq('kind', 'assistant')
+    .eq('kind', kind)
     .gte('created_at', since.toISOString());
-  if (error) raise(error, 'count assistant replies');
+  if (error) raise(error, `count ${kind} messages`);
   return count ?? 0;
+}
+
+/** Number of assistant (free-form AI) replies sent to this contact since `since`. */
+export function countAssistantReplies(db: SupabaseClient, waId: string, since: Date): Promise<number> {
+  return countBotMessages(db, waId, 'assistant', since);
 }

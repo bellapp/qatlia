@@ -33,6 +33,8 @@ export interface EchoEvent {
   type: 'echo';
   waId: string;
   text: string | null;
+  /** The echo's own message id, used to dedupe redeliveries and echoes of the bot's sends. */
+  wamid: string | null;
 }
 
 const KNOWN_KINDS: ReadonlySet<string> = new Set([
@@ -57,6 +59,7 @@ const messageSchema = z.object({
 });
 
 const echoSchema = z.object({
+  id: z.string().min(1).optional(),
   to: z.string().min(1),
   type: z.string().optional(),
   text: z.object({ body: z.string() }).partial().optional(),
@@ -115,6 +118,7 @@ function parseEcho(raw: unknown): EchoEvent | null {
     type: 'echo',
     waId: echo.to,
     text: echo.type === 'text' ? echo.text?.body ?? null : null,
+    wamid: echo.id ?? null,
   };
 }
 

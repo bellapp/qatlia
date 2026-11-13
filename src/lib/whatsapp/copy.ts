@@ -6,6 +6,7 @@
  * preview from the first URL of the message.
  */
 
+import { ANALYSIS_WINDOW_HOURS } from '@/lib/billing/policy';
 import { supportWhatsAppUrl } from '@/lib/support';
 
 export type Lang = 'fr' | 'ar';
@@ -54,9 +55,9 @@ ${DEMO_VIDEO_URL}
   },
 
   pricing: {
-    fr: `Vous commencez gratuitement avec des crédits offerts à l'inscription, sans carte bancaire. Ensuite, vous achetez des crédits seulement quand vous en avez besoin, sans abonnement. Les recalculs sur un même projet sont gratuits pendant 24 h.
+    fr: `Vous commencez gratuitement avec des crédits offerts à l'inscription, sans carte bancaire. Ensuite, vous achetez des crédits seulement quand vous en avez besoin, sans abonnement. Les recalculs de la même liste sont gratuits pendant ${ANALYSIS_WINDOW_HOURS} h.
 Détails : https://qatlia.ma`,
-    ar: `كتبدا بالمجان بكريديات مهداة ملي كتسجل، بلا بطاقة بنكية. من بعد كتشري الكريديات غير ملي تحتاجهم، بلا اشتراك. إعادة الحساب فنفس المشروع مجانية لمدة 24 ساعة.
+    ar: `كتبدا بالمجان بكريديات مهداة ملي كتسجل، بلا بطاقة بنكية. من بعد كتشري الكريديات غير ملي تحتاجهم، بلا اشتراك. إعادة الحساب فنفس اللائحة مجانية لمدة ${ANALYSIS_WINDOW_HOURS} ساعة.
 التفاصيل: https://qatlia.ma`,
   },
 

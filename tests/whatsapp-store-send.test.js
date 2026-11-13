@@ -15,6 +15,9 @@ const {
   updateContact,
   recentHistory,
   countAssistantReplies,
+  countBotMessages,
+  claimGreeting,
+  releaseGreeting,
 } = load('src/lib/whatsapp/store.ts');
 const { sendText } = load('src/lib/whatsapp/send.ts');
 
@@ -43,6 +46,7 @@ function fakeDb(respond) {
         insert(payload) { query.op = 'insert'; query.payload = payload; return builder; },
         update(payload) { query.op = 'update'; query.payload = payload; return builder; },
         eq(column, value) { query.filters.push(['eq', column, value]); return builder; },
+        is(column, value) { query.filters.push(['is', column, value]); return builder; },
         neq(column, value) { query.filters.push(['neq', column, value]); return builder; },
         gte(column, value) { query.filters.push(['gte', column, value]); return builder; },
         order(column, options) { query.orders.push([column, options]); return builder; },
@@ -123,7 +127,7 @@ test('upsertContact creates an absent contact with name and referral, and maps t
   const insert = db.queries.find((q) => q.op === 'insert');
   assert.equal(insert.table, 'whatsapp_contacts');
   assert.deepEqual(insert.payload, { wa_id: '212600000000', profile_name: 'Karim', referral: { source_id: 'ad-1' } });
-  assert.deepEqual(state, { waId: '212600000000', lang: 'fr', greetedAt: null, handoffUntil: null });
+  assert.deepEqual(state, { waId: '212600000000', lang: 'fr', greetedAt: null, handoffUntil: null, fromAd: true });
 });
 
 test('upsertContact on an existing contact never sends greeted_at, handoff_until or referral', async () => {
@@ -144,7 +148,29 @@ test('upsertContact on an existing contact never sends greeted_at, handoff_until
     lang: 'ar',
     greetedAt: new Date('2026-11-10T09:00:00.000Z'),
     handoffUntil: new Date('2026-11-13T09:00:00.000Z'),
+    fromAd: true,
   });
+});
+
+test('upsertContact reports fromAd from the stored referral or from the current event, without leaking the referral', async () => {
+  const noReferral = { ...CONTACT_ROW, referral: null };
+  // Stored referral, none on this event.
+  let db = fakeDb(() => ok(CONTACT_ROW));
+  let state = await upsertContact(db, { waId: '212600000000', profileName: null, referral: null });
+  assert.equal(state.fromAd, true);
+  // No stored referral, but this very first ad message carries one (the row returned is the pre-patch row).
+  db = fakeDb((q) => (q.op === 'select' ? ok(noReferral) : ok()));
+  state = await upsertContact(db, { waId: '212600000000', profileName: null, referral: { source_id: 'ad-2' } });
+  assert.equal(state.fromAd, true);
+  assert.ok(!('referral' in state));
+  // Neither.
+  db = fakeDb(() => ok(noReferral));
+  state = await upsertContact(db, { waId: '212600000000', profileName: null, referral: null });
+  assert.equal(state.fromAd, false);
+  // New contact created without referral.
+  db = fakeDb((q) => (q.op === 'select' && q.single === 'maybe' ? ok(null) : ok(noReferral)));
+  state = await upsertContact(db, { waId: '212600000000', profileName: null, referral: null });
+  assert.equal(state.fromAd, false);
 });
 
 test('upsertContact writes nothing when the existing contact is unchanged', async () => {
@@ -199,9 +225,54 @@ test('recordOutbound rejects with WhatsAppTablesMissingError when the tables are
   );
 });
 
-test('recordOutbound treats an already stored wamid (23505) as done', async () => {
+test('recordOutbound returns true when a row was inserted', async () => {
+  const db = fakeDb(() => ok());
+  assert.equal(await recordOutbound(db, { waId: '1', wamid: 'w', direction: 'bot', kind: 'fixed', body: 'x' }), true);
+});
+
+test('recordOutbound treats an already stored wamid (23505) as done and returns false', async () => {
   const db = fakeDb(() => fail('23505'));
-  await recordOutbound(db, { waId: '1', wamid: 'w', direction: 'human', kind: 'text', body: 'x' });
+  assert.equal(await recordOutbound(db, { waId: '1', wamid: 'w', direction: 'human', kind: 'text', body: 'x' }), false);
+});
+
+// --- claimGreeting / releaseGreeting ---------------------------------------
+
+test('claimGreeting conditionally sets greeted_at and reports whether this call won', async () => {
+  const at = new Date('2026-11-12T10:00:00.000Z');
+  let db = fakeDb(() => ok([{ wa_id: '1' }]));
+  assert.equal(await claimGreeting(db, '1', at), true);
+  const q = db.queries[0];
+  assert.equal(q.table, 'whatsapp_contacts');
+  assert.equal(q.op, 'update');
+  assert.deepEqual(Object.keys(q.payload).sort(), ['greeted_at', 'updated_at']);
+  assert.equal(q.payload.greeted_at, '2026-11-12T10:00:00.000Z');
+  assert.deepEqual(q.filters, [
+    ['eq', 'wa_id', '1'],
+    ['is', 'greeted_at', null],
+  ]);
+
+  db = fakeDb(() => ok([]));
+  assert.equal(await claimGreeting(db, '1', at), false);
+});
+
+test('claimGreeting rejects with WhatsAppTablesMissingError and rethrows other errors', async () => {
+  const at = new Date();
+  await assert.rejects(claimGreeting(fakeDb(() => fail('PGRST205')), '1', at), WhatsAppTablesMissingError);
+  await assert.rejects(claimGreeting(fakeDb(() => fail('XX000', 'disk full')), '1', at), /disk full/);
+});
+
+test('releaseGreeting clears greeted_at only when it still holds the given instant', async () => {
+  const db = fakeDb(() => ok());
+  await releaseGreeting(db, '1', new Date('2026-11-12T10:00:00.000Z'));
+  const q = db.queries[0];
+  assert.equal(q.op, 'update');
+  assert.equal(q.payload.greeted_at, null);
+  assert.ok(typeof q.payload.updated_at === 'string');
+  assert.deepEqual(q.filters, [
+    ['eq', 'wa_id', '1'],
+    ['eq', 'greeted_at', '2026-11-12T10:00:00.000Z'],
+  ]);
+  await assert.rejects(releaseGreeting(fakeDb(() => fail('XX000', 'disk full')), '1', new Date()), /disk full/);
 });
 
 test('updateContact maps the patch to columns, stamps updated_at, and can clear handoffUntil', async () => {
@@ -285,6 +356,20 @@ test('countAssistantReplies treats a missing count as zero', async () => {
   assert.equal(await countAssistantReplies(db, '1', new Date()), 0);
 });
 
+test('countBotMessages counts bot rows of the given kind since the given instant', async () => {
+  const db = fakeDb(() => ok(null, { count: 2 }));
+  const since = new Date('2026-11-12T10:00:00.000Z');
+  assert.equal(await countBotMessages(db, '1', 'image_hint', since), 2);
+  assert.deepEqual(db.queries[0].filters, [
+    ['eq', 'wa_id', '1'],
+    ['eq', 'direction', 'bot'],
+    ['eq', 'kind', 'image_hint'],
+    ['gte', 'created_at', '2026-11-12T10:00:00.000Z'],
+  ]);
+  assert.deepEqual(db.queries[0].options, { count: 'exact', head: true });
+  assert.equal(await countBotMessages(fakeDb(() => ok(null, { count: null })), '1', 'image_hint', since), 0);
+});
+
 // --- sendText --------------------------------------------------------------
 
 const CONFIG = {
@@ -295,6 +380,7 @@ const CONFIG = {
   graphVersion: 'v23.0',
   enabled: true,
   handoffMode: 'coexistence',
+  scope: 'ads',
   model: 'm',
   openrouterKey: null,
 };
