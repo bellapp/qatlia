@@ -288,6 +288,16 @@ export const en: Catalog = {
       edges: 'Edging',
       labor: 'Labour',
       total: 'Total',
+      detail: {
+        title: 'Price detail',
+        panel: 'Panel',
+        edge: 'Edge banding',
+        laborFixed: 'Labour (flat fee)',
+        laborPerMeter: 'Labour (per metre of cut)',
+        perPanel: '{count} × {price} MAD',
+        perM2: '{count} × {area} m² × {price} MAD/m²',
+        perMeter: '{length} m × {price} MAD/m',
+      },
     },
     metrics: {
       sheets: 'Sheets',
