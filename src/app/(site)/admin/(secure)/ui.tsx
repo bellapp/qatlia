@@ -23,7 +23,7 @@ export function Stat({ label, value, hint, tone }: { label: string; value: React
     <div className="rounded-xl bg-white/[0.03] border border-white/10 px-3 py-2.5 min-w-0">
       <div className="text-[10px] font-bold uppercase tracking-widest text-slate-500">{label}</div>
       <div className={`text-lg font-black tabular-nums ${color} truncate`}>{value}</div>
-      {hint ? <div className="text-[11px] text-slate-500 truncate">{hint}</div> : null}
+      {hint ? <div className="text-[11px] text-slate-500 break-words">{hint}</div> : null}
     </div>
   );
 }

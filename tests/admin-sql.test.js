@@ -90,4 +90,35 @@ test('012 : aucune exécution de SQL dynamique, aucune fonction existante modifi
   assertNoExistingFunctionTouched(SQL_012);
 });
 
+// ─── 013 ────────────────────────────────────────────────────────────────────
+
+const SQL_013 = read('013_admin_payments.sql');
+
+test('013 : admin_audit_log est fermée aux rôles clients', () => {
+  assertClosedTable(SQL_013, 'public.admin_audit_log');
+});
+
+test('013 : admin_kpis est SECURITY DEFINER, search_path figé, service_role seul, fuseau Casablanca', () => {
+  assertServiceRoleFunction(SQL_013, 'admin_kpis', '()');
+  assert.ok(SQL_013.includes("'Africa/Casablanca'"));
+});
+
+test('013 : le grand livre reste sans écriture pour les rôles clients après 013', () => {
+  const replay = ['001_initial_schema.sql', '004_create_public_schema.sql', '005_credit_policy.sql', '013_admin_payments.sql']
+    .map(read)
+    .join('\n');
+  for (const role of ['anon', 'authenticated']) {
+    const privileges = effectivePrivileges(replay, 'public.credit_transactions', role);
+    for (const write of ['INSERT', 'UPDATE', 'DELETE', 'TRUNCATE']) {
+      assert.equal(privileges[write], undefined, `${role} must not hold ${write} on credit_transactions`);
+    }
+  }
+});
+
+test('013 : colonnes ajoutées sans toucher aux fonctions existantes', () => {
+  assert.match(SQL_013, /ADD COLUMN IF NOT EXISTS amount_paid NUMERIC\(10,2\)/i);
+  assert.match(SQL_013, /ADD COLUMN IF NOT EXISTS currency\s+TEXT/i);
+  assertNoExistingFunctionTouched(SQL_013);
+});
+
 module.exports = { assertClosedTable, assertServiceRoleFunction, assertNoExistingFunctionTouched, read, flat };

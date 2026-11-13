@@ -4,9 +4,9 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 
 const ITEMS = [
+  { href: '/admin', label: 'Vue d’ensemble', match: (path: string) => path === '/admin' },
   { href: '/admin/clients', label: 'Clients', match: (path: string) => path.startsWith('/admin/clients') },
-  // Lot 1: manual orders are still validated on the secret-code page at /admin.
-  { href: '/admin', label: 'Commandes manuelles', match: (path: string) => path === '/admin' },
+  { href: '/admin/paiements', label: 'Paiements', match: (path: string) => path.startsWith('/admin/paiements') },
 ];
 
 export function AdminNav() {

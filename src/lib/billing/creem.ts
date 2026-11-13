@@ -21,7 +21,7 @@
 
 import { createHmac, timingSafeEqual } from 'crypto';
 import { CREDIT_PACKS, CreditPack, PackId, normalizePackId } from './catalog';
-import { GrantResolution, isUuid } from './grant';
+import { GrantResolution, isUuid, readAmountPaid } from './grant';
 import { resolveSafeOrigin } from './checkout-params';
 
 export interface CreemCheckoutMetadata {
@@ -128,7 +128,8 @@ function buildGrant(
   productId: string | null,
   transactionId: string | null,
   products: Record<PackId, string>,
-  source: 'creem_checkout'
+  source: 'creem_checkout',
+  charged: { amountPaid: number | null; currency: string | null }
 ): GrantResolution {
   const userId = metadata.userId;
   if (!isUuid(userId)) {
@@ -158,6 +159,8 @@ function buildGrant(
       credits: CREDIT_PACKS[packId].credits,
       idempotencyKey: `creem:${transactionId}`,
       source,
+      amountPaid: charged.amountPaid,
+      currency: charged.currency,
     },
   };
 }
@@ -182,7 +185,8 @@ export function resolveCreemGrant(event: CreemEventLike, products: Record<PackId
       readId(object.product) ?? readId(order.product),
       transactionId,
       products,
-      'creem_checkout'
+      'creem_checkout',
+      readAmountPaid(order.amount_paid, order.currency)
     );
   }
 

@@ -31,6 +31,26 @@ export interface CreditGrant {
   /** Stable key stored in credit_transactions.stripe_payment_id (unique index). */
   idempotencyKey: string;
   source: 'checkout_session' | 'creem_checkout';
+  /**
+   * What the provider says it charged, in major units, for the back office.
+   * Informational only: it never changes `credits`. Null when the event does
+   * not carry a usable amount.
+   */
+  amountPaid: number | null;
+  /** ISO-4217 code in upper case, null exactly when `amountPaid` is. */
+  currency: string | null;
+}
+
+/**
+ * The charged amount of a provider event, from its integer minor units
+ * (centimes / cents) and currency code. Anything malformed yields nulls.
+ */
+export function readAmountPaid(minorUnits: unknown, currency: unknown): { amountPaid: number | null; currency: string | null } {
+  const code = typeof currency === 'string' ? currency.trim().toUpperCase() : '';
+  if (typeof minorUnits !== 'number' || !Number.isInteger(minorUnits) || minorUnits < 0 || !/^[A-Z]{3}$/.test(code)) {
+    return { amountPaid: null, currency: null };
+  }
+  return { amountPaid: minorUnits / 100, currency: code };
 }
 
 export type GrantResolution =
@@ -72,7 +92,8 @@ function buildGrant(
   metadata: Record<string, unknown>,
   paymentId: unknown,
   source: CreditGrant['source'],
-  keyPrefix: string
+  keyPrefix: string,
+  charged: { amountPaid: number | null; currency: string | null }
 ): GrantResolution {
   const userId = metadata.userId;
   if (!isUuid(userId)) {
@@ -97,6 +118,8 @@ function buildGrant(
       credits: CREDIT_PACKS[packId].credits,
       idempotencyKey: `${keyPrefix}:${paymentId.trim()}`,
       source,
+      amountPaid: charged.amountPaid,
+      currency: charged.currency,
     },
   };
 }
@@ -111,7 +134,13 @@ export function resolveGrant(event: StripeEventLike): GrantResolution {
     if (object.payment_status !== 'paid') {
       return { ok: false, reason: 'SESSION_NOT_PAID', retryable: false };
     }
-    return buildGrant(readMetadata(object.metadata as Metadata), object.id, 'checkout_session', 'cs');
+    return buildGrant(
+      readMetadata(object.metadata as Metadata),
+      object.id,
+      'checkout_session',
+      'cs',
+      readAmountPaid(object.amount_total, object.currency)
+    );
   }
 
   return { ok: false, reason: `UNHANDLED_EVENT:${String(event?.type)}`, retryable: false };

@@ -1,17 +1,21 @@
 import Link from 'next/link';
 import { ArrowLeft, ShieldCheck } from 'lucide-react';
-import { requireAdminPage } from '@/lib/admin/auth';
+import { getAdminUser } from '@/lib/admin/auth';
 import { AdminNav } from './AdminNav';
 
 /**
- * Shell of the account-protected back office. Every page under (secure)
- * also guards itself, so its data is never read for a non-admin even if the
- * layout and the page render in parallel.
+ * Shell of the account-protected back office.
+ *
+ * The guard lives in each page (requireAdminPage with its own path), so a
+ * visitor comes back to the page they asked for after logging in. The layout
+ * only decides whether to draw the shell: for anyone but an admin it renders
+ * the page alone, which redirects or answers 404 before reading any data.
  */
 export const dynamic = 'force-dynamic';
 
 export default async function SecureAdminLayout({ children }: { children: React.ReactNode }) {
-  const admin = await requireAdminPage('/admin/clients');
+  const admin = await getAdminUser();
+  if (!admin) return <>{children}</>;
 
   return (
     <div className="min-h-screen bg-[#0B1220] text-slate-200 font-sans antialiased px-4 py-5 md:px-8 md:py-8">
