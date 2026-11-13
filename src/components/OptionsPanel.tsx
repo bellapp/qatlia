@@ -1,7 +1,14 @@
 'use client';
 
 import React from 'react';
-import { OptimizationOptions, OPTIMIZATION_PRIORITY_VALUES, MaterialType } from '@/lib/cutting/binpacking';
+import {
+  OptimizationOptions,
+  OPTIMIZATION_PRIORITY_VALUES,
+  MaterialType,
+  PRICED_EDGE_IDS,
+  EDGEBANDING_PRESETS,
+  type EdgePriceMap,
+} from '@/lib/cutting/binpacking';
 import type { LaborPricing, StockPricing } from '@/lib/costing';
 import { Gauge, Layers3, Lock, ScanLine, Scissors, Coins } from 'lucide-react';
 import { Tooltip } from '@/components/Tooltip';
@@ -10,12 +17,27 @@ import {
   LABOR_PRICING_MODE_KEYS,
   OPTIMIZATION_PRIORITY_LABEL_KEYS,
   STOCK_PRICING_MODE_KEYS,
+  edgeBandingLabelKey,
 } from '@/i18n/domain';
 
 interface OptionsPanelProps {
   options: OptimizationOptions;
   onChange: (newOptions: OptimizationOptions) => void;
   disabled?: boolean;
+  /** The artisan's price per metre for each edge-banding colour; absent ones use the catalog. */
+  edgePrices?: EdgePriceMap;
+  /** A price typed for one colour (null: back to the catalog price). */
+  onEdgePriceChange?: (edgeId: string, price: number | null) => void;
+  /** The last price could not be saved in the account. */
+  edgePriceSaveFailed?: boolean;
+}
+
+/** '' resets, '8', '8,5' or '8.5' set, anything else is ignored. */
+function parseEdgePrice(raw: string): number | null | undefined {
+  const text = raw.trim().replace(',', '.');
+  if (text === '') return null;
+  const value = Number(text);
+  return Number.isFinite(value) && value >= 0 && value <= 1_000_000 ? Math.round(value * 100) / 100 : undefined;
 }
 
 function Switch({
@@ -59,7 +81,14 @@ function Switch({
 // src/lib/cutting/binpacking.ts, which this UI must never drift from.
 const DEFAULT_LABOR_PRICING: LaborPricing = { mode: 'fixed', value: 0 };
 
-export const OptionsPanel: React.FC<OptionsPanelProps> = ({ options, onChange, disabled = false }) => {
+export const OptionsPanel: React.FC<OptionsPanelProps> = ({
+  options,
+  onChange,
+  disabled = false,
+  edgePrices = {},
+  onEdgePriceChange,
+  edgePriceSaveFailed = false,
+}) => {
   const { t } = useLocale();
   const updateField = <K extends keyof OptimizationOptions>(field: K, value: OptimizationOptions[K]) => {
     onChange({ ...options, [field]: value });
@@ -190,6 +219,51 @@ export const OptionsPanel: React.FC<OptionsPanelProps> = ({ options, onChange, d
           </div>
         </div>
       </Tooltip>
+
+      {onEdgePriceChange && (
+        <div data-testid="edge-prices" className="p-4 rounded-xl bg-studio-panel/50 border border-studio-border/70 space-y-2.5">
+          <div>
+            <span className="block text-[11px] font-semibold text-slate-900 dark:text-white">{t('options.pricing.edgeTitle')}</span>
+            <span className="block text-[10px] text-slate-500">{t('options.pricing.edgeHint')}</span>
+          </div>
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+            {PRICED_EDGE_IDS.map((edgeId) => {
+              const preset = EDGEBANDING_PRESETS.find((e) => e.id === edgeId)!;
+              const own = edgePrices[edgeId];
+              const label = t(edgeBandingLabelKey(edgeId));
+              return (
+                <label key={edgeId} className="flex items-center gap-1.5 text-[11px] text-slate-600 dark:text-slate-300">
+                  <span aria-hidden="true" className="h-3 w-3 rounded-full border border-studio-border shrink-0" style={{ backgroundColor: preset.color }} />
+                  <span className="flex-1 truncate">{label}</span>
+                  <input
+                    key={`${edgeId}-${own ?? ''}`}
+                    type="text"
+                    inputMode="decimal"
+                    dir="ltr"
+                    disabled={disabled}
+                    defaultValue={typeof own === 'number' ? String(own) : ''}
+                    placeholder={String(preset.pricePerM)}
+                    aria-label={t('options.pricing.edgePriceAria', { color: label })}
+                    onBlur={(e) => {
+                      const price = parseEdgePrice(e.target.value);
+                      if (price === undefined) {
+                        e.target.value = typeof own === 'number' ? String(own) : '';
+                        return;
+                      }
+                      if ((price ?? undefined) !== own) onEdgePriceChange(edgeId, price);
+                    }}
+                    onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur(); }}
+                    className="w-14 px-1.5 py-1 rounded-md bg-studio-field border border-studio-border text-slate-800 dark:text-slate-200 text-[11px] font-mono text-end outline-none focus:border-brand-500/50 disabled:opacity-50"
+                  />
+                </label>
+              );
+            })}
+          </div>
+          {edgePriceSaveFailed && (
+            <p role="alert" className="text-[10px] font-semibold text-amber-600 dark:text-amber-300">{t('options.pricing.edgeSaveFailed')}</p>
+          )}
+        </div>
+      )}
     </div>
   );
 };

@@ -52,6 +52,7 @@ const SHARED_TOKENS = new Set([
   'atelier.cost.detail.perPanel',
   'atelier.cost.detail.perM2',
   'atelier.cost.detail.perMeter',
+  'atelier.stock.presetPriceTag',
   'options.kerf.unit',
   'options.kerf.scaleMax',
   'options.pricing.stockPerM2',
