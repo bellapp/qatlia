@@ -481,12 +481,18 @@ export const en: Catalog = {
   options: {
     kerf: {
       chip: 'Kerf {value} mm',
-      tooltip: 'Material removed by the saw blade between two cuts. Standard: 3 mm for a carbide blade.',
+      tooltip: 'Material removed by the saw blade between two cuts. At 0, the plan does not count it. Standard: 3 mm for a carbide blade.',
       title: 'Blade thickness (kerf)',
       desc: 'Saw cut removed between two cuts',
       unit: 'mm',
       aria: 'Blade thickness in millimetres',
       scaleMax: '10 mm',
+    },
+    margin: {
+      tooltip: 'Strip kept clear along all four edges of the panel, to trim damaged edges. At 0, pieces start at the edge.',
+      title: 'Edge margin',
+      desc: 'Strip kept clear along each edge of the panel',
+      aria: 'Edge margin in millimetres',
     },
     priority: {
       tooltip: 'Nesting algorithm: guillotine = edge-to-edge straight cuts (workshop standard). Min waste = best area yield.',
