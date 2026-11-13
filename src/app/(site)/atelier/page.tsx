@@ -54,6 +54,15 @@ import {
 import { OptionsPanel } from '@/components/OptionsPanel';
 import { PiecesManager } from '@/components/PiecesManager';
 import { AuthModal } from '@/components/AuthModal';
+import {
+  savePendingWork,
+  loadPendingWork,
+  isFromThisTab,
+  shouldOfferPendingWork,
+  clearPendingWork,
+  type PendingAction,
+  type PendingWork,
+} from '@/lib/pending-work';
 import { QuotationDialog } from '@/components/QuotationDialog';
 import { EmptyState } from '@/components/EmptyState';
 import { AccountMenu } from '@/components/AccountMenu';
@@ -178,7 +187,16 @@ export default function Dashboard() {
   const [isAuthModalOpen, setIsAuthModalOpen] = useState<boolean>(false);
   // Which action opened the (shared) auth modal, so its onSuccess handler
   // resumes the right one instead of always re-triggering the PDF export.
-  const [pendingAuthAction, setPendingAuthAction] = useState<'pdf' | 'quotation' | null>(null);
+  const [pendingAuthAction, setPendingAuthAction] = useState<'pdf' | 'quotation' | PendingAction | null>(null);
+  // Work kept across a sign-in (src/lib/pending-work.ts): offered with a
+  // button when it comes back in another tab, and the action to run once the
+  // kept state is back on screen.
+  const [resumeOffer, setResumeOffer] = useState<PendingWork | null>(null);
+  const [resumeRequest, setResumeRequest] = useState<{ action: PendingAction; image?: string; resumed: boolean } | null>(null);
+  // A resumed scan or run spends a credit: at most one per page load.
+  const resumingRef = useRef(false);
+  // A project opened from history wins over older kept work.
+  const openedFromHistoryRef = useRef(false);
   const [isDownloadingPdf, setIsDownloadingPdf] = useState<boolean>(false);
   const [isQuotationDialogOpen, setIsQuotationDialogOpen] = useState<boolean>(false);
   // The id /api/projects last confirmed saving, if any — the quotation
@@ -425,6 +443,7 @@ const commitPanelName = () => {
     setDisplayUnit(readStoredDisplayUnit(window.localStorage));
 
     const savedProj = sessionStorage.getItem('qatlia_saved_project');
+    openedFromHistoryRef.current = !!savedProj;
     // Set alongside 'qatlia_saved_project' when a project is opened from
     // history (see history/page.tsx's handleLoadProject) — without this,
     // QuotationDialog only ever knew about the *last auto-saved* project
@@ -608,7 +627,59 @@ const commitPanelName = () => {
     await persistProject(result, 'pdf', { pdfGeneratedAt: generatedAt });
   };
 
-  const handleRunOptimization = async () => {
+  /**
+   * A signed-out visitor asked for a scan or a run: keep their work (photo,
+   * pieces, panel, settings) and ask them to sign in. The action resumes on
+   * its own right after, even through the Google round trip.
+   */
+  const askSignInKeepingWork = (action: PendingAction, image?: string) => {
+    try {
+      savePendingWork(window.localStorage, window.sessionStorage, {
+        action,
+        image,
+        pieces,
+        sheets,
+        options: options as unknown as Record<string, unknown>,
+        cutMode,
+        projectName: projectName.trim() || undefined,
+      });
+    } catch {
+      /* the modal still opens; only the automatic resume is lost */
+    }
+    // Nothing was spent: the resume after this sign-in may run.
+    resumingRef.current = false;
+    setPendingAuthAction(action);
+    setIsAuthModalOpen(true);
+  };
+
+  /** Puts kept work back on screen. */
+  const applyPendingWork = (work: PendingWork) => {
+    if (work.pieces.length > 0) setPieces(normalizePiecesWithColors(work.pieces as Piece[]));
+    if (work.sheets.length > 0) setSheets(work.sheets as Sheet[]);
+    if (work.options) setOptions((prev) => ({ ...prev, ...(work.options as Partial<OptimizationOptions>) }));
+    if (work.cutMode) setCutMode(work.cutMode);
+    if (work.projectName) {
+      setProjectName(work.projectName);
+      setProjectNameDraft(work.projectName);
+    }
+    // The photo is not put in the scan preview: that card reads "analysed",
+    // and it has not been yet. The resume banner shows it instead.
+  };
+
+  /**
+   * Runs the kept action. The entry is cleared before anything is sent, and
+   * a ref allows one resume per page, so a credit is never spent twice.
+   */
+  const resumePendingWork = (work: PendingWork, { resumed }: { resumed: boolean }) => {
+    if (resumingRef.current) return;
+    resumingRef.current = true;
+    clearPendingWork(window.localStorage, window.sessionStorage);
+    setResumeOffer(null);
+    applyPendingWork(work);
+    setResumeRequest({ action: work.action, image: work.image, resumed });
+  };
+
+  const handleRunOptimization = async ({ resumed = false }: { resumed?: boolean } = {}) => {
     setIsOptimizing(true);
     setOptimizeError(null);
     try {
@@ -631,7 +702,10 @@ const commitPanelName = () => {
       const data = await res.json().catch(() => null);
 
       if (!res.ok || !data?.success) {
-        if (res.status === 401) {
+        if (res.status === 401 && !resumed) {
+          // Keep the pieces and run again right after sign-in.
+          askSignInKeepingWork('optimize');
+        } else if (res.status === 401) {
           setOptimizeError(t('atelier.optimize.authRequired'));
         } else if (res.status === 402) {
           setOptimizeError(t('atelier.optimize.noCredits'));
@@ -660,6 +734,8 @@ const commitPanelName = () => {
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+    // Lets the same photo be picked again, which onChange would otherwise ignore.
+    e.target.value = '';
 
     setIsProcessingVision(true);
     setVisionError(null);
@@ -673,78 +749,157 @@ const commitPanelName = () => {
         // scan on a workshop connection. A failed downscale (no canvas, exotic
         // codec) must never block a scan: fall back to the original bytes.
         const scanImage = (await downscaleDataUrl(base64, 1600, 0.8)) ?? base64;
-        const res = await fetch('/api/vision', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            imageBase64: scanImage,
-            sheetMaterial: activeSheet.material || 'mdf',
-          }),
-        });
-
-        const data = await res.json();
-        if (data.success && Array.isArray(data.pieces) && data.pieces.length > 0) {
-          // The thumbnail is saved with the project and shown in history:
-          // 600px keeps the cut list readable while staying well under the
-          // server's size cap (SCAN_THUMB_MAX_CHARS), since the history page
-          // loads every project's thumbnail at once.
-          setPreviewImage(scanImage);
-          void downscaleDataUrl(scanImage, 600, 0.7).then(setScanThumb);
-          const newPieces: Piece[] = data.pieces.map((p: { name?: string; width?: number | string; height?: number | string; quantity?: number | string; material?: string; color?: string }, i: number) => {
-            // /api/vision always extracts and returns canonical centimetres
-            // (see its prompt), so no magnitude-based mm heuristic is applied
-            // here — a legitimate 600 cm bar must survive untouched. Only a
-            // finite, strictly positive number is trusted (see
-            // `safeFinitePositive`); anything else (missing, NaN, Infinity,
-            // <= 0) falls back deterministically instead of reaching
-            // `Math.round` with a non-finite value.
-            const h = safeFinitePositive(p.height, 10);
-            const w = safeFinitePositive(p.width, 10);
-            const quantity = Math.max(1, Math.round(safeFinitePositive(p.quantity, 1)));
-            return {
-              id: `ext_${Date.now()}_${i}`,
-              name: p.name || t('pieces.defaultName', { index: i + 1 }),
-              height: Math.round(h * 10) / 10,
-              width: Math.round(w * 10) / 10,
-              quantity,
-              material: (p.material as MaterialType) || (activeSheet.material || 'mdf'),
-              rotatable: true,
-              // Chants read from the sheet's edge column, like a manual
-              // toggle: sides only, no banding type chosen yet.
-              ...(scannedEdges(p) ? { edges: scannedEdges(p) } : {}),
-              color: getResolvedPieceColor({
-                color: p.color,
-                id: `ext_${Date.now()}_${i}`,
-                name: p.name,
-                height: h,
-                width: w,
-                quantity,
-                index: i,
-              }),
-            };
-          });
-          setPieces(normalizePiecesWithColors(newPieces));
-          storeAnalysisPass(data.analysisPass);
-          // The server is the only authority on the balance; it is echoed back
-          // only when a credit was actually debited.
-          if (typeof data.creditsRemaining === 'number') setUserCredits(data.creditsRemaining);
-        } else {
-          if (res.status === 401) setIsAuthModalOpen(true);
-          if (typeof data.creditsRemaining === 'number') setUserCredits(data.creditsRemaining);
-          // The route's own `message` stays French for non-browser callers; the
-          // workshop renders the artisan's language from the `error` code, and a
-          // code this build does not know degrades to the generic message.
-          setVisionError(visionErrorKey(data.error));
-        }
+        await runScan(scanImage);
       } catch (err) {
         setVisionError('atelier.visionError.network');
-        console.error(err);
-      } finally {
         setIsProcessingVision(false);
+        console.error(err);
       }
     };
     reader.readAsDataURL(file);
   };
+
+  /**
+   * Analyses a (downscaled) cut-list photo. A signed-out visitor is asked to
+   * sign in first, with the photo kept; `resumed` marks the automatic run
+   * after that sign-in, which never asks again.
+   */
+  const runScan = async (scanImage: string, { resumed = false }: { resumed?: boolean } = {}) => {
+    setIsProcessingVision(true);
+    setVisionError(null);
+    try {
+      if (!resumed) {
+        const { data: { user } } = await createClient().auth.getUser();
+        if (!user) {
+          askSignInKeepingWork('scan', scanImage);
+          return;
+        }
+      }
+      const res = await fetch('/api/vision', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          imageBase64: scanImage,
+          sheetMaterial: activeSheet.material || 'mdf',
+        }),
+      });
+
+      const data = await res.json();
+      if (data.success && Array.isArray(data.pieces) && data.pieces.length > 0) {
+        // The thumbnail is saved with the project and shown in history:
+        // 600px keeps the cut list readable while staying well under the
+        // server's size cap (SCAN_THUMB_MAX_CHARS), since the history page
+        // loads every project's thumbnail at once.
+        setPreviewImage(scanImage);
+        void downscaleDataUrl(scanImage, 600, 0.7).then(setScanThumb);
+        const newPieces: Piece[] = data.pieces.map((p: { name?: string; width?: number | string; height?: number | string; quantity?: number | string; material?: string; color?: string }, i: number) => {
+          // /api/vision always extracts and returns canonical centimetres
+          // (see its prompt), so no magnitude-based mm heuristic is applied
+          // here — a legitimate 600 cm bar must survive untouched. Only a
+          // finite, strictly positive number is trusted (see
+          // `safeFinitePositive`); anything else (missing, NaN, Infinity,
+          // <= 0) falls back deterministically instead of reaching
+          // `Math.round` with a non-finite value.
+          const h = safeFinitePositive(p.height, 10);
+          const w = safeFinitePositive(p.width, 10);
+          const quantity = Math.max(1, Math.round(safeFinitePositive(p.quantity, 1)));
+          return {
+            id: `ext_${Date.now()}_${i}`,
+            name: p.name || t('pieces.defaultName', { index: i + 1 }),
+            height: Math.round(h * 10) / 10,
+            width: Math.round(w * 10) / 10,
+            quantity,
+            material: (p.material as MaterialType) || (activeSheet.material || 'mdf'),
+            rotatable: true,
+            // Chants read from the sheet's edge column, like a manual
+            // toggle: sides only, no banding type chosen yet.
+            ...(scannedEdges(p) ? { edges: scannedEdges(p) } : {}),
+            color: getResolvedPieceColor({
+              color: p.color,
+              id: `ext_${Date.now()}_${i}`,
+              name: p.name,
+              height: h,
+              width: w,
+              quantity,
+              index: i,
+            }),
+          };
+        });
+        setPieces(normalizePiecesWithColors(newPieces));
+        storeAnalysisPass(data.analysisPass);
+        // The server is the only authority on the balance; it is echoed back
+        // only when a credit was actually debited.
+        if (typeof data.creditsRemaining === 'number') setUserCredits(data.creditsRemaining);
+      } else {
+        if (res.status === 401 && !resumed) {
+          // Signed out since the check above: keep the photo, ask again.
+          askSignInKeepingWork('scan', scanImage);
+          return;
+        }
+        if (typeof data.creditsRemaining === 'number') setUserCredits(data.creditsRemaining);
+        // The route's own `message` stays French for non-browser callers; the
+        // workshop renders the artisan's language from the `error` code, and a
+        // code this build does not know degrades to the generic message.
+        setVisionError(visionErrorKey(data.error));
+      }
+    } catch (err) {
+      setVisionError('atelier.visionError.network');
+      console.error(err);
+    } finally {
+      setIsProcessingVision(false);
+    }
+  };
+
+  // Runs a resumed action once the kept pieces and panel are on screen.
+  useEffect(() => {
+    if (!resumeRequest) return;
+    const request = resumeRequest;
+    setResumeRequest(null);
+    if (request.action === 'scan' && request.image) void runScan(request.image, { resumed: request.resumed });
+    else if (request.action === 'optimize') void handleRunOptimization({ resumed: request.resumed });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [resumeRequest]);
+
+  // Work kept before a sign-in. Back in the tab that asked for it (Google
+  // round trip, reload): resume on its own once signed in. In another tab
+  // (the email-confirmation link): show it once and offer a button, since a
+  // resumed action spends a credit.
+  useEffect(() => {
+    if (openedFromHistoryRef.current) return;
+    const work = loadPendingWork(window.localStorage);
+    if (!work) return;
+    let cancelled = false;
+    const sameTab = isFromThisTab(window.sessionStorage, work);
+    (async () => {
+      let signedIn = false;
+      try {
+        const { data: { user } } = await createClient().auth.getUser();
+        signedIn = !!user;
+      } catch {
+        /* treated as signed out */
+      }
+      if (cancelled) return;
+      if (sameTab) {
+        if (signedIn) {
+          resumePendingWork(work, { resumed: true });
+        } else {
+          // Came back without signing in: the work is shown with its button,
+          // which asks for the sign-in again; signing in finishes it.
+          applyPendingWork(work);
+          setPendingAuthAction(work.action);
+          setResumeOffer(work);
+        }
+        return;
+      }
+      if (!shouldOfferPendingWork(window.localStorage, window.sessionStorage, work)) return;
+      applyPendingWork(work);
+      setResumeOffer(work);
+    })();
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const handleDownloadJson = () => {
     if (!result) return;
@@ -1169,6 +1324,36 @@ const commitPanelName = () => {
               visualizer keeps the wider stage at 7 cols. */}
           <div className="lg:col-span-5 space-y-4">
             
+            {/* Work kept across a sign-in, back in another tab: one explicit
+                click resumes it (it spends a credit), or it is dismissed. */}
+            {resumeOffer && (
+              <div role="status" className="flex flex-wrap items-center gap-3 p-3.5 rounded-xl bg-brand-400/10 border border-brand-500/30">
+                {resumeOffer.image && (
+                  <img src={resumeOffer.image} alt="" className="w-12 h-12 object-cover rounded-lg border border-studio-border" />
+                )}
+                <p className="flex-1 min-w-[140px] text-xs font-bold text-slate-800 dark:text-slate-100">
+                  {t(resumeOffer.action === 'scan' ? 'atelier.resume.scan' : 'atelier.resume.optimize')}
+                </p>
+                <button
+                  type="button"
+                  onClick={() => resumePendingWork(resumeOffer, { resumed: false })}
+                  className="px-3 py-2 rounded-lg bg-brand-400 hover:bg-brand-500 text-slate-950 text-xs font-black transition-colors"
+                >
+                  {t(resumeOffer.action === 'scan' ? 'atelier.resume.runScan' : 'atelier.resume.runOptimize')}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    clearPendingWork(window.localStorage, window.sessionStorage);
+                    setResumeOffer(null);
+                  }}
+                  className="px-2.5 py-2 rounded-lg text-xs font-bold text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition-colors"
+                >
+                  {t('atelier.resume.dismiss')}
+                </button>
+              </div>
+            )}
+
             {/* Quick Actions: Hero Cards */}
             <div className="grid grid-cols-2 gap-3">
               {/* Take Photo Card */}
@@ -1541,7 +1726,7 @@ const commitPanelName = () => {
             )}
             {/* Primary CTA Button */}
             <button
-              onClick={handleRunOptimization}
+              onClick={() => void handleRunOptimization()}
               disabled={isOptimizing || pieces.length === 0}
               className="w-full py-3.5 rounded-xl bg-brand-400 hover:bg-brand-500 text-slate-950 font-bold text-sm tracking-[0.08em] uppercase shadow-xl shadow-brand-500/30 ring-1 ring-brand-600/40 transition-all flex items-center justify-center gap-2.5 disabled:opacity-30 disabled:shadow-none disabled:ring-0 active:scale-[0.98]"
             >
@@ -2019,7 +2204,7 @@ const commitPanelName = () => {
                       untouched; these two are quick top-level shortcuts. */}
                   <div className="flex flex-wrap items-center gap-2.5">
                     <button
-                      onClick={handleRunOptimization}
+                      onClick={() => void handleRunOptimization()}
                       disabled={isOptimizing || pieces.length === 0}
                       className="flex-1 min-w-[200px] py-3.5 rounded-xl bg-brand-400 hover:bg-brand-500 text-slate-950 font-bold text-sm flex items-center justify-center gap-2 disabled:opacity-30 transition-all"
                     >
@@ -2045,6 +2230,7 @@ const commitPanelName = () => {
       <AuthModal
         isOpen={isAuthModalOpen}
         onClose={() => setIsAuthModalOpen(false)}
+        purpose={pendingAuthAction === 'scan' || pendingAuthAction === 'optimize' ? pendingAuthAction : 'pdf'}
         title={pendingAuthAction === 'quotation' ? t('quotation.title') : undefined}
         subtitle={pendingAuthAction === 'quotation' ? t('quotation.authRequired') : undefined}
         onSuccess={() => {
@@ -2054,6 +2240,11 @@ const commitPanelName = () => {
             if (user) {
               setUserEmail(user.email || null);
               if (pendingAuthAction === 'pdf') handleDownloadPdf();
+              // A kept scan or run picks up where the visitor left it.
+              if (pendingAuthAction === 'scan' || pendingAuthAction === 'optimize') {
+                const work = loadPendingWork(window.localStorage);
+                if (work) resumePendingWork(work, { resumed: true });
+              }
               // 'quotation': the dialog itself stays open with the artisan's
               // filled-in fields intact — they just click "Generate" again.
             }

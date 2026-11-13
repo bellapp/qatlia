@@ -39,8 +39,18 @@ function formatFindings(findings) {
 
 // ─── Real source tree: must come back clean ────────────────────────────────
 
+// The operator back office (src/app/(site)/admin) is read by the merchant
+// only, in French, and is deliberately not translated (plan 2026-11-12).
+const isBackOffice = (abs) => {
+  const segments = path.relative(path.resolve('src/app'), abs).split(path.sep);
+  return segments[0] === '(site)' && segments[1] === 'admin';
+};
+
 test('every customer-facing .tsx file under src/app and src/components has no hardcoded literal French UI text', () => {
-  const targets = [...walk(path.resolve('src/app'), ['.tsx']), ...walk(path.resolve('src/components'), ['.tsx'])];
+  const targets = [
+    ...walk(path.resolve('src/app'), ['.tsx']).filter((abs) => !isBackOffice(abs)),
+    ...walk(path.resolve('src/components'), ['.tsx']),
+  ];
   assert.ok(targets.length > 10, 'sanity: expected to find a substantial number of .tsx files to scan');
 
   const allFindings = targets.flatMap((abs) => scanFile(path.relative(process.cwd(), abs), 'jsx'));

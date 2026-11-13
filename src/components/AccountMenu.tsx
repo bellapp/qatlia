@@ -7,6 +7,7 @@ import { createClient } from '@/lib/supabase/client';
 import { ChevronDown, KeyRound, LogOut, MessageCircle, Receipt, User, Zap } from 'lucide-react';
 import { useLocale } from '@/components/LocaleProvider';
 import { supportWhatsAppUrl } from '@/lib/support';
+import { clearPendingWork } from '@/lib/pending-work';
 
 interface AccountMenuProps {
   email: string;
@@ -29,6 +30,8 @@ export function AccountMenu({ email }: AccountMenuProps) {
   const handleLogout = async () => {
     const supabase = createClient();
     await supabase.auth.signOut();
+    // Work kept for a sign-in must not wait for the next person on a shared computer.
+    clearPendingWork(window.localStorage, window.sessionStorage);
     router.push('/');
     router.refresh();
   };

@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
+import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { getSupabaseAdminConfig } from './config';
 import { CreditGrant } from './grant';
 
@@ -44,5 +44,27 @@ export async function applyGrant(grant: CreditGrant): Promise<NextResponse> {
     );
   }
 
+  if (grantResult.duplicate !== true && grant.amountPaid !== null) {
+    await recordAmountPaid(supabaseAdmin, grant);
+  }
+
   return NextResponse.json({ received: true, granted: true, duplicate: grantResult.duplicate === true });
+}
+
+/**
+ * Note on the ledger row what the provider charged, for the back office.
+ * Best effort: the credits are already granted, so a failure here (for
+ * instance migration 013 not applied yet) is logged and never retried by the
+ * provider.
+ */
+async function recordAmountPaid(supabaseAdmin: SupabaseClient, grant: CreditGrant): Promise<void> {
+  try {
+    const { error } = await supabaseAdmin
+      .from('credit_transactions')
+      .update({ amount_paid: grant.amountPaid, currency: grant.currency })
+      .eq('stripe_payment_id', grant.idempotencyKey);
+    if (error) console.error('recording the paid amount failed:', error.message);
+  } catch (err) {
+    console.error('recording the paid amount failed:', err);
+  }
 }

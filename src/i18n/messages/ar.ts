@@ -257,6 +257,14 @@ export const ar: Catalog = {
       materialLabel: 'المادة',
       materialAria: 'مادة اللوح',
     },
+    /** Offered when work kept across a sign-in comes back in another tab. */
+    resume: {
+      scan: 'صورة ورقة القطع في انتظارك.',
+      optimize: 'قطعك في انتظارك.',
+      runScan: 'حلّل ورقتي',
+      runOptimize: 'أطلق التحسين',
+      dismiss: 'تجاهل',
+    },
     advanced: {
       toggle: 'إعدادات القطع المتقدمة',
     },
@@ -580,6 +588,20 @@ export const ar: Catalog = {
     showPassword: 'إظهار كلمة المرور',
     hidePassword: 'إخفاء كلمة المرور',
     submitLogin: 'تسجيل الدخول والتصدير',
+    checkEmail: 'تم إنشاء الحساب. افتح الرابط المرسل إلى {email} لتأكيد بريدك، ثم سجّل الدخول هنا: عملك في انتظارك.',
+    /** Wording when sign-in interrupts a scan or an optimization: the work is kept and resumes. */
+    scan: {
+      title: 'حلّل ورقة القطع الخاصة بك',
+      subtitle: 'أنشئ حسابك المجاني ({count} رصيداً هدية): صورتك محفوظة وسيتم تحليلها فور تسجيل دخولك.',
+      loginSubtitle: 'سجّل الدخول: صورتك محفوظة وسيتم تحليلها مباشرة بعد ذلك.',
+      submitLogin: 'تسجيل الدخول والتحليل',
+    },
+    optimize: {
+      title: 'أطلق عملية التحسين',
+      subtitle: 'أنشئ حسابك المجاني ({count} رصيداً هدية): قطعك محفوظة وسيبدأ التحسين فور تسجيل دخولك.',
+      loginSubtitle: 'سجّل الدخول: قطعك محفوظة وسيبدأ التحسين مباشرة بعد ذلك.',
+      submitLogin: 'تسجيل الدخول والتحسين',
+    },
     submitSignup: 'إنشاء الحساب',
     switchToSignup: 'إنشاء حساب (+ {count} أرصدة)',
     switchToLogin: 'لديك حساب بالفعل؟ سجّل الدخول',

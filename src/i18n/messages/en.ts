@@ -256,6 +256,14 @@ export const en: Catalog = {
       materialLabel: 'Material',
       materialAria: 'Panel material',
     },
+    /** Offered when work kept across a sign-in comes back in another tab. */
+    resume: {
+      scan: 'Your cut-list photo is waiting.',
+      optimize: 'Your pieces are waiting.',
+      runScan: 'Analyse my cut list',
+      runOptimize: 'Run the optimisation',
+      dismiss: 'Dismiss',
+    },
     advanced: {
       toggle: 'Advanced cutting settings',
     },
@@ -579,6 +587,20 @@ export const en: Catalog = {
     showPassword: 'Show the password',
     hidePassword: 'Hide the password',
     submitLogin: 'Sign in & export',
+    checkEmail: 'Account created. Open the link sent to {email} to confirm your address, then sign in here: your work is waiting.',
+    /** Wording when sign-in interrupts a scan or an optimization: the work is kept and resumes. */
+    scan: {
+      title: 'Analyse your cut list',
+      subtitle: 'Create your free account ({count} credits included): your photo is kept and will be analysed as soon as you are signed in.',
+      loginSubtitle: 'Sign in: your photo is kept and will be analysed right after.',
+      submitLogin: 'Sign in and analyse',
+    },
+    optimize: {
+      title: 'Run your optimisation',
+      subtitle: 'Create your free account ({count} credits included): your pieces are kept and the optimisation will run as soon as you are signed in.',
+      loginSubtitle: 'Sign in: your pieces are kept and the optimisation will run right after.',
+      submitLogin: 'Sign in and optimise',
+    },
     submitSignup: 'Create the account',
     switchToSignup: 'Create an account (+ {count} credits)',
     switchToLogin: 'Already have an account? Sign in',
