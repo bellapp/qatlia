@@ -61,3 +61,15 @@ Les noms ci-dessous sont exacts. Les valeurs ne doivent jamais être écrites da
   - s'abonner aux champs `messages` et `smb_message_echoes`.
 
 > L'étape 6 ne peut se faire qu'une fois la PR déployée, car l'adresse du webhook n'existe pas avant.
+
+## Passage en production
+
+À faire seulement une fois la mise en place terminée. Cochez chaque case une fois l'étape terminée.
+
+- [ ] **1. Appliquer la migration.** Appliquer `supabase/migrations/015_whatsapp_bot.sql` sur Supabase.
+- [ ] **2. Fusionner et configurer le webhook.** Fusionner la PR, attendre le déploiement, puis configurer le webhook (étape 6 de la mise en place ci-dessus). Meta doit afficher « Vérifié ».
+- [ ] **3. Tester le bot éteint.** Avec `WHATSAPP_BOT_ENABLED=false`, envoyer un message depuis un autre numéro : une ligne apparaît dans la table `whatsapp_messages`, et rien n'est envoyé.
+- [ ] **4. Désactiver le message d'accueil et le message d'absence** de l'app WhatsApp Business (téléphone → Outils professionnels). Pourquoi : en coexistence, ces messages automatiques arrivent comme des échos, et le bot croirait qu'un humain a répondu et se tairait pendant 24 h.
+- [ ] **5. Allumer le bot.** Passer `WHATSAPP_BOT_ENABLED=true` dans Vercel et redéployer. Tester depuis un numéro neuf : accueil, puis `1`, `2`, une question libre en français, une question en darija, un vocal, puis `3`. Répondre depuis l'app et vérifier que le bot se tait.
+- [ ] **6. Retour arrière immédiat.** Mettre `WHATSAPP_BOT_ENABLED=false` dans Vercel, redéployer, puis réactiver le message d'accueil dans l'app WhatsApp Business.
+- [ ] **7. Où lire les conversations.** Dans Supabase, table `whatsapp_messages`. Une boîte de réception web est hors périmètre de la v1.
