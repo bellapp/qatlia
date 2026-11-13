@@ -35,6 +35,7 @@ import {
   OptimizationResult,
   OptimizationOptions,
   OPTIONS_DEFAULTS,
+  DEFAULT_STOCK_SHEET,
   MaterialType,
   CutMode,
   getMaterialDef,
@@ -104,9 +105,7 @@ import {
   resolveProjectUnitMetadata,
 } from '@/lib/units';
 
-const DEFAULT_SHEETS: Sheet[] = [
-  { id: 's0', height: 278, width: 208, kerf: 0.3, margin: 1.0, grainDirection: false, material: 'mdf', quantity: 1 },
-];
+const DEFAULT_SHEETS: Sheet[] = [DEFAULT_STOCK_SHEET];
 
 /**
  * The French name the default panel used to carry. It described the 278×208
@@ -650,6 +649,11 @@ const commitPanelName = () => {
     }
   };
 
+
+  /** The edge margin is kept on the panel, in cm; the setting is in mm like the kerf. */
+  const handleEdgeMarginChange = (marginMm: number) => {
+    setSheets(prev => prev.map(s => ({ ...s, margin: marginMm / 10 })));
+  };
 
   const handleOptionsChange = (newOpts: OptimizationOptions) => {
     setOptions(newOpts);
@@ -1906,6 +1910,8 @@ const commitPanelName = () => {
                     options={options}
                     onChange={handleOptionsChange}
                     disabled={isOptimizing}
+                    edgeMarginMm={Math.round((activeSheet.margin ?? 0) * 100) / 10}
+                    onEdgeMarginChange={handleEdgeMarginChange}
                     edgePrices={edgePrices}
                     onEdgePriceChange={(edgeId, price) => void handleEdgePriceChange(edgeId, price)}
                     edgePriceSaveFailed={edgePriceSaveFailed}
