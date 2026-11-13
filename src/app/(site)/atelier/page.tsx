@@ -37,7 +37,18 @@ import {
   OPTIONS_DEFAULTS,
   MaterialType,
   CutMode,
+  getMaterialDef,
+  repriceCostingInput,
+  type EdgePriceMap,
 } from '@/lib/cutting/binpacking';
+import { computeCostBreakdown } from '@/lib/costing';
+import {
+  loadDeviceEdgePrices,
+  saveDeviceEdgePrices,
+  fetchAccountEdgePrices,
+  saveAccountEdgePrices,
+} from '@/lib/edge-prices';
+import { isSamePanel } from '@/lib/panel-preset-rules';
 import { PIECE_COLOR_PALETTE, getResolvedPieceColor } from '@/lib/pieces/catalog';
 import {
   BUILT_IN_PRESETS,
@@ -49,6 +60,9 @@ import {
   createAccountPresets,
   deleteAccountPreset,
   importDevicePresetsOnce,
+  setDevicePresetPrice,
+  setAccountPresetPrice,
+  isPanelPrice,
   type PanelPreset,
 } from '@/lib/panel-presets';
 import { OptionsPanel } from '@/components/OptionsPanel';
@@ -268,6 +282,39 @@ export default function Dashboard() {
 
   const allPresets = [...BUILT_IN_PRESETS, ...savedPresets];
 
+  // The artisan's price per metre for each edge-banding colour: in the
+  // account when signed in (migration 015), on the device otherwise. A colour
+  // without one keeps the catalog price.
+  const [edgePrices, setEdgePrices] = useState<EdgePriceMap>({});
+  const [edgePriceSource, setEdgePriceSource] = useState<'device' | 'account'>('device');
+  const [edgePriceSaveFailed, setEdgePriceSaveFailed] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    setEdgePrices(loadDeviceEdgePrices());
+    (async () => {
+      try {
+        const { data: { user } } = await createClient().auth.getUser();
+        if (!user) return;
+        let account = await fetchAccountEdgePrices();
+        if (account === null) return;
+        // First signed-in use: the prices set on this device become the account's.
+        const device = loadDeviceEdgePrices();
+        if (Object.keys(account).length === 0 && Object.keys(device).length > 0) {
+          if (await saveAccountEdgePrices(device as Record<string, number>)) account = device;
+        }
+        if (cancelled) return;
+        setEdgePrices(account);
+        setEdgePriceSource('account');
+      } catch {
+        /* the device prices stay in use */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
     const activeSheet = sheets[0] || DEFAULT_SHEETS[0];
 // Panel naming: the artisan can name a stock panel; without a name the
   // dimensions stand in. The draft syncs when the panel itself changes.
@@ -276,13 +323,18 @@ export default function Dashboard() {
   // Custom project name (audit feature): empty means auto-name fallback.
   const [projectName, setProjectName] = useState<string>('');
   const [projectNameDraft, setProjectNameDraft] = useState<string>('');  const [presetNameDraft, setPresetNameDraft] = useState<string>('');
-  const [presetColorDraft, setPresetColorDraft] = useState<string>('');
+  // Price of the stock panel (MAD per panel), as typed; committed on blur.
+  const [panelPriceDraft, setPanelPriceDraft] = useState<string>('');
   const [presetFeedback, setPresetFeedback] = useState<{ tone: 'success' | 'warning'; text: string } | null>(null);
 
   useEffect(() => {
     setPanelNameDraft(activeSheet.label || '');
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeSheet.id, activeSheet.label]);
+
+  useEffect(() => {
+    setPanelPriceDraft(isPanelPrice(activeSheet.pricePerSheet) ? String(activeSheet.pricePerSheet) : '');
+  }, [activeSheet.pricePerSheet]);
 
   /** Applies the typed name to the current stock panel (payload `label`). */
 const commitPanelName = () => {
@@ -308,9 +360,10 @@ const commitPanelName = () => {
       height: activeSheet.height,
       width: activeSheet.width,
       material: activeSheet.material ?? undefined,
-      color: presetColorDraft.trim() || undefined,
+      color: activeSheet.color?.trim() || undefined,
       hasGrain: !!activeSheet.hasGrain,
       grainOrientation: activeSheet.hasGrain ? (activeSheet.grainOrientation ?? 'vertical') : undefined,
+      ...(isPanelPrice(activeSheet.pricePerSheet) ? { pricePerSheet: activeSheet.pricePerSheet } : {}),
     };
     const duplicate = findDuplicatePreset(preset, savedPresets);
     if (duplicate) {
@@ -333,7 +386,6 @@ const commitPanelName = () => {
       setSavedPresets(loadSavedPresets());
     }
     setPresetNameDraft('');
-    setPresetColorDraft('');
     setPresetFeedback({ tone: 'success', text: t('atelier.stock.presetSavedOk', { name }) });
   };
 
@@ -358,9 +410,94 @@ const commitPanelName = () => {
     [
       p.color?.trim(),
       p.hasGrain ? t(p.grainOrientation === 'horizontal' ? 'atelier.stock.grainHorizontal' : 'atelier.stock.grainVertical') : null,
+      isPanelPrice(p.pricePerSheet) ? t('atelier.stock.presetPriceTag', { price: n(p.pricePerSheet) }) : null,
     ]
       .filter(Boolean)
       .join(' · ');
+
+  /**
+   * Prices the plan on screen again after a price change, without a new
+   * optimization: same pieces, same panels, new rates (see
+   * repriceCostingInput). The PDF and the quote read this same result.
+   */
+  const repriceResult = (next: { sheet?: Sheet; edgePrices?: EdgePriceMap }) => {
+    setResult((current) => {
+      if (!current?.costingInput) return current;
+      const costingInput = repriceCostingInput(current.costingInput, {
+        edgePricesPerM: next.edgePrices ?? edgePrices,
+        sheet: next.sheet ?? activeSheet,
+        stockPricingOverrides: options.stockPricingOverrides,
+      });
+      return { ...current, costingInput, costBreakdown: computeCostBreakdown(costingInput) };
+    });
+  };
+
+  /** Reads a typed price: '' clears it, '450', '450,5' or '450.5' set it, anything else is refused. */
+  const parsePriceInput = (raw: string): number | null | 'invalid' => {
+    const text = raw.trim().replace(',', '.');
+    if (text === '') return null;
+    const value = Number(text);
+    return isPanelPrice(value) ? Math.round(value * 100) / 100 : 'invalid';
+  };
+
+  /** Applies the typed panel price to the stock panel (MAD per panel). */
+  const commitPanelPrice = () => {
+    const parsed = parsePriceInput(panelPriceDraft);
+    if (parsed === 'invalid') {
+      setPanelPriceDraft(isPanelPrice(activeSheet.pricePerSheet) ? String(activeSheet.pricePerSheet) : '');
+      return;
+    }
+    if ((parsed ?? undefined) === activeSheet.pricePerSheet) return;
+    const { pricePerSheet: _previous, ...rest } = activeSheet;
+    void _previous;
+    const nextSheet: Sheet = parsed === null ? rest : { ...rest, pricePerSheet: parsed };
+    setSheets([nextSheet]);
+    repriceResult({ sheet: nextSheet });
+  };
+
+  /** Sets (or, with null, resets to the catalog) the price per metre of one edge colour. */
+  const handleEdgePriceChange = async (edgeId: string, price: number | null) => {
+    const next: EdgePriceMap = { ...edgePrices };
+    if (price === null) delete next[edgeId];
+    else next[edgeId] = price;
+    setEdgePrices(next);
+    repriceResult({ edgePrices: next });
+    if (edgePriceSource === 'account') {
+      setEdgePriceSaveFailed(!(await saveAccountEdgePrices({ [edgeId]: price })));
+    } else {
+      saveDeviceEdgePrices(next);
+    }
+  };
+
+  /** Changes the price of a saved panel; the stock panel follows when it is that panel. */
+  const handlePresetPrice = async (preset: PanelPreset, raw: string) => {
+    const parsed = parsePriceInput(raw);
+    if (parsed === 'invalid' || (parsed ?? undefined) === preset.pricePerSheet) return;
+    const updated = presetSource === 'account'
+      ? await setAccountPresetPrice(preset.id, parsed)
+      : setDevicePresetPrice(preset.id, parsed);
+    if (!updated) {
+      setPresetFeedback({ tone: 'warning', text: t('atelier.stock.presetSaveFailed') });
+      return;
+    }
+    setSavedPresets((current) => current.map((p) => (p.id === preset.id ? { ...updated, builtIn: false } : p)));
+    setPresetFeedback({ tone: 'success', text: t('atelier.stock.presetPriceSaved', { name: preset.name }) });
+    const current = {
+      height: activeSheet.height,
+      width: activeSheet.width,
+      material: activeSheet.material,
+      color: activeSheet.color,
+      hasGrain: activeSheet.hasGrain,
+      grainOrientation: activeSheet.grainOrientation,
+    };
+    if (isSamePanel(current, preset)) {
+      const { pricePerSheet: _previous, ...rest } = activeSheet;
+      void _previous;
+      const nextSheet: Sheet = parsed === null ? rest : { ...rest, pricePerSheet: parsed };
+      setSheets([nextSheet]);
+      repriceResult({ sheet: nextSheet });
+    }
+  };
 
 
   const { theme } = useTheme();
@@ -695,7 +832,7 @@ const commitPanelName = () => {
           sheet: { ...activeSheet, kerf: options.kerfWidth },
           sheets,
           pieces,
-          options,
+          options: { ...options, edgePricesPerM: edgePrices },
           cutMode,
           analysisPass: readAnalysisPass() ?? undefined,
         }),
@@ -1554,8 +1691,22 @@ const commitPanelName = () => {
                       const grain = preset.builtIn
                         ? {}
                         : { hasGrain: !!preset.hasGrain, grainOrientation: preset.hasGrain ? preset.grainOrientation ?? 'vertical' : undefined };
-                      setSheets([{ ...activeSheet, height: preset.height, width: preset.width, material: (preset.material as MaterialType) || activeSheet.material, ...grain }]);
+                      // A saved panel also brings its colour and its price; a
+                      // standard size has no price of its own (catalog price).
+                      const { pricePerSheet: _previousPrice, ...withoutPrice } = activeSheet;
+                      void _previousPrice;
+                      const nextSheet: Sheet = {
+                        ...withoutPrice,
+                        height: preset.height,
+                        width: preset.width,
+                        material: (preset.material as MaterialType) || activeSheet.material,
+                        ...grain,
+                        ...(preset.builtIn ? {} : { color: preset.color || undefined }),
+                        ...(isPanelPrice(preset.pricePerSheet) ? { pricePerSheet: preset.pricePerSheet } : {}),
+                      };
+                      setSheets([nextSheet]);
                       setActiveSheetIndex(0);
+                      repriceResult({ sheet: nextSheet });
                     }}
                     className="w-full appearance-none bg-studio-field border border-studio-border hover:border-studio-border-hover rounded-lg py-2 ps-8 pe-3 text-xs font-semibold text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-brand-500/50 cursor-pointer transition-colors [&>option]:bg-white [&>option]:text-slate-900 dark:[&>option]:bg-slate-900 dark:[&>option]:text-slate-100"
                   >
@@ -1641,13 +1792,34 @@ const commitPanelName = () => {
                   <input
                     id="preset-color-input"
                     type="text"
-                    value={presetColorDraft}
-                    onChange={(e) => setPresetColorDraft(e.target.value)}
+                    value={activeSheet.color ?? ''}
+                    onChange={(e) => setSheets([{ ...activeSheet, color: e.target.value || undefined }])}
+                    onBlur={() => repriceResult({ sheet: activeSheet })}
                     maxLength={60}
                     placeholder={t('atelier.stock.presetColorPlaceholder')}
                     className="w-full px-2.5 py-1.5 rounded-lg bg-studio-field border border-studio-border text-slate-800 dark:text-slate-200 text-xs outline-none focus:border-brand-500/50 focus:ring-1 focus:ring-brand-500/20 transition-all"
                   />
                 </div>
+                {cutMode === '2d' && (
+                  <div className="flex-1 min-w-[160px] space-y-1">
+                    <label htmlFor="panel-price-input" className="text-[9px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 block">
+                      {t('atelier.stock.panelPriceLabel')}
+                    </label>
+                    <input
+                      id="panel-price-input"
+                      data-testid="panel-price-input"
+                      type="text"
+                      inputMode="decimal"
+                      dir="ltr"
+                      value={panelPriceDraft}
+                      onChange={(e) => setPanelPriceDraft(e.target.value)}
+                      onBlur={commitPanelPrice}
+                      onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur(); }}
+                      placeholder={t('atelier.stock.panelPricePlaceholder', { price: n(getMaterialDef(activeSheet.material).pricePerM2) })}
+                      className="w-full px-2.5 py-1.5 rounded-lg bg-studio-field border border-studio-border text-slate-800 dark:text-slate-200 text-xs font-mono outline-none focus:border-brand-500/50 focus:ring-1 focus:ring-brand-500/20 transition-all"
+                    />
+                  </div>
+                )}
               </div>
 
               {presetFeedback && (
@@ -1666,6 +1838,21 @@ const commitPanelName = () => {
                         {presetDetails(p) && (
                           <span className="ms-2 text-[10px] font-normal text-slate-500 dark:text-slate-400">{presetDetails(p)}</span>
                         )}
+                      </span>
+                      <span className="ms-auto me-2 flex items-center gap-1 shrink-0">
+                        <input
+                          key={`${p.id}-${p.pricePerSheet ?? ''}`}
+                          type="text"
+                          inputMode="decimal"
+                          dir="ltr"
+                          defaultValue={isPanelPrice(p.pricePerSheet) ? String(p.pricePerSheet) : ''}
+                          onBlur={(e) => void handlePresetPrice(p, e.target.value)}
+                          onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur(); }}
+                          placeholder={t('atelier.stock.presetPricePlaceholder')}
+                          aria-label={t('atelier.stock.presetPriceAria', { name: p.name })}
+                          className="w-20 px-2 py-1 rounded-md bg-studio-panel border border-studio-border text-[11px] font-mono text-slate-800 dark:text-slate-200 outline-none focus:border-brand-500/50"
+                        />
+                        <span className="text-[10px] text-slate-500">{t('atelier.cost.currency')}</span>
                       </span>
                       <button
                         type="button"
@@ -1690,6 +1877,7 @@ const commitPanelName = () => {
                 displayUnit={displayUnit}
                 showMaterialCol={options.considerMaterial}
                 disabled={isOptimizing}
+                edgePrices={edgePrices}
               />
             </div>
 
@@ -1718,6 +1906,9 @@ const commitPanelName = () => {
                     options={options}
                     onChange={handleOptionsChange}
                     disabled={isOptimizing}
+                    edgePrices={edgePrices}
+                    onEdgePriceChange={(edgeId, price) => void handleEdgePriceChange(edgeId, price)}
+                    edgePriceSaveFailed={edgePriceSaveFailed}
                   />
                 </div>
               )}
