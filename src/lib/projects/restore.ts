@@ -44,7 +44,8 @@ export function pickRestorableResult(value: unknown): OptimizationResult | null 
 
   const { sheetsUsed, sheets, placedPieces, wastePercentage } = value;
   if (!Number.isInteger(sheetsUsed) || (sheetsUsed as number) < 1) return null;
-  if (!Array.isArray(sheets) || sheets.length === 0) return null;
+  if (!Array.isArray(sheets) || sheets.length < (sheetsUsed as number)) return null;
+  if (!sheets.every(isRecord)) return null;
   if (!Array.isArray(placedPieces)) return null;
   if (!placedPieces.every((piece) => isPlacedPieceOnASheet(piece, sheetsUsed as number))) return null;
   if (!isFiniteNumber(wastePercentage)) return null;

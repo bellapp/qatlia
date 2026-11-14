@@ -43,3 +43,28 @@ test('missing offcuts and unplaced pieces are read as none', () => {
   assert.deepEqual(result.offcuts, []);
   assert.deepEqual(result.unplacedPieces, []);
 });
+
+test('a sheet that is not an object refuses the result', () => {
+  const saved = savedResult();
+  saved.sheets = [null];
+  assert.equal(restore().pickRestorableResult(saved), null);
+});
+
+test('fewer sheets than sheetsUsed refuses the result', () => {
+  const saved = savedResult();
+  saved.sheetsUsed = saved.sheets.length + 1;
+  assert.equal(restore().pickRestorableResult(saved), null);
+});
+
+test('a piece placed on a sheet beyond sheetsUsed refuses the result', () => {
+  const saved = savedResult();
+  saved.placedPieces[0].sheetIndex = saved.sheetsUsed;
+  assert.equal(restore().pickRestorableResult(saved), null);
+});
+
+test('the cost breakdown is returned by reference', () => {
+  const saved = savedResult();
+  assert.ok(saved.costBreakdown, 'a real result carries a cost breakdown');
+  const result = restore().pickRestorableResult(saved);
+  assert.equal(result.costBreakdown, saved.costBreakdown);
+});
