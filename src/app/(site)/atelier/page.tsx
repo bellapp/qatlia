@@ -88,13 +88,14 @@ import { ThemeToggle } from '@/components/ThemeToggle';
 import { useTheme } from '@/components/ThemeProvider';
 import { OnboardingTour } from '@/components/OnboardingTour';
 import { LocaleSwitcher, useLocale } from '@/components/LocaleProvider';
-import type { TranslationKey } from '@/i18n';
+import { formatDateTime, type TranslationKey } from '@/i18n';
 import { edgeBandingLabelKey, materialLabelKey, visionErrorKey } from '@/i18n/domain';
 import { buildCostDetail, hasLaborCharge } from '@/lib/cost-detail';
 import { writeLocalHistoryItem, type LocalHistoryItem } from '@/lib/history';
 import { deriveQuotationPanels, deriveQuotationPieces } from '@/lib/quotation-items';
 import { buildPdfPayload } from '@/lib/pdf-payload';
 import { buildPersistedProjectPayload } from '@/lib/projects/persistence-payload';
+import { pickRestorableResult, readRestoredProjectDate } from '@/lib/projects/restore';
 import { downscaleDataUrl } from '@/lib/image-downscale';
 import { readAnalysisPass, storeAnalysisPass } from '@/lib/billing/analysis-pass-store';
 import {
@@ -108,6 +109,15 @@ import {
 } from '@/lib/units';
 
 const DEFAULT_SHEETS: Sheet[] = [DEFAULT_STOCK_SHEET];
+
+/** Day and time of the save, as the history cards show it. */
+const RESTORED_DATE_OPTIONS: Intl.DateTimeFormatOptions = {
+  day: 'numeric',
+  month: 'short',
+  year: 'numeric',
+  hour: '2-digit',
+  minute: '2-digit',
+};
 
 /** CSS length for the whole content width of the plan viewport. Kept as the
  *  bare literal the claims audit recognises as geometry, not as a figure. */
@@ -217,6 +227,9 @@ export default function Dashboard() {
   // Lightweight thumbnail persisted with the project (history card preview).
   const [scanThumb, setScanThumb] = useState<string | null>(null);
   const [pdfGeneratedAt, setPdfGeneratedAt] = useState<string | null>(null);
+  // When the plan on screen was saved, set only while it is a plan reopened
+  // from history as saved. A new run replaces that plan, so it clears it.
+  const [restoredAt, setRestoredAt] = useState<string | null>(null);
   const [isAuthModalOpen, setIsAuthModalOpen] = useState<boolean>(false);
   // Which action opened the (shared) auth modal, so its onSuccess handler
   // resumes the right one instead of always re-triggering the PDF export.
@@ -624,7 +637,20 @@ const commitPanelName = () => {
           setProjectName(parsed.projectName.trim());
           setProjectNameDraft(parsed.projectName.trim());
         }
-        setScanThumb(typeof parsed.scanThumb === 'string' ? parsed.scanThumb : null);
+        // The scan image comes back with the plan: the card reads it from
+        // `previewImage`, the next save carries it on from `scanThumb`.
+        const restoredThumb = typeof parsed.scanThumb === 'string' ? parsed.scanThumb : null;
+        setScanThumb(restoredThumb);
+        setPreviewImage(restoredThumb);
+        // The saved plan is put back as it was saved, with no new run and no
+        // new save; an old or damaged result gives null and the atelier opens
+        // without a plan, as before.
+        const restoredResult = pickRestorableResult(parsed.result);
+        if (restoredResult) {
+          setResult(restoredResult);
+          setActiveSheetIndex(0);
+          setRestoredAt(readRestoredProjectDate(sessionStorage.getItem('qatlia_restored_project_meta')));
+        }
         setPdfGeneratedAt(typeof parsed.pdfGeneratedAt === 'string' ? parsed.pdfGeneratedAt : null);
         if (parsed.options) setOptions((prev) => optionsWithoutStockOverride({ ...prev, ...parsed.options }));
         if (restoredProjectId) setLastSavedProjectId(restoredProjectId);
@@ -650,6 +676,7 @@ const commitPanelName = () => {
         window.setTimeout(() => {
           sessionStorage.removeItem('qatlia_saved_project');
           sessionStorage.removeItem('qatlia_restored_project_id');
+          sessionStorage.removeItem('qatlia_restored_project_meta');
         }, 0);
       } catch (e) {
         console.error('Erreur restauration projet:', e);
@@ -657,6 +684,7 @@ const commitPanelName = () => {
         // sitting in sessionStorage forever — clear it right away.
         sessionStorage.removeItem('qatlia_saved_project');
         sessionStorage.removeItem('qatlia_restored_project_id');
+        sessionStorage.removeItem('qatlia_restored_project_meta');
       }
     }
   }, []);
@@ -883,6 +911,7 @@ const commitPanelName = () => {
       storeAnalysisPass(data.analysisPass);
       const optResult = data.result as OptimizationResult;
       setResult(optResult);
+      setRestoredAt(null);
       setActiveSheetIndex(0);
       if (typeof data.creditsRemaining === 'number') setUserCredits(data.creditsRemaining);
       void persistProject(optResult, 'optimize');
@@ -1974,6 +2003,21 @@ const commitPanelName = () => {
             
             {result ? (
               <>
+                {/* A plan reopened from history is shown exactly as saved: this
+                    says so, with the date, until a new run replaces it. */}
+                {restoredAt && (
+                  <div
+                    role="status"
+                    data-testid="restored-plan-notice"
+                    className="flex items-start gap-3 p-3.5 rounded-xl bg-sky-500/10 border border-sky-500/20"
+                  >
+                    <CheckCircle2 className="w-4 h-4 shrink-0 mt-0.5 text-sky-500 dark:text-sky-400" aria-hidden="true" />
+                    <p className="text-xs font-semibold text-sky-700 dark:text-sky-300 min-w-0">
+                      {t('atelier.restored.notice', { date: formatDateTime(locale, restoredAt, RESTORED_DATE_OPTIONS) })}
+                    </p>
+                  </div>
+                )}
+
                 {/* Cost Summary Banner — the subtotal comes from result.costBreakdown
                     (src/lib/costing.ts), the same figure shown in the cost
                     breakdown below and rendered in the PDF export. No estimated

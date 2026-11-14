@@ -189,6 +189,9 @@ export const en: Catalog = {
       optimized: 'Optimization complete',
       rerun: 'Re-run optimization',
     },
+    restored: {
+      notice: 'Plan saved on {date}. Reopened as saved, with no new run.',
+    },
     scan: {
       cameraTitle: 'Camera',
       cameraDesc: 'Scan a paper cut list',

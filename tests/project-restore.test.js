@@ -1,5 +1,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const path = require('node:path');
 const { loadTsModule } = require('./helpers/load-ts-module');
 
 // Reopening a project from the history puts its saved plan back on screen
@@ -67,4 +69,34 @@ test('the cost breakdown is returned by reference', () => {
   assert.ok(saved.costBreakdown, 'a real result carries a cost breakdown');
   const result = restore().pickRestorableResult(saved);
   assert.equal(result.costBreakdown, saved.costBreakdown);
+});
+
+const atelierSource = () => fs.readFileSync(path.resolve('src/app/(site)/atelier/page.tsx'), 'utf8');
+const historySource = () => fs.readFileSync(path.resolve('src/app/(site)/history/page.tsx'), 'utf8');
+
+test('the atelier puts the saved plan and the scan back on screen', () => {
+  const page = atelierSource();
+  assert.match(page, /const restoredResult = pickRestorableResult\(parsed\.result\);/);
+  assert.match(page, /if \(restoredResult\) \{\s*setResult\(restoredResult\);\s*setActiveSheetIndex\(0\);/);
+  assert.match(page, /setPreviewImage\(restoredThumb\)/);
+});
+
+test('the history writes the save date and the atelier reads it, then clears it like the other keys', () => {
+  assert.match(historySource(), /sessionStorage\.setItem\('qatlia_restored_project_meta'/);
+  const page = atelierSource();
+  assert.match(page, /sessionStorage\.getItem\('qatlia_restored_project_meta'\)/);
+  // Removed after the timeout in the success branch, at once in the catch branch.
+  assert.equal(page.match(/sessionStorage\.removeItem\('qatlia_restored_project_meta'\)/g).length, 2);
+});
+
+test('a successful optimization takes the "reopened as saved" notice away', () => {
+  assert.match(atelierSource(), /setResult\(optResult\);\s*setRestoredAt\(null\);/);
+});
+
+test('the save date left by the history is read back only when it is a date', () => {
+  const { readRestoredProjectDate } = restore();
+  assert.equal(readRestoredProjectDate(JSON.stringify({ createdAt: '2026-11-14T09:30:00.000Z' })), '2026-11-14T09:30:00.000Z');
+  for (const raw of [null, '', 'not json', '[]', '{}', JSON.stringify({ createdAt: 42 }), JSON.stringify({ createdAt: 'yesterday' })]) {
+    assert.equal(readRestoredProjectDate(raw), null);
+  }
 });

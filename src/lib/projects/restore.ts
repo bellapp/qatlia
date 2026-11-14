@@ -56,3 +56,19 @@ export function pickRestorableResult(value: unknown): OptimizationResult | null 
     unplacedPieces: Array.isArray(value.unplacedPieces) ? value.unplacedPieces : [],
   } as unknown as OptimizationResult;
 }
+
+/**
+ * The save date the history leaves next to a reopened project
+ * (`qatlia_restored_project_meta`), or `null` when it is missing, unreadable
+ * or not a date. The notice above the plan only shows with a real date.
+ */
+export function readRestoredProjectDate(raw: string | null): string | null {
+  if (!raw) return null;
+  try {
+    const meta: unknown = JSON.parse(raw);
+    if (!isRecord(meta) || typeof meta.createdAt !== 'string') return null;
+    return Number.isNaN(new Date(meta.createdAt).getTime()) ? null : meta.createdAt;
+  } catch {
+    return null;
+  }
+}

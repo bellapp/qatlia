@@ -190,6 +190,9 @@ export const ar: Catalog = {
       optimized: 'تم التحسين بنجاح',
       rerun: 'إعادة التحسين',
     },
+    restored: {
+      notice: 'مخطط محفوظ بتاريخ {date}. فُتح كما هو، دون تحسين جديد.',
+    },
     scan: {
       cameraTitle: 'الكاميرا',
       cameraDesc: 'صوّر قائمة القياسات الورقية',

@@ -284,6 +284,8 @@ export default function HistoryPage() {
       // UUID_PATTERN's own doc comment) — nothing valid to restore there.
       if (UUID_PATTERN.test(project.id)) sessionStorage.setItem('qatlia_restored_project_id', project.id);
       else sessionStorage.removeItem('qatlia_restored_project_id');
+      // The atelier says when the plan it reopens was saved.
+      sessionStorage.setItem('qatlia_restored_project_meta', JSON.stringify({ createdAt: project.created_at }));
       window.location.href = '/atelier';
     }
   };

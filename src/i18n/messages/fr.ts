@@ -229,6 +229,9 @@ export const fr = {
       optimized: 'Optimisation réussie',
       rerun: 'Relancer l’optimisation',
     },
+    restored: {
+      notice: 'Plan enregistré le {date}. Rouvert tel quel, sans nouvelle optimisation.',
+    },
     scan: {
       cameraTitle: 'Appareil photo',
       cameraDesc: 'Scanner une fiche de débit papier',

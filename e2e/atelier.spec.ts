@@ -419,3 +419,88 @@ test.describe('Atelier Dashboard (/atelier)', () => {
     expect(pageErrors).toEqual([]);
   });
 });
+
+// A project reopened from history: the history page leaves the saved project
+// in sessionStorage and the atelier puts its plan back. The saved result
+// below is hard-coded: one 70 x 40 piece on one 100 x 60 panel.
+const SAVED_PROJECT = {
+  name: 'Côté seul',
+  projectName: 'Côté seul',
+  scanThumb:
+    'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==',
+  sheet: { id: 's0', height: 100, width: 60, kerf: 0, margin: 0, grainDirection: false, material: 'mdf', quantity: 1 },
+  sheets: [{ id: 's0', height: 100, width: 60, kerf: 0, margin: 0, grainDirection: false, material: 'mdf', quantity: 1 }],
+  pieces: [{ id: 'a', name: 'Côté', height: 70, width: 40, quantity: 1, material: 'mdf', rotatable: true }],
+  result: {
+    cutMode: '2d',
+    sheetsUsed: 1,
+    sheets: [
+      {
+        index: 0,
+        material: 'mdf',
+        width: 60,
+        height: 100,
+        pieces: [
+          { pieceId: 'a_0', pieceNumber: 1, name: 'Côté', baseName: 'Côté', isUnnamed: false, originalHeight: 70, originalWidth: 40, height: 70, width: 40, x: 0, y: 0, rotated: false, sheetIndex: 0, material: 'mdf', originalIndex: 0 },
+        ],
+        offcuts: [
+          { id: 'sheet0_offcut_40x0_20x100', x: 40, y: 0, width: 20, height: 100, sheetIndex: 0, areaM2: 0.2, isReusable: true },
+          { id: 'sheet0_offcut_0x70_40x30', x: 0, y: 70, width: 40, height: 30, sheetIndex: 0, areaM2: 0.12, isReusable: true },
+        ],
+        cuts: [
+          { id: 'sheet0_cut_0', sheetIndex: 0, axis: 'vertical', lengthCm: 100 },
+          { id: 'sheet0_cut_1', sheetIndex: 0, axis: 'horizontal', lengthCm: 40 },
+        ],
+        usedArea: 2800,
+        wasteRate: 53.3,
+      },
+    ],
+    placedPieces: [
+      { pieceId: 'a_0', pieceNumber: 1, name: 'Côté', baseName: 'Côté', isUnnamed: false, originalHeight: 70, originalWidth: 40, height: 70, width: 40, x: 0, y: 0, rotated: false, sheetIndex: 0, material: 'mdf', originalIndex: 0 },
+    ],
+    offcuts: [
+      { id: 'sheet0_offcut_40x0_20x100', x: 40, y: 0, width: 20, height: 100, sheetIndex: 0, areaM2: 0.2, isReusable: true },
+      { id: 'sheet0_offcut_0x70_40x30', x: 0, y: 70, width: 40, height: 30, sheetIndex: 0, areaM2: 0.12, isReusable: true },
+    ],
+    unplacedPieces: [],
+    totalAreaAvailable: 6000,
+    totalAreaUsed: 2800,
+    wastePercentage: 53.3,
+    totalLinearCutMeters: 1.4,
+    costBreakdown: { currency: 'MAD', materialCost: 72, materialCostBasis: 'measured', edgeCost: 0, edgeCostBasis: 'measured', laborCost: 0, laborCostBasis: 'measured', subtotal: 72 },
+    costingInput: {
+      material: { sheets: [{ areaM2: 0.6, quantity: 1, pricing: { mode: 'per_sheet', value: 72 }, material: 'mdf', widthCm: 60, heightCm: 100 }], basis: 'measured' },
+      edge: { segments: [], basis: 'measured' },
+      labor: { pricing: { mode: 'fixed', value: 0 } },
+    },
+    materialStats: [{ material: 'mdf', sheetsUsed: 1, totalPieces: 1, usedArea: 2800, wasteRate: 53.3 }],
+    explanation: { chosenGoal: 'linear_guillotine', activeConstraints: [], candidatesEvaluated: 18 },
+  },
+};
+
+test.describe('Atelier reopening a saved project', () => {
+  test('a project reopened from history shows its saved plan without a new run', async ({ page }) => {
+    const optimizeRequests: string[] = [];
+    page.on('request', (request) => {
+      if (request.url().includes('/api/optimize')) optimizeRequests.push(request.url());
+    });
+
+    await page.addInitScript((project) => {
+      sessionStorage.setItem('qatlia_saved_project', JSON.stringify(project));
+      sessionStorage.setItem('qatlia_restored_project_meta', JSON.stringify({ createdAt: '2026-11-14T09:30:00.000Z' }));
+    }, SAVED_PROJECT);
+
+    await page.goto('/atelier', { waitUntil: 'domcontentloaded' });
+    await expect(page.getByRole('img', { name: 'QatliA' })).toBeVisible({ timeout: 15000 });
+
+    await expect(page.getByTestId('cut-plan-svg')).toBeVisible({ timeout: 15000 });
+    await expect(page.getByTestId('restored-plan-notice')).toBeVisible();
+    await expect(page.getByTestId('cost-banner-total')).toContainText('72');
+    // The scan image comes back with the plan.
+    await expect(page.getByRole('img', { name: 'Aperçu de la fiche de débit scannée' })).toBeVisible();
+
+    // Nothing in the page ran the optimizer (which would spend a credit).
+    await page.waitForTimeout(1000);
+    expect(optimizeRequests).toEqual([]);
+  });
+});
