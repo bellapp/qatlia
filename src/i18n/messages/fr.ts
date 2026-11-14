@@ -365,6 +365,9 @@ export const fr = {
     },
     plan: {
       sheetTab: 'Panneau {index}',
+      barTab: 'Barre {index}',
+      prevSheet: 'Précédent',
+      nextSheet: 'Suivant',
       zoomOut: 'Zoom arrière',
       zoomIn: 'Zoom avant',
       zoomReset: 'Réinitialiser le zoom',
