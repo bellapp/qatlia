@@ -184,8 +184,17 @@ test('considerMaterial=true sums candidatesEvaluated across matched material gro
 
   const result = optimizeCutting2D(pieces, sheets, { considerMaterial: true });
 
+  // What one material's search evaluates on its own: every strategy, plus the
+  // layouts the second pass (the one keeping the largest offcut whole) tries.
+  const alone = (material) => optimizeCutting2D(
+    pieces.filter((piece) => piece.material === material),
+    sheets.filter((sheet) => sheet.material === material),
+    {}
+  ).explanation.candidatesEvaluated;
+
   // Only "mdf" and "verre" have matching stock; "chene" is skipped entirely (0 candidates).
-  assert.equal(result.explanation.candidatesEvaluated, strategyCount * 2);
+  assert.ok(alone('mdf') >= strategyCount && alone('verre') >= strategyCount);
+  assert.equal(result.explanation.candidatesEvaluated, alone('mdf') + alone('verre'));
 });
 
 // ─── Priority scoring policy (pure, deterministic) ─────────────────────────

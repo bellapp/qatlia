@@ -8,6 +8,8 @@ export const MAX_GEOMETRY = 100000;
 export const MAX_PIECES = 5000;
 export const MAX_PIECE_QUANTITY = 10000;
 export const MAX_SHEETS = 100;
+/** Ceiling on an artisan-set price (MAD per panel or per metre): far above any real one. */
+export const MAX_UNIT_PRICE = 1_000_000;
 
 // Budget cap, not a geometry cap: the number of pieces the optimizer actually
 // places (sum of the per-row quantities) that we are confident fits inside the
@@ -56,6 +58,10 @@ export const SheetSchema = z.object({
   grainDirection: z.boolean().default(true),
   material: z.enum(MATERIAL_TYPE_VALUES).optional(),
   quantity: z.number().int().positive().max(MAX_SHEETS).optional(),
+  // The artisan's panel: colour for the price detail, price per panel (MAD).
+  // Listed here because z.object drops keys it does not know.
+  color: z.string().max(60).optional(),
+  pricePerSheet: z.number().finite().min(0).max(MAX_UNIT_PRICE).optional(),
 });
 
 export const OptimizeSchema = z.object({
@@ -93,6 +99,10 @@ export const OptimizeSchema = z.object({
     // OPTIONS_DEFAULTS/DEFAULT_LABOR_PRICING in binpacking.ts.
     stockPricingOverrides: z.partialRecord(z.enum(MATERIAL_TYPE_VALUES), StockPricingSchema).optional(),
     laborPricing: LaborPricingSchema.optional(),
+    // The artisan's price per metre of edge banding, every colour (MAD/m).
+    // A page still open from before carries a price per colour
+    // (`edgePricesPerM`): it passes through and is ignored.
+    edgeBandPricePerM: z.number().finite().min(0).max(MAX_UNIT_PRICE).optional(),
   }).passthrough().optional(),
 }).refine((data) => data.sheet !== undefined || (data.sheets !== undefined && data.sheets.length > 0), {
   message: 'Either `sheet` or a non-empty `sheets` array must be provided',

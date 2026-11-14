@@ -4,6 +4,7 @@ import autoTable from 'jspdf-autotable';
 import { fromCanonicalCm } from '@/lib/units';
 import { ExportSchema } from '@/lib/exports/pdf-schema';
 import { computeCostBreakdown } from '@/lib/costing';
+import { buildCostDetail, hasLaborCharge } from '@/lib/cost-detail';
 import { pdfCatalogFor } from '@/lib/exports/pdf-catalog';
 import {
   registerAmiriFont,
@@ -12,7 +13,8 @@ import {
   arabicSafeCellHooks,
   NOT_REGISTERED,
 } from '@/lib/exports/pdf-fonts';
-import { formatDateTime } from '@/i18n';
+import { formatDateTime, translate } from '@/i18n';
+import { edgeBandingLabelKey, materialLabelKey } from '@/i18n/domain';
 
 /** Every direct label/table font in this route: Arabic content switches to
  * the embedded Amiri font for its own draw call only (see
@@ -56,6 +58,9 @@ export async function POST(req: Request) {
     const fmt = (valueCm: number) => fromCanonicalCm(valueCm, displayUnit).toFixed(1);
     const toM2 = (w: number, h: number) => (w * h) / 10_000;
     const fmtMad = (valueMad: number) => `${valueMad.toFixed(2).replace('.', ',')} MAD`;
+    /** A quantity or rate with at most `decimals` decimals, trailing zeros dropped (2,9768 ; 6,3 ; 8). */
+    const fmtNumber = (value: number, decimals: number) =>
+      String(Number(value.toFixed(decimals))).replace('.', ',');
 
     const sheetAreaM2 = toM2(sheet.width, sheet.height);
     const totalSheetsAreaM2 = sheetAreaM2 * result.sheetsUsed;
@@ -159,7 +164,9 @@ export async function POST(req: Request) {
     // 'ar' (every ar-catalog string is Arabic), or an artisan-typed Arabic
     // projectName/material even in a French/English-locale export. A
     // pure-Latin fr/en export never decodes or embeds the font at all.
-    const fontRegistration = payloadNeedsArabicFont(locale, projectName, material)
+    // The price detail also prints the artisan's own panel names and colours.
+    const panelTexts = (result.costingInput?.material.sheets ?? []).flatMap((line) => [line.label ?? '', line.color ?? '']);
+    const fontRegistration = payloadNeedsArabicFont(locale, projectName, material, ...panelTexts)
       ? await registerAmiriFont(doc)
       : NOT_REGISTERED;
     const cellHooks = arabicSafeCellHooks(doc, fontRegistration);
@@ -443,6 +450,114 @@ export async function POST(req: Request) {
       },
       ...cellHooks,
     });
+
+    // DÉTAIL DU CHIFFRAGE — what each total is made of: panels × unit price,
+    // linear metres of each edge banding × rate, labour. Regrouped from the
+    // same `costingInput` the totals above were recomputed from (see
+    // src/lib/cost-detail.ts); the subtotal row is the breakdown's own.
+    if (costBreakdown && result.costingInput) {
+      const detail = buildCostDetail(result.costingInput);
+      const detailRows: string[][] = [];
+
+      for (const panel of detail.panels) {
+        const widthCm = panel.widthCm ?? sheet.width;
+        const heightCm = panel.heightCm ?? sheet.height;
+        const name = [
+          cat.detail.panel,
+          panel.label,
+          panel.material ? translate(locale, materialLabelKey(panel.material)) : material.toUpperCase(),
+          panel.color,
+          `${fmt(heightCm)} × ${fmt(widthCm)} ${displayUnit}`,
+        ]
+          .filter(Boolean)
+          .join(' · ');
+        detailRows.push(
+          panel.pricing.mode === 'per_sheet'
+            ? [name, String(panel.count), `${fmtMad(panel.pricing.value)} ${cat.detail.perPanel}`, fmtMad(panel.total)]
+            : [
+                name,
+                `${panel.count} × ${fmtNumber(panel.areaM2, 4)} m²`,
+                `${fmtNumber(panel.pricing.value, 2)} MAD/m²`,
+                fmtMad(panel.total),
+              ]
+        );
+      }
+
+      for (const edge of detail.edges) {
+        const name = edge.edgeId ? `${cat.detail.edge} · ${translate(locale, edgeBandingLabelKey(edge.edgeId))}` : cat.detail.edge;
+        detailRows.push([name, `${fmtNumber(edge.lengthM, 2)} m`, `${fmtNumber(edge.pricePerMeter, 2)} MAD/m`, fmtMad(edge.total)]);
+      }
+
+      if (hasLaborCharge(detail.labor)) {
+        detailRows.push(
+          detail.labor.pricing.mode === 'per_meter'
+            ? [
+                cat.detail.laborPerMeter,
+                `${fmtNumber(detail.labor.cutLengthM ?? 0, 2)} m`,
+                `${fmtNumber(detail.labor.pricing.value, 2)} MAD/m`,
+                fmtMad(detail.labor.total),
+              ]
+            : [cat.detail.laborFixed, '1', fmtMad(detail.labor.pricing.value), fmtMad(detail.labor.total)]
+        );
+      }
+
+      const recapFinalY = ((doc as unknown) as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY;
+      // Below the recap, or on a fresh page when the title and a few rows
+      // would not fit; the page header is drawn later on every page (y 10–25).
+      let detailStartY = recapFinalY + 10;
+      if (detailStartY > 297 - 45) {
+        doc.addPage('a4', 'portrait');
+        detailStartY = 36;
+      }
+      doc.setFont(BASE_FONT, 'bold');
+      doc.setFontSize(9.5);
+      drawText(cat.detail.title, 14, detailStartY - 2);
+
+      autoTable(doc, {
+        startY: detailStartY,
+        margin: { left: 14, right: 14, top: 30 },
+        head: [[cat.detail.columnItem, cat.detail.columnQuantity, cat.detail.columnUnitPrice, cat.detail.columnAmount]],
+        body: detailRows,
+        foot: [[cat.detail.subtotal, '', '', fmtMad(costBreakdown.subtotal)]],
+        theme: 'plain',
+        headStyles: {
+          font: BASE_FONT,
+          fontSize: 7.5,
+          fontStyle: 'bold',
+          textColor: [0, 0, 0],
+          cellPadding: 1.2,
+          lineColor: [0, 0, 0],
+          lineWidth: { top: 0.2, bottom: 0.2, left: 0, right: 0 },
+        },
+        footStyles: {
+          font: BASE_FONT,
+          fontSize: 7.5,
+          fontStyle: 'bold',
+          textColor: [0, 0, 0],
+          cellPadding: 1.2,
+          lineColor: [0, 0, 0],
+          lineWidth: { top: 0.2, bottom: 0.2, left: 0, right: 0 },
+        },
+        styles: {
+          font: BASE_FONT,
+          fontSize: 6.8,
+          cellPadding: 1.1,
+          textColor: [0, 0, 0],
+        },
+        columnStyles: {
+          0: { halign: 'left', cellWidth: 82 },
+          1: { halign: 'right', cellWidth: 34 },
+          2: { halign: 'right', cellWidth: 34 },
+          3: { halign: 'right', cellWidth: 32 },
+        },
+        showFoot: 'lastPage',
+        // Figures read right-aligned, their column titles and the subtotal too.
+        didParseCell: (data) => {
+          if (data.column.index > 0) data.cell.styles.halign = 'right';
+        },
+        ...cellHooks,
+      });
+    }
 
     // PAGES SCHÉMAS GRAPHIQUES (A4 Paysage)
     uniquePatterns.forEach((pat, pIndex) => {

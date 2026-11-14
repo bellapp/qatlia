@@ -41,10 +41,27 @@ const StockPricingSchema = z.object({
   value: rate(),
 });
 
+// Display-only names for the price detail (see src/lib/cost-detail.ts): never
+// read by the calculator, and optional because results saved before they
+// existed do not carry them. Listed here because z.object drops keys it does
+// not know. A name longer than shown is cut, not refused: a long panel name
+// must never cost the artisan their PDF.
+const displayText = (max: number) =>
+  z
+    .string()
+    .max(2000)
+    .transform((value) => value.slice(0, max))
+    .optional();
+
 const SheetCostLineSchema = z.object({
   areaM2: areaM2(),
   quantity: z.number().int().nonnegative().max(MAX_QUANTITY),
   pricing: StockPricingSchema,
+  material: displayText(40),
+  label: displayText(80),
+  color: displayText(60),
+  widthCm: geometryValue().optional(),
+  heightCm: geometryValue().optional(),
 });
 
 const MaterialCostInputSchema = z.object({
@@ -55,6 +72,7 @@ const MaterialCostInputSchema = z.object({
 const EdgeSegmentCostLineSchema = z.object({
   lengthM: lengthM(),
   pricePerMeter: rate(),
+  edgeId: displayText(40),
 });
 
 const EdgeCostInputSchema = z.object({

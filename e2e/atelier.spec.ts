@@ -184,6 +184,12 @@ test.describe('Atelier Dashboard (/atelier)', () => {
     await expect(firstDataRow.getByText(/^1$/)).toBeVisible();
     await expect(firstDataRow.getByText(/\d+([.,]\d+)? × \d+([.,]\d+)?/)).toBeVisible();
     await expect(cutList.getByRole('row', { name: /test rotation/i }).getByText(/oui|90°/i)).toBeVisible();
+
+    // Chrome's page translation must leave the amount and its currency alone:
+    // on an Arabic-language phone it rendered "MAD" as "UAE dirham".
+    const bannerTotal = page.getByTestId('cost-banner-total');
+    await expect(bannerTotal).toHaveAttribute('translate', 'no');
+    await expect(bannerTotal).toContainText('MAD');
   });
 
   test('optimized offcuts stay consistent across engine, plan and list', async ({ page }) => {

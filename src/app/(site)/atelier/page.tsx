@@ -35,9 +35,21 @@ import {
   OptimizationResult,
   OptimizationOptions,
   OPTIONS_DEFAULTS,
+  DEFAULT_STOCK_SHEET,
   MaterialType,
   CutMode,
+  catalogPanelPrice,
+  repriceCostingInput,
+  withLegacyStockPrice,
 } from '@/lib/cutting/binpacking';
+import { computeCostBreakdown } from '@/lib/costing';
+import {
+  loadDeviceEdgePrice,
+  saveDeviceEdgePrice,
+  fetchAccountEdgePrice,
+  saveAccountEdgePrice,
+} from '@/lib/edge-prices';
+import { isSamePanel } from '@/lib/panel-preset-rules';
 import { PIECE_COLOR_PALETTE, getResolvedPieceColor } from '@/lib/pieces/catalog';
 import {
   BUILT_IN_PRESETS,
@@ -49,6 +61,9 @@ import {
   createAccountPresets,
   deleteAccountPreset,
   importDevicePresetsOnce,
+  setDevicePresetPrice,
+  setAccountPresetPrice,
+  isPanelPrice,
   type PanelPreset,
 } from '@/lib/panel-presets';
 import { OptionsPanel } from '@/components/OptionsPanel';
@@ -72,7 +87,8 @@ import { useTheme } from '@/components/ThemeProvider';
 import { OnboardingTour } from '@/components/OnboardingTour';
 import { LocaleSwitcher, useLocale } from '@/components/LocaleProvider';
 import type { TranslationKey } from '@/i18n';
-import { materialLabelKey, visionErrorKey } from '@/i18n/domain';
+import { edgeBandingLabelKey, materialLabelKey, visionErrorKey } from '@/i18n/domain';
+import { buildCostDetail, hasLaborCharge } from '@/lib/cost-detail';
 import { writeLocalHistoryItem, type LocalHistoryItem } from '@/lib/history';
 import { deriveQuotationPanels, deriveQuotationPieces } from '@/lib/quotation-items';
 import { buildPdfPayload } from '@/lib/pdf-payload';
@@ -89,9 +105,7 @@ import {
   resolveProjectUnitMetadata,
 } from '@/lib/units';
 
-const DEFAULT_SHEETS: Sheet[] = [
-  { id: 's0', height: 278, width: 208, kerf: 0.3, margin: 1.0, grainDirection: false, material: 'mdf', quantity: 1 },
-];
+const DEFAULT_SHEETS: Sheet[] = [DEFAULT_STOCK_SHEET];
 
 /**
  * The French name the default panel used to carry. It described the 278×208
@@ -102,6 +116,16 @@ const DEFAULT_SHEETS: Sheet[] = [
 const LEGACY_DEFAULT_PANEL_LABEL = 'Panneau standard 278×208';
 const withoutLegacyPanelLabel = (sheet: Sheet): Sheet =>
   sheet.label === LEGACY_DEFAULT_PANEL_LABEL ? { ...sheet, label: undefined } : sheet;
+
+/**
+ * The cut settings no longer carry a panel price: the panel has its own
+ * (see withLegacyStockPrice, which moves an old one onto the panel).
+ */
+const optionsWithoutStockOverride = (options: OptimizationOptions): OptimizationOptions => {
+  const { stockPricingOverrides: _legacy, ...rest } = options;
+  void _legacy;
+  return rest;
+};
 
 /**
  * The stock materials offered in the workshop's quick selector. These are the
@@ -267,6 +291,39 @@ export default function Dashboard() {
 
   const allPresets = [...BUILT_IN_PRESETS, ...savedPresets];
 
+  // The artisan's one price per metre of edge banding: in the account when
+  // signed in (migration 015), on the device otherwise. Null: each colour
+  // keeps its catalog price.
+  const [edgePrice, setEdgePrice] = useState<number | null>(null);
+  const [edgePriceSource, setEdgePriceSource] = useState<'device' | 'account'>('device');
+  const [edgePriceSaveFailed, setEdgePriceSaveFailed] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    setEdgePrice(loadDeviceEdgePrice());
+    (async () => {
+      try {
+        const { data: { user } } = await createClient().auth.getUser();
+        if (!user) return;
+        let account = await fetchAccountEdgePrice();
+        if (account === undefined) return;
+        // First signed-in use: the price set on this device becomes the account's.
+        const device = loadDeviceEdgePrice();
+        if (account === null && device !== null) {
+          if (await saveAccountEdgePrice(device)) account = device;
+        }
+        if (cancelled) return;
+        setEdgePrice(account);
+        setEdgePriceSource('account');
+      } catch {
+        /* the device prices stay in use */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
     const activeSheet = sheets[0] || DEFAULT_SHEETS[0];
 // Panel naming: the artisan can name a stock panel; without a name the
   // dimensions stand in. The draft syncs when the panel itself changes.
@@ -275,13 +332,18 @@ export default function Dashboard() {
   // Custom project name (audit feature): empty means auto-name fallback.
   const [projectName, setProjectName] = useState<string>('');
   const [projectNameDraft, setProjectNameDraft] = useState<string>('');  const [presetNameDraft, setPresetNameDraft] = useState<string>('');
-  const [presetColorDraft, setPresetColorDraft] = useState<string>('');
+  // Price of the stock panel (MAD per panel), as typed; committed on blur.
+  const [panelPriceDraft, setPanelPriceDraft] = useState<string>('');
   const [presetFeedback, setPresetFeedback] = useState<{ tone: 'success' | 'warning'; text: string } | null>(null);
 
   useEffect(() => {
     setPanelNameDraft(activeSheet.label || '');
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeSheet.id, activeSheet.label]);
+
+  useEffect(() => {
+    setPanelPriceDraft(isPanelPrice(activeSheet.pricePerSheet) ? String(activeSheet.pricePerSheet) : '');
+  }, [activeSheet.pricePerSheet]);
 
   /** Applies the typed name to the current stock panel (payload `label`). */
 const commitPanelName = () => {
@@ -307,9 +369,10 @@ const commitPanelName = () => {
       height: activeSheet.height,
       width: activeSheet.width,
       material: activeSheet.material ?? undefined,
-      color: presetColorDraft.trim() || undefined,
+      color: activeSheet.color?.trim() || undefined,
       hasGrain: !!activeSheet.hasGrain,
       grainOrientation: activeSheet.hasGrain ? (activeSheet.grainOrientation ?? 'vertical') : undefined,
+      ...(isPanelPrice(activeSheet.pricePerSheet) ? { pricePerSheet: activeSheet.pricePerSheet } : {}),
     };
     const duplicate = findDuplicatePreset(preset, savedPresets);
     if (duplicate) {
@@ -332,7 +395,6 @@ const commitPanelName = () => {
       setSavedPresets(loadSavedPresets());
     }
     setPresetNameDraft('');
-    setPresetColorDraft('');
     setPresetFeedback({ tone: 'success', text: t('atelier.stock.presetSavedOk', { name }) });
   };
 
@@ -357,9 +419,91 @@ const commitPanelName = () => {
     [
       p.color?.trim(),
       p.hasGrain ? t(p.grainOrientation === 'horizontal' ? 'atelier.stock.grainHorizontal' : 'atelier.stock.grainVertical') : null,
+      isPanelPrice(p.pricePerSheet) ? t('atelier.stock.presetPriceTag', { price: n(p.pricePerSheet) }) : null,
     ]
       .filter(Boolean)
       .join(' · ');
+
+  /**
+   * Prices the plan on screen again after a price change, without a new
+   * optimization: same pieces, same panels, new rates (see
+   * repriceCostingInput). The PDF and the quote read this same result.
+   */
+  const repriceResult = (next: { sheet?: Sheet; edgePrice?: number | null }) => {
+    setResult((current) => {
+      if (!current?.costingInput) return current;
+      const ownEdgePrice = next.edgePrice !== undefined ? next.edgePrice : edgePrice;
+      const costingInput = repriceCostingInput(current.costingInput, {
+        edgeBandPricePerM: ownEdgePrice ?? undefined,
+        sheet: next.sheet ?? activeSheet,
+      });
+      return { ...current, costingInput, costBreakdown: computeCostBreakdown(costingInput) };
+    });
+  };
+
+  /** Reads a typed price: '' clears it, '450', '450,5' or '450.5' set it, anything else is refused. */
+  const parsePriceInput = (raw: string): number | null | 'invalid' => {
+    const text = raw.trim().replace(',', '.');
+    if (text === '') return null;
+    const value = Number(text);
+    return isPanelPrice(value) ? Math.round(value * 100) / 100 : 'invalid';
+  };
+
+  /** Applies the typed panel price to the stock panel (MAD per panel). */
+  const commitPanelPrice = () => {
+    const parsed = parsePriceInput(panelPriceDraft);
+    if (parsed === 'invalid') {
+      setPanelPriceDraft(isPanelPrice(activeSheet.pricePerSheet) ? String(activeSheet.pricePerSheet) : '');
+      return;
+    }
+    if ((parsed ?? undefined) === activeSheet.pricePerSheet) return;
+    const { pricePerSheet: _previous, ...rest } = activeSheet;
+    void _previous;
+    const nextSheet: Sheet = parsed === null ? rest : { ...rest, pricePerSheet: parsed };
+    setSheets([nextSheet]);
+    repriceResult({ sheet: nextSheet });
+  };
+
+  /** Sets (or, with null, resets to the catalog prices) the price per metre of edge banding. */
+  const handleEdgePriceChange = async (price: number | null) => {
+    setEdgePrice(price);
+    repriceResult({ edgePrice: price });
+    if (edgePriceSource === 'account') {
+      setEdgePriceSaveFailed(!(await saveAccountEdgePrice(price)));
+    } else {
+      saveDeviceEdgePrice(price);
+    }
+  };
+
+  /** Changes the price of a saved panel; the stock panel follows when it is that panel. */
+  const handlePresetPrice = async (preset: PanelPreset, raw: string) => {
+    const parsed = parsePriceInput(raw);
+    if (parsed === 'invalid' || (parsed ?? undefined) === preset.pricePerSheet) return;
+    const updated = presetSource === 'account'
+      ? await setAccountPresetPrice(preset.id, parsed)
+      : setDevicePresetPrice(preset.id, parsed);
+    if (!updated) {
+      setPresetFeedback({ tone: 'warning', text: t('atelier.stock.presetSaveFailed') });
+      return;
+    }
+    setSavedPresets((current) => current.map((p) => (p.id === preset.id ? { ...updated, builtIn: false } : p)));
+    setPresetFeedback({ tone: 'success', text: t('atelier.stock.presetPriceSaved', { name: preset.name }) });
+    const current = {
+      height: activeSheet.height,
+      width: activeSheet.width,
+      material: activeSheet.material,
+      color: activeSheet.color,
+      hasGrain: activeSheet.hasGrain,
+      grainOrientation: activeSheet.grainOrientation,
+    };
+    if (isSamePanel(current, preset)) {
+      const { pricePerSheet: _previous, ...rest } = activeSheet;
+      void _previous;
+      const nextSheet: Sheet = parsed === null ? rest : { ...rest, pricePerSheet: parsed };
+      setSheets([nextSheet]);
+      repriceResult({ sheet: nextSheet });
+    }
+  };
 
 
   const { theme } = useTheme();
@@ -461,8 +605,11 @@ const commitPanelName = () => {
     if (savedProj) {
       try {
         const parsed = JSON.parse(savedProj);
-        if (parsed.sheet) setSheets([withoutLegacyPanelLabel(parsed.sheet)]);
-        if (Array.isArray(parsed.sheets)) setSheets(parsed.sheets.map(withoutLegacyPanelLabel));
+        // A panel price once set in the cut settings becomes the panel's own price.
+        const legacyStockPrices = parsed.options?.stockPricingOverrides;
+        const restoreSheet = (sheet: Sheet) => withLegacyStockPrice(withoutLegacyPanelLabel(sheet), legacyStockPrices);
+        if (parsed.sheet) setSheets([restoreSheet(parsed.sheet)]);
+        if (Array.isArray(parsed.sheets)) setSheets(parsed.sheets.map(restoreSheet));
         if (Array.isArray(parsed.pieces)) setPieces(normalizePiecesWithColors(parsed.pieces));
         if (typeof parsed.projectName === 'string' && parsed.projectName.trim()) {
           setProjectName(parsed.projectName.trim());
@@ -470,7 +617,7 @@ const commitPanelName = () => {
         }
         setScanThumb(typeof parsed.scanThumb === 'string' ? parsed.scanThumb : null);
         setPdfGeneratedAt(typeof parsed.pdfGeneratedAt === 'string' ? parsed.pdfGeneratedAt : null);
-        if (parsed.options) setOptions((prev) => ({ ...prev, ...parsed.options }));
+        if (parsed.options) setOptions((prev) => optionsWithoutStockOverride({ ...prev, ...parsed.options }));
         if (restoredProjectId) setLastSavedProjectId(restoredProjectId);
         // Legacy saved projects carry no unit metadata at all; they predate
         // this feature and were always canonical cm. `resolveProjectUnitMetadata`
@@ -512,6 +659,11 @@ const commitPanelName = () => {
     }
   };
 
+
+  /** The edge margin is kept on the panel, in cm; the setting is in mm like the kerf. */
+  const handleEdgeMarginChange = (marginMm: number) => {
+    setSheets(prev => prev.map(s => ({ ...s, margin: marginMm / 10 })));
+  };
 
   const handleOptionsChange = (newOpts: OptimizationOptions) => {
     setOptions(newOpts);
@@ -655,8 +807,9 @@ const commitPanelName = () => {
   /** Puts kept work back on screen. */
   const applyPendingWork = (work: PendingWork) => {
     if (work.pieces.length > 0) setPieces(normalizePiecesWithColors(work.pieces as Piece[]));
-    if (work.sheets.length > 0) setSheets(work.sheets as Sheet[]);
-    if (work.options) setOptions((prev) => ({ ...prev, ...(work.options as Partial<OptimizationOptions>) }));
+    const legacyStockPrices = (work.options as Partial<OptimizationOptions> | undefined)?.stockPricingOverrides;
+    if (work.sheets.length > 0) setSheets((work.sheets as Sheet[]).map((sheet) => withLegacyStockPrice(sheet, legacyStockPrices)));
+    if (work.options) setOptions((prev) => optionsWithoutStockOverride({ ...prev, ...(work.options as Partial<OptimizationOptions>) }));
     if (work.cutMode) setCutMode(work.cutMode);
     if (work.projectName) {
       setProjectName(work.projectName);
@@ -694,7 +847,7 @@ const commitPanelName = () => {
           sheet: { ...activeSheet, kerf: options.kerfWidth },
           sheets,
           pieces,
-          options,
+          options: { ...optionsWithoutStockOverride(options), ...(edgePrice !== null ? { edgeBandPricePerM: edgePrice } : {}) },
           cutMode,
           analysisPass: readAnalysisPass() ?? undefined,
         }),
@@ -1093,6 +1246,13 @@ const commitPanelName = () => {
     usedArea: result.totalAreaUsed,
   } : null);
   const currentSheetPieces = currentSheet ? [...currentSheet.pieces].sort((a, b) => a.pieceNumber - b.pieceNumber) : [];
+
+  // What each cost total is made of, regrouped from the input the optimizer
+  // priced (src/lib/cost-detail.ts) — the same detail the PDF report prints.
+  const costDetail = result?.costingInput ? buildCostDetail(result.costingInput) : null;
+  /** At most `decimals` decimals, in the reader's locale (2,9768 ; 6,3 ; 8). */
+  const detailNumber = (value: number, decimals: number) => n(value, { maximumFractionDigits: decimals });
+  const detailMoney = (value: number) => n(value, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
   // Derived straight from the optimizer's own result (every sheet actually
   // used, every piece actually placed) — never from a user-editable total —
@@ -1546,8 +1706,22 @@ const commitPanelName = () => {
                       const grain = preset.builtIn
                         ? {}
                         : { hasGrain: !!preset.hasGrain, grainOrientation: preset.hasGrain ? preset.grainOrientation ?? 'vertical' : undefined };
-                      setSheets([{ ...activeSheet, height: preset.height, width: preset.width, material: (preset.material as MaterialType) || activeSheet.material, ...grain }]);
+                      // A saved panel also brings its colour and its price; a
+                      // standard size has no price of its own (catalog price).
+                      const { pricePerSheet: _previousPrice, ...withoutPrice } = activeSheet;
+                      void _previousPrice;
+                      const nextSheet: Sheet = {
+                        ...withoutPrice,
+                        height: preset.height,
+                        width: preset.width,
+                        material: (preset.material as MaterialType) || activeSheet.material,
+                        ...grain,
+                        ...(preset.builtIn ? {} : { color: preset.color || undefined }),
+                        ...(isPanelPrice(preset.pricePerSheet) ? { pricePerSheet: preset.pricePerSheet } : {}),
+                      };
+                      setSheets([nextSheet]);
                       setActiveSheetIndex(0);
+                      repriceResult({ sheet: nextSheet });
                     }}
                     className="w-full appearance-none bg-studio-field border border-studio-border hover:border-studio-border-hover rounded-lg py-2 ps-8 pe-3 text-xs font-semibold text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-brand-500/50 cursor-pointer transition-colors [&>option]:bg-white [&>option]:text-slate-900 dark:[&>option]:bg-slate-900 dark:[&>option]:text-slate-100"
                   >
@@ -1633,13 +1807,34 @@ const commitPanelName = () => {
                   <input
                     id="preset-color-input"
                     type="text"
-                    value={presetColorDraft}
-                    onChange={(e) => setPresetColorDraft(e.target.value)}
+                    value={activeSheet.color ?? ''}
+                    onChange={(e) => setSheets([{ ...activeSheet, color: e.target.value || undefined }])}
+                    onBlur={() => repriceResult({ sheet: activeSheet })}
                     maxLength={60}
                     placeholder={t('atelier.stock.presetColorPlaceholder')}
                     className="w-full px-2.5 py-1.5 rounded-lg bg-studio-field border border-studio-border text-slate-800 dark:text-slate-200 text-xs outline-none focus:border-brand-500/50 focus:ring-1 focus:ring-brand-500/20 transition-all"
                   />
                 </div>
+                {cutMode === '2d' && (
+                  <div className="flex-1 min-w-[160px] space-y-1">
+                    <label htmlFor="panel-price-input" className="text-[9px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 block">
+                      {t('atelier.stock.panelPriceLabel')}
+                    </label>
+                    <input
+                      id="panel-price-input"
+                      data-testid="panel-price-input"
+                      type="text"
+                      inputMode="decimal"
+                      dir="ltr"
+                      value={panelPriceDraft}
+                      onChange={(e) => setPanelPriceDraft(e.target.value)}
+                      onBlur={commitPanelPrice}
+                      onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur(); }}
+                      placeholder={t('atelier.stock.panelPricePlaceholder', { price: detailMoney(catalogPanelPrice(activeSheet.material, activeSheet.width, activeSheet.height)) })}
+                      className="w-full px-2.5 py-1.5 rounded-lg bg-studio-field border border-studio-border text-slate-800 dark:text-slate-200 text-xs font-mono outline-none focus:border-brand-500/50 focus:ring-1 focus:ring-brand-500/20 transition-all"
+                    />
+                  </div>
+                )}
               </div>
 
               {presetFeedback && (
@@ -1658,6 +1853,21 @@ const commitPanelName = () => {
                         {presetDetails(p) && (
                           <span className="ms-2 text-[10px] font-normal text-slate-500 dark:text-slate-400">{presetDetails(p)}</span>
                         )}
+                      </span>
+                      <span className="ms-auto me-2 flex items-center gap-1 shrink-0">
+                        <input
+                          key={`${p.id}-${p.pricePerSheet ?? ''}`}
+                          type="text"
+                          inputMode="decimal"
+                          dir="ltr"
+                          defaultValue={isPanelPrice(p.pricePerSheet) ? String(p.pricePerSheet) : ''}
+                          onBlur={(e) => void handlePresetPrice(p, e.target.value)}
+                          onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur(); }}
+                          placeholder={t('atelier.stock.presetPricePlaceholder')}
+                          aria-label={t('atelier.stock.presetPriceAria', { name: p.name })}
+                          className="w-20 px-2 py-1 rounded-md bg-studio-panel border border-studio-border text-[11px] font-mono text-slate-800 dark:text-slate-200 outline-none focus:border-brand-500/50"
+                        />
+                        <span className="text-[10px] text-slate-500" translate="no">{t('atelier.cost.currency')}</span>
                       </span>
                       <button
                         type="button"
@@ -1710,6 +1920,11 @@ const commitPanelName = () => {
                     options={options}
                     onChange={handleOptionsChange}
                     disabled={isOptimizing}
+                    edgeMarginMm={Math.round((activeSheet.margin ?? 0) * 100) / 10}
+                    onEdgeMarginChange={handleEdgeMarginChange}
+                    edgePrice={edgePrice}
+                    onEdgePriceChange={(price) => void handleEdgePriceChange(price)}
+                    edgePriceSaveFailed={edgePriceSaveFailed}
                   />
                 </div>
               )}
@@ -1760,7 +1975,9 @@ const commitPanelName = () => {
                   <div className="relative flex flex-wrap items-center justify-between gap-4">
                     <div>
                       <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-brand-400 mb-1 font-mono">{t('atelier.cost.bannerLabel')}</p>
-                      <p className="text-3xl font-black font-mono text-white tracking-tight" dir="ltr">
+                      {/* translate="no": Chrome's page translation turned "MAD" into
+                          "UAE dirham" on an Arabic-language phone. */}
+                      <p data-testid="cost-banner-total" className="text-3xl font-black font-mono text-white tracking-tight" dir="ltr" translate="no">
                         {result.costBreakdown ? n(result.costBreakdown.subtotal) : '—'} <span className="text-brand-400">{t('atelier.cost.currency')}</span>
                       </p>
                       <p className="text-[11px] text-slate-400 mt-1">
@@ -2089,21 +2306,79 @@ const commitPanelName = () => {
                     <div className="grid grid-cols-4 gap-2 text-xs">
                       <div className="p-2 rounded-lg bg-studio-field text-center">
                         <span className="text-[9px] text-slate-500 block uppercase">{t('atelier.cost.panels')}</span>
-                        <span className="font-mono font-black text-slate-900 dark:text-white" dir="ltr">{t('atelier.cost.amount', { value: n(result.costBreakdown?.materialCost ?? 0) })}</span>
+                        <span className="font-mono font-black text-slate-900 dark:text-white" dir="ltr" translate="no">{t('atelier.cost.amount',{ value: n(result.costBreakdown?.materialCost ?? 0) })}</span>
                       </div>
                       <div className="p-2 rounded-lg bg-studio-field text-center">
                         <span className="text-[9px] text-slate-500 block uppercase">{t('atelier.cost.edges')}</span>
-                        <span className="font-mono font-black text-slate-900 dark:text-white" dir="ltr">{t('atelier.cost.amount', { value: n(result.costBreakdown?.edgeCost ?? 0) })}</span>
+                        <span className="font-mono font-black text-slate-900 dark:text-white" dir="ltr" translate="no">{t('atelier.cost.amount',{ value: n(result.costBreakdown?.edgeCost ?? 0) })}</span>
                       </div>
                       <div className="p-2 rounded-lg bg-studio-field text-center">
                         <span className="text-[9px] text-slate-500 block uppercase">{t('atelier.cost.labor')}</span>
-                        <span className="font-mono font-black text-slate-900 dark:text-white" dir="ltr">{t('atelier.cost.amount', { value: n(result.costBreakdown?.laborCost ?? 0) })}</span>
+                        <span className="font-mono font-black text-slate-900 dark:text-white" dir="ltr" translate="no">{t('atelier.cost.amount',{ value: n(result.costBreakdown?.laborCost ?? 0) })}</span>
                       </div>
                       <div className="p-2 rounded-lg bg-studio-field text-center">
                         <span className="text-[9px] text-slate-500 block uppercase">{t('atelier.cost.total')}</span>
-                        <span className="font-mono font-black text-brand-400" dir="ltr">{t('atelier.cost.amount', { value: n(result.costBreakdown?.subtotal ?? 0) })}</span>
+                        <span className="font-mono font-black text-brand-400" dir="ltr" translate="no">{t('atelier.cost.amount',{ value: n(result.costBreakdown?.subtotal ?? 0) })}</span>
                       </div>
                     </div>
+                    {costDetail && (costDetail.panels.length > 0 || costDetail.edges.length > 0) && (
+                      <div data-testid="cost-detail" className="pt-1">
+                        <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1">{t('atelier.cost.detail.title')}</p>
+                        <ul className="divide-y divide-studio-border/50 text-[11px]">
+                          {costDetail.panels.map((panel, i) => (
+                            <li key={`panel-${i}`} className="flex flex-wrap items-baseline justify-between gap-x-3 py-1.5">
+                              <span className="text-slate-700 dark:text-slate-200 min-w-0">
+                                {[
+                                  t('atelier.cost.detail.panel'),
+                                  panel.label,
+                                  t(materialLabelKey(panel.material ?? activeSheet.material)),
+                                  panel.color,
+                                ].filter(Boolean).join(' · ')}
+                                <span className="ms-1.5 font-mono text-[10px] text-slate-500" dir="ltr">
+                                  {formatDisplayValue(panel.heightCm ?? activeSheet.height, displayUnit)} × {formatDisplayValue(panel.widthCm ?? activeSheet.width, displayUnit)} {displayUnit}
+                                </span>
+                              </span>
+                              <span className="ms-auto flex items-baseline gap-3">
+                                <span className="font-mono text-[10px] text-slate-500 dark:text-slate-400" dir="ltr" translate="no">
+                                  {panel.pricing.mode === 'per_sheet'
+                                    ? t('atelier.cost.detail.perPanel', { count: panel.count, price: detailMoney(panel.pricing.value) })
+                                    : t('atelier.cost.detail.perM2', { count: panel.count, area: detailNumber(panel.areaM2, 4), price: detailNumber(panel.pricing.value, 2) })}
+                                </span>
+                                <span className="font-mono font-bold text-slate-900 dark:text-white tabular-nums" dir="ltr" translate="no">{t('atelier.cost.amount',{ value: detailMoney(panel.total) })}</span>
+                              </span>
+                            </li>
+                          ))}
+                          {costDetail.edges.map((edge, i) => (
+                            <li key={`edge-${i}`} className="flex flex-wrap items-baseline justify-between gap-x-3 py-1.5">
+                              <span className="text-slate-700 dark:text-slate-200">
+                                {edge.edgeId ? `${t('atelier.cost.detail.edge')} · ${t(edgeBandingLabelKey(edge.edgeId))}` : t('atelier.cost.detail.edge')}
+                              </span>
+                              <span className="ms-auto flex items-baseline gap-3">
+                                <span className="font-mono text-[10px] text-slate-500 dark:text-slate-400" dir="ltr" translate="no">
+                                  {t('atelier.cost.detail.perMeter', { length: detailNumber(edge.lengthM, 2), price: detailNumber(edge.pricePerMeter, 2) })}
+                                </span>
+                                <span className="font-mono font-bold text-slate-900 dark:text-white tabular-nums" dir="ltr" translate="no">{t('atelier.cost.amount',{ value: detailMoney(edge.total) })}</span>
+                              </span>
+                            </li>
+                          ))}
+                          {hasLaborCharge(costDetail.labor) && (
+                            <li className="flex flex-wrap items-baseline justify-between gap-x-3 py-1.5">
+                              <span className="text-slate-700 dark:text-slate-200">
+                                {t(costDetail.labor.pricing.mode === 'per_meter' ? 'atelier.cost.detail.laborPerMeter' : 'atelier.cost.detail.laborFixed')}
+                              </span>
+                              <span className="ms-auto flex items-baseline gap-3">
+                                {costDetail.labor.pricing.mode === 'per_meter' && (
+                                  <span className="font-mono text-[10px] text-slate-500 dark:text-slate-400" dir="ltr" translate="no">
+                                    {t('atelier.cost.detail.perMeter', { length: detailNumber(costDetail.labor.cutLengthM ?? 0, 2), price: detailNumber(costDetail.labor.pricing.value, 2) })}
+                                  </span>
+                                )}
+                                <span className="font-mono font-bold text-slate-900 dark:text-white tabular-nums" dir="ltr" translate="no">{t('atelier.cost.amount',{ value: detailMoney(costDetail.labor.total) })}</span>
+                              </span>
+                            </li>
+                          )}
+                        </ul>
+                      </div>
+                    )}
                   </div>
                 )}
               </>

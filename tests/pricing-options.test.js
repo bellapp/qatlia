@@ -174,14 +174,15 @@ test('OptimizeSchema rejects more than 100 sheets', () => {
   assert.equal(parsed.success, false);
 });
 
-test('OptionsPanel wires laborPricing and stockPricingOverrides controls with defaults matching current behavior', () => {
+test('OptionsPanel wires the laborPricing control with a default matching current behavior', () => {
   const fs = require('node:fs');
   const path = require('node:path');
   const source = fs.readFileSync(path.resolve('src/components/OptionsPanel.tsx'), 'utf8');
 
   assert.match(source, /laborPricing/, 'OptionsPanel must read/write options.laborPricing');
-  assert.match(source, /stockPricingOverrides/, 'OptionsPanel must read/write options.stockPricingOverrides');
   assert.match(source, /mode:\s*'fixed',\s*value:\s*0/, 'the labor pricing default must stay a fixed MAD 0 charge');
-  assert.match(source, /per_m2/, 'the stock override control must offer the per_m2 mode');
+  // The panel price lives on the stock panel itself (user request,
+  // 2026-11-13): the cut settings no longer set one, per m² or per panel.
+  assert.doesNotMatch(source, /stockPricingOverrides/, 'the cut settings must not set a panel price any more');
   assert.doesNotMatch(source, /:\s*any\b/, 'OptionsPanel must stay strictly typed (no `any`)');
 });

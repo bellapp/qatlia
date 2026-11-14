@@ -23,6 +23,8 @@ export interface PanelPreset extends PanelPresetAttributes {
   color?: string;
   hasGrain?: boolean;
   grainOrientation?: GrainOrientation;
+  /** What the artisan pays for one such panel, MAD. Absent: catalog price per m². */
+  pricePerSheet?: number;
   builtIn?: boolean;
 }
 
@@ -52,7 +54,13 @@ function cleanPreset(preset: NewPanelPreset): NewPanelPreset {
     ...(preset.material ? { material: preset.material } : {}),
     ...(color ? { color } : {}),
     ...(preset.hasGrain ? { hasGrain: true, grainOrientation: preset.grainOrientation === 'horizontal' ? 'horizontal' : 'vertical' } : {}),
+    ...(isPanelPrice(preset.pricePerSheet) ? { pricePerSheet: Math.round(preset.pricePerSheet * 100) / 100 } : {}),
   };
+}
+
+/** A usable panel price: finite, from 0 to 1 000 000 MAD. */
+export function isPanelPrice(value: unknown): value is number {
+  return typeof value === 'number' && Number.isFinite(value) && value >= 0 && value <= 1_000_000;
 }
 
 // ─── Device presets (anonymous use, and fallback) ───────────────────────────
@@ -91,6 +99,21 @@ export function savePreset(preset: NewPanelPreset): PanelPreset {
   // Soft cap: 40 user presets keeps localStorage tiny and the dropdown usable.
   window.localStorage.setItem(STORAGE_KEY, JSON.stringify(saved.slice(-40)));
   return entry;
+}
+
+/** Sets (or, with null, clears) the price of a preset saved on this device. */
+export function setDevicePresetPrice(id: string, pricePerSheet: number | null): PanelPreset | null {
+  const saved = loadSavedPresets();
+  let updated: PanelPreset | null = null;
+  const next = saved.map((p) => {
+    if (p.id !== id) return p;
+    const { pricePerSheet: _previous, ...rest } = p;
+    void _previous;
+    updated = pricePerSheet === null ? rest : { ...rest, pricePerSheet: Math.round(pricePerSheet * 100) / 100 };
+    return updated;
+  });
+  window.localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
+  return updated;
 }
 
 export function deletePreset(id: string): void {
@@ -134,6 +157,21 @@ export async function createAccountPresets(presets: NewPanelPreset[]): Promise<A
     return { ok: false, error: data?.error === 'PRESET_LIMIT' ? 'PRESET_LIMIT' : 'FAILED' };
   } catch {
     return { ok: false, error: 'FAILED' };
+  }
+}
+
+/** Sets (or, with null, clears) the price of an account preset; the updated preset, or null. */
+export async function setAccountPresetPrice(id: string, pricePerSheet: number | null): Promise<PanelPreset | null> {
+  try {
+    const res = await fetch(`/api/panel-presets/${encodeURIComponent(id)}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ pricePerSheet }),
+    });
+    const data = await res.json().catch(() => null);
+    return res.ok && data?.success && data.preset ? (data.preset as PanelPreset) : null;
+  } catch {
+    return null;
   }
 }
 

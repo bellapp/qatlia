@@ -183,7 +183,7 @@ export default function CreditsPage() {
           </span>
           <h1 className="text-3xl md:text-4xl font-black text-slate-900 dark:text-white">
             {headlineBefore}
-            <span dir="ltr">{formatMAD(CREDIT_PACKS.starter.priceMAD)}</span>
+            <span dir="ltr" translate="no">{formatMAD(CREDIT_PACKS.starter.priceMAD)}</span>
             {headlineAfter}
           </h1>
           <p className="text-sm text-slate-600 dark:text-slate-400 max-w-xl mx-auto">{t('creditsPage.policy')}</p>
@@ -235,7 +235,7 @@ export default function CreditsPage() {
             {myManualOrders.slice(0, 5).map((o) => (
               <div key={o.order_number} className="flex items-center justify-between text-xs py-1.5 border-b border-studio-border/40 last:border-0">
                 <span dir="ltr" className="font-mono font-bold text-slate-700 dark:text-slate-200">{o.order_number}</span>
-                <span dir="ltr" className="font-mono text-slate-500">{n(o.amount_mad)} {t('creditsPage.currency')} · {o.credits} cr</span>
+                <span dir="ltr" translate="no" className="font-mono text-slate-500">{n(o.amount_mad)} {t('creditsPage.currency')} · {o.credits} cr</span>
                 <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
                   o.status === 'granted' ? 'bg-emerald-500/15 text-emerald-400' :
                   o.status === 'refused' ? 'bg-rose-500/15 text-rose-400' :
@@ -285,7 +285,7 @@ export default function CreditsPage() {
                   <div className="flex items-center justify-between mb-2">
                     <h3 className={`text-base font-bold ${tone.strong}`}>{packName}</h3>
                   </div>
-                  <div className="flex items-baseline gap-1 my-3">
+                  <div className="flex items-baseline gap-1 my-3" translate="no">
                     <span dir="ltr" className={`text-3xl font-black ${tone.strong}`}>
                       {n(p.priceMAD)}
                     </span>
@@ -342,7 +342,7 @@ export default function CreditsPage() {
                 </button>
                 {cardProvider === 'creem' && (
                   <p className={`mt-1.5 text-center text-[11px] font-semibold ${tone.muted}`}>
-                    <span dir="ltr">{t('creditsPage.cardPrice', { price: formatUSD(p.priceUSD) })}</span>
+                    <span dir="ltr" translate="no">{t('creditsPage.cardPrice',{ price: formatUSD(p.priceUSD) })}</span>
                   </p>
                 )}
                 <button

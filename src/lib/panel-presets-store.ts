@@ -10,7 +10,7 @@ import { z } from 'zod';
 import { createClient as createAdminClient, type SupabaseClient } from '@supabase/supabase-js';
 import { getSupabaseAdminConfig } from '@/lib/billing/config';
 import { MATERIAL_TYPE_VALUES } from '@/lib/cutting/binpacking';
-import { MAX_GEOMETRY } from '@/lib/cutting/optimize-schema';
+import { MAX_GEOMETRY, MAX_UNIT_PRICE } from '@/lib/cutting/optimize-schema';
 import { PRESET_COLOR_MAX_CHARS, type GrainOrientation } from '@/lib/panel-preset-rules';
 
 /** Enough for any workshop's stock, small enough to keep the dropdown usable. */
@@ -28,6 +28,8 @@ export interface PanelPresetRow {
   color: string | null;
   has_grain: boolean;
   grain_orientation: GrainOrientation | null;
+  /** MAD per panel (migration 015); absent when that migration is not applied yet. */
+  price_per_sheet?: number | string | null;
   created_at?: string;
 }
 
@@ -41,9 +43,12 @@ export interface AccountPanelPreset {
   color?: string;
   hasGrain?: boolean;
   grainOrientation?: GrainOrientation;
+  pricePerSheet?: number;
 }
 
-export const PRESET_COLUMNS = 'id, user_id, name, height, width, material, color, has_grain, grain_orientation, created_at';
+/** The columns before migration 015, read while it is not applied yet. */
+export const LEGACY_PRESET_COLUMNS = 'id, user_id, name, height, width, material, color, has_grain, grain_orientation, created_at';
+export const PRESET_COLUMNS = `${LEGACY_PRESET_COLUMNS}, price_per_sheet`;
 
 export function toAccountPreset(row: PanelPresetRow): AccountPanelPreset {
   return {
@@ -55,6 +60,10 @@ export function toAccountPreset(row: PanelPresetRow): AccountPanelPreset {
     material: row.material,
     ...(row.color ? { color: row.color } : {}),
     ...(row.has_grain ? { hasGrain: true, grainOrientation: row.grain_orientation === 'horizontal' ? 'horizontal' : 'vertical' } : {}),
+    // NUMERIC comes back from PostgREST as a string.
+    ...(row.price_per_sheet !== null && row.price_per_sheet !== undefined && Number.isFinite(Number(row.price_per_sheet))
+      ? { pricePerSheet: Number(row.price_per_sheet) }
+      : {}),
   };
 }
 
@@ -68,7 +77,14 @@ export const PresetInputSchema = z.object({
   color: z.string().max(PRESET_COLOR_MAX_CHARS).nullable().optional(),
   hasGrain: z.boolean().nullable().optional(),
   grainOrientation: z.enum(['vertical', 'horizontal']).nullable().optional(),
+  /** MAD per panel; null or absent: the catalog price per m² applies. */
+  pricePerSheet: z.number().finite().min(0).max(MAX_UNIT_PRICE).nullable().optional(),
 });
+
+/** A panel price as stored: whole cents, like the NUMERIC(12,2) column. */
+export function toStoredPrice(value: number): number {
+  return Math.round(value * 100) / 100;
+}
 
 export type PresetInput = z.infer<typeof PresetInputSchema>;
 
@@ -85,6 +101,8 @@ export function toPresetRow(userId: string, input: PresetInput): Omit<PanelPrese
     color,
     has_grain: hasGrain,
     grain_orientation: hasGrain ? (input.grainOrientation === 'horizontal' ? 'horizontal' : 'vertical') : null,
+    // Only sent when set, so a save without a price still works before migration 015.
+    ...(typeof input.pricePerSheet === 'number' ? { price_per_sheet: toStoredPrice(input.pricePerSheet) } : {}),
   };
 }
 
@@ -92,6 +110,25 @@ export function toPresetRow(userId: string, input: PresetInput): Omit<PanelPrese
 export function createPresetsDb(): SupabaseClient | null {
   const config = getSupabaseAdminConfig();
   return config ? createAdminClient(config.url, config.serviceRoleKey) : null;
+}
+
+/** True when a column does not exist yet (migration 015 not applied). */
+export function isMissingColumnError(error: { code?: string; message?: string } | null | undefined): boolean {
+  if (!error) return false;
+  if (error.code === '42703' || error.code === 'PGRST204') return true;
+  return /column .* does not exist|could not find the .* column/i.test(error.message || '');
+}
+
+/**
+ * The artisan's presets, oldest first. Before migration 015 the price column
+ * does not exist: the presets are then read without it rather than lost.
+ */
+export async function selectUserPresets(db: SupabaseClient, userId: string) {
+  const query = (columns: string) =>
+    db.from('panel_presets').select(columns).eq('user_id', userId).order('created_at', { ascending: true });
+  const first = await query(PRESET_COLUMNS);
+  if (!first.error || !isMissingColumnError(first.error)) return first;
+  return query(LEGACY_PRESET_COLUMNS);
 }
 
 /** True when the table does not exist yet (migration 011 not applied). */

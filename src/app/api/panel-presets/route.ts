@@ -3,12 +3,15 @@ import { z } from 'zod';
 import { createClient } from '@/lib/supabase/server';
 import { findDuplicatePreset } from '@/lib/panel-preset-rules';
 import {
+  LEGACY_PRESET_COLUMNS,
   MAX_PRESETS_PER_REQUEST,
   MAX_PRESETS_PER_USER,
   PRESET_COLUMNS,
   PresetInputSchema,
   createPresetsDb,
+  isMissingColumnError,
   isMissingTableError,
+  selectUserPresets,
   toAccountPreset,
   toPresetRow,
   type PanelPresetRow,
@@ -38,11 +41,7 @@ export async function GET() {
       return NextResponse.json({ success: true, presets: [], note: 'cloud_not_ready' });
     }
 
-    const { data, error } = await db
-      .from('panel_presets')
-      .select(PRESET_COLUMNS)
-      .eq('user_id', user.id)
-      .order('created_at', { ascending: true });
+    const { data, error } = await selectUserPresets(db, user.id);
 
     if (error) {
       if (isMissingTableError(error)) {
@@ -52,7 +51,7 @@ export async function GET() {
       return NextResponse.json({ error: 'PRESETS_UNAVAILABLE' }, { status: 503 });
     }
 
-    return NextResponse.json({ success: true, presets: ((data || []) as PanelPresetRow[]).map(toAccountPreset) });
+    return NextResponse.json({ success: true, presets: ((data || []) as unknown as PanelPresetRow[]).map(toAccountPreset) });
   } catch (err) {
     console.error('panel presets GET error:', err);
     return NextResponse.json({ error: 'SERVER_ERROR' }, { status: 500 });
@@ -95,10 +94,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'CLOUD_NOT_READY' }, { status: 503 });
     }
 
-    const { data: existingRows, error: listError } = await db
-      .from('panel_presets')
-      .select(PRESET_COLUMNS)
-      .eq('user_id', user.id);
+    const { data: existingRows, error: listError } = await selectUserPresets(db, user.id);
     if (listError) {
       if (isMissingTableError(listError)) {
         return NextResponse.json({ error: 'CLOUD_NOT_READY' }, { status: 503 });
@@ -107,7 +103,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'PRESETS_UNAVAILABLE' }, { status: 503 });
     }
 
-    const known = ((existingRows || []) as PanelPresetRow[]).map(toAccountPreset);
+    const known = ((existingRows || []) as unknown as PanelPresetRow[]).map(toAccountPreset);
     const existingCount = known.length;
     const toInsert: ReturnType<typeof toPresetRow>[] = [];
     const duplicates: Array<{ name: string; existingName: string }> = [];
@@ -129,7 +125,15 @@ export async function POST(req: Request) {
 
     let created: ReturnType<typeof toAccountPreset>[] = [];
     if (toInsert.length > 0) {
-      const { data, error } = await db.from('panel_presets').insert(toInsert).select(PRESET_COLUMNS);
+      let { data, error } = await db.from('panel_presets').insert(toInsert).select(PRESET_COLUMNS);
+      if (error && isMissingColumnError(error)) {
+        // Migration 015 not applied yet: keep the panels, without their price.
+        const withoutPrice = toInsert.map(({ price_per_sheet: _price, ...row }) => {
+          void _price;
+          return row;
+        });
+        ({ data, error } = await db.from('panel_presets').insert(withoutPrice).select(LEGACY_PRESET_COLUMNS));
+      }
       if (error) {
         if (isMissingTableError(error)) {
           return NextResponse.json({ error: 'CLOUD_NOT_READY' }, { status: 503 });
@@ -137,7 +141,7 @@ export async function POST(req: Request) {
         console.error('panel presets insert failed:', error.message);
         return NextResponse.json({ error: 'PRESETS_UNAVAILABLE' }, { status: 503 });
       }
-      created = ((data || []) as PanelPresetRow[]).map(toAccountPreset);
+      created = ((data || []) as unknown as PanelPresetRow[]).map(toAccountPreset);
     }
 
     return NextResponse.json({ success: true, created, duplicates, invalid });

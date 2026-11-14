@@ -1,6 +1,7 @@
 import {
   computeCostBreakdown,
   resolveEdgeRatePerMeter,
+  roundCurrency,
   type CostBreakdown,
   type CostBreakdownInput,
   type LaborPricing,
@@ -45,6 +46,68 @@ export const EDGEBANDING_PRESETS: EdgeBandingPreset[] = [
   { id: 'walnut', label: 'Noyer', color: '#5C4033', pricePerM: 14 },
 ];
 
+// ─── The artisan's own prices (user request, 2026-11-13) ──────────────────
+// Panel and edge-banding prices vary from one supplier to the next, so the
+// artisan can set them: a price per panel on the stock panel itself, and one
+// price per metre of edge banding. Without one, the catalog price applies.
+
+function isPrice(value: unknown): value is number {
+  return typeof value === 'number' && Number.isFinite(value) && value >= 0;
+}
+
+/**
+ * MAD per metre for an edge-banding colour. The artisan sets one price for
+ * every colour (user request, 2026-11-13: a price per colour was too much
+ * detail); without it each colour keeps its catalog price.
+ */
+export function edgePricePerM(edgeId: string, ownPricePerM?: number): number {
+  const preset = EDGEBANDING_PRESETS.find((e) => e.id === edgeId) || EDGEBANDING_PRESETS[0];
+  if (preset.id === 'none') return 0;
+  return isPrice(ownPricePerM) ? ownPricePerM : preset.pricePerM;
+}
+
+/**
+ * The catalog price of one whole panel: its material's price per m² times
+ * its area, to the cent. Artisans buy and price panels by the panel, so the
+ * catalog default is a price per panel too (user request, 2026-11-13).
+ */
+export function catalogPanelPrice(material: MaterialType | null | undefined, widthCm: number, heightCm: number): number {
+  return roundCurrency(getMaterialDef((material || 'mdf') as MaterialType).pricePerM2 * ((widthCm * heightCm) / 10000));
+}
+
+/**
+ * How one stock panel is priced, always per panel from the atelier: the
+ * artisan's price when set, else the catalog price of that panel. A
+ * per-material override still applies for callers of the API that send one
+ * (the atelier no longer does; see `withLegacyStockPrice`).
+ */
+export function sheetPricing(
+  sheet: { material?: MaterialType | null; pricePerSheet?: number; width: number; height: number },
+  overrides?: Partial<Record<MaterialType, StockPricing>>
+): StockPricing {
+  if (isPrice(sheet.pricePerSheet)) return { mode: 'per_sheet', value: sheet.pricePerSheet };
+  const material = (sheet.material || 'mdf') as MaterialType;
+  return overrides?.[material] ?? { mode: 'per_sheet', value: catalogPanelPrice(material, sheet.width, sheet.height) };
+}
+
+/**
+ * Work saved while the cut settings still had their own panel price
+ * (« Remplacer le prix catalogue du panneau ») gets that price back as the
+ * panel's own price, so reopening it keeps the same amount and shows it in
+ * the panel price field.
+ */
+export function withLegacyStockPrice<T extends { material?: MaterialType | null; pricePerSheet?: number; width: number; height: number }>(
+  sheet: T,
+  overrides: unknown
+): T {
+  if (isPrice(sheet.pricePerSheet) || !overrides || typeof overrides !== 'object') return sheet;
+  const override = (overrides as Record<string, unknown>)[sheet.material || 'mdf'] as Partial<StockPricing> | undefined;
+  if (!override || !isPrice(override.value)) return sheet;
+  if (override.mode === 'per_sheet') return { ...sheet, pricePerSheet: roundCurrency(override.value) };
+  if (override.mode === 'per_m2') return { ...sheet, pricePerSheet: roundCurrency(override.value * ((sheet.width * sheet.height) / 10000)) };
+  return sheet;
+}
+
 export interface Piece {
   id?: string; name?: string; height: number; width: number; quantity: number;
   material?: MaterialType | null; grainDirection?: boolean; edges?: EdgeBandingConfig;
@@ -66,6 +129,10 @@ export interface Sheet {
   hasGrain?: boolean;
   /** Direction of the panel's grain: 'vertical' = along height, 'horizontal' = along width. */
   grainOrientation?: 'vertical' | 'horizontal';
+  /** Colour or décor of the panel (« Blanc », « Noyer »), shown in the price detail. */
+  color?: string;
+  /** What the artisan pays for one such panel, MAD. Absent: the catalog price per m² applies. */
+  pricePerSheet?: number;
 }
 // Single source of truth for supported optimization goals, shared by the API
 // schema (enum validation) and the options UI (rendered choices), so neither
@@ -89,6 +156,8 @@ export interface OptimizationOptions {
    * invented per-meter estimate.
    */
   laborPricing?: LaborPricing;
+  /** The artisan's price per metre of edge banding, every colour (see `edgePricePerM`). */
+  edgeBandPricePerM?: number;
   /**
    * Per-material stock price override fed into the shared cost calculator.
    * A material absent from this map keeps using the material library's
@@ -98,8 +167,19 @@ export interface OptimizationOptions {
   stockPricingOverrides?: Partial<Record<MaterialType, StockPricing>>;
 }
 const DEFAULT_LABOR_PRICING: LaborPricing = { mode: 'fixed', value: 0 };
+// The saw kerf and the edge margin both start at zero (user request,
+// 2026-11-13): a new job is laid out on the whole panel, and the artisan sets
+// the blade thickness and the edge trim to match the workshop. Three
+// millimetres of kerf and a centimetre of margin on every edge, applied
+// without being asked for, made plans look worse than a competing one that
+// counted neither.
+export const DEFAULT_STOCK_SHEET: Sheet = {
+  id: 's0', height: 278, width: 208, kerf: 0, margin: 0, grainDirection: false, material: 'mdf', quantity: 1,
+};
+/** Largest edge margin the atelier lets an artisan set, in mm. */
+export const MAX_EDGE_MARGIN_MM = 30;
 export const OPTIONS_DEFAULTS: OptimizationOptions = {
-  kerfWidth: 3, showLabels: true, singleSheetOnly: false, considerMaterial: false,
+  kerfWidth: 0, showLabels: true, singleSheetOnly: false, considerMaterial: false,
   edgeBanding: false, grainDirection: false, optimizationPriority: 'linear_guillotine', defaultMaterial: 'mdf',
   minReusableOffcutWidth: 15, minReusableOffcutHeight: 15, laborPricing: DEFAULT_LABOR_PRICING,
 };
@@ -155,7 +235,14 @@ export interface Offcut { id: string; x: number; y: number; width: number; heigh
  * see `splitFreeRect` for where each instruction comes from.
  */
 export interface CutInstruction { id: string; sheetIndex: number; axis: 'horizontal' | 'vertical'; lengthCm: number; }
-export interface SheetResult { index: number; material: MaterialType; width: number; height: number; pieces: PlacedPiece[]; offcuts: Offcut[]; cuts: CutInstruction[]; usedArea: number; wasteRate: number; }
+export interface SheetResult {
+  index: number; material: MaterialType; width: number; height: number; pieces: PlacedPiece[]; offcuts: Offcut[]; cuts: CutInstruction[]; usedArea: number; wasteRate: number;
+  /** The artisan's name for the stock panel this sheet was cut from, when given. */
+  label?: string;
+  /** Colour and price of that stock panel, carried for the price (see `sheetPricing`). */
+  color?: string;
+  pricePerSheet?: number;
+}
 export interface MaterialStats { material: MaterialType; sheetsUsed: number; totalPieces: number; usedArea: number; wasteRate: number; }
 
 // Customer-safe summary of how a plan was chosen: what goal was pursued, which
@@ -187,6 +274,49 @@ export interface OptimizationResult {
   costingInput?: CostBreakdownInput;
   materialStats?: MaterialStats[];
   explanation?: OptimizationExplanation;
+}
+
+/**
+ * The same plan, priced again with new prices: a changed edge rate or panel
+ * price updates the cost without a new optimization (which may cost a
+ * credit). Only lines that say what they are can be repriced — an edge
+ * segment with its colour, a panel line with the stock panel's material and
+ * size (src/lib/cost-detail.ts) — so a result saved before they existed keeps
+ * its prices. Edge segments are always repriced from the colour, which also
+ * replaces a per-piece rate; the atelier never sets one.
+ */
+export function repriceCostingInput(
+  input: CostBreakdownInput,
+  prices: {
+    edgeBandPricePerM?: number;
+    sheet?: Pick<Sheet, 'material' | 'width' | 'height' | 'color' | 'pricePerSheet'>;
+  }
+): CostBreakdownInput {
+  const { sheet } = prices;
+  const isThisSheet = (line: SheetCostLine) =>
+    !!sheet &&
+    line.material === (sheet.material || 'mdf') &&
+    line.widthCm === sheet.width &&
+    line.heightCm === sheet.height;
+  return {
+    ...input,
+    material: {
+      ...input.material,
+      sheets: input.material.sheets.map((line) => {
+        if (!sheet || !isThisSheet(line)) return line;
+        const { color: _previousColor, ...rest } = line;
+        void _previousColor;
+        const color = sheet.color?.trim().slice(0, 60);
+        return { ...rest, pricing: sheetPricing(sheet), ...(color ? { color } : {}) };
+      }),
+    },
+    edge: {
+      ...input.edge,
+      segments: input.edge.segments.map((segment) =>
+        segment.edgeId ? { ...segment, pricePerMeter: edgePricePerM(segment.edgeId, prices.edgeBandPricePerM) } : segment
+      ),
+    },
+  };
 }
 
 /** Reason code for a piece left unplaced for a structural (non-geometric) reason. */
@@ -889,6 +1019,63 @@ function packSheetWithStrategy(
   return packSheetWithFreeRects(items, sheet, strategy, sheetIndex, nextPieceNumber);
 }
 
+// ─── Keeping the rest of a panel whole ─────────────────────────────
+//
+// A job rarely fills its last panel. What is left of it is worth far more as
+// one piece running the panel's full length than as the same area in scattered
+// rectangles: the workshop can put it back on the rack and cut long parts from
+// it later (customer report, 2026-11-13: a competing plan used a 91 cm strip of
+// the fourth panel and left the rest whole, ours spread four pieces across it).
+//
+// A strip limit keeps every piece of one panel within `extent` cm of its
+// origin edge along one axis; the rest of the panel, one saw pass further, is
+// left untouched.
+interface StripLimit {
+  /** Position of the limited panel in the plan. */
+  sheetIndex: number;
+  /** 'width': pieces stay within `extent` of the left edge; 'height': of the top edge. */
+  axis: 'width' | 'height';
+  /** Usable extent of the strip in cm, margins excluded. */
+  extent: number;
+  /** How many panels the plan may use in all. */
+  sheetCount: number;
+}
+
+function packSheetWithinStrip(
+  items: ExpandedPiece[],
+  sheet: Sheet,
+  strip: StripLimit,
+  strategy: PackingStrategy,
+  sheetIndex: number,
+  nextPieceNumber: number
+): SheetPackingCandidate {
+  const margin = Math.max(0, sheet.margin || 0);
+  const kerf = Math.max(0, sheet.kerf || 0);
+  const usableWidth = Math.max(0, sheet.width - (margin * 2));
+  const usableHeight = Math.max(0, sheet.height - (margin * 2));
+  const narrowed: Sheet = strip.axis === 'width'
+    ? { ...sheet, width: Math.min(sheet.width, strip.extent + (margin * 2)) }
+    : { ...sheet, height: Math.min(sheet.height, strip.extent + (margin * 2)) };
+  const candidate = packSheetWithStrategy(items, narrowed, strategy, sheetIndex, nextPieceNumber);
+  if (candidate.pieces.length === 0) return candidate;
+
+  const rest: FreeRect = strip.axis === 'width'
+    ? { x: margin + strip.extent + kerf, y: margin, width: usableWidth - strip.extent - kerf, height: usableHeight }
+    : { x: margin, y: margin + strip.extent + kerf, width: usableWidth, height: usableHeight - strip.extent - kerf };
+  if (rest.width <= 1e-9 || rest.height <= 1e-9) return candidate;
+
+  // The pass that frees the strip from the rest of the panel comes first at
+  // the saw, so it is first in the list; it runs the panel's full usable span.
+  const separation: SplitCut = strip.axis === 'width'
+    ? { axis: 'vertical', lengthCm: usableHeight }
+    : { axis: 'horizontal', lengthCm: usableWidth };
+  const cuts = [separation, ...candidate.cuts].map((cut, position) => ({
+    id: `sheet${sheetIndex}_cut_${position}`, sheetIndex, axis: cut.axis, lengthCm: cut.lengthCm,
+  }));
+
+  return { ...candidate, freeRects: [...candidate.freeRects, rest], cuts };
+}
+
 // Round to a fixed cm precision so IDs/areas are stable across floating-point noise.
 function roundTo(value: number, decimals: number): number {
   const factor = 10 ** decimals;
@@ -941,6 +1128,9 @@ function buildSheetResult(sheet: Sheet, sheetIndex: number, defaultMaterial: Mat
     material: (sheet.material || defaultMaterial) as MaterialType,
     width: sheet.width,
     height: sheet.height,
+    ...(sheet.label ? { label: sheet.label } : {}),
+    ...(sheet.color ? { color: sheet.color } : {}),
+    ...(isPrice(sheet.pricePerSheet) ? { pricePerSheet: sheet.pricePerSheet } : {}),
     pieces,
     offcuts: buildOffcutsForSheet(freeRects, sheet, sheetIndex, options),
     cuts,
@@ -949,21 +1139,45 @@ function buildSheetResult(sheet: Sheet, sheetIndex: number, defaultMaterial: Mat
   };
 }
 
+/** Where one plan search stood before packing the panel at a given position. */
+interface PlanSearchCheckpoint { frontier: PartialPlanCandidate[]; completed: PartialPlanCandidate[]; }
+
+interface PlanSearchControls {
+  /** Keeps one panel's pieces within a strip (see `StripLimit`). */
+  strip?: StripLimit;
+  /**
+   * Indexed by panel position. A search without a strip fills it in; a strip
+   * search of the same strategy reads it to skip the panels before its strip.
+   */
+  checkpoints?: PlanSearchCheckpoint[];
+  /** Counts the packing work done, one unit per piece offered to a panel. */
+  meter?: { work: number };
+}
+
 function simulatePlanForStrategy(
   items: ExpandedPiece[],
   sheets: Sheet[],
   strategy: PackingStrategy,
   mergedOptions: OptimizationOptions,
-  defaultMaterial: MaterialType
+  defaultMaterial: MaterialType,
+  search: PlanSearchControls = {}
 ): PlanCandidate {
+  const { strip, checkpoints, meter } = search;
   const stockSequence = getStockSequence(sheets);
-    const candidateStrategies = [
-      strategy,
-      ...PACKING_STRATEGIES.filter((candidate) => candidate.id !== strategy.id),
-    ];
+  const candidateStrategies = [
+    strategy,
+    ...PACKING_STRATEGIES.filter((candidate) => candidate.id !== strategy.id),
+  ];
+  // A strip search already knows how many panels the job takes: a plan that
+  // needs one more is of no use to it, so it stops there instead of opening
+  // panel after panel.
+  const maxSheets = strip ? strip.sheetCount : Number.POSITIVE_INFINITY;
   const maxSheetArea = sheets.reduce((max, sheet) => Math.max(max, sheet.width * sheet.height), 0);
   const beamWidth = 6;
-  let frontier: PartialPlanCandidate[] = [{
+  // Every panel before the strip is packed exactly as in the search that left
+  // the checkpoints, so a strip search picks up from the one at its panel.
+  const resumeFrom = strip && checkpoints ? checkpoints[strip.sheetIndex] : undefined;
+  let frontier: PartialPlanCandidate[] = resumeFrom ? resumeFrom.frontier : [{
     sheets: [],
     placedPieces: [],
     unplacedPieces: items,
@@ -972,7 +1186,7 @@ function simulatePlanForStrategy(
     remaining: items,
     nextPieceNumber: 1,
   }];
-  const completed: PartialPlanCandidate[] = [];
+  const completed: PartialPlanCandidate[] = resumeFrom ? [...resumeFrom.completed] : [];
 
   const rankPartialPlan = (plan: PartialPlanCandidate): [number, number, number, number] => {
     const remainingArea = plan.remaining.reduce((sum, piece) => sum + (piece.width * piece.height), 0);
@@ -987,9 +1201,10 @@ function simulatePlanForStrategy(
 
   while (frontier.length > 0) {
     const nextFrontier: PartialPlanCandidate[] = [];
+    if (checkpoints && !strip) checkpoints[frontier[0].sheets.length] = { frontier, completed: [...completed] };
 
     for (const plan of frontier) {
-      if (plan.remaining.length === 0 || (mergedOptions.singleSheetOnly && plan.sheets.length >= 1)) {
+      if (plan.remaining.length === 0 || (mergedOptions.singleSheetOnly && plan.sheets.length >= 1) || plan.sheets.length >= maxSheets) {
         completed.push(plan);
         continue;
       }
@@ -999,7 +1214,10 @@ function simulatePlanForStrategy(
       let producedCandidate = false;
 
       for (const candidateStrategy of candidateStrategies) {
-        const candidate = packSheetWithStrategy(plan.remaining, sheet, candidateStrategy, sheetIndex, plan.nextPieceNumber);
+        if (meter) meter.work += plan.remaining.length;
+        const candidate = strip && strip.sheetIndex === sheetIndex
+          ? packSheetWithinStrip(plan.remaining, sheet, strip, candidateStrategy, sheetIndex, plan.nextPieceNumber)
+          : packSheetWithStrategy(plan.remaining, sheet, candidateStrategy, sheetIndex, plan.nextPieceNumber);
         if (candidate.pieces.length === 0) continue;
 
         producedCandidate = true;
@@ -1207,7 +1425,9 @@ function buildActiveConstraints(options: OptimizationOptions, sheetsUsed: number
 interface StrategySearchOutcome { plan: PlanCandidate; candidatesEvaluated: number; }
 
 // Runs every packing strategy against one homogeneous set of items/stock and
-// keeps the best plan per the active `optimizationPriority` scoring policy.
+// keeps the best plan per the active `optimizationPriority` scoring policy,
+// then gives that plan a second pass to keep its largest offcut whole (see
+// `keepLargestRemnantWhole`).
 function runStrategySearch(
   items: ExpandedPiece[],
   candidateSheets: Sheet[],
@@ -1215,16 +1435,234 @@ function runStrategySearch(
   defaultMaterial: MaterialType
 ): StrategySearchOutcome {
   let bestPlan: PlanCandidate | null = null;
+  // Left by the first strategy's search for the second pass, which runs that
+  // same strategy again with a strip on one panel.
+  const checkpoints: PlanSearchCheckpoint[] = [];
 
   for (const strategy of PACKING_STRATEGIES) {
-    const candidate = simulatePlanForStrategy(items, candidateSheets, strategy, mergedOptions, defaultMaterial);
+    const candidate = simulatePlanForStrategy(items, candidateSheets, strategy, mergedOptions, defaultMaterial, strategy === PACKING_STRATEGIES[0] ? { checkpoints } : {});
     bestPlan = chooseBetterPlan(bestPlan, candidate, mergedOptions.optimizationPriority);
   }
 
+  if (!bestPlan) {
+    return {
+      plan: { sheets: [], placedPieces: [], unplacedPieces: items, totalAreaUsed: 0, totalAreaAvailable: 0 },
+      candidatesEvaluated: PACKING_STRATEGIES.length,
+    };
+  }
+
+  if (!remnantPassEnabled) return { plan: bestPlan, candidatesEvaluated: PACKING_STRATEGIES.length };
+  const second = keepLargestRemnantWhole(items, candidateSheets, bestPlan, checkpoints, mergedOptions, defaultMaterial);
+  return { plan: second.plan, candidatesEvaluated: PACKING_STRATEGIES.length + second.candidatesEvaluated };
+}
+
+// ─── Second pass: the largest offcut, in one piece ────────────────
+//
+// Every plan that places the same pieces on the same number of panels wastes
+// the same area, so the first search has nothing to tell them apart but
+// sawing effort. The workshop does: what is left of the last panel goes back
+// on the rack, and one large offcut can be cut again where the same area in
+// scattered rectangles cannot (customer report, 2026-11-13).
+//
+// This pass takes the finished plan and asks for the same pieces on the same
+// number of panels, with one panel's pieces held in a strip (`StripLimit`).
+// It narrows that strip as far as the job still fits, on each panel position
+// in turn and along both axes (which pieces end up sharing the strip decides
+// how narrow it can get), and keeps the plan whose largest reusable offcut is
+// worth most, provided it is worth clearly more than the first plan's. A plan is only ever replaced by one that places as many pieces,
+// on no more panels, with as much area used: sheet count and waste cannot get
+// worse here.
+
+// Tests compare a plan with the one the first search alone gives; nothing in
+// the app turns the pass off.
+let remnantPassEnabled = true;
+function withoutRemnantPass<T>(run: () => T): T {
+  remnantPassEnabled = false;
+  try {
+    return run();
+  } finally {
+    remnantPassEnabled = true;
+  }
+}
+
+// An offcut that still runs the panel's full length can take any part the
+// panel itself could, long ones included; a wider but shorter one cannot. So
+// at equal area the full-length offcut is the better one to keep, and it is
+// counted as worth a quarter more than its area. The figure is a judgment,
+// not a measurement: it makes a full-length offcut win unless the other is
+// clearly larger.
+const FULL_LENGTH_REMNANT_WORTH = 1.25;
+
+// The first plan is the one chosen for the least sawing, with pieces of one
+// width on the same saw line. It is only given up for an offcut worth at least
+// a quarter more than the one it already leaves: a plan that already keeps a
+// good offcut is not rearranged for a few centimetres. Like the weight above,
+// the figure is a judgment.
+const REMNANT_GAIN_WORTH_A_NEW_PLAN = 1.25;
+
+// How finely the strip is narrowed, in cm.
+const STRIP_SEARCH_PRECISION_CM = 1;
+
+// Ceiling on the second pass's packing work, in the unit of
+// `PlanSearchControls.meter` (one per piece offered to a panel). It is a count,
+// not a duration, so the same job always gets the same plan. A job of some
+// seventy pieces on four panels tries every position well within it; a job of
+// hundreds of pieces reaches it after its last few panels, which are the
+// cheap ones to retry and the ones a job leaves partly empty.
+const REMNANT_SEARCH_WORK_BUDGET = 400_000;
+
+function usableSpan(sheet: Sheet): { margin: number; kerf: number; width: number; height: number } {
+  const margin = Math.max(0, sheet.margin || 0);
   return {
-    plan: bestPlan || { sheets: [], placedPieces: [], unplacedPieces: items, totalAreaUsed: 0, totalAreaAvailable: 0 },
-    candidatesEvaluated: PACKING_STRATEGIES.length,
+    margin,
+    kerf: Math.max(0, sheet.kerf || 0),
+    width: Math.max(0, sheet.width - (margin * 2)),
+    height: Math.max(0, sheet.height - (margin * 2)),
   };
+}
+
+/** What the largest reusable offcut of a plan is worth: its area in cm², weighted up when it runs a panel's full length. */
+function largestRemnantWorth(plan: PlanCandidate, stockSequence: Sheet[], sheets: Sheet[]): number {
+  let worth = 0;
+  for (const sheet of plan.sheets) {
+    const usable = usableSpan(getSheetForIndex(stockSequence, sheets, sheet.index));
+    const fullLength = Math.max(usable.width, usable.height);
+    for (const offcut of sheet.offcuts) {
+      if (!offcut.isReusable) continue;
+      const lengthwise = Math.max(
+        usable.height >= usable.width ? offcut.height : 0,
+        usable.width >= usable.height ? offcut.width : 0
+      );
+      const runsFullLength = lengthwise >= fullLength - 1e-6;
+      worth = Math.max(worth, offcut.width * offcut.height * (runsFullLength ? FULL_LENGTH_REMNANT_WORTH : 1));
+    }
+  }
+  return worth;
+}
+
+// The panel left part-used reads best at the end of the plan: full panels
+// first, then the one that goes back on the rack. Pieces, offcuts and cuts are
+// renumbered to follow the new order.
+function moveSheetLast(plan: PlanCandidate, from: number): PlanCandidate {
+  const order = [...plan.sheets.slice(0, from), ...plan.sheets.slice(from + 1), plan.sheets[from]];
+  let pieceNumber = 0;
+  const sheets = order.map((sheet, index) => ({
+    ...sheet,
+    index,
+    pieces: sheet.pieces.map((piece) => {
+      pieceNumber += 1;
+      return { ...piece, sheetIndex: index, pieceNumber };
+    }),
+    offcuts: sheet.offcuts.map((offcut) => ({
+      ...offcut,
+      sheetIndex: index,
+      id: buildOffcutId(index, offcut.x, offcut.y, offcut.width, offcut.height),
+    })),
+    cuts: sheet.cuts.map((cut, position) => ({ ...cut, sheetIndex: index, id: `sheet${index}_cut_${position}` })),
+  }));
+  return { ...plan, sheets, placedPieces: sheets.flatMap((sheet) => sheet.pieces) };
+}
+
+function keepLargestRemnantWhole(
+  items: ExpandedPiece[],
+  sheets: Sheet[],
+  basePlan: PlanCandidate,
+  checkpoints: PlanSearchCheckpoint[],
+  mergedOptions: OptimizationOptions,
+  defaultMaterial: MaterialType
+): StrategySearchOutcome {
+  const sheetCount = basePlan.sheets.length;
+  const strategy = PACKING_STRATEGIES[0];
+  if (sheetCount === 0 || !strategy) return { plan: basePlan, candidatesEvaluated: 0 };
+
+  const stockSequence = getStockSequence(sheets);
+  const meter = { work: 0 };
+  let best = basePlan;
+  let bestStripIndex = -1;
+  // What a plan's largest offcut must be worth to replace the best so far.
+  let worthToBeat = largestRemnantWorth(basePlan, stockSequence, sheets) * REMNANT_GAIN_WORTH_A_NEW_PLAN;
+  let probes = 0;
+
+  const probe = (strip: StripLimit): PlanCandidate | null => {
+    probes += 1;
+    const candidate = simulatePlanForStrategy(items, sheets, strategy, mergedOptions, defaultMaterial, { strip, checkpoints, meter });
+    const keepsThePlan = candidate.unplacedPieces.length <= basePlan.unplacedPieces.length
+      && candidate.sheets.length <= sheetCount
+      && candidate.totalAreaUsed >= basePlan.totalAreaUsed - 1e-6;
+    return keepsThePlan ? candidate : null;
+  };
+
+  // How far the pieces of the limited panel actually reach along the strip axis.
+  const reachOf = (plan: PlanCandidate, strip: StripLimit, margin: number): number => {
+    const sheet = plan.sheets[strip.sheetIndex];
+    if (!sheet) return 0;
+    return sheet.pieces.reduce((reach, piece) => Math.max(
+      reach,
+      strip.axis === 'width' ? piece.x + piece.width - margin : piece.y + piece.height - margin
+    ), 0);
+  };
+
+  const finish = (): StrategySearchOutcome => {
+    // Moving a panel is only safe among panels cut from the same stock entry:
+    // a panel's position decides which stock panel (size, price) it stands for.
+    const stockAt = (index: number) => getSheetForIndex(stockSequence, sheets, index);
+    const movable = bestStripIndex >= 0 && bestStripIndex < best.sheets.length - 1
+      && best.sheets.every((sheet) => sheet.index <= bestStripIndex || stockAt(sheet.index) === stockAt(bestStripIndex));
+    return { plan: movable ? moveSheetLast(best, bestStripIndex) : best, candidatesEvaluated: probes };
+  };
+
+  // Last panel first: it is the one a job leaves partly empty, and the
+  // cheapest to retry since every panel before it is already packed.
+  for (let sheetIndex = sheetCount - 1; sheetIndex >= 0; sheetIndex -= 1) {
+    const usable = usableSpan(getSheetForIndex(stockSequence, sheets, sheetIndex));
+    // The axis whose strip leaves a full-length offcut goes first.
+    const axes: StripLimit['axis'][] = usable.height >= usable.width ? ['width', 'height'] : ['height', 'width'];
+
+    for (const axis of axes) {
+      const along = axis === 'width' ? usable.width : usable.height;
+      const across = axis === 'width' ? usable.height : usable.width;
+      if (along <= 0 || across <= 0) continue;
+      const restWorthPerCm = across * (across >= along ? FULL_LENGTH_REMNANT_WORTH : 1);
+
+      // `low` is the widest strip known not to work, `high` the narrowest
+      // known to work. Before any probe `high` is the widest strip whose
+      // offcut would still be worth enough, and it is tried first: if the
+      // job does not fit there, this panel and axis have nothing to offer.
+      let low = 0;
+      let high = along - usable.kerf - (worthToBeat / restWorthPerCm) - 1e-6;
+      let forced: number | null = high;
+      let fits = false;
+
+      while (forced !== null || high - low > STRIP_SEARCH_PRECISION_CM) {
+        if (meter.work >= REMNANT_SEARCH_WORK_BUDGET) return finish();
+        const extent: number = forced ?? (low + high) / 2;
+        forced = null;
+        if (extent <= low) break;
+        const strip: StripLimit = { sheetIndex, axis, extent, sheetCount };
+        const plan = probe(strip);
+        if (!plan) {
+          if (!fits) break;
+          low = extent;
+          continue;
+        }
+        fits = true;
+        high = extent;
+        const worth = largestRemnantWorth(plan, stockSequence, sheets);
+        if (worth > worthToBeat) {
+          best = plan;
+          bestStripIndex = sheetIndex;
+          worthToBeat = worth;
+        }
+        // The pieces may stop short of the limit: the strip is tried at
+        // exactly their reach next, so no sliver is left between them and
+        // the cut that frees the offcut.
+        const reach = reachOf(plan, strip, usable.margin);
+        if (reach < extent - 1e-3 && reach > low + 1e-3) forced = reach;
+      }
+    }
+  }
+
+  return finish();
 }
 
 // Re-assigns sheet indexes, piece numbers, and offcut IDs so a plan produced
@@ -1444,14 +1882,20 @@ export function optimizeCutting2D(
   );
   const totalM = Math.round((totalCutLengthCm / 100) * 10) / 10;
 
-  // Material cost: one line per physical sheet actually used, priced per m²
-  // from the material library unless the caller supplied an explicit
-  // per-material override. This is 'measured' because it is derived from
+  // Material cost: one line per physical sheet actually used, priced per
+  // panel (the artisan's price, else the catalog price of that panel; see
+  // `sheetPricing`). This is 'measured' because it is derived from
   // the real plan (finalPlan.sheets), not a pre-optimization guess.
   const sheetCostLines: SheetCostLine[] = finalPlan.sheets.map((sheet) => ({
     areaM2: (sheet.width * sheet.height) / 10000,
     quantity: 1,
-    pricing: mergedOptions.stockPricingOverrides?.[sheet.material] ?? { mode: 'per_m2', value: getMaterialDef(sheet.material).pricePerM2 },
+    pricing: sheetPricing(sheet, mergedOptions.stockPricingOverrides),
+    // Which panel this is, for the price detail (src/lib/cost-detail.ts) only.
+    material: sheet.material,
+    ...(sheet.label ? { label: sheet.label.slice(0, 80) } : {}),
+    ...(sheet.color ? { color: sheet.color.slice(0, 60) } : {}),
+    widthCm: sheet.width,
+    heightCm: sheet.height,
   }));
 
   // Edge banding cost: derived from the pieces the packer actually placed
@@ -1468,7 +1912,7 @@ export function optimizeCutting2D(
     const pricePerMeter = resolveEdgeRatePerMeter(
       placed.edges.pricePerM !== undefined
         ? { kind: 'explicit', pricePerMeter: placed.edges.pricePerM }
-        : { kind: 'preset', preset: { id: preset.id, pricePerMeter: preset.pricePerM } }
+        : { kind: 'preset', preset: { id: preset.id, pricePerMeter: edgePricePerM(preset.id, mergedOptions.edgeBandPricePerM) } }
     );
     if (pricePerMeter <= 0) continue;
     // Edge flags (top/bottom/left/right) refer to the piece's own labeled
@@ -1480,7 +1924,7 @@ export function optimizeCutting2D(
     if (placed.edges.left) lengthM += placed.originalHeight / 100;
     if (placed.edges.right) lengthM += placed.originalHeight / 100;
     if (lengthM === 0) continue;
-    edgeSegments.push({ lengthM, pricePerMeter });
+    edgeSegments.push({ lengthM, pricePerMeter, edgeId: preset.id });
   }
 
   // Built once, then handed to computeCostBreakdown *and* returned verbatim
@@ -1522,4 +1966,5 @@ export const GuillotinePacker = {
   strategies: PACKING_STRATEGIES,
   pruneFreeRects,
   chooseBetterPlan,
+  withoutRemnantPass,
 };
