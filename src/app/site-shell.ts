@@ -29,6 +29,8 @@ export const sharedMetadata: Metadata = {
     apple: "/apple-touch-icon.png",
   },
   appleWebApp: { capable: true, title: "QatliA", statusBarStyle: "black-translucent" },
+  // Proves to Meta that the QatliA business portfolio owns qatlia.ma.
+  verification: { other: { "facebook-domain-verification": "w739k3ckib7axcvs2dho307xo7djgs" } },
 };
 
 export const sharedViewport: Viewport = { themeColor: "#F5A623" };
