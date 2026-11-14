@@ -224,3 +224,24 @@ test('every fixed reply exists in both languages and is non-empty', () => {
     }
   }
 });
+
+test('no fixed reply mentions a bank card', () => {
+  const keys = ['howItWorks', 'pricing', 'advisor', 'redirect', 'imageHint', 'mediaHandoff', 'fallback'];
+  const texts = [COPY.greeting, ...keys.flatMap((key) => [COPY[key].fr, COPY[key].ar])];
+  for (const text of texts) {
+    assert.ok(!/carte|بطاقة|كارت/i.test(text), text.slice(0, 60));
+  }
+});
+
+test('the pricing reply lists every pack, the signup gift and the cost of an analysis', () => {
+  const { CREDIT_PACKS, formatMAD } = load('src/lib/billing/catalog.ts');
+  const { SIGNUP_FREE_CREDITS, VISION_CREDIT_COST } = load('src/lib/billing/policy.ts');
+  for (const pack of Object.values(CREDIT_PACKS)) {
+    assert.ok(COPY.pricing.fr.includes(`${pack.credits} crédits : ${formatMAD(pack.priceMAD)}`), pack.id);
+    assert.ok(COPY.pricing.ar.includes(`${pack.credits} كريدي بـ ${pack.priceMAD} درهم`), pack.id);
+  }
+  assert.ok(COPY.pricing.fr.includes(`${SIGNUP_FREE_CREDITS} crédits gratuits`));
+  assert.ok(COPY.pricing.ar.includes(`${SIGNUP_FREE_CREDITS} كريدي مجانا`));
+  assert.ok(COPY.pricing.fr.includes(`${VISION_CREDIT_COST} crédit = 1 analyse complète`));
+  assert.ok(COPY.pricing.ar.includes(`${VISION_CREDIT_COST} كريدي = تحليل كامل`));
+});

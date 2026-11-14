@@ -6,7 +6,8 @@
  * preview from the first URL of the message.
  */
 
-import { ANALYSIS_WINDOW_HOURS } from '@/lib/billing/policy';
+import { CREDIT_PACKS, formatMAD } from '@/lib/billing/catalog';
+import { ANALYSIS_WINDOW_HOURS, SIGNUP_FREE_CREDITS, VISION_CREDIT_COST } from '@/lib/billing/policy';
 import { supportWhatsAppUrl } from '@/lib/support';
 
 export type Lang = 'fr' | 'ar';
@@ -14,6 +15,14 @@ export type Lang = 'fr' | 'ar';
 export const DEMO_VIDEO_URL = 'https://youtu.be/dQE_PzXUAR0';
 
 const SUPPORT_URL = supportWhatsAppUrl();
+
+// Packs are listed from the catalog so a price change reaches the bot too.
+const PACK_LINES_FR = Object.values(CREDIT_PACKS)
+  .map((pack) => `• ${pack.credits} crédits : ${formatMAD(pack.priceMAD)}`)
+  .join('\n');
+const PACK_LINES_AR = Object.values(CREDIT_PACKS)
+  .map((pack) => `• ${pack.credits} كريدي بـ ${pack.priceMAD} درهم`)
+  .join('\n');
 
 export const COPY: {
   greeting: string;
@@ -28,7 +37,7 @@ export const COPY: {
   greeting: `Bonjour 👋 Merci pour votre intérêt !
 QatliA optimise la découpe de vos panneaux : prenez en photo votre fiche de mesure et recevez le plan de coupe en PDF en quelques secondes.
 🎥 Démo en 1 min : ${DEMO_VIDEO_URL}
-👉 Essai gratuit, sans carte bancaire : https://qatlia.ma
+👉 Essai gratuit : https://qatlia.ma
 Répondez :
 1️⃣ Comment ça marche
 2️⃣ Tarifs
@@ -55,10 +64,24 @@ ${DEMO_VIDEO_URL}
   },
 
   pricing: {
-    fr: `Vous commencez gratuitement avec des crédits offerts à l'inscription, sans carte bancaire. Ensuite, vous achetez des crédits seulement quand vous en avez besoin, sans abonnement. Les recalculs de la même liste sont gratuits pendant ${ANALYSIS_WINDOW_HOURS} h.
-Détails : https://qatlia.ma`,
-    ar: `كتبدا بالمجان بكريديات مهداة ملي كتسجل، بلا بطاقة بنكية. من بعد كتشري الكريديات غير ملي تحتاجهم، بلا اشتراك. إعادة الحساب فنفس اللائحة مجانية لمدة ${ANALYSIS_WINDOW_HOURS} ساعة.
-التفاصيل: https://qatlia.ma`,
+    fr: `💰 Tarifs QatliA
+🎁 ${SIGNUP_FREE_CREDITS} crédits gratuits à l'inscription pour essayer.
+${VISION_CREDIT_COST} crédit = 1 analyse complète (photo de la fiche + plan de coupe).
+Recalculs de la même liste gratuits pendant ${ANALYSIS_WINDOW_HOURS} h, exports PDF gratuits.
+
+Packs, sans abonnement :
+${PACK_LINES_FR}
+
+👉 https://qatlia.ma`,
+    ar: `💰 الأثمنة ديال QatliA
+🎁 ${SIGNUP_FREE_CREDITS} كريدي مجانا ملي كتسجل باش تجرب.
+${VISION_CREDIT_COST} كريدي = تحليل كامل (صورة الورقة + مخطط التقطيع).
+إعادة الحساب فنفس اللائحة مجانية لمدة ${ANALYSIS_WINDOW_HOURS} ساعة، وملفات PDF مجانية.
+
+الباقات، بلا اشتراك:
+${PACK_LINES_AR}
+
+👉 https://qatlia.ma`,
   },
 
   advisor: {
