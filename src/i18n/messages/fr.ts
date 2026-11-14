@@ -367,6 +367,7 @@ export const fr = {
       sheetTab: 'Panneau {index}',
       zoomOut: 'Zoom arrière',
       zoomIn: 'Zoom avant',
+      zoomReset: 'Réinitialiser le zoom',
       zoomLevelAria: 'Niveau de zoom',
     },
     exports: {

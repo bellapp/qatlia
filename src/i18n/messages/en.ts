@@ -326,6 +326,7 @@ export const en: Catalog = {
       sheetTab: 'Sheet {index}',
       zoomOut: 'Zoom out',
       zoomIn: 'Zoom in',
+      zoomReset: 'Reset zoom',
       zoomLevelAria: 'Zoom level',
     },
     exports: {
