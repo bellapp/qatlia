@@ -10,14 +10,14 @@ const {
   tablesWithRlsEnabled,
 } = require('./helpers/sql-inspect');
 
-// Migration 015 backs the WhatsApp bot (src/app/api/whatsapp/webhook). Both
+// Migration 016 backs the WhatsApp bot (src/app/api/whatsapp/webhook). Both
 // tables are written and read by the webhook route with the service role only:
 // no client role may touch them, so there is no policy and no client grant.
 //
 // No Postgres is reachable from this environment, so the assertions are on the
 // statements the database will receive, replayed in file order.
 
-const MIGRATION = 'supabase/migrations/015_whatsapp_bot.sql';
+const MIGRATION = 'supabase/migrations/016_whatsapp_bot.sql';
 const sql = fs.readFileSync(path.resolve(__dirname, '..', MIGRATION), 'utf8');
 const statements = splitStatements(sql).map((statement) => statement.replace(/\s+/g, ' ').trim());
 

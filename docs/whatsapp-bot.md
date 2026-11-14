@@ -69,7 +69,7 @@ Les noms ci-dessous sont exacts. Les valeurs ne doivent jamais être écrites da
 
 À faire seulement une fois la mise en place terminée. Cochez chaque case une fois l'étape terminée.
 
-- [ ] **1. Appliquer la migration.** Appliquer `supabase/migrations/015_whatsapp_bot.sql` sur Supabase.
+- [ ] **1. Appliquer la migration.** Appliquer `supabase/migrations/016_whatsapp_bot.sql` sur Supabase.
 - [ ] **2. Fusionner et configurer le webhook.** Fusionner la PR, attendre le déploiement, puis configurer le webhook (étape 6 de la mise en place ci-dessus). Meta doit afficher « Vérifié ».
 - [ ] **3. Tester le bot éteint.** Avec `WHATSAPP_BOT_ENABLED=false`, envoyer un message depuis un autre numéro : une ligne apparaît dans la table `whatsapp_messages`, et rien n'est envoyé.
 - [ ] **4. Désactiver le message d'accueil et le message d'absence** de l'app WhatsApp Business (téléphone → Outils professionnels). Pourquoi : en coexistence, ces messages automatiques arrivent comme des échos, et le bot croirait qu'un humain a répondu et se tairait pendant 24 h.

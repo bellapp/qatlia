@@ -219,7 +219,7 @@ export async function POST(request: Request): Promise<Response> {
       else await handleInbound(db, config, event);
     } catch (error) {
       if (error instanceof WhatsAppTablesMissingError) {
-        console.error('[whatsapp] migration 015 non appliquée');
+        console.error('[whatsapp] migration 016 non appliquée');
         break;
       }
       console.error('[whatsapp] event failed', describeError(error));

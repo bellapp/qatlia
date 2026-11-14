@@ -532,7 +532,7 @@ test('missing WhatsApp tables: 200, nothing sent, the rest of the batch is skipp
       assert.equal(state.sent.length, 0);
       assert.equal(state.claims.length, 0);
       assert.equal(state.contacts.size, 1, 'the second event was never processed');
-      assert.ok(logged.some((line) => line.includes('[whatsapp] migration 015 non appliquée')));
+      assert.ok(logged.some((line) => line.includes('[whatsapp] migration 016 non appliquée')));
     });
   });
 });

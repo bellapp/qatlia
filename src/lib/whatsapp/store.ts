@@ -18,10 +18,10 @@ const CONTACT_COLUMNS = 'wa_id, profile_name, lang, greeted_at, handoff_until, r
 /** Postgres unique violation. */
 const UNIQUE_VIOLATION = '23505';
 
-/** Thrown when migration 015 has not been applied to this database yet. */
+/** Thrown when migration 016 has not been applied to this database yet. */
 export class WhatsAppTablesMissingError extends Error {
   constructor() {
-    super('[whatsapp] tables missing: apply supabase/migrations/015_whatsapp_bot.sql');
+    super('[whatsapp] tables missing: apply supabase/migrations/016_whatsapp_bot.sql');
     this.name = 'WhatsAppTablesMissingError';
   }
 }
@@ -189,7 +189,7 @@ export async function updateContact(
   }
   if (Object.keys(columns).length === 0) return;
 
-  // No trigger maintains updated_at (see migration 015).
+  // No trigger maintains updated_at (see migration 016).
   columns.updated_at = new Date().toISOString();
   const { error } = await db.from(CONTACTS).update(columns).eq('wa_id', waId);
   if (error) raise(error, 'update contact');
