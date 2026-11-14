@@ -261,3 +261,11 @@ test('a reply of 2000 characters is cut to MAX_REPLY_CHARS', async () => {
   const result = await ask(f);
   assert.equal(result.reply.length, MAX_REPLY_CHARS);
 });
+
+test('the system prompt never feeds the model a bank-card promise and forbids bringing it up', () => {
+  for (const mode of ['redirect', 'coexistence']) {
+    const prompt = buildSystemPrompt(mode);
+    assert.ok(!/sans carte bancaire/i.test(prompt), mode);
+    assert.ok(prompt.includes('Ne parle jamais de carte bancaire'), mode);
+  }
+});
