@@ -35,6 +35,38 @@ const IMPORT_FORMAT_SPEC = 'Nom;Hauteur;Largeur;Quantité';
 /** The figures of the placeholder example row; only the piece name is localized. */
 const IMPORT_EXAMPLE_VALUES = '230;45,5;2';
 
+/**
+ * The pieces table on a phone (360px up to `sm`): number, name, dimensions,
+ * quantity, edge banding, actions. Twelve equal tracks are ~20px each at that
+ * width, which left no room for the edge-banding picker, so the five sized
+ * tracks take exactly what their content needs and the name takes the rest.
+ * The dimensions track follows the unit: "230.0 × 120.0" is 70px in 10px
+ * JetBrains Mono, "2780.0 × 2080.0" is 82px (74px at 9px, see
+ * `DIMENSIONS_FONT`). Below 360px the old twelve tracks stay, without the
+ * picker. The class names are spelled out whole so Tailwind can find them.
+ */
+const PIECES_GRID_PHONE: Record<DisplayUnit, string> = {
+  cm: 'min-[360px]:grid-cols-[16px_minmax(0,1fr)_72px_24px_18px_98px]',
+  mm: 'min-[360px]:grid-cols-[16px_minmax(0,1fr)_76px_24px_18px_98px] min-[390px]:grid-cols-[16px_minmax(0,1fr)_84px_24px_18px_98px]',
+};
+
+/** Grid shared by the header, every row and the direct-entry line, so their
+ *  columns stay aligned. `sm` and up keep the twelve-track desktop geometry. */
+function piecesGridClass(unit: DisplayUnit): string {
+  return `grid grid-cols-12 ${PIECES_GRID_PHONE[unit]} sm:grid-cols-12 gap-1 sm:gap-1.5 px-2 sm:px-3`;
+}
+
+/** Type size of the two figures. Millimetres carry one more digit, so they
+ *  stay at 9px until 390px, where their track widens. */
+const DIMENSIONS_FONT: Record<DisplayUnit, string> = {
+  cm: 'text-[9px] min-[360px]:text-[10px] sm:text-[11px] lg:text-[10px] xl:text-xs',
+  mm: 'text-[9px] min-[390px]:text-[10px] sm:text-[11px] lg:text-[10px] xl:text-xs',
+};
+
+/** Spans of the cells that are wider than one track outside the phone grid. */
+const NAME_SPAN = 'col-span-2 min-[360px]:col-span-1 sm:col-span-3';
+const WIDE_SPAN = 'col-span-4 min-[360px]:col-span-1 sm:col-span-3';
+
 const EDGE_SIDES: readonly EdgeSide[] = ['left', 'right', 'top', 'bottom'];
 
 /** Amber stroke color for active edges, matching the brand accent used elsewhere for edge state. */
@@ -141,7 +173,7 @@ function EdgePickerButton({
         aria-haspopup="dialog"
         aria-expanded={open}
         aria-label={t('pieces.edge.pickerAria', { name, count: activeCount })}
-        className="w-6 h-6 flex items-center justify-center rounded hover:bg-studio-border transition-colors"
+        className="w-[18px] h-[18px] sm:w-6 sm:h-6 flex items-center justify-center rounded hover:bg-studio-border transition-colors"
       >
         <svg viewBox="0 0 20 20" width="18" height="18" aria-hidden="true">
           <rect
@@ -830,19 +862,21 @@ export const PiecesManager: React.FC<PiecesManagerProps> = ({
       )}
 
       {/* Mobile reclaims 30px of horizontal budget over the sm+ layout — a
-          narrower gutter and gap — because at 390px twelve `minmax(0,1fr)`
-          tracks are only ~20px each and the actions cell cannot hold its five
-          buttons. The three grids (header, row, quick-add) carry the SAME
-          px/gap pair so the columns stay aligned. */}
-      <div className="grid grid-cols-12 gap-1 sm:gap-1.5 px-2 sm:px-3 py-2 text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 border-b border-studio-border">
+          narrower gutter and gap. The three grids (header, row, direct entry)
+          take the SAME class from `piecesGridClass` so the columns stay
+          aligned. */}
+      <div className={`${piecesGridClass(displayUnit)} py-2 text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 border-b border-studio-border`}>
         <div className="col-span-1 text-end pe-1">{t('pieces.columns.number')}</div>
-        <div className="col-span-2 sm:col-span-3">{t('pieces.columns.piece')}</div>
-        <div className="col-span-4 sm:col-span-3 text-end">{t('pieces.columns.dimensions', { unit: displayUnit })}</div>
+        <div className={NAME_SPAN}>{t('pieces.columns.piece')}</div>
+        <div className={`${WIDE_SPAN} text-end`}>{t('pieces.columns.dimensions', { unit: displayUnit })}</div>
         <div className="col-span-1 text-center pe-0.5">{t('pieces.columns.quantity')}</div>
-        <div className="hidden sm:flex col-span-1 justify-center overflow-hidden">
-          <span className="truncate text-[9px] tracking-normal leading-none">{t('pieces.columns.edges')}</span>
+        {/* On a phone the label is wider than its 18px track: it starts on
+            the picker and runs over the empty start of the actions header
+            instead of being cut down to one letter. */}
+        <div className="hidden min-[360px]:flex col-span-1 items-center sm:items-stretch justify-start sm:justify-center sm:overflow-hidden">
+          <span className="whitespace-nowrap sm:truncate text-[9px] tracking-normal leading-none">{t('pieces.columns.edges')}</span>
         </div>
-        <div className="col-span-4 sm:col-span-3 text-end pe-1">{t('pieces.columns.color')}</div>
+        <div className={`${WIDE_SPAN} text-end pe-1`}>{t('pieces.columns.color')}</div>
       </div>
 
       <div ref={listRef} data-testid="pieces-list" className="max-h-[340px] overflow-y-auto overscroll-contain scroll-smooth">
@@ -876,7 +910,7 @@ export const PiecesManager: React.FC<PiecesManagerProps> = ({
                   data-piece-name={piece.name}
                   onMouseEnter={() => setFocusedRow(piece.id || null)}
                   onMouseLeave={() => setFocusedRow(null)}
-                  className={`grid grid-cols-12 gap-1 sm:gap-1.5 items-center px-2 sm:px-3 py-2.5 transition-colors group ${
+                  className={`${piecesGridClass(displayUnit)} items-center py-2.5 transition-colors group ${
                     isSelected ? 'bg-brand-400/10' : 'hover:bg-studio-field/60'
                   }`}
                 >
@@ -898,7 +932,7 @@ export const PiecesManager: React.FC<PiecesManagerProps> = ({
                     </span>
                   </div>
 
-                  <div className="col-span-2 sm:col-span-3 flex flex-1 items-center gap-2 min-w-0">
+                  <div className={`${NAME_SPAN} flex flex-1 items-center gap-2 min-w-0`}>
                     {/* `dir="auto"` isolates the stored name from the UI
                         direction: a Latin name ("Panneau Latéral Gauche") keeps
                         its own LTR flow and `truncate` eats its END, while an
@@ -912,9 +946,11 @@ export const PiecesManager: React.FC<PiecesManagerProps> = ({
                       className="w-full min-w-0 bg-transparent text-start text-slate-900 dark:text-slate-100 font-medium text-xs outline-none focus:text-slate-900 dark:focus:text-white truncate placeholder-slate-500"
                       placeholder={t('pieces.row.namePlaceholder')}
                     />
+                    {/* Below 390px the name has ~25px: the dot and its gap
+                        would take 14 of them, so the name keeps the room. */}
                     {!isFocused && (
                       <span
-                        className={`shrink-0 w-1.5 h-1.5 rounded-full ${matClass.split(' ')[1]}`}
+                        className={`hidden min-[390px]:block shrink-0 w-1.5 h-1.5 rounded-full ${matClass.split(' ')[1]}`}
                         title={t('pieces.row.materialAria', { material: t(materialLabelKey(piece.material)) })}
                       />
                     )}
@@ -924,7 +960,7 @@ export const PiecesManager: React.FC<PiecesManagerProps> = ({
                       fixed 36/40px boxes: a display value always carries one
                       decimal, so "230.0" already overflowed in cm and "2780.0"
                       in mm, and the digits were clipped mid-character. */}
-                  <div className="col-span-4 sm:col-span-3 min-w-0 flex items-center justify-end gap-0.5 font-mono text-[9px] min-[360px]:text-[10px] sm:text-[11px] lg:text-[10px] xl:text-xs tabular-nums">
+                  <div className={`${WIDE_SPAN} min-w-0 flex items-center justify-end gap-0.5 font-mono ${DIMENSIONS_FONT[displayUnit]} tabular-nums`}>
                     <input
                       type="number"
                       step="0.1"
@@ -980,12 +1016,12 @@ export const PiecesManager: React.FC<PiecesManagerProps> = ({
                         handleUpdate(piece.id || '', 'quantity', parsed);
                       }}
                       onBlur={() => clearDraft(piece.id || '', 'quantity')}
-                      className="w-7 h-6 text-center bg-brand-400 rounded text-slate-900 font-mono font-bold text-[11px] leading-none outline-none border border-transparent focus:border-brand-600 focus:ring-1 focus:ring-brand-500/40 tabular-nums appearance-none [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                      className="w-6 sm:w-7 h-6 text-center bg-brand-400 rounded text-slate-900 font-mono font-bold text-[11px] leading-none outline-none border border-transparent focus:border-brand-600 focus:ring-1 focus:ring-brand-500/40 tabular-nums appearance-none [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
                       aria-label={t('pieces.row.quantityAria')}
                     />
                   </div>
 
-                  <div className="hidden sm:flex col-span-1 items-center justify-center">
+                  <div className="hidden min-[360px]:flex col-span-1 items-center justify-center">
                     <EdgePickerButton
                       name={piece.name || t('pieces.row.fallbackName', { index: index + 1 })}
                       edges={edges}
@@ -993,12 +1029,12 @@ export const PiecesManager: React.FC<PiecesManagerProps> = ({
                     />
                   </div>
 
-                  {/* Five buttons in ~101px on mobile: uniform 18px boxes
-                      (18×5 + 4 gaps of 2px = 98px) instead of the 20/24/22px
-                      mix, which needed 114px and squeezed the grain icon out.
-                      Every `sm:` size below restores the validated desktop
-                      geometry exactly. */}
-                  <div className="col-span-4 sm:col-span-3 min-w-0 overflow-visible flex items-center justify-end gap-0.5 sm:gap-1">
+                  {/* Five buttons in the 98px actions track of the phone grid:
+                      uniform 18px boxes (18×5 + 4 gaps of 2px = 98px) instead
+                      of the 20/24/22px mix, which needed 114px and squeezed
+                      the grain icon out. Every `sm:` size below restores the
+                      validated desktop geometry exactly. */}
+                  <div className={`${WIDE_SPAN} min-w-0 overflow-visible flex items-center justify-end gap-0.5 sm:gap-1`}>
                     {/* Swap H<->W for this piece; the icon is the accessible
                         name's symbol, the title carries the translated wording. */}
                     <button
@@ -1106,13 +1142,13 @@ export const PiecesManager: React.FC<PiecesManagerProps> = ({
         }}
         aria-label={t('pieces.inlineAdd.rowAria')}
         data-testid="pieces-inline-add"
-        className="grid grid-cols-12 gap-1 sm:gap-1.5 items-center px-2 sm:px-3 py-2 border-t border-dashed border-studio-border/80 bg-studio-field/30"
+        className={`${piecesGridClass(displayUnit)} items-center py-2 border-t border-dashed border-studio-border/80 bg-studio-field/30`}
       >
         <div className="col-span-1 flex items-center justify-end pe-1 text-slate-400 dark:text-slate-500">
           <Plus className="w-3.5 h-3.5" aria-hidden="true" />
         </div>
 
-        <div className="col-span-2 sm:col-span-3 min-w-0">
+        <div className={`${NAME_SPAN} min-w-0`}>
           <input
             value={newReference}
             onChange={(event) => setNewReference(event.target.value)}
@@ -1123,7 +1159,7 @@ export const PiecesManager: React.FC<PiecesManagerProps> = ({
           />
         </div>
 
-        <div className="col-span-4 sm:col-span-3 min-w-0 flex items-center justify-end gap-0.5 font-mono text-[9px] min-[360px]:text-[10px] sm:text-[11px] lg:text-[10px] xl:text-xs tabular-nums">
+        <div className={`${WIDE_SPAN} min-w-0 flex items-center justify-end gap-0.5 font-mono ${DIMENSIONS_FONT[displayUnit]} tabular-nums`}>
           <input
             type="number"
             step="0.1"
@@ -1158,13 +1194,13 @@ export const PiecesManager: React.FC<PiecesManagerProps> = ({
             onChange={(event) => setNewQty(event.target.value)}
             disabled={disabled}
             aria-label={t('pieces.inlineAdd.quantityAria')}
-            className="w-7 h-6 text-center bg-studio-field border border-studio-border rounded text-slate-900 dark:text-white font-mono font-bold text-[11px] leading-none outline-none focus:border-brand-400 tabular-nums appearance-none [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+            className="w-6 sm:w-7 h-6 text-center bg-studio-field border border-studio-border rounded text-slate-900 dark:text-white font-mono font-bold text-[11px] leading-none outline-none focus:border-brand-400 tabular-nums appearance-none [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
           />
         </div>
 
-        <div className="hidden sm:block col-span-1" aria-hidden="true" />
+        <div className="hidden min-[360px]:block col-span-1" aria-hidden="true" />
 
-        <div className="col-span-4 sm:col-span-3 min-w-0 flex items-center justify-end gap-2">
+        <div className={`${WIDE_SPAN} min-w-0 flex items-center justify-end gap-2`}>
           <button
             type="button"
             onClick={submitQuickAdd}
