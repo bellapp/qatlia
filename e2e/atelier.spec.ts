@@ -109,6 +109,46 @@ test.describe('Atelier Dashboard (/atelier)', () => {
     expect(await viewport.evaluate((element) => element.scrollHeight > element.clientHeight)).toBe(true);
   });
 
+  test('on a phone the zoom enlarges the plan and its buttons stay in view', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.reload();
+    await page.getByRole('button', { name: /optimiser/i }).click();
+    await expect(page.getByRole('button', { name: /panneau 1/i })).toBeVisible({ timeout: 15000 });
+
+    const viewport = page.getByTestId('cut-plan-viewport');
+    const svg = page.getByTestId('cut-plan-svg');
+    const fitted = (await svg.boundingBox())?.width ?? 0;
+    expect(fitted).toBeGreaterThan(0);
+
+    const zoomIn = page.getByRole('button', { name: /zoom avant/i });
+    for (let step = 0; step < 5; step += 1) await zoomIn.click();
+
+    // 225%: the plan is wider than the screen and scrolls sideways.
+    await expect.poll(async () => (await svg.boundingBox())?.width ?? 0).toBeGreaterThan(fitted * 2);
+    expect(await viewport.evaluate((element) => element.scrollWidth > element.clientWidth)).toBe(true);
+
+    await viewport.evaluate((element) => {
+      element.scrollTop = element.scrollHeight;
+      element.scrollLeft = element.scrollWidth;
+    });
+    const zoomOut = page.getByRole('button', { name: /zoom arri[èe]re/i });
+    const box = await zoomOut.boundingBox();
+    const frame = await viewport.boundingBox();
+    expect(box).not.toBeNull();
+    expect(frame).not.toBeNull();
+    expect(box!.x).toBeGreaterThanOrEqual(frame!.x);
+    expect(box!.x + box!.width).toBeLessThanOrEqual(frame!.x + frame!.width);
+    expect(box!.y + box!.height).toBeLessThanOrEqual(frame!.y + frame!.height);
+    await zoomOut.click();
+    await expect(page.getByText('200%')).toBeVisible();
+
+    const reset = page.getByRole('button', { name: /réinitialiser le zoom/i });
+    await reset.click();
+    await expect(page.getByText('100%')).toBeVisible();
+    await expect(reset).toBeDisabled();
+    await expect.poll(async () => Math.round((await svg.boundingBox())?.width ?? 0)).toBe(Math.round(fitted));
+  });
+
   test('add-piece action stays below the piece rows', async ({ page }) => {
     await page.setViewportSize({ width: 1280, height: 1024 });
     await page.reload();

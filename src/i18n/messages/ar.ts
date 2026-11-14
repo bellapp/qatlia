@@ -327,6 +327,7 @@ export const ar: Catalog = {
       sheetTab: 'لوح {index}',
       zoomOut: 'تصغير',
       zoomIn: 'تكبير',
+      zoomReset: 'إعادة ضبط التكبير',
       zoomLevelAria: 'مستوى التكبير',
     },
     exports: {

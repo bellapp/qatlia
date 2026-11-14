@@ -8,6 +8,7 @@ import {
   RefreshCw,
   ZoomIn,
   ZoomOut,
+  RotateCcw,
   Zap,
   AlertTriangle,
   Camera,
@@ -106,6 +107,13 @@ import {
 } from '@/lib/units';
 
 const DEFAULT_SHEETS: Sheet[] = [DEFAULT_STOCK_SHEET];
+
+/** CSS length for the whole content width of the plan viewport. Kept as the
+ *  bare literal the claims audit recognises as geometry, not as a figure. */
+const FULL_WIDTH = '100%';
+/** Width of the cutting plan at 100% zoom: 560px, or the whole viewport when
+ *  that is narrower (a phone). Every zoom step multiplies this width. */
+const PLAN_FIT_WIDTH = `min(560px, ${FULL_WIDTH})`;
 
 /**
  * The French name the default panel used to carry. It described the 278×208
@@ -2056,11 +2064,15 @@ const commitPanelName = () => {
                   {/* SVG Canvas — the plan is geometry, not prose: its origin is
                       the sheet's top-left corner and its labels are cm/mm
                       figures, so it stays LTR even when the workshop is RTL. */}
-                  <div dir="ltr" data-testid="cut-plan-viewport" className={`relative min-h-[420px] max-h-[70vh] overflow-auto overscroll-contain p-5 flex ${isDark ? 'bg-[#040812]' : 'bg-[#F1F5F9]'}`}>
+                  {/* The frame does not scroll; the viewport inside it does.
+                      The two overlays belong to the frame: as absolute
+                      children of the scrolling box they scrolled away with
+                      the zoomed plan, taking the zoom-out button with them. */}
+                  <div dir="ltr" data-testid="cut-plan-frame" className="relative">
                     {/* Zoom controls — floating instrument control, pinned to the
-                        viewport itself (not the toolbar) so it stays reachable
-                        while the plan underneath scrolls. Reads out/in like the
-                        plan it drives, so it keeps LTR order in every locale. */}
+                        frame (not the toolbar) so it stays reachable while the
+                        plan underneath scrolls. Reads out/in like the plan it
+                        drives, so it keeps LTR order in every locale. */}
                     <div dir="ltr" className="absolute bottom-3 end-3 z-10 flex items-center gap-1.5 bg-studio-panel/90 backdrop-blur rounded-lg border border-studio-border p-0.5 shadow-sm">
                       <button aria-label={t('atelier.plan.zoomOut')} onClick={() => setZoomLevel(Math.max(0.5, zoomLevel - 0.25))} disabled={zoomLevel <= 0.5} className="p-1 rounded-md hover:bg-studio-border transition-colors text-slate-600 dark:text-slate-400 disabled:opacity-35 disabled:cursor-not-allowed">
                         <ZoomOut className="w-3.5 h-3.5" />
@@ -2069,32 +2081,46 @@ const commitPanelName = () => {
                       <button aria-label={t('atelier.plan.zoomIn')} onClick={() => setZoomLevel(Math.min(2.5, zoomLevel + 0.25))} disabled={zoomLevel >= 2.5} className="p-1 rounded-md hover:bg-studio-border transition-colors text-slate-600 dark:text-slate-400 disabled:opacity-35 disabled:cursor-not-allowed">
                         <ZoomIn className="w-3.5 h-3.5" />
                       </button>
+                      {/* Back to 100% in one tap, instead of counting zoom-out
+                          steps on a phone. Inert when already there. */}
+                      <span className="h-3.5 w-px bg-studio-border" aria-hidden="true" />
+                      <button aria-label={t('atelier.plan.zoomReset')} title={t('atelier.plan.zoomReset')} data-testid="cut-plan-zoom-reset" onClick={() => setZoomLevel(1)} disabled={zoomLevel === 1} className="p-1 rounded-md hover:bg-studio-border transition-colors text-slate-600 dark:text-slate-400 disabled:opacity-35 disabled:cursor-not-allowed">
+                        <RotateCcw className="w-3.5 h-3.5" />
+                      </button>
                     </div>
                     {/* Technical corner readout — decorative blueprint annotation
-                        (sheet size + kerf), pinned to the viewport itself so it
-                        stays put while the plan underneath scrolls/zooms. Sits
+                        (sheet size + kerf), pinned to the frame so it stays put
+                        while the plan underneath scrolls/zooms. Sits
                         at the opposite corner from the zoom controls above. */}
                     <div aria-hidden="true" dir="ltr" className="pointer-events-none absolute bottom-3 start-3 z-10 flex items-center gap-2 rounded-lg border border-studio-border/70 bg-studio-panel/90 backdrop-blur px-2.5 py-1.5 font-mono text-[10px] font-bold text-slate-500 dark:text-slate-400 shadow-sm">
                       <span className="flex items-center gap-1">
                         <Boxes className="w-3 h-3 text-sky-400" />
                         {formatDisplayValue(activeSheet.height, displayUnit)}×{formatDisplayValue(activeSheet.width, displayUnit)} {displayUnit}
                       </span>
-                      <span className="h-3 w-px bg-studio-border" />
-                      <span className="flex items-center gap-1">
+                      {/* Below 400px the kerf part gives way to the four zoom
+                          buttons: "2780.0×2060.0 mm | 10 mm" ran under them
+                          on a 360-390px phone. The kerf stays in the settings. */}
+                      <span className="hidden xs:block h-3 w-px bg-studio-border" />
+                      <span className="hidden xs:flex items-center gap-1">
                         <Scissors className="w-3 h-3 text-brand-400" />
                         {options.kerfWidth} mm
                       </span>
                     </div>
+                    <div dir="ltr" data-testid="cut-plan-viewport" className={`min-h-[420px] max-h-[70vh] overflow-auto overscroll-contain p-5 flex ${isDark ? 'bg-[#040812]' : 'bg-[#F1F5F9]'}`}>
                     {/* m-auto (not justify-center): when the zoomed plan is wider
                         than the viewport, auto margins clamp to 0 and BOTH edges
                         stay reachable by scrolling — centered overflow via
                         justify-center would clip the left edge under the padding
-                        and visually slide the plan under the toolbar. */}
+                        and visually slide the plan under the toolbar.
+                        shrink-0: a flex item shrinks to fit by default, which
+                        squeezed the zoomed plan back to the screen width — on a
+                        phone the zoom did nothing at all. The width at 100% is
+                        560px, or the whole viewport when that is narrower, and
+                        every zoom step multiplies that width. */}
                     <div
-                      className="m-auto transition-[width,max-width] duration-200 ease-out"
+                      className="m-auto shrink-0 transition-[width] duration-200 ease-out"
                       style={{
-                        width: `${Math.round(560 * zoomLevel)}px`,
-                        maxWidth: zoomLevel <= 1 ? '100%' : undefined,
+                        width: `calc(${PLAN_FIT_WIDTH} * ${zoomLevel})`,
                       }}
                     >
                       <svg
@@ -2194,6 +2220,7 @@ const commitPanelName = () => {
                           );
                         })}
                       </svg>
+                    </div>
                     </div>
                   </div>
                 </div>
