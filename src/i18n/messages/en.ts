@@ -324,6 +324,9 @@ export const en: Catalog = {
     },
     plan: {
       sheetTab: 'Sheet {index}',
+      barTab: 'Bar {index}',
+      prevSheet: 'Previous',
+      nextSheet: 'Next',
       zoomOut: 'Zoom out',
       zoomIn: 'Zoom in',
       zoomReset: 'Reset zoom',

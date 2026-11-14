@@ -69,6 +69,7 @@ import {
 } from '@/lib/panel-presets';
 import { OptionsPanel } from '@/components/OptionsPanel';
 import { PiecesManager } from '@/components/PiecesManager';
+import { SheetTabs } from '@/components/SheetTabs';
 import { AuthModal } from '@/components/AuthModal';
 import {
   savePendingWork,
@@ -2040,25 +2041,13 @@ const commitPanelName = () => {
                 <div className="overflow-hidden rounded-xl border border-studio-border shadow-xl shadow-black/[0.06] dark:shadow-black/30">
                   {/* Tabs for sheets — opaque toolbar: the plan scrolls under it
                       when zoomed, translucency made that read as an overlap bug */}
-                  <div data-testid="cut-plan-toolbar" className="relative z-20 flex flex-wrap items-center gap-2 px-4 py-2.5 bg-studio-panel border-b border-studio-border/60">
-                    <div className="flex min-w-0 flex-1 items-center gap-1 overflow-x-auto">
-                      {Array.from({length: result.sheetsUsed}).map((_, i) => (
-                        <button
-                          key={i}
-                          onClick={() => setActiveSheetIndex(i)}
-                          className={`px-3 py-1.5 rounded-lg text-[11px] font-bold transition-all ${
-                            i === activeSheetIndex
-                              ? 'bg-brand-500/15 text-brand-400 border border-brand-500/30'
-                              : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:text-slate-300'
-                          }`}
-                        >
-                          {t('atelier.plan.sheetTab', { index: i + 1 })}
-                          <span className="ms-1.5 text-[10px] text-slate-600 font-mono" dir="ltr">
-                            {result.sheets[i]?.wasteRate?.toFixed(0)}%
-                          </span>
-                        </button>
-                      ))}
-                    </div>
+                  <div data-testid="cut-plan-toolbar" className="relative z-20 flex items-center gap-2 px-2 sm:px-4 py-2 bg-studio-panel border-b border-studio-border/60">
+                    <SheetTabs
+                      wasteRates={Array.from({ length: result.sheetsUsed }, (_, i) => result.sheets[i]?.wasteRate ?? 0)}
+                      activeIndex={activeSheetIndex}
+                      onSelect={(index) => setActiveSheetIndex(Math.max(0, Math.min(result.sheetsUsed - 1, index)))}
+                      mode={result.cutMode === '1d' ? '1d' : '2d'}
+                    />
                   </div>
 
                   {/* SVG Canvas — the plan is geometry, not prose: its origin is

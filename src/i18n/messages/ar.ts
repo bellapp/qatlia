@@ -325,6 +325,9 @@ export const ar: Catalog = {
     },
     plan: {
       sheetTab: 'لوح {index}',
+      barTab: 'قضيب {index}',
+      prevSheet: 'السابق',
+      nextSheet: 'التالي',
       zoomOut: 'تصغير',
       zoomIn: 'تكبير',
       zoomReset: 'إعادة ضبط التكبير',
