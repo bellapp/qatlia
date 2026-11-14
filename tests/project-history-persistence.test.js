@@ -263,3 +263,34 @@ test('an invalid rename body is still refused as INVALID_NAME', async () => {
     assert.equal((await res.json()).error, 'INVALID_NAME');
   });
 });
+
+// ─── PATCH /api/projects/[id] — rename ──────────────────────────────────────
+
+test('renaming a project also names it for the next reopen, and keeps every other key', async () => {
+  resetState();
+  state.user = { id: UUID };
+  state.projects.set(PROJECT_ID, { user_id: UUID, name: 'Débit', options_json: { projectName: 'Ancien', quotation: { quoteNumber: 'D-1' } } });
+  const res = await withEnv(CONFIGURED, async () => projectRoute().PATCH(...patch(PROJECT_ID, { name: '  Cuisine Alami ' })));
+  assert.equal(res.status, 200);
+  assert.deepEqual(state.updates, [{ id: PROJECT_ID, patch: { name: 'Cuisine Alami', options_json: { projectName: 'Cuisine Alami', quotation: { quoteNumber: 'D-1' } } } }]);
+});
+
+test('a 120-character name is accepted and a 121-character one refused', async () => {
+  resetState();
+  state.user = { id: UUID };
+  state.projects.set(PROJECT_ID, { user_id: UUID, name: 'Débit', options_json: {} });
+  const ok = await withEnv(CONFIGURED, async () => projectRoute().PATCH(...patch(PROJECT_ID, { name: 'n'.repeat(120) })));
+  const tooLong = await withEnv(CONFIGURED, async () => projectRoute().PATCH(...patch(PROJECT_ID, { name: 'n'.repeat(121) })));
+  assert.equal(ok.status, 200);
+  assert.equal(tooLong.status, 400);
+});
+
+test('renaming another artisan\'s project answers 404 and writes nothing', async () => {
+  resetState();
+  state.user = { id: UUID };
+  state.projects.set(OTHER_PROJECT_ID, { user_id: OTHER_UUID, name: 'Autre', options_json: {} });
+  const res = await withEnv(CONFIGURED, async () => projectRoute().PATCH(...patch(OTHER_PROJECT_ID, { name: 'Pris' })));
+  assert.equal(res.status, 404);
+  assert.deepEqual(state.updates, []);
+  assert.equal(state.projects.get(OTHER_PROJECT_ID).name, 'Autre');
+});
