@@ -100,3 +100,10 @@ test('the save date left by the history is read back only when it is a date', ()
     assert.equal(readRestoredProjectDate(raw), null);
   }
 });
+
+test('a reopened bar plan puts the atelier in bar mode, not only the viewer', () => {
+  assert.match(
+    atelierSource(),
+    /if \(restoredResult\) \{[^}]*if \(restoredResult\.cutMode === '1d' \|\| restoredResult\.cutMode === '2d'\) setCutMode\(restoredResult\.cutMode\);/
+  );
+});

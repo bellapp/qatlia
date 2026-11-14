@@ -649,6 +649,9 @@ const commitPanelName = () => {
         if (restoredResult) {
           setResult(restoredResult);
           setActiveSheetIndex(0);
+          // A bar plan reopens in bar mode: the header, the stock card, the
+          // project name and a re-run all follow the mode, not only the viewer.
+          if (restoredResult.cutMode === '1d' || restoredResult.cutMode === '2d') setCutMode(restoredResult.cutMode);
           setRestoredAt(readRestoredProjectDate(sessionStorage.getItem('qatlia_restored_project_meta')));
         }
         setPdfGeneratedAt(typeof parsed.pdfGeneratedAt === 'string' ? parsed.pdfGeneratedAt : null);
