@@ -102,3 +102,174 @@ test('the private bucket is created without a single storage policy', () => {
   assert.doesNotMatch(code, /create\s+policy/i, 'only the service key reaches storage.objects');
   assert.doesNotMatch(code, /storage\.objects/i);
 });
+
+// GET /api/projects/[id]/scan hands the owner a 5-minute signed link to the
+// image kept in the private bucket, and nobody else.
+
+const { stubModule } = require('./helpers/stub-module');
+
+const SCAN_PATH = `${UUID}/${PROJECT_ID}.jpg`;
+const scanState = { user: null, rows: new Map(), lookupError: null, signed: [], signError: null, eqCalls: [] };
+
+function resetScanState() {
+  scanState.user = null;
+  scanState.rows = new Map();
+  scanState.lookupError = null;
+  scanState.signed = [];
+  scanState.signError = null;
+  scanState.eqCalls = [];
+}
+
+stubModule('@/lib/supabase/server', {
+  createClient: () => ({
+    auth: { getUser: async () => ({ data: { user: scanState.user }, error: null }) },
+    from: (table) => {
+      assert.equal(table, 'projects');
+      const filters = {};
+      const chain = {
+        select: () => chain,
+        eq: (col, value) => { filters[col] = value; scanState.eqCalls.push([col, value]); return chain; },
+        maybeSingle: async () => {
+          if (scanState.lookupError) return { data: null, error: { message: scanState.lookupError } };
+          const row = scanState.rows.get(filters.id);
+          if (!row || row.user_id !== filters.user_id) return { data: null, error: null };
+          return { data: { id: filters.id, user_id: row.user_id, options_json: row.options_json }, error: null };
+        },
+      };
+      return chain;
+    },
+  }),
+});
+stubModule('@supabase/supabase-js', {
+  createClient: () => ({
+    storage: {
+      from: (bucket) => ({
+        createSignedUrl: async (signedPath, expiresIn) => {
+          scanState.signed.push([bucket, signedPath, expiresIn]);
+          if (scanState.signError) return { data: null, error: { message: scanState.signError } };
+          return { data: { signedUrl: `https://files.example/${bucket}/${signedPath}?token=abc` }, error: null };
+        },
+      }),
+    },
+  }),
+});
+
+const SCAN_ENV_KEYS = ['NEXT_PUBLIC_SUPABASE_URL', 'SUPABASE_SERVICE_ROLE_KEY'];
+const SCAN_CONFIGURED = { NEXT_PUBLIC_SUPABASE_URL: 'https://real.supabase.co', SUPABASE_SERVICE_ROLE_KEY: 'sbsvc_real' };
+
+async function withScanEnv(overrides, fn) {
+  const saved = {};
+  for (const key of SCAN_ENV_KEYS) { saved[key] = process.env[key]; delete process.env[key]; }
+  for (const [key, value] of Object.entries(overrides)) process.env[key] = value;
+  try { return await fn(); } finally {
+    for (const key of SCAN_ENV_KEYS) { if (saved[key] === undefined) delete process.env[key]; else process.env[key] = saved[key]; }
+  }
+}
+
+async function getScan(id = PROJECT_ID, env = SCAN_CONFIGURED) {
+  const { GET } = loadTsModule('src/app/api/projects/[id]/scan/route.ts');
+  const consoleError = console.error;
+  const logged = [];
+  console.error = (...args) => { logged.push(args.map(String).join(' ')); };
+  try {
+    return await withScanEnv(env, async () => {
+      const res = await GET(new Request(`https://qatlia.example/api/projects/${id}/scan`), { params: { id } });
+      return { res, body: await res.json(), logged };
+    });
+  } finally {
+    console.error = consoleError;
+  }
+}
+
+test('the owner of a project with an image gets a 5-minute signed link', async () => {
+  resetScanState();
+  scanState.user = { id: UUID };
+  scanState.rows.set(PROJECT_ID, { user_id: UUID, options_json: { scanPath: SCAN_PATH } });
+  const { res, body } = await getScan();
+  assert.equal(res.status, 200);
+  assert.deepEqual(body, { success: true, url: `https://files.example/scans/${SCAN_PATH}?token=abc` });
+  assert.deepEqual(scanState.signed, [['scans', SCAN_PATH, 300]]);
+  assert.deepEqual(scanState.eqCalls, [['id', PROJECT_ID], ['user_id', UUID]], 'the row is read by id AND owner');
+  assert.match(res.headers.get('cache-control') || '', /no-store/);
+});
+
+test('another artisan\'s project is a 404 and nothing is signed', async () => {
+  resetScanState();
+  scanState.user = { id: UUID };
+  scanState.rows.set(PROJECT_ID, { user_id: OTHER_UUID, options_json: { scanPath: `${OTHER_UUID}/${PROJECT_ID}.jpg` } });
+  const { res, body } = await getScan();
+  assert.equal(res.status, 404);
+  assert.equal(body.error, 'NOT_FOUND');
+  assert.deepEqual(scanState.signed, []);
+});
+
+test('a project that does not exist, or a non-UUID id, is the same 404', async () => {
+  resetScanState();
+  scanState.user = { id: UUID };
+  assert.equal((await getScan()).res.status, 404);
+  assert.equal((await getScan('not-a-uuid')).res.status, 404);
+  assert.deepEqual(scanState.signed, []);
+});
+
+test('a stored scanPath that points at another artisan is never signed', async () => {
+  resetScanState();
+  scanState.user = { id: UUID };
+  for (const bad of [`${OTHER_UUID}/${PROJECT_ID}.jpg`, `${UUID}/../${OTHER_UUID}/${PROJECT_ID}.jpg`, `${UUID}/${PROJECT_ID}.svg`, 42, {}]) {
+    scanState.rows.set(PROJECT_ID, { user_id: UUID, options_json: { scanPath: bad } });
+    const { res, body } = await getScan();
+    assert.equal(res.status, 404, String(bad));
+    assert.equal(body.error, 'NOT_FOUND');
+  }
+  assert.deepEqual(scanState.signed, []);
+});
+
+test('a project without an image is a 404 and nothing is signed', async () => {
+  resetScanState();
+  scanState.user = { id: UUID };
+  for (const options_json of [{}, null, { scanPath: null }, { scanPath: '' }]) {
+    scanState.rows.set(PROJECT_ID, { user_id: UUID, options_json });
+    assert.equal((await getScan()).res.status, 404);
+  }
+  assert.deepEqual(scanState.signed, []);
+});
+
+test('signed out is a 401 and nothing is read or signed', async () => {
+  resetScanState();
+  scanState.rows.set(PROJECT_ID, { user_id: UUID, options_json: { scanPath: SCAN_PATH } });
+  const { res, body } = await getScan();
+  assert.equal(res.status, 401);
+  assert.equal(body.error, 'AUTH_REQUIRED');
+  assert.deepEqual(scanState.eqCalls, []);
+  assert.deepEqual(scanState.signed, []);
+});
+
+test('a missing service key is a 503 and nothing is signed', async () => {
+  resetScanState();
+  scanState.user = { id: UUID };
+  scanState.rows.set(PROJECT_ID, { user_id: UUID, options_json: { scanPath: SCAN_PATH } });
+  const { res } = await getScan(PROJECT_ID, {});
+  assert.equal(res.status, 503);
+  assert.deepEqual(scanState.signed, []);
+});
+
+test('a signing error is a 503 that never leaks the error text', async () => {
+  resetScanState();
+  scanState.user = { id: UUID };
+  scanState.rows.set(PROJECT_ID, { user_id: UUID, options_json: { scanPath: SCAN_PATH } });
+  scanState.signError = 'secret bucket detail sbsvc_real';
+  const { res, body, logged } = await getScan();
+  assert.equal(res.status, 503);
+  assert.doesNotMatch(JSON.stringify(body), /secret|sbsvc|bucket detail/);
+  assert.equal(body.url, undefined);
+  assert.ok(logged.some((line) => line.includes('secret bucket detail')), 'the text goes to the server log only');
+});
+
+test('a failed lookup is a 503 that never leaks the error text', async () => {
+  resetScanState();
+  scanState.user = { id: UUID };
+  scanState.lookupError = 'relation projects exploded';
+  const { res, body } = await getScan();
+  assert.equal(res.status, 503);
+  assert.doesNotMatch(JSON.stringify(body), /exploded/);
+  assert.deepEqual(scanState.signed, []);
+});
