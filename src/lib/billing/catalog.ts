@@ -10,7 +10,9 @@
  * client component, a route handler or a plain Node test.
  */
 
-export type PackId = 'starter' | 'standard' | 'pro' | 'atelier_max';
+import type { AppCurrency } from '../currency';
+
+export type PackId ='starter' | 'standard' | 'pro' | 'atelier_max';
 
 /** ISO-4217 code as shown to the customer. */
 export const BILLING_CURRENCY = 'MAD' as const;
@@ -39,6 +41,12 @@ export interface CreditPack {
    * product's price: it is what the card button shows before the redirect.
    */
   priceUSD: number;
+  /**
+   * The same pack for a euro account, charged through Creem's euro products
+   * (user decision 2026-11-15: the dollar figures, in euros). Must equal the
+   * price of the `CREEM_PRODUCT_*_EUR` product.
+   */
+  priceEUR: number;
   badge: string;
   highlight: boolean;
 };
@@ -57,6 +65,7 @@ export const CREDIT_PACKS: Record<PackId, CreditPack> = {
     displayCredits: '30',
     priceMAD: 50,
     priceUSD: 4.99,
+    priceEUR: 4.99,
     badge: '50 DH',
     highlight: false,
   },
@@ -68,6 +77,7 @@ export const CREDIT_PACKS: Record<PackId, CreditPack> = {
     displayCredits: '80',
     priceMAD: 100,
     priceUSD: 9.99,
+    priceEUR: 9.99,
     badge: 'Populaire (100 DH)',
     highlight: true,
   },
@@ -79,6 +89,7 @@ export const CREDIT_PACKS: Record<PackId, CreditPack> = {
     displayCredits: '200',
     priceMAD: 200,
     priceUSD: 19.99,
+    priceEUR: 19.99,
     badge: 'Économique (200 DH)',
     highlight: false,
   },
@@ -90,6 +101,7 @@ export const CREDIT_PACKS: Record<PackId, CreditPack> = {
     displayCredits: '400',
     priceMAD: 300,
     priceUSD: 29.99,
+    priceEUR: 29.99,
     badge: 'Meilleur prix (300 DH)',
     highlight: false,
   },
@@ -141,4 +153,23 @@ export function formatUSD(amount: number): string {
 export function formatMAD(amount: number): string {
   const value = Number.isInteger(amount) ? String(amount) : amount.toFixed(2).replace('.', ',');
   return `${value} DH`;
+}
+
+/** Customer-facing EUR formatting ("4,99 €"). */
+export function formatEUR(amount: number): string {
+  return `${amount.toFixed(2).replace('.', ',')} €`;
+}
+
+/** The price of a pack in an account currency, as charged. */
+export function packPrice(pack: CreditPack, currency: AppCurrency): number {
+  if (currency === 'EUR') return pack.priceEUR;
+  if (currency === 'USD') return pack.priceUSD;
+  return pack.priceMAD;
+}
+
+/** An amount as shown to the customer, in its currency ("50 DH", "4,99 €", "$4.99"). */
+export function formatPrice(amount: number, currency: AppCurrency): string {
+  if (currency === 'EUR') return formatEUR(amount);
+  if (currency === 'USD') return formatUSD(amount);
+  return formatMAD(amount);
 }

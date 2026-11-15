@@ -585,6 +585,10 @@ export const en: Catalog = {
     changePassword: 'Change password',
     logout: 'Sign out',
   },
+  currency: {
+    label: 'Currency',
+    names: { MAD: 'DH (dirham)', EUR: '€ (euro)', USD: '$ (dollar)' },
+  },
   support: {
     footerHeading: 'Contact',
     menuEntry: 'Contact support',
@@ -681,6 +685,8 @@ export const en: Catalog = {
     manualPaymentOnly: 'Payment by bank transfer or in cash (CashPlus / Wafacash), in dirhams ({currency})',
     securePaymentInternational:
       'Payment secured by {provider} — international cards, Apple Pay and Google Pay, charged in dollars ({currency})',
+    securePaymentInternationalEur:
+      'Secure payment by {provider} — international cards, Apple Pay and Google Pay, charged in euros ({currency})',
     cardPrice: 'By card: {price}',
     invoiceNote: 'Invoice and receipt emailed instantly',
     manual: {
@@ -718,6 +724,7 @@ export const en: Catalog = {
       },
     },
     errors: {
+      manualMadOnly: 'Bank transfer and cash payments are in dirhams. Switch your currency to DH to use them.',
       authRequired: 'Sign in to buy credits.',
       invalidSelection: 'This pack is no longer available. Please choose another one.',
       unavailable: 'Payment is temporarily unavailable. Please try again later.',
@@ -803,6 +810,8 @@ export const en: Catalog = {
     saving: 'Saving…',
     submit: 'Update the password',
     passwordUpdated: 'Password updated.',
+    currencyTitle: 'Currency',
+    currencyHint: 'Packs are shown and paid in this currency. It was chosen from your country; you can change it.',
     errors: {
       tooShort: '{min} characters minimum.',
       mismatch: 'The passwords do not match.',

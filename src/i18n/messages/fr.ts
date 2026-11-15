@@ -644,6 +644,10 @@ export const fr = {
     logout: 'Déconnexion',
   },
   /** Contact channels; the address and number themselves live in `@/lib/support`. */
+  currency: {
+    label: 'Devise',
+    names: { MAD: 'DH (dirham)', EUR: '€ (euro)', USD: '$ (dollar)' },
+  },
   support: {
     footerHeading: 'Contact',
     menuEntry: 'Contacter le support',
@@ -758,6 +762,8 @@ export const fr = {
     manualPaymentOnly: 'Paiement par virement bancaire ou en espèces (CashPlus / Wafacash), en dirhams ({currency})',
     securePaymentInternational:
       'Paiement sécurisé par {provider} — cartes bancaires internationales, Apple Pay et Google Pay, débitées en dollars ({currency})',
+    securePaymentInternationalEur:
+      'Paiement sécurisé par {provider} — cartes bancaires internationales, Apple Pay et Google Pay, débitées en euros ({currency})',
     // Shown under the card button: the amount the card payment really charges.
     cardPrice: 'Par carte : {price}',
     invoiceNote: 'Facture et reçu instantanés par email',
@@ -801,6 +807,7 @@ export const fr = {
      * their own language, and never the provider's own message.
      */
     errors: {
+      manualMadOnly: 'Le virement et le paiement en espèces se font en dirhams. Passez votre devise en DH pour les utiliser.',
       authRequired: 'Connectez-vous pour acheter des crédits.',
       invalidSelection: 'Ce pack n’est plus disponible. Choisissez-en un autre.',
       unavailable: 'Le paiement est momentanément indisponible. Réessayez plus tard.',
@@ -891,6 +898,8 @@ export const fr = {
     saving: 'Enregistrement…',
     submit: 'Mettre à jour le mot de passe',
     passwordUpdated: 'Mot de passe mis à jour.',
+    currencyTitle: 'Devise',
+    currencyHint: 'Les packs sont affichés et payés dans cette devise. Elle a été choisie selon votre pays ; vous pouvez la changer.',
     errors: {
       tooShort: '{min} caractères minimum.',
       mismatch: 'Les mots de passe ne correspondent pas.',

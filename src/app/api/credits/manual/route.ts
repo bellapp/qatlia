@@ -5,6 +5,8 @@ import { createClient as createSupabaseClient } from '@supabase/supabase-js';
 import { getSupabaseAdminConfig } from '@/lib/billing/config';
 import { CREDIT_PACKS, PackId } from '@/lib/billing/catalog';
 import { readBankTransferDetails } from '@/lib/billing/bank-transfer';
+import { offersManualPayment } from '@/lib/currency';
+import { resolveRequestCurrency } from '@/lib/currency-server';
 
 export const dynamic = 'force-dynamic';
 
@@ -58,6 +60,13 @@ export async function POST(req: Request) {
     if (!adminConfig) {
       return NextResponse.json({ error: 'DB_NOT_CONFIGURED' }, { status: 503 });
     }
+
+    // Transfer and cash go to a Moroccan account in dirhams: offered to a
+    // dirham account only (the page hides the button for the others).
+    if (!offersManualPayment(await resolveRequestCurrency(req, user.id))) {
+      return NextResponse.json({ error: 'MANUAL_PAYMENT_MAD_ONLY' }, { status: 409 });
+    }
+
     const admin = createSupabaseClient(adminConfig.url, adminConfig.serviceRoleKey);
 
     // One order to pay at a time: a customer who already has a pending order

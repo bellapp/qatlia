@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getCreemConfig, getCreemWebhookSecret } from '@/lib/billing/config';
+import { creemProductIdsByPack, getCreemConfig, getCreemWebhookSecret } from '@/lib/billing/config';
 import { resolveCreemGrant, verifyCreemSignature } from '@/lib/billing/creem';
 import { applyGrant } from '@/lib/billing/apply-grant';
 
@@ -29,7 +29,9 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'INVALID_PAYLOAD' }, { status: 400 });
   }
 
-  const resolved = resolveCreemGrant(event, creem.products);
+  // Dollar and euro products both pay for a pack; the order's own currency
+  // and amount are what the ledger records.
+  const resolved = resolveCreemGrant(event, creemProductIdsByPack(creem));
 
   // Same contract as the Stripe webhook: a paid event that cannot be mapped to
   // a grant fails delivery so Creem retries and the operator can investigate.

@@ -586,6 +586,10 @@ export const ar: Catalog = {
     changePassword: 'تغيير كلمة المرور',
     logout: 'تسجيل الخروج',
   },
+  currency: {
+    label: 'العملة',
+    names: { MAD: 'درهم (DH)', EUR: 'يورو (€)', USD: 'دولار ($)' },
+  },
   support: {
     footerHeading: 'تواصل معنا',
     menuEntry: 'التواصل مع الدعم',
@@ -682,6 +686,8 @@ export const ar: Catalog = {
     manualPaymentOnly: 'الدفع عبر تحويل بنكي أو نقداً (كاش بلوس / وفاكاش)، بالدرهم ({currency})',
     securePaymentInternational:
       'دفع مؤمَّن عبر {provider} — بطاقات بنكية دولية وApple Pay وGoogle Pay، ويُخصم بالدولار ({currency})',
+    securePaymentInternationalEur:
+      'دفع مؤمَّن عبر {provider} — بطاقات بنكية دولية وApple Pay وGoogle Pay، ويُخصم باليورو ({currency})',
     cardPrice: 'بالبطاقة: {price}',
     invoiceNote: 'الفاتورة والوصل يُرسلان فوراً بالبريد الإلكتروني',
     manual: {
@@ -719,6 +725,7 @@ export const ar: Catalog = {
       },
     },
     errors: {
+      manualMadOnly: 'التحويل البنكي والدفع نقداً يتمّان بالدرهم. غيّر عملتك إلى الدرهم لاستعمالهما.',
       authRequired: 'سجّل الدخول لشراء الأرصدة.',
       invalidSelection: 'هذه الباقة لم تعد متوفرة. اختر باقة أخرى.',
       unavailable: 'الدفع غير متوفر مؤقتاً. أعد المحاولة لاحقاً.',
@@ -803,6 +810,8 @@ export const ar: Catalog = {
     saving: 'جارٍ الحفظ…',
     submit: 'تحديث كلمة المرور',
     passwordUpdated: 'تم تحديث كلمة المرور.',
+    currencyTitle: 'العملة',
+    currencyHint: 'تُعرض الباقات وتُدفع بهذه العملة. اختيرت حسب بلدك، ويمكنك تغييرها.',
     errors: {
       tooShort: '{min} أحرف على الأقل.',
       mismatch: 'كلمتا المرور غير متطابقتين.',

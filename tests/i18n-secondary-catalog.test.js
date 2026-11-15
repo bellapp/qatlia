@@ -215,7 +215,8 @@ test('the credits page renders pack copy from the catalog, never a hardcoded nam
   }
   // The amounts and credit counts still come from the billing catalog.
   assert.match(source, /CREDIT_PACKS/);
-  assert.match(source, /priceMAD/);
+  // In the account currency: dirhams, euros or dollars, as charged.
+  assert.match(source, /packPrice\(/);
 });
 
 test('every checkout error code the route can return has localized copy', () => {
