@@ -91,7 +91,7 @@ import { LocaleSwitcher, useLocale } from '@/components/LocaleProvider';
 import { formatDateTime, type TranslationKey } from '@/i18n';
 import { edgeBandingLabelKey, materialLabelKey, visionErrorKey } from '@/i18n/domain';
 import { buildCostDetail, hasLaborCharge } from '@/lib/cost-detail';
-import { writeLocalHistoryItem, renameLocalHistoryItem, type LocalHistoryItem } from '@/lib/history';
+import { writeLocalHistoryItem, renameLocalHistoryItem, markLocalHistoryPdf, type LocalHistoryItem } from '@/lib/history';
 import { saveProjectName, type RenameOutcome } from '@/lib/projects/rename';
 import { deriveQuotationPanels, deriveQuotationPieces } from '@/lib/quotation-items';
 import { buildPdfPayload } from '@/lib/pdf-payload';
@@ -565,9 +565,10 @@ const commitPanelName = () => {
       name,
       { fetch: (input, init) => fetch(input, init), renameLocal: renameLocalHistoryItem },
     );
-    if (outcome === 'saved') lastPersistedNameRef.current = name;
-    // A newer commit, or a save of the whole project, owns the line now.
+    // A newer commit, or a save of the whole project, owns the line and the
+    // name the saved project carries now.
     if (attempt !== nameSaveAttemptRef.current) return;
+    if (outcome === 'saved') lastPersistedNameRef.current = name;
     // An emptied name goes back to the automatic one: nothing to say. The
     // "saved with the plan" line is for a name typed before any plan exists.
     setNameSaveState(outcome === 'pending' && !name ? 'idle' : outcome);
@@ -801,6 +802,9 @@ const commitPanelName = () => {
     // the same run twice. Local history is now the fallback for anonymous
     // users and failed uploads, never an addition to a successful cloud save.
     let savedToCloud = false;
+    // The record this save just wrote, for the name check at the end.
+    let savedCloudId: string | null = null;
+    let savedLocalId: string | null = null;
     try {
       const supabase = createClient();
       const {
@@ -819,6 +823,7 @@ const commitPanelName = () => {
           // project's options_json (see /api/export-quotation) — only once
           // the server confirms the save, never a client-guessed id.
           if (data?.success && typeof data.projectId === 'string') {
+            savedCloudId = data.projectId;
             setLastSavedProjectId(data.projectId);
             setLocalProjectId(null);
           }
@@ -829,6 +834,7 @@ const commitPanelName = () => {
     }
     if (!savedToCloud) {
       const localId = `${source}_${Date.now()}`;
+      savedLocalId = localId;
       setLocalProjectId(localId);
       writeLocalHistoryItem({
         id: localId,
@@ -843,12 +849,26 @@ const commitPanelName = () => {
       options_json: payload as unknown as LocalHistoryItem['options_json'],
     });
     }
-    // The saved project now carries this name: the line says so, whatever it
-    // said before (not saved, saved with the plan), and a late answer from an
+    // The saved project now carries `committedName`: the line says so, whatever
+    // it said before (not saved, saved with the plan), and a late answer from an
     // earlier name commit no longer overwrites it.
-    nameSaveAttemptRef.current += 1;
-    lastPersistedNameRef.current = payload.projectName ?? '';
-    setNameSaveState(payload.projectName ? 'saved' : 'idle');
+    const attempt = ++nameSaveAttemptRef.current;
+    lastPersistedNameRef.current = committedName;
+    const currentName = projectNameRef.current.trim();
+    if (currentName === committedName) {
+      setNameSaveState(committedName ? 'saved' : 'idle');
+      return;
+    }
+    // The field was left while this save was running: the new record carries
+    // the previous name, so the name typed since is written to it now.
+    const outcome = await saveProjectName(
+      { cloudId: savedCloudId, localId: savedLocalId },
+      currentName,
+      { fetch: (input, init) => fetch(input, init), renameLocal: renameLocalHistoryItem },
+    );
+    if (attempt !== nameSaveAttemptRef.current) return;
+    if (outcome === 'saved') lastPersistedNameRef.current = currentName;
+    setNameSaveState(outcome === 'pending' && !currentName ? 'idle' : outcome);
   };
 
   /**
@@ -872,6 +892,8 @@ const commitPanelName = () => {
         console.error('Erreur enregistrement PDF dans l’historique:', err);
       }
     }
+    // A project kept on this device only is updated on its own entry too.
+    if (!lastSavedProjectId && localProjectId && markLocalHistoryPdf(localProjectId, generatedAt)) return;
     await persistProject(result, 'pdf', { pdfGeneratedAt: generatedAt });
   };
 
@@ -1575,7 +1597,7 @@ const commitPanelName = () => {
                   })}
                 </p>
               </div>
-              {result && (
+              {result && !restoredAt && (
                 <span className="ms-auto inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-600 dark:text-emerald-400 text-[10px] font-bold">
                   <CheckCircle2 className="w-3 h-3" /> {t('atelier.project.optimized')}
                 </span>

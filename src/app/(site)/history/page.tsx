@@ -44,6 +44,7 @@ interface ProjectHistoryItem {
     displayUnit?: DisplayUnit;
     canonicalUnit?: 'cm';
     migratedFromLegacyUnit?: boolean;
+    projectName?: string;
   };
 }
 
@@ -275,7 +276,20 @@ export default function HistoryPage() {
 
   const handleLoadProject = (project: ProjectHistoryItem) => {
     if (project.options_json) {
-      sessionStorage.setItem('qatlia_saved_project', JSON.stringify(project.options_json));
+      // A project renamed from the history before the name was also kept in its
+      // saved data still carries the old name there: the name on the card wins,
+      // but only over a name that is stored (an automatic name is never typed
+      // into the atelier's field).
+      const storedName = project.options_json.projectName;
+      const restoredOptions =
+        UUID_PATTERN.test(project.id)
+        && project.name.trim()
+        && typeof storedName === 'string'
+        && storedName.trim()
+        && storedName.trim() !== project.name.trim()
+          ? { ...project.options_json, projectName: project.name.trim() }
+          : project.options_json;
+      sessionStorage.setItem('qatlia_saved_project', JSON.stringify(restoredOptions));
       // Read back by atelier/page.tsx's restore effect so QuotationDialog's
       // `projectId` targets the project the artisan actually opened here,
       // not only the most recent auto-save (Task 8 remediation — item 10).

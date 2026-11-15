@@ -4,7 +4,7 @@ import { createClient } from '@/lib/supabase/server';
 import { createClient as createAdminClient, type SupabaseClient } from '@supabase/supabase-js';
 import { getSupabaseAdminConfig } from '@/lib/billing/config';
 import { CompanyIdentitySchema, ClientIdentitySchema, QUOTATION_LOCALES } from '@/lib/quotation';
-import { PROJECT_NAME_MAX_CHARS, sanitizePdfGeneratedAt } from '@/lib/projects/history-metadata';
+import { sanitizePdfGeneratedAt, sanitizeProjectName } from '@/lib/projects/history-metadata';
 
 /**
  * `GET /api/projects/[id]` — read-only, ownership-checked access to a single
@@ -113,10 +113,6 @@ export async function GET(_req: Request, context: { params: { id: string } }) {
  * Local-only projects (never synced to the cloud `projects` table) cannot be
  * updated here — the client renames those directly in localStorage.
  */
-const RenameSchema = z.object({
-  name: z.string().trim().min(1, 'EMPTY_NAME').max(PROJECT_NAME_MAX_CHARS, 'NAME_TOO_LONG'),
-});
-
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 type OwnOptions = { ok: true; existing: Record<string, unknown> } | { ok: false; response: NextResponse };
@@ -188,11 +184,11 @@ export async function PATCH(
       return NextResponse.json({ success: true, id, pdfGeneratedAt });
     }
 
-    const parsed = RenameSchema.safeParse(body);
-    if (!parsed.success) {
+    // Same rule as the name a save carries: trimmed, not empty, 120 characters at most.
+    const name = sanitizeProjectName(body?.name);
+    if (!name) {
       return NextResponse.json({ error: 'INVALID_NAME' }, { status: 400 });
     }
-    const { name } = parsed.data;
 
     if (!UUID_PATTERN.test(id)) {
       return NextResponse.json({ error: 'NOT_FOUND' }, { status: 404 });

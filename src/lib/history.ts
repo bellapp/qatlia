@@ -25,6 +25,7 @@ export interface LocalHistoryItem {
     canonicalUnit?: 'cm';
     migratedFromLegacyUnit?: boolean;
     projectName?: string;
+    pdfGeneratedAt?: string;
   };
 }
 
@@ -61,6 +62,26 @@ export function renameLocalHistoryItem(id: string, name: string): boolean {
       item.id === id
         ? { ...item, name, options_json: { ...item.options_json, projectName: name } }
         : item,
+    );
+    window.localStorage.setItem(LOCAL_HISTORY_KEY, JSON.stringify(next));
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Records that the PDF of a device-only project was generated, on its own
+ * history entry, so exporting it does not add a second entry. Returns false
+ * when the entry is not there or the storage cannot be written.
+ */
+export function markLocalHistoryPdf(id: string, pdfGeneratedAt: string): boolean {
+  if (typeof window === 'undefined') return false;
+  try {
+    const list = readLocalHistory();
+    if (!list.some((item) => item.id === id)) return false;
+    const next = list.map((item) =>
+      item.id === id ? { ...item, options_json: { ...item.options_json, pdfGeneratedAt } } : item,
     );
     window.localStorage.setItem(LOCAL_HISTORY_KEY, JSON.stringify(next));
     return true;
