@@ -383,6 +383,7 @@ const CONFIG = {
   scope: 'ads',
   model: 'm',
   openrouterKey: null,
+  ycloud: null,
 };
 
 function fakeFetch(respond) {
@@ -441,4 +442,78 @@ test('sendText returns null when a 200 answer carries no message id', async () =
   const fetchImpl = fakeFetch(() => new Response(JSON.stringify({ messages: [] }), { status: 200 }));
   assert.equal(await sendText(CONFIG, '1', 'hi', fetchImpl), null);
   assert.equal(errorLog.mock.callCount(), 1);
+});
+
+// --- sendText through YCloud -------------------------------------------------
+// The bot's number was onboarded through YCloud, and Meta only lets YCloud send
+// from it: when YCloud is configured, replies go through its API.
+
+const YCLOUD_CONFIG = { ...CONFIG, ycloud: { apiKey: 'YC-SECRET-KEY', from: '+212726263686' } };
+
+test('with YCloud configured, sendText posts to YCloud and returns the WhatsApp message id', async () => {
+  const fetchImpl = fakeFetch(
+    () => new Response(JSON.stringify({ id: 'yc1', wamid: 'wamid.Y', status: 'accepted' }), { status: 200 }),
+  );
+  const id = await sendText(YCLOUD_CONFIG, '212600000000', 'Bonjour https://qatlia.ma', fetchImpl);
+  assert.equal(id, 'wamid.Y');
+  const call = fetchImpl.calls[0];
+  assert.equal(call.url, 'https://api.ycloud.com/v2/whatsapp/messages/sendDirectly');
+  assert.equal(call.init.method, 'POST');
+  assert.equal(call.init.headers['X-API-Key'], 'YC-SECRET-KEY');
+  assert.equal(call.init.headers['Content-Type'], 'application/json');
+  assert.equal(call.init.headers.Authorization, undefined);
+  assert.deepEqual(call.body, {
+    from: '+212726263686',
+    to: '+212600000000',
+    type: 'text',
+    text: { body: 'Bonjour https://qatlia.ma', previewUrl: true },
+  });
+});
+
+test('with YCloud, an accepted reply without wamid falls back to the YCloud id', async () => {
+  const fetchImpl = fakeFetch(() => new Response(JSON.stringify({ id: 'yc1', status: 'accepted' }), { status: 200 }));
+  assert.equal(await sendText(YCLOUD_CONFIG, '1', 'hi', fetchImpl), 'ycloud:yc1');
+});
+
+test('with YCloud, a failed status returns null and logs the error code but never the key', async () => {
+  const fetchImpl = fakeFetch(
+    () =>
+      new Response(
+        JSON.stringify({ id: 'yc1', status: 'failed', errorCode: '131047', errorMessage: 'key YC-SECRET-KEY window' }),
+        { status: 200 },
+      ),
+  );
+  assert.equal(await sendText(YCLOUD_CONFIG, '1', 'hi', fetchImpl), null);
+  assert.equal(errorLog.mock.callCount(), 1);
+  const logged = errorLog.mock.calls[0].arguments.map(String).join(' ');
+  assert.match(logged, /\[whatsapp\] send failed/);
+  assert.match(logged, /131047/);
+  assert.ok(!logged.includes('YC-SECRET-KEY'));
+});
+
+test('with YCloud, a non-2xx answer returns null without logging the key or the response body', async () => {
+  const fetchImpl = fakeFetch(
+    () => new Response(JSON.stringify({ message: 'bad key YC-SECRET-KEY' }), { status: 401 }),
+  );
+  assert.equal(await sendText(YCLOUD_CONFIG, '1', 'hi', fetchImpl), null);
+  const logged = errorLog.mock.calls[0].arguments.map(String).join(' ');
+  assert.match(logged, /401/);
+  assert.ok(!logged.includes('YC-SECRET-KEY'));
+  assert.ok(!logged.includes('bad key'));
+});
+
+test('with YCloud, a network error returns null without throwing', async () => {
+  const fetchImpl = async () => {
+    throw new TypeError('fetch failed YC-SECRET-KEY');
+  };
+  assert.equal(await sendText(YCLOUD_CONFIG, '1', 'hi', fetchImpl), null);
+  const logged = errorLog.mock.calls[0].arguments.map(String).join(' ');
+  assert.match(logged, /TypeError/);
+  assert.ok(!logged.includes('YC-SECRET-KEY'));
+});
+
+test('with YCloud, a recipient already in E.164 is not given a second plus', async () => {
+  const fetchImpl = fakeFetch(() => new Response(JSON.stringify({ id: 'yc1', wamid: 'w' }), { status: 200 }));
+  await sendText(YCLOUD_CONFIG, '+212600000000', 'hi', fetchImpl);
+  assert.equal(fetchImpl.calls[0].body.to, '+212600000000');
 });

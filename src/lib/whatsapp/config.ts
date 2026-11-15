@@ -11,6 +11,16 @@ export type HandoffMode = 'coexistence' | 'redirect';
 /** Who the bot answers in coexistence mode: only people who came from the ad, or everyone. */
 export type BotScope = 'ads' | 'all';
 
+/**
+ * Replies go through YCloud when the bot number was onboarded with it: Meta then
+ * only lets YCloud send from that number. Inbound still arrives through Meta.
+ */
+export interface YCloudConfig {
+  apiKey: string;
+  /** The bot number in E.164 (e.g. +212726263686). */
+  from: string;
+}
+
 export interface WhatsAppConfig {
   appSecret: string;
   verifyToken: string;
@@ -22,6 +32,8 @@ export interface WhatsAppConfig {
   scope: BotScope;
   model: string;
   openrouterKey: string | null;
+  /** `null`: replies go straight to the Meta Graph API. */
+  ycloud: YCloudConfig | null;
 }
 
 const DEFAULT_GRAPH_VERSION = 'v23.0';
@@ -49,6 +61,20 @@ function readSecret(env: Env, key: string): string | null {
   return trimmed;
 }
 
+/** The sender number in E.164, or `null` when it is missing or not a phone number. */
+function readFromNumber(env: Env): string | null {
+  const value = read(env, 'WHATSAPP_FROM_NUMBER');
+  if (!value) return null;
+  const digits = value.replace(/[\s().-]/g, '').replace(/^\+/, '');
+  return /^[0-9]{8,15}$/.test(digits) ? `+${digits}` : null;
+}
+
+function readYCloud(env: Env): YCloudConfig | null {
+  const apiKey = readSecret(env, 'YCLOUD_API_KEY');
+  const from = readFromNumber(env);
+  return apiKey && from ? { apiKey, from } : null;
+}
+
 /** Returns `null` when any credential is missing or still a placeholder. */
 export function getWhatsAppConfig(env: Env = process.env): WhatsAppConfig | null {
   const appSecret = readSecret(env, 'WHATSAPP_APP_SECRET');
@@ -68,5 +94,6 @@ export function getWhatsAppConfig(env: Env = process.env): WhatsAppConfig | null
     scope: env.WHATSAPP_BOT_SCOPE === 'all' ? 'all' : 'ads',
     model: read(env, 'WHATSAPP_BOT_MODEL') ?? read(env, 'OPENROUTER_MODEL') ?? DEFAULT_MODEL,
     openrouterKey: read(env, 'OPENROUTER_API_KEY'),
+    ycloud: readYCloud(env),
   };
 }
