@@ -18,6 +18,13 @@
  */
 export const SCAN_IMAGE_MAX_CHARS = 1_400_000;
 
+/**
+ * Upper bound on the decoded image: the bucket's own `file_size_limit`
+ * (migration 017). The character cap alone can decode to slightly more, and
+ * the bucket would then refuse it as a 503 instead of a 400 here.
+ */
+export const SCAN_IMAGE_MAX_BYTES = 1_048_576;
+
 export const SCAN_BUCKET = 'scans';
 
 export type ScanMime = 'image/jpeg' | 'image/png' | 'image/webp';
@@ -69,7 +76,7 @@ export function parseScanImage(dataUrl: unknown): ParsedScanImage | null {
   const body = dataUrl.slice(header[0].length);
   if (!BASE64_BODY.test(body)) return null;
   const bytes = Buffer.from(body, 'base64');
-  if (!hasMagicBytes(mime, bytes)) return null;
+  if (bytes.length > SCAN_IMAGE_MAX_BYTES || !hasMagicBytes(mime, bytes)) return null;
   return { mime, ext: EXT_BY_MIME[mime], bytes };
 }
 

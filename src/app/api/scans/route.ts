@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { createClient as createAdminClient } from '@supabase/supabase-js';
 import { getSupabaseAdminConfig } from '@/lib/billing/config';
+import { createRateLimiter, SCAN_RATE_LIMIT } from '@/lib/rate-limit';
 import { SCAN_BUCKET, SCAN_IMAGE_MAX_CHARS, parseScanImage, scanPathFor } from '@/lib/projects/scan-image';
 
 /**
@@ -11,6 +12,9 @@ import { SCAN_BUCKET, SCAN_IMAGE_MAX_CHARS, parseScanImage, scanPathFor } from '
  * and the file id from the server, never from the request body. The path is
  * stored with the project by `POST /api/projects`.
  */
+
+/** One limiter per server instance (see the scope note in src/lib/rate-limit.ts). */
+const scanRateLimiter = createRateLimiter(SCAN_RATE_LIMIT);
 
 // The dataURL plus the JSON wrapper around it.
 const MAX_BODY_BYTES = SCAN_IMAGE_MAX_CHARS + 1_000;
@@ -29,6 +33,20 @@ export async function POST(request: Request) {
     } = await supabase.auth.getUser();
     if (!user) {
       return NextResponse.json({ error: 'AUTH_REQUIRED', message: 'Connectez-vous pour garder une image.' }, { status: 401 });
+    }
+
+    // Free sign-up and a permanent object per call: brake a scripted loop
+    // before the body is even read.
+    const rateLimit = scanRateLimiter.check(user.id);
+    if (!rateLimit.allowed) {
+      return NextResponse.json(
+        {
+          error: 'RATE_LIMITED',
+          message: "Trop d'images en peu de temps. Patientez un instant avant de réessayer.",
+          retryAfterSeconds: rateLimit.retryAfterSeconds,
+        },
+        { status: 429, headers: { 'Retry-After': String(rateLimit.retryAfterSeconds) } }
+      );
     }
 
     const declaredLength = Number(request.headers.get('content-length'));

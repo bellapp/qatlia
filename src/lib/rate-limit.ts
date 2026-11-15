@@ -67,6 +67,16 @@ export const VISION_RATE_LIMIT = { limit: 10, windowMs: 60_000 } as const;
  */
 export const QUOTATION_RATE_LIMIT = { limit: 15, windowMs: 60_000 } as const;
 
+/**
+ * The scan-image upload budget: 10 images per minute per user.
+ *
+ * Every accepted call writes a permanent object of up to 1 MB to the private
+ * bucket, and sign-up is free, so without a brake one account could grow the
+ * bucket without bound. One scan per project is the normal use; ten a minute
+ * never gets in the way of an artisan working through a pile of cut lists.
+ */
+export const SCAN_RATE_LIMIT = { limit: 10, windowMs: 60_000 } as const;
+
 export function createRateLimiter({ limit, windowMs, now = Date.now, maxKeys = 10_000 }: RateLimiterOptions): RateLimiter {
   if (!Number.isInteger(limit) || limit <= 0 || !Number.isFinite(windowMs) || windowMs <= 0) {
     throw new Error(`INVALID_RATE_LIMIT: limit=${String(limit)} windowMs=${String(windowMs)}`);

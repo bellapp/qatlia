@@ -302,6 +302,45 @@ test('every stored scan gets a fresh file id', async () => {
   assert.notEqual(first.scanPath, second.scanPath);
 });
 
+test('the eleventh scan inside the window is refused with Retry-After and stores nothing', async () => {
+  resetState();
+  state.user = { id: UUID };
+  const { SCAN_RATE_LIMIT } = loadTsModule('src/lib/rate-limit.ts');
+  assert.deepEqual([SCAN_RATE_LIMIT.limit, SCAN_RATE_LIMIT.windowMs], [10, 60_000]);
+  await withEnv(CONFIGURED, async () => {
+    const { POST } = scansRoute();
+    for (let i = 0; i < SCAN_RATE_LIMIT.limit; i += 1) {
+      // eslint-disable-next-line no-await-in-loop
+      assert.equal((await POST(postScan({ image: TINY_JPEG }))).status, 200);
+    }
+    assert.equal(state.uploads.length, SCAN_RATE_LIMIT.limit);
+
+    // The brake sits right after auth: even an unreadable body is refused as 429.
+    const denied = await POST(postScan('{not json'));
+    assert.equal(denied.status, 429);
+    assert.ok(Number(denied.headers.get('Retry-After')) > 0);
+    const body = await denied.json();
+    assert.equal(body.error, 'RATE_LIMITED');
+    assert.equal(state.uploads.length, SCAN_RATE_LIMIT.limit, 'no eleventh upload');
+
+    // Another artisan has a budget of their own.
+    state.user = { id: OTHER_UUID };
+    assert.equal((await POST(postScan({ image: TINY_JPEG }))).status, 200);
+  });
+});
+
+test('a signed-out call is refused before it counts against any budget', async () => {
+  resetState();
+  const { SCAN_RATE_LIMIT } = loadTsModule('src/lib/rate-limit.ts');
+  await withEnv(CONFIGURED, async () => {
+    const { POST } = scansRoute();
+    for (let i = 0; i < SCAN_RATE_LIMIT.limit + 2; i += 1) {
+      // eslint-disable-next-line no-await-in-loop
+      assert.equal((await POST(postScan({ image: TINY_JPEG }))).status, 401);
+    }
+  });
+});
+
 test('without a service key a scan answers 503 SCAN_STORAGE_UNAVAILABLE and sends nothing', async () => {
   resetState();
   state.user = { id: UUID };

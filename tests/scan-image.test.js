@@ -76,12 +76,26 @@ test('the decoded bytes must carry the magic bytes of the declared type', () => 
   assert.equal(parseScanImage('data:image/jpeg;base64,'), null);
 });
 
+test('an image over the bucket byte cap is refused here, not by the bucket', () => {
+  const { parseScanImage, SCAN_IMAGE_MAX_BYTES, SCAN_IMAGE_MAX_CHARS } = scan();
+  assert.equal(SCAN_IMAGE_MAX_BYTES, 1_048_576);
+  const jpegOf = (size) => {
+    const bytes = Buffer.alloc(size);
+    bytes[0] = 0xff; bytes[1] = 0xd8; bytes[2] = 0xff;
+    return dataUrl('image/jpeg', bytes);
+  };
+  const atCap = jpegOf(SCAN_IMAGE_MAX_BYTES);
+  const overCap = jpegOf(SCAN_IMAGE_MAX_BYTES + 1);
+  assert.ok(overCap.length <= SCAN_IMAGE_MAX_CHARS, 'the character cap alone would let it through');
+  assert.equal(parseScanImage(atCap).bytes.length, SCAN_IMAGE_MAX_BYTES);
+  assert.equal(parseScanImage(overCap), null);
+});
+
 test('the private bucket is created without a single storage policy', () => {
   const sql = fs.readFileSync(path.join(__dirname, '..', 'supabase', 'migrations', '017_scan_images.sql'), 'utf8');
   assert.match(sql, /storage\.buckets/);
   assert.match(sql, /'scans'/);
-  assert.match(sql, /false/, 'public = false');
-  assert.match(sql, /1048576/);
+  assert.match(sql, /'scans',\s*'scans',\s*false,\s*1048576,/, 'id, name, public = false, 1 MB limit');
   assert.match(sql, /array\['image\/jpeg',\s*'image\/png',\s*'image\/webp'\]/i);
   assert.match(sql, /on conflict \(id\) do nothing/i);
   const code = sql.replace(/--.*$/gm, '');
