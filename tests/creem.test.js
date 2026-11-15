@@ -153,6 +153,11 @@ test('Creem is configured only with a real key and a product for every pack, on 
   assert.deepEqual(test_.products, PRODUCTS);
 
   assert.equal(getCreemConfig({ ...CONFIGURED, CREEM_API_KEY: 'creem_live_realkey' }).apiBase, 'https://api.creem.io');
+  // Creem production keys are `creem_` + random characters, with no `live_`
+  // segment (docs.creem.io): only test keys name their mode.
+  assert.equal(getCreemConfig({ ...CONFIGURED, CREEM_API_KEY: 'creem_4Hc9KSL33A97' }).apiBase, 'https://api.creem.io');
+  assert.equal(getCreemConfig({ ...CONFIGURED, CREEM_API_KEY: 'creem_' }), null, 'a bare prefix is not a key');
+  assert.equal(getCreemConfig({ ...CONFIGURED, CREEM_API_KEY: 'creemkey' }), null);
   assert.equal(getCreemConfig({ ...CONFIGURED, CREEM_API_KEY: 'creem_test_your_creem_api_key' }), null, 'the template placeholder is not a key');
   assert.equal(getCreemConfig({ ...CONFIGURED, CREEM_API_KEY: 'sk_test_abc' }), null);
   assert.equal(getCreemConfig({ ...CONFIGURED, CREEM_PRODUCT_PRO: undefined }), null, 'a missing pack product disables Creem');
