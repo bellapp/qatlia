@@ -38,8 +38,8 @@ interface LocaleContextValue {
 const LocaleContext = createContext<LocaleContextValue>({
   locale: DEFAULT_LOCALE,
   setLocale: () => {},
-  t: (key, vars) => translate(DEFAULT_LOCALE, key, vars),
-  tn: (key, count, vars) => translatePlural(DEFAULT_LOCALE, key, count, vars),
+  t: (key, vars) => translate(DEFAULT_LOCALE, key, { currency: DEFAULT_CURRENCY, ...vars }),
+  tn: (key, count, vars) => translatePlural(DEFAULT_LOCALE, key, count, { currency: DEFAULT_CURRENCY, ...vars }),
   n: (value, options) => formatNumber(DEFAULT_LOCALE, value, options),
   dir: dirFor(DEFAULT_LOCALE),
 });
