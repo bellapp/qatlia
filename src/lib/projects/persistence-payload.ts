@@ -19,6 +19,8 @@ export interface PersistedProjectPayloadInput {
   projectName?: string;
   /** Downscaled JPEG dataURL of the scanned cut-list photo (optional). */
   scanThumb?: string | null;
+  /** Path of the scan image kept in the private bucket (optional). */
+  scanPath?: string | null;
   /** ISO timestamp of the last PDF export for this project (optional). */
   pdfGeneratedAt?: string | null;
   sheets: Sheet[];
@@ -40,6 +42,7 @@ export interface PersistedProjectPayload extends ProjectUnitPersistenceMetadata 
   /** Present only when the artisan named the project themselves. */
   projectName?: string;
   scanThumb?: string | null;
+  scanPath?: string | null;
   pdfGeneratedAt?: string | null;
   sheets: Sheet[];
   sheet: Sheet;
@@ -59,6 +62,7 @@ export function buildPersistedProjectPayload(
     name: input.name,
     ...(input.projectName?.trim() ? { projectName: input.projectName.trim() } : {}),
     ...(input.scanThumb ? { scanThumb: input.scanThumb } : {}),
+    ...(input.scanPath ? { scanPath: input.scanPath } : {}),
     ...(input.pdfGeneratedAt ? { pdfGeneratedAt: input.pdfGeneratedAt } : {}),
     sheets: input.sheets,
     sheet: input.sheet,
