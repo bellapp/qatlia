@@ -11,6 +11,8 @@ import type { LaborPricing } from '@/lib/costing';
 import { Frame, Gauge, Layers3, Lock, ScanLine, Scissors, Coins } from 'lucide-react';
 import { Tooltip } from '@/components/Tooltip';
 import { useLocale } from '@/components/LocaleProvider';
+import { useCurrency } from '@/components/currency-store';
+import { catalogPriceIn } from '@/lib/currency';
 import {
   LABOR_PRICING_MODE_KEYS,
   OPTIMIZATION_PRIORITY_LABEL_KEYS,
@@ -91,6 +93,7 @@ export const OptionsPanel: React.FC<OptionsPanelProps> = ({
   edgePriceSaveFailed = false,
 }) => {
   const { t } = useLocale();
+  const { currency } = useCurrency();
   const updateField = <K extends keyof OptimizationOptions>(field: K, value: OptimizationOptions[K]) => {
     onChange({ ...options, [field]: value });
   };
@@ -99,8 +102,9 @@ export const OptionsPanel: React.FC<OptionsPanelProps> = ({
 
   const laborPricing: LaborPricing = options.laborPricing ?? DEFAULT_LABOR_PRICING;
   const updateLaborPricing = (next: LaborPricing) => updateField('laborPricing', next);
-  // Catalog prices per metre still differ by colour; the hint shows their range.
-  const catalogEdgePrices = EDGEBANDING_PRESETS.filter((e) => e.id !== 'none').map((e) => e.pricePerM);
+  // Catalog prices per metre still differ by colour; the hint shows their
+  // range, converted from dirhams for a euro or dollar account.
+  const catalogEdgePrices = EDGEBANDING_PRESETS.filter((e) => e.id !== 'none').map((e) => catalogPriceIn(e.pricePerM, currency));
   const catalogEdgeRange = `${Math.min(...catalogEdgePrices)}–${Math.max(...catalogEdgePrices)}`;
 
   return (

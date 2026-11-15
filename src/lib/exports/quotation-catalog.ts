@@ -20,6 +20,8 @@
 import type { QuotationLocale } from '@/lib/quotation';
 import { translate } from '@/i18n';
 import { MATERIAL_LABEL_KEYS } from '@/i18n/domain';
+import type { AppCurrency } from '@/lib/currency';
+import { withCurrencyCode } from './currency-labels';
 
 const fr = {
   documentTitle: 'DEVIS',
@@ -119,8 +121,9 @@ const ar: QuotationCatalog = {
 
 export const quotationCatalogs: Record<QuotationLocale, QuotationCatalog> = { fr, ar };
 
-export function quotationCatalogFor(locale: string): QuotationCatalog {
-  return locale === 'ar' ? quotationCatalogs.ar : quotationCatalogs.fr;
+/** The catalog for a document language, its money labels in the account currency (default MAD). */
+export function quotationCatalogFor(locale: string, currency: AppCurrency = 'MAD'): QuotationCatalog {
+  return withCurrencyCode(locale === 'ar' ? quotationCatalogs.ar : quotationCatalogs.fr, currency);
 }
 
 // ─── Known internal material keys — localized; anything else (an artisan's

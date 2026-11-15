@@ -6,6 +6,7 @@ import { ExportSchema } from '@/lib/exports/pdf-schema';
 import { computeCostBreakdown } from '@/lib/costing';
 import { buildCostDetail, hasLaborCharge } from '@/lib/cost-detail';
 import { pdfCatalogFor } from '@/lib/exports/pdf-catalog';
+import { formatExportMoney } from '@/lib/exports/currency-labels';
 import {
   registerAmiriFont,
   payloadNeedsArabicFont,
@@ -42,8 +43,9 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'INVALID_DATA', details: parsed.error.format() }, { status: 400 });
     }
 
-    const { projectName, material, sheet, result, displayUnit, locale } = parsed.data;
-    const cat = pdfCatalogFor(locale);
+    const { projectName, material, sheet, result, displayUnit, locale, currency } = parsed.data;
+    // Amounts and labels in the account currency the atelier priced the plan in.
+    const cat = pdfCatalogFor(locale, currency);
 
     // Input geometry (sheet/pieces/offcuts) is always canonical centimetres —
     // there is no magnitude-based mm/cm guessing here. `fmt` is the only
@@ -57,7 +59,7 @@ export async function POST(req: Request) {
     // it — every one of these — completely unchanged).
     const fmt = (valueCm: number) => fromCanonicalCm(valueCm, displayUnit).toFixed(1);
     const toM2 = (w: number, h: number) => (w * h) / 10_000;
-    const fmtMad = (valueMad: number) => `${valueMad.toFixed(2).replace('.', ',')} MAD`;
+    const fmtMad = (value: number) => formatExportMoney(value, currency);
     /** A quantity or rate with at most `decimals` decimals, trailing zeros dropped (2,9768 ; 6,3 ; 8). */
     const fmtNumber = (value: number, decimals: number) =>
       String(Number(value.toFixed(decimals))).replace('.', ',');
@@ -477,7 +479,7 @@ export async function POST(req: Request) {
             : [
                 name,
                 `${panel.count} × ${fmtNumber(panel.areaM2, 4)} m²`,
-                `${fmtNumber(panel.pricing.value, 2)} MAD/m²`,
+                `${fmtNumber(panel.pricing.value, 2)} ${currency}/m²`,
                 fmtMad(panel.total),
               ]
         );
@@ -485,7 +487,7 @@ export async function POST(req: Request) {
 
       for (const edge of detail.edges) {
         const name = edge.edgeId ? `${cat.detail.edge} · ${translate(locale, edgeBandingLabelKey(edge.edgeId))}` : cat.detail.edge;
-        detailRows.push([name, `${fmtNumber(edge.lengthM, 2)} m`, `${fmtNumber(edge.pricePerMeter, 2)} MAD/m`, fmtMad(edge.total)]);
+        detailRows.push([name, `${fmtNumber(edge.lengthM, 2)} m`, `${fmtNumber(edge.pricePerMeter, 2)} ${currency}/m`, fmtMad(edge.total)]);
       }
 
       if (hasLaborCharge(detail.labor)) {
@@ -494,7 +496,7 @@ export async function POST(req: Request) {
             ? [
                 cat.detail.laborPerMeter,
                 `${fmtNumber(detail.labor.cutLengthM ?? 0, 2)} m`,
-                `${fmtNumber(detail.labor.pricing.value, 2)} MAD/m`,
+                `${fmtNumber(detail.labor.pricing.value, 2)} ${currency}/m`,
                 fmtMad(detail.labor.total),
               ]
             : [cat.detail.laborFixed, '1', fmtMad(detail.labor.pricing.value), fmtMad(detail.labor.total)]

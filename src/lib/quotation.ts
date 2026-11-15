@@ -226,6 +226,8 @@ export const QuotationRequestSchema = z
     notes: optionalShortText(MAX_NOTES_TEXT),
     locale: z.enum(QUOTATION_LOCALES).default('fr'),
     includeAmountInWords: z.boolean().default(false),
+    /** The account currency the amounts are in (absent: dirhams). */
+    currency: z.enum(['MAD', 'EUR', 'USD']).default('MAD'),
     logoDataUrl: LogoDataUrlSchema.optional(),
     panels: z.array(QuotationPanelSchema).max(MAX_QUOTATION_PANELS).default([]),
     pieces: z.array(QuotationPieceSchema).max(MAX_QUOTATION_PIECES).default([]),
@@ -268,6 +270,8 @@ export interface QuotationRequestPayloadInput {
   notes?: string;
   locale: QuotationLocale;
   includeAmountInWords: boolean;
+  /** The account currency the amounts are in; absent: dirhams. */
+  currency?: 'MAD' | 'EUR' | 'USD';
   logoDataUrl?: string;
   projectId?: string;
   /** Bounded detail lines derived from the optimizer's own result — see the module doc above `QuotationPanelSchema`/`QuotationPieceSchema`. */
@@ -449,20 +453,36 @@ function frNeedsDeBeforeNoun(n: number): boolean {
   return n > 0 && n % 1_000_000 === 0;
 }
 
-/** Renders an amount in French words: "<dirhams> dirham(s) [et <centimes> centime(s)]". Deterministic, bounded — see `AMOUNT_IN_WORDS_MAX_MAD`. */
-export function amountInWordsFr(amountMad: number): string {
+/** The currency an amount in words names: the account currency (dirham by default). */
+export type AmountCurrency = 'MAD' | 'EUR' | 'USD';
+
+/** French unit and sub-unit names, singular then plural. */
+const FR_CURRENCY_WORDS: Record<AmountCurrency, { unit: [string, string]; cent: [string, string] }> = {
+  MAD: { unit: ['dirham', 'dirhams'], cent: ['centime', 'centimes'] },
+  EUR: { unit: ['euro', 'euros'], cent: ['centime', 'centimes'] },
+  USD: { unit: ['dollar', 'dollars'], cent: ['cent', 'cents'] },
+};
+
+/** "un million de dirhams" but "un million d'euros": elided before a vowel. */
+function frDe(noun: string): string {
+  return /^[aeiouy]/i.test(noun) ? "d'" : 'de ';
+}
+
+/** Renders an amount in French words: "<units> dirham(s) [et <centimes> centime(s)]" (or euros, dollars). Deterministic, bounded — see `AMOUNT_IN_WORDS_MAX_MAD`. */
+export function amountInWordsFr(amountMad: number, currency: AmountCurrency = 'MAD'): string {
   assertAmountInWordsBound(amountMad, 'amountInWordsFr');
   const { units: dirhams, cents: centimes } = splitIntoCents(amountMad);
+  const words = FR_CURRENCY_WORDS[currency] ?? FR_CURRENCY_WORDS.MAD;
 
-  const dirhamLabel = dirhams <= 1 ? 'dirham' : 'dirhams';
-  const dirhamConnector = frNeedsDeBeforeNoun(dirhams) ? 'de ' : '';
+  const dirhamLabel = dirhams <= 1 ? words.unit[0] : words.unit[1];
+  const dirhamConnector = frNeedsDeBeforeNoun(dirhams) ? frDe(dirhamLabel) : '';
   let result = `${frNumberToWords(dirhams)} ${dirhamConnector}${dirhamLabel}`;
 
   if (centimes > 0) {
-    const centimeLabel = centimes <= 1 ? 'centime' : 'centimes';
+    const centimeLabel = centimes <= 1 ? words.cent[0] : words.cent[1];
     // centimes is always < 100 (see splitIntoCents), so this connector is
     // always empty in practice — kept for correctness/symmetry, not dead code.
-    const centimeConnector = frNeedsDeBeforeNoun(centimes) ? 'de ' : '';
+    const centimeConnector = frNeedsDeBeforeNoun(centimes) ? frDe(centimeLabel) : '';
     result += ` et ${frNumberToWords(centimes)} ${centimeConnector}${centimeLabel}`;
   }
   return result;
@@ -555,20 +575,31 @@ function arNumberToWords(n: number): string {
 
 const AR_DIRHAM_FORMS = { singular: 'درهم', dual: 'درهمان', plural: 'دراهم' };
 const AR_CENTIME_FORMS = { singular: 'سنتيم', dual: 'سنتيمان', plural: 'سنتيمات' };
+// يورو is invariable; دولار and سنت take the regular masculine forms.
+const AR_EURO_FORMS = { singular: 'يورو', dual: 'يورو', plural: 'يورو' };
+const AR_DOLLAR_FORMS = { singular: 'دولار', dual: 'دولاران', plural: 'دولارات' };
+const AR_CENT_FORMS = { singular: 'سنت', dual: 'سنتان', plural: 'سنتات' };
 
-/** Renders an amount in Arabic words: "<dirhams> <noun> [و<centimes> <noun>]", Western digits never involved. Deterministic, bounded — see `AMOUNT_IN_WORDS_MAX_MAD`. */
-export function amountInWordsAr(amountMad: number): string {
+const AR_CURRENCY_FORMS: Record<AmountCurrency, { unit: typeof AR_DIRHAM_FORMS; cent: typeof AR_DIRHAM_FORMS }> = {
+  MAD: { unit: AR_DIRHAM_FORMS, cent: AR_CENTIME_FORMS },
+  EUR: { unit: AR_EURO_FORMS, cent: AR_CENT_FORMS },
+  USD: { unit: AR_DOLLAR_FORMS, cent: AR_CENT_FORMS },
+};
+
+/** Renders an amount in Arabic words: "<units> <noun> [و<centimes> <noun>]", Western digits never involved. Deterministic, bounded — see `AMOUNT_IN_WORDS_MAX_MAD`. */
+export function amountInWordsAr(amountMad: number, currency: AmountCurrency = 'MAD'): string {
   assertAmountInWordsBound(amountMad, 'amountInWordsAr');
   const { units: dirhams, cents: centimes } = splitIntoCents(amountMad);
+  const forms = AR_CURRENCY_FORMS[currency] ?? AR_CURRENCY_FORMS.MAD;
 
-  let result = `${arNumberToWords(dirhams)} ${arCountedForm(dirhams, AR_DIRHAM_FORMS)}`;
+  let result = `${arNumberToWords(dirhams)} ${arCountedForm(dirhams, forms.unit)}`;
   if (centimes > 0) {
-    result += ` و${arNumberToWords(centimes)} ${arCountedForm(centimes, AR_CENTIME_FORMS)}`;
+    result += ` و${arNumberToWords(centimes)} ${arCountedForm(centimes, forms.cent)}`;
   }
   return result;
 }
 
-/** Dispatches to `amountInWordsFr`/`amountInWordsAr` for the given output locale. */
-export function amountInWords(amountMad: number, locale: QuotationLocale): string {
-  return locale === 'ar' ? amountInWordsAr(amountMad) : amountInWordsFr(amountMad);
+/** Dispatches to `amountInWordsFr`/`amountInWordsAr` for the given output locale and currency. */
+export function amountInWords(amountMad: number, locale: QuotationLocale, currency: AmountCurrency = 'MAD'): string {
+  return locale === 'ar' ? amountInWordsAr(amountMad, currency) : amountInWordsFr(amountMad, currency);
 }
