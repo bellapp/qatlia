@@ -364,6 +364,13 @@ export default function Dashboard() {
   const [nameSaveState, setNameSaveState] = useState<'idle' | 'saving' | RenameOutcome>('idle');
   const lastPersistedNameRef = useRef<string>('');
   const nameSaveAttemptRef = useRef(0);
+  // The committed project name, readable by an async save that started from an
+  // older render (an optimization running while the name is typed).
+  const projectNameRef = useRef<string>('');
+  const commitName = (name: string) => {
+    projectNameRef.current = name;
+    setProjectName(name);
+  };
   const [presetNameDraft, setPresetNameDraft] = useState<string>('');
   // Price of the stock panel (MAD per panel), as typed; committed on blur.
   const [panelPriceDraft, setPanelPriceDraft] = useState<string>('');
@@ -549,7 +556,7 @@ const commitPanelName = () => {
    *  one; the line under the field says how that went. */
   const commitProjectName = async () => {
     const name = projectNameDraft.trim();
-    setProjectName(name);
+    commitName(name);
     if (name === lastPersistedNameRef.current) return;
     const attempt = ++nameSaveAttemptRef.current;
     setNameSaveState('saving');
@@ -559,17 +566,20 @@ const commitPanelName = () => {
       { fetch: (input, init) => fetch(input, init), renameLocal: renameLocalHistoryItem },
     );
     if (outcome === 'saved') lastPersistedNameRef.current = name;
-    // A newer commit owns the line now.
-    if (attempt === nameSaveAttemptRef.current) setNameSaveState(outcome);
+    // A newer commit, or a save of the whole project, owns the line now.
+    if (attempt !== nameSaveAttemptRef.current) return;
+    // An emptied name goes back to the automatic one: nothing to say. The
+    // "saved with the plan" line is for a name typed before any plan exists.
+    setNameSaveState(outcome === 'pending' && !name ? 'idle' : outcome);
   };
 
   /** The name a saved project carries: custom > panel label > auto. */
-  const derivedProjectName = projectName.trim()
-    || activeSheet.label?.trim()
+  const automaticProjectName = activeSheet.label?.trim()
     || t(cutMode === '1d' ? 'atelier.project.nameBars' : 'atelier.project.nameSheets', {
       material: (activeSheet.material || 'mdf').toUpperCase(),
       count: pieces.reduce((s, p) => s + (p.quantity || 1), 0),
     });
+  const derivedProjectName = projectName.trim() || automaticProjectName;
 
   // Re-sync the free-typed drafts whenever the canonical sheet dimensions or
   // the display unit change from *outside* the draft itself (a cm↔mm toggle,
@@ -662,7 +672,7 @@ const commitPanelName = () => {
         if (Array.isArray(parsed.sheets)) setSheets(parsed.sheets.map(restoreSheet));
         if (Array.isArray(parsed.pieces)) setPieces(normalizePiecesWithColors(parsed.pieces));
         if (typeof parsed.projectName === 'string' && parsed.projectName.trim()) {
-          setProjectName(parsed.projectName.trim());
+          commitName(parsed.projectName.trim());
           setProjectNameDraft(parsed.projectName.trim());
           lastPersistedNameRef.current = parsed.projectName.trim();
         }
@@ -753,14 +763,17 @@ const commitPanelName = () => {
     // this save is itself the rewrite of a legacy record (pendingUnitMigration),
     // or a prior save already carried that historical origin forward.
     const persistedMigratedFromLegacyUnit = pendingUnitMigration || migratedFromLegacyUnit;
+    // The name committed now, not the one this handler's render saw: the field
+    // may have been left while the optimization was running.
+    const committedName = projectNameRef.current.trim();
     const payload = buildPersistedProjectPayload({
       // `{material}` stays the stable payload value upper-cased (MDF, VERRE, …)
       // rather than a translated label, so a project keeps the same identity in
       // history whatever language it was saved in; only the wording around it
       // follows the artisan's locale.
       // Custom project name (when the artisan named it) > panel label > auto.
-      name: derivedProjectName,
-      projectName: projectName.trim() || undefined,
+      name: committedName || automaticProjectName,
+      projectName: committedName || undefined,
       scanThumb: scanThumb || undefined,
       pdfGeneratedAt: overrides.pdfGeneratedAt || pdfGeneratedAt || undefined,
       sheets,
@@ -814,8 +827,6 @@ const commitPanelName = () => {
     } catch (err) {
       console.error('Erreur auto-save projet:', err);
     }
-    // The name this save carries is the one the saved project now has.
-    lastPersistedNameRef.current = payload.projectName ?? '';
     if (!savedToCloud) {
       const localId = `${source}_${Date.now()}`;
       setLocalProjectId(localId);
@@ -832,6 +843,12 @@ const commitPanelName = () => {
       options_json: payload as unknown as LocalHistoryItem['options_json'],
     });
     }
+    // The saved project now carries this name: the line says so, whatever it
+    // said before (not saved, saved with the plan), and a late answer from an
+    // earlier name commit no longer overwrites it.
+    nameSaveAttemptRef.current += 1;
+    lastPersistedNameRef.current = payload.projectName ?? '';
+    setNameSaveState(payload.projectName ? 'saved' : 'idle');
   };
 
   /**
@@ -891,7 +908,7 @@ const commitPanelName = () => {
     if (work.options) setOptions((prev) => optionsWithoutStockOverride({ ...prev, ...(work.options as Partial<OptimizationOptions>) }));
     if (work.cutMode) setCutMode(work.cutMode);
     if (work.projectName) {
-      setProjectName(work.projectName);
+      commitName(work.projectName);
       setProjectNameDraft(work.projectName);
     }
     // The photo is not put in the scan preview: that card reads "analysed",

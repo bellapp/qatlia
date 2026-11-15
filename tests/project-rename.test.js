@@ -1,5 +1,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const path = require('node:path');
 const { loadTsModule } = require('./helpers/load-ts-module');
 
 // Typing a name in the atelier and leaving the field saves it: on the server
@@ -88,4 +90,33 @@ test('a local history that cannot be written reports false', () => {
   const storage = { getItem: () => raw, setItem: () => { throw new Error('quota'); } };
   assert.equal(withStorage(storage, () => renameLocalHistoryItem('optimize_1', 'Cuisine')), false);
   assert.ok(LOCAL_HISTORY_KEY);
+});
+
+// The screen's wiring lives in the page files, so it is read from the source.
+
+const atelierSource = () => fs.readFileSync(path.resolve('src/app/(site)/atelier/page.tsx'), 'utf8');
+const historySource = () => fs.readFileSync(path.resolve('src/app/(site)/history/page.tsx'), 'utf8');
+
+test('an emptied name shows no message, since the plan may already be saved', () => {
+  assert.match(atelierSource(), /setNameSaveState\(outcome === 'pending' && !name \? 'idle' : outcome\)/);
+});
+
+test('a save of the whole project reads the name committed now and the line follows what it saved', () => {
+  const page = atelierSource();
+  const persist = page.slice(page.indexOf('const persistProject = async'), page.indexOf('const recordPdfGenerated'));
+  assert.match(persist, /const committedName = projectNameRef\.current\.trim\(\);/);
+  assert.match(persist, /projectName: committedName \|\| undefined,/);
+  assert.match(persist, /name: committedName \|\| automaticProjectName,/);
+  assert.doesNotMatch(persist, /projectName\.trim\(\)/);
+  assert.match(persist, /lastPersistedNameRef\.current = payload\.projectName \?\? '';\s*setNameSaveState\(payload\.projectName \? 'saved' : 'idle'\);/);
+  // The reference follows every place the committed name is set.
+  assert.equal(page.match(/commitName\(/g).length, 3);
+  assert.equal(page.match(/setProjectName\(/g).length, 1);
+});
+
+test('renaming a card in the history also renames the project it reopens', () => {
+  assert.match(
+    historySource(),
+    /p\.id === proj\.id \? \{ \.\.\.p, name, options_json: \{ \.\.\.p\.options_json, projectName: name \} \} : p/
+  );
 });

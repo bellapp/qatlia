@@ -170,7 +170,12 @@ export default function HistoryPage() {
       ok = renameLocalHistoryItem(proj.id, name);
     }
     if (ok) {
-      setProjects((prev) => prev.map((p) => (p.id === proj.id ? { ...p, name } : p)));
+      // The atelier reads `options_json.projectName` on reopening, so the card
+      // in memory carries the new name there too (as the server and the local
+      // history now do).
+      setProjects((prev) => prev.map((p) => (
+        p.id === proj.id ? { ...p, name, options_json: { ...p.options_json, projectName: name } } : p
+      )));
     }
   };
 
