@@ -99,7 +99,7 @@ import { buildPdfPayload } from '@/lib/pdf-payload';
 import { buildPersistedProjectPayload } from '@/lib/projects/persistence-payload';
 import { pickRestorableResult, readRestoredProjectDate } from '@/lib/projects/restore';
 import { downscaleDataUrl } from '@/lib/image-downscale';
-import { createScanKeeper, saveProjectToCloud } from '@/lib/projects/scan-upload';
+import { createScanKeeper, saveProjectToCloud, settledWithin } from '@/lib/projects/scan-upload';
 import { readAnalysisPass, storeAnalysisPass } from '@/lib/billing/analysis-pass-store';
 import {
   type DisplayUnit,
@@ -234,6 +234,9 @@ export default function Dashboard() {
   // Held outside React state so two saves in a row never send it twice.
   const [scanKeeper] = useState(() => createScanKeeper({ fetch: (url, init) => fetch(url, init), downscale: downscaleDataUrl }));
   const scanViewer = useScanViewer();
+  // The last save's scan attach (a PATCH that rewrites the project's saved
+  // data); a PDF marker or a rename on the same project waits for it first.
+  const scanAttachRef = useRef<Promise<boolean>>(Promise.resolve(false));
   const [pdfGeneratedAt, setPdfGeneratedAt] = useState<string | null>(null);
   // When the plan on screen was saved, set only while it is a plan reopened
   // from history as saved. A new run replaces that plan, so it clears it.
@@ -567,6 +570,7 @@ const commitPanelName = () => {
     if (name === lastPersistedNameRef.current) return;
     const attempt = ++nameSaveAttemptRef.current;
     setNameSaveState('saving');
+    await settledWithin(scanAttachRef.current);
     const outcome = await saveProjectName(
       { cloudId: lastSavedProjectId, localId: localProjectId },
       name,
@@ -828,6 +832,7 @@ const commitPanelName = () => {
         // The project is saved without waiting for the scan image: a new scan's
         // image is sent afterwards and attached to it (`saved.scanAttached`,
         // never rejected); a refusal leaves the thumbnail only.
+        scanAttachRef.current = saved.scanAttached;
         if (saved.ok) {
           savedToCloud = true;
           // The quotation dialog merges its metadata into *this* saved
@@ -872,6 +877,7 @@ const commitPanelName = () => {
     }
     // The field was left while this save was running: the new record carries
     // the previous name, so the name typed since is written to it now.
+    await settledWithin(scanAttachRef.current);
     const outcome = await saveProjectName(
       { cloudId: savedCloudId, localId: savedLocalId },
       currentName,
@@ -892,6 +898,7 @@ const commitPanelName = () => {
   const recordPdfGenerated = async (generatedAt: string) => {
     if (!result) return;
     if (lastSavedProjectId) {
+      await settledWithin(scanAttachRef.current);
       try {
         const res = await fetch(`/api/projects/${lastSavedProjectId}`, {
           method: 'PATCH',

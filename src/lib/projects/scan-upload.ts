@@ -180,6 +180,26 @@ export async function saveProjectToCloud(
   return { ok: true, projectId, scanAttached };
 }
 
+/** How long a PDF marker or a rename waits for a running scan attach (see `settledWithin`). */
+export const SCAN_ATTACH_WAIT_MS = 30_000;
+
+/**
+ * Waits until `pending` settles, or `ms` at most; never rejects. The atelier
+ * waits so for the scan attach (a read-merge-write of the project's
+ * `options_json`) before its own PATCH on the same row, which would otherwise
+ * lose one of the two keys.
+ */
+export function settledWithin(pending: Promise<unknown>, ms: number = SCAN_ATTACH_WAIT_MS): Promise<void> {
+  return new Promise<void>((resolve) => {
+    const timer = setTimeout(resolve, ms);
+    const done = () => {
+      clearTimeout(timer);
+      resolve();
+    };
+    pending.then(done, done);
+  });
+}
+
 /** A signed link slower than this is given up: the thumbnail is shown instead. */
 const LINK_TIMEOUT_MS = 15_000;
 
@@ -224,22 +244,71 @@ export interface ScanViewInput {
  */
 export type ScanReducedReason = 'not-kept' | 'link-failed';
 
+/**
+ * What the viewer shows. `src` is null only when the project kept its full
+ * image but neither it nor a thumbnail can be shown: the note says so alone.
+ */
 export type ScanViewSource =
   | { src: string; reduced: false }
-  | { src: string; reduced: true; reducedReason: ScanReducedReason };
+  | { src: string | null; reduced: true; reducedReason: ScanReducedReason };
 
-/** True when showing the scan needs a signed link from the server first. */
-export function scanViewNeedsFetch(input: ScanViewInput): boolean {
+/**
+ * A signed link lives 300 s; it is reused for 4 minutes, so reopening the
+ * same image does not download it again under a new link, and a link handed
+ * out always has a minute left.
+ */
+export const SCAN_LINK_REUSE_MS = 4 * 60_000;
+
+export interface ScanLinkCache {
+  get(projectId: string): string | null;
+  set(projectId: string, url: string): void;
+}
+
+export function createScanLinkCache(now: () => number = Date.now): ScanLinkCache {
+  const links = new Map<string, { url: string; expiresAt: number }>();
+  return {
+    get(projectId) {
+      const link = links.get(projectId);
+      if (!link) return null;
+      if (now() > link.expiresAt) {
+        links.delete(projectId);
+        return null;
+      }
+      return link.url;
+    },
+    set(projectId, url) {
+      links.set(projectId, { url, expiresAt: now() + SCAN_LINK_REUSE_MS });
+    },
+  };
+}
+
+function wantsLink(input: ScanViewInput): boolean {
   return !input.localImage && input.hasFullScan && typeof input.projectId === 'string' && PROJECT_ID_PATTERN.test(input.projectId);
 }
 
-/** What the viewer shows: the full image, else the thumbnail marked reduced, else null. */
-export async function resolveScanView(input: ScanViewInput, fetchImpl: FetchLike): Promise<ScanViewSource | null> {
+/** True when showing the scan needs a signed link from the server first. */
+export function scanViewNeedsFetch(input: ScanViewInput, cache?: ScanLinkCache): boolean {
+  return wantsLink(input) && !(cache && cache.get(input.projectId as string));
+}
+
+/**
+ * What the viewer shows: the full image (in memory, or through a signed link,
+ * reused from `cache` while it is fresh), else the thumbnail marked reduced
+ * with the reason, else null when there is nothing to show at all.
+ */
+export async function resolveScanView(input: ScanViewInput, fetchImpl: FetchLike, cache?: ScanLinkCache): Promise<ScanViewSource | null> {
   if (input.localImage) return { src: input.localImage, reduced: false };
-  if (scanViewNeedsFetch(input)) {
-    const url = await fetchScanUrl(input.projectId as string, fetchImpl);
-    if (url) return { src: url, reduced: false };
+  if (wantsLink(input)) {
+    const projectId = input.projectId as string;
+    const cached = cache?.get(projectId);
+    if (cached) return { src: cached, reduced: false };
+    const url = await fetchScanUrl(projectId, fetchImpl);
+    if (url) {
+      cache?.set(projectId, url);
+      return { src: url, reduced: false };
+    }
   }
-  if (!input.thumb) return null;
-  return { src: input.thumb, reduced: true, reducedReason: input.hasFullScan ? 'link-failed' : 'not-kept' };
+  const reducedReason: ScanReducedReason = input.hasFullScan ? 'link-failed' : 'not-kept';
+  if (!input.thumb) return input.hasFullScan ? { src: null, reduced: true, reducedReason } : null;
+  return { src: input.thumb, reduced: true, reducedReason };
 }

@@ -473,3 +473,67 @@ test('the atelier scan preview is a button that opens the viewer', () => {
   assert.match(page, /localImage: scanKeeper\.freshImage\(\),/);
   assert.match(page, /hasFullScan: scanKeeper\.knownPath\(\) !== null,/);
 });
+
+// Lot 3 fix wave.
+
+test('waiting for the scan to be attached never rejects and never waits past its cap', async () => {
+  const { settledWithin } = scanUpload();
+  let resolveIt;
+  const pending = new Promise((resolve) => { resolveIt = resolve; });
+  const waited = settledWithin(pending, 1000);
+  resolveIt(true);
+  const start = Date.now();
+  await waited;
+  assert.ok(Date.now() - start < 500, 'settles as soon as the attach does');
+  const t0 = Date.now();
+  await settledWithin(new Promise(() => {}), 30);
+  assert.ok(Date.now() - t0 >= 25, 'a hung attach is given up at the cap');
+  await settledWithin(Promise.reject(new Error('never')), 1000);
+});
+
+test('the atelier lets a running scan attach finish before its PDF marker or a rename writes the same row', () => {
+  const page = atelierSource();
+  const persist = page.slice(page.indexOf('const persistProject = async'), page.indexOf('const recordPdfGenerated'));
+  assert.match(persist, /scanAttachRef\.current = saved\.scanAttached;/);
+  const record = page.slice(page.indexOf('const recordPdfGenerated'), page.indexOf('const askSignInKeepingWork'));
+  assert.match(record, /if \(lastSavedProjectId\) \{\s*await settledWithin\(scanAttachRef\.current\);/);
+  // Both name writes wait too: the one when the field is left, the one after a save.
+  assert.equal(page.match(/await settledWithin\(scanAttachRef\.current\);\s*const outcome = await saveProjectName\(/g).length, 2);
+});
+
+test('a signed link is reused for about four minutes, then asked for again', async () => {
+  const { resolveScanView, createScanLinkCache, scanViewNeedsFetch } = scanUpload();
+  let now = 1_000_000;
+  const cache = createScanLinkCache(() => now);
+  let n = 0;
+  const fetchImpl = recordingFetch(() => jsonResponse(200, { success: true, url: `https://x.supabase.co/a.jpg?token=${++n}` }));
+  const input = { projectId: PROJECT_ID, hasFullScan: true, thumb: REDUCED };
+  assert.equal((await resolveScanView(input, fetchImpl, cache)).src, 'https://x.supabase.co/a.jpg?token=1');
+  now += 4 * 60_000 - 1;
+  assert.equal((await resolveScanView(input, fetchImpl, cache)).src, 'https://x.supabase.co/a.jpg?token=1');
+  assert.equal(fetchImpl.calls.length, 1, 'the image is not downloaded again under a new link');
+  assert.equal(scanViewNeedsFetch(input, cache), false);
+  now += 2;
+  assert.equal(scanViewNeedsFetch(input, cache), true);
+  assert.equal((await resolveScanView(input, fetchImpl, cache)).src, 'https://x.supabase.co/a.jpg?token=2');
+  assert.equal(fetchImpl.calls.length, 2);
+  // Another project has its own link.
+  await resolveScanView({ ...input, projectId: '9a8b7c6d-5e4f-4a3b-8c2d-1e0f9a8b7c6e' }, fetchImpl, cache);
+  assert.equal(fetchImpl.calls.length, 3);
+});
+
+test('a link that failed is not remembered', async () => {
+  const { resolveScanView, createScanLinkCache } = scanUpload();
+  const cache = createScanLinkCache(() => 0);
+  let fail = true;
+  const fetchImpl = recordingFetch(() => (fail ? jsonResponse(503, { error: 'SCAN_UNAVAILABLE' }) : jsonResponse(200, { success: true, url: 'https://x.supabase.co/a.jpg' })));
+  await quietly(() => resolveScanView({ projectId: PROJECT_ID, hasFullScan: true, thumb: REDUCED }, fetchImpl, cache));
+  fail = false;
+  assert.equal((await resolveScanView({ projectId: PROJECT_ID, hasFullScan: true, thumb: REDUCED }, fetchImpl, cache)).src, 'https://x.supabase.co/a.jpg');
+  assert.equal(fetchImpl.calls.length, 2);
+});
+
+test('a kept image with no thumbnail whose link failed still opens, with the link-failed note alone', async () => {
+  const view = await quietly(() => scanUpload().resolveScanView({ projectId: PROJECT_ID, hasFullScan: true, thumb: null }, recordingFetch(() => jsonResponse(503, {}))));
+  assert.deepEqual(view, { src: null, reduced: true, reducedReason: 'link-failed' });
+});

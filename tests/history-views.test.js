@@ -368,3 +368,62 @@ test('the history shows the scan in the viewer, no longer in a blank tab', () =>
   assert.match(page, /hasFullScan: row\.hasFullScan,/);
   assert.match(page, /thumb: row\.scanThumb,/);
 });
+
+// Lot 3 fix wave: a kept image without a thumbnail, and the full image loading.
+
+const fullScanOnlyRow = toHistoryRow({
+  id: '1b2c3d4e-5f60-4a71-8b92-a3b4c5d6e7f8', name: 'Salon', material: 'mdf',
+  sheet_width: 206, sheet_height: 279, created_at: '2026-11-15T10:00:00.000Z',
+  options_json: { pieces: [{ quantity: 1 }], scanPath: '0b1c2d3e-4f50-4a61-8b72-93a4b5c6d7e8/1f2e3d4c-5b6a-4978-8a9b-0c1d2e3f4a5b.jpg' },
+});
+
+test('a project that kept its image but no thumbnail still offers the scan button, in every view', () => {
+  assert.equal(fullScanOnlyRow.hasFullScan, true);
+  assert.equal(fullScanOnlyRow.scanThumb, null);
+  const cards = renderComponent('src/components/history/HistoryCards.tsx', 'HistoryCards', listProps([fullScanOnlyRow]));
+  const card = cards.match(/<button[^>]*data-testid="history-scan"[^>]*>/)[0];
+  assert.match(card, /aria-label="Voir l&#x27;image de Salon"/);
+  assert.match(card, /\bw-14 h-14\b/);
+  const table = renderComponent('src/components/history/HistoryTable.tsx', 'HistoryTable', listProps([fullScanOnlyRow]));
+  for (const id of ['history-scan', 'history-scan-compact']) {
+    const button = table.match(new RegExp(`<button[^>]*data-testid="${id}"[^>]*>`))[0];
+    assert.match(button, /aria-label="Voir l&#x27;image de Salon"/);
+    assert.match(button, /\bw-10 h-10\b/);
+  }
+  // Nothing kept at all: still no button.
+  assert.doesNotMatch(renderComponent('src/components/history/HistoryCards.tsx', 'HistoryCards', listProps([legacyRow])), /data-testid="history-scan"/);
+});
+
+test('while the full image loads, its thumbnail stands in for it', () => {
+  const html = unescape(renderViewer({ src: SIGNED_URL, reduced: false, thumb: TINY_JPEG }));
+  const imgs = html.match(/<img[^>]*>/g);
+  assert.equal(imgs.length, 2);
+  const full = imgs.find((img) => img.includes(SIGNED_URL));
+  const thumb = imgs.find((img) => img.includes(TINY_JPEG));
+  assert.match(full, /\bhidden\b/, 'the full image loads out of sight');
+  assert.doesNotMatch(thumb, /\bhidden\b/);
+  assert.match(thumb, /alt="Cuisine Alami"/);
+  assert.match(html, /data-testid="scan-viewer-open"/, 'the full image can already be opened');
+  assert.ok(!html.includes(REDUCED_NOTE));
+});
+
+test('what the viewer shows while the full image loads, once loaded, and when it fails', () => {
+  const { scanViewerContent } = loadComponentModule('src/components/ScanViewer.tsx');
+  const full = { src: SIGNED_URL, reduced: false, thumb: TINY_JPEG };
+  assert.deepEqual(scanViewerContent(full, 'loading'), { image: TINY_JPEG, loadingFull: SIGNED_URL, note: null, openable: true });
+  assert.deepEqual(scanViewerContent(full, 'loaded'), { image: SIGNED_URL, loadingFull: null, note: null, openable: true });
+  assert.deepEqual(scanViewerContent(full, 'failed'), { image: TINY_JPEG, loadingFull: null, note: 'link-failed', openable: false });
+  assert.deepEqual(scanViewerContent({ ...full, thumb: null }, 'loading'), { image: SIGNED_URL, loadingFull: null, note: null, openable: true });
+  assert.deepEqual(scanViewerContent({ ...full, thumb: null }, 'failed'), { image: null, loadingFull: null, note: 'link-failed', openable: false });
+  assert.deepEqual(scanViewerContent({ src: TINY_JPEG, reduced: false }, 'loading'), { image: TINY_JPEG, loadingFull: null, note: null, openable: false });
+  assert.deepEqual(scanViewerContent({ src: TINY_JPEG, reduced: true }, 'loading'), { image: TINY_JPEG, loadingFull: null, note: 'not-kept', openable: false });
+  assert.deepEqual(scanViewerContent({ src: null, reduced: true, reducedReason: 'link-failed' }, 'loading'), { image: null, loadingFull: null, note: 'link-failed', openable: false });
+});
+
+test('a kept image that cannot be shown at all says so, with no broken image', () => {
+  const html = unescape(renderViewer({ src: null, reduced: true, reducedReason: 'link-failed' }));
+  assert.doesNotMatch(html, /<img/);
+  assert.ok(html.includes(LINK_FAILED_NOTE));
+  const close = html.match(/<button[^>]*data-testid="scan-viewer-close"[^>]*>/)[0];
+  assert.match(close, /\bw-10 h-10\b/);
+});
