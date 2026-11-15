@@ -79,7 +79,9 @@ export function ScanViewer({ src, reduced, alt, onClose }: ScanViewerProps) {
       aria-modal="true"
       aria-labelledby={titleId}
       data-testid="scan-viewer"
-      className="fixed inset-0 z-[60] flex flex-col bg-slate-950/95 text-white"
+      // A click on the image keeps the focus in the viewer, not on the page.
+      tabIndex={-1}
+      className="fixed inset-0 z-[60] flex flex-col bg-slate-950 text-white outline-none"
     >
       <div onClick={closeOnBackdrop} className="shrink-0 flex items-center gap-2 px-3 sm:px-4 py-2 border-b border-white/10">
         <h2 id={titleId} className="flex-1 min-w-0 truncate text-sm font-bold">{t('scanViewer.title')}</h2>
