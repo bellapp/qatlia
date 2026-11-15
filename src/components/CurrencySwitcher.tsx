@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { Coins } from 'lucide-react';
-import { APP_CURRENCIES, isAppCurrency, type AppCurrency } from '@/lib/currency';
+import { APP_CURRENCIES, isAppCurrency } from '@/lib/currency';
 import { useLocale } from '@/components/LocaleProvider';
 import { useCurrency } from '@/components/currency-store';
 
