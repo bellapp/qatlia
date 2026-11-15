@@ -117,10 +117,19 @@ export function createScanKeeper(deps: { fetch: FetchLike; downscale: Downscale 
   };
 }
 
+/** A signed link slower than this is given up: the thumbnail is shown instead. */
+const LINK_TIMEOUT_MS = 15_000;
+
 /** A 5-minute signed link to a cloud project's kept image, or null. */
 export async function fetchScanUrl(projectId: string, fetchImpl: FetchLike): Promise<string | null> {
+  // A hung request would keep the scan buttons waiting until a reload.
+  const controller = typeof AbortController === 'function' ? new AbortController() : null;
+  const timer = controller ? setTimeout(() => controller.abort(), LINK_TIMEOUT_MS) : null;
   try {
-    const res = await fetchImpl(`/api/projects/${encodeURIComponent(projectId)}/scan`, { cache: 'no-store' });
+    const res = await fetchImpl(`/api/projects/${encodeURIComponent(projectId)}/scan`, {
+      cache: 'no-store',
+      ...(controller ? { signal: controller.signal } : {}),
+    });
     if (!res.ok) {
       console.warn('Lien de l’image du scan indisponible:', res.status);
       return null;
@@ -130,6 +139,8 @@ export async function fetchScanUrl(projectId: string, fetchImpl: FetchLike): Pro
   } catch (err) {
     console.warn('Lien de l’image du scan indisponible:', err);
     return null;
+  } finally {
+    if (timer) clearTimeout(timer);
   }
 }
 

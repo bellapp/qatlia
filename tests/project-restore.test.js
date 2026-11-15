@@ -305,6 +305,16 @@ test('a project with a kept image shows it through its signed link', async () =>
   assert.equal(fetchImpl.calls[0].input, `/api/projects/${PROJECT_ID}/scan`);
 });
 
+test('both requests can be given up, so a hung server never keeps the scan buttons waiting', async () => {
+  const fetchImpl = recordingFetch(() => jsonResponse(200, { success: true, scanPath: PATH, url: 'https://x.supabase.co/a.jpg' }));
+  const k = keeper(fetchImpl);
+  k.newScan(ORIGINAL);
+  await k.keep();
+  await scanUpload().fetchScanUrl(PROJECT_ID, fetchImpl);
+  assert.equal(fetchImpl.calls.length, 2);
+  for (const call of fetchImpl.calls) assert.ok(call.init.signal instanceof AbortSignal, `${call.input} carries an abort signal`);
+});
+
 test('a link that cannot be had falls back to the thumbnail, marked reduced', async () => {
   const answers = [
     () => jsonResponse(404, { error: 'NOT_FOUND' }),
