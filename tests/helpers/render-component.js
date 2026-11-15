@@ -34,9 +34,16 @@ function resolveSource(base) {
  * source file of this project goes through normal module resolution.
  */
 function loadComponentModule(sourcePath, locale = 'fr') {
-  const { translate } = loadTsModule('src/i18n/index.ts');
+  const { translate, translatePlural, formatNumber, dirFor } = loadTsModule('src/i18n/index.ts');
+  const localeValue = {
+    t: (key, vars) => translate(locale, key, vars),
+    tn: (key, count, vars) => translatePlural(locale, key, count, vars),
+    n: (value, options) => formatNumber(locale, value, options),
+    dir: dirFor(locale),
+    locale,
+  };
   const stubs = {
-    '@/components/LocaleProvider': { useLocale: () => ({ t: (key, vars) => translate(locale, key, vars), locale }) },
+    '@/components/LocaleProvider': { useLocale: () => localeValue },
   };
   const cache = new Map();
 

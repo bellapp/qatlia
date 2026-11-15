@@ -240,3 +240,49 @@ test.describe('Keyboard focus order: DOM order holds, visual order mirrors under
     });
   }
 });
+
+test.describe('History: cards or table, readable on a phone', () => {
+  // One project kept on this device only, so the page needs no account. The
+  // init script runs again on reload: it seeds the history and never touches
+  // the remembered view (`qatlia_history_view`), or the reload would prove nothing.
+  const LOCAL_PROJECT = {
+    id: 'optimize_1763116800000',
+    name: 'ق'.repeat(120),
+    material: 'mdf',
+    sheet_width: 206,
+    sheet_height: 279,
+    kerf: 0.3,
+    grain_direction: false,
+    status: 'completed',
+    created_at: '2026-11-14T10:40:00.000Z',
+    options_json: { pieces: [{ name: 'Côté', height: 70, width: 40, quantity: 3 }], result: { sheetsUsed: 1, wastePercentage: 12.5 } },
+  };
+
+  test('at 390px the table becomes a compact list, without sideways scrolling, and the choice survives a reload', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.addInitScript((project) => {
+      localStorage.setItem('qatlia-locale', 'ar');
+      localStorage.setItem('qatlia_local_history_v1', JSON.stringify([project]));
+    }, LOCAL_PROJECT);
+    await page.goto('/history', { waitUntil: 'domcontentloaded' });
+
+    const toTable = page.getByTestId('history-view-table');
+    await expect(toTable).toBeVisible({ timeout: 15000 });
+    await toTable.click();
+    await expect(toTable).toHaveAttribute('aria-pressed', 'true');
+
+    const compact = page.getByTestId('history-compact');
+    await expect(compact).toBeVisible();
+    await expect(page.getByTestId('history-table')).toBeHidden();
+    await expect(compact.getByTestId('history-open-compact')).toBeVisible();
+
+    const fits = await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth);
+    expect(fits).toBe(true);
+
+    await page.reload({ waitUntil: 'domcontentloaded' });
+    await expect(page.getByTestId('history-compact')).toBeVisible({ timeout: 15000 });
+    await expect(page.getByTestId('history-view-table')).toHaveAttribute('aria-pressed', 'true');
+    const stillFits = await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth);
+    expect(stillFits).toBe(true);
+  });
+});

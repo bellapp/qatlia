@@ -175,7 +175,8 @@ test('the "optimized" chip is not shown on a plan reopened as saved', () => {
 
 test('a project renamed before the name was kept in its data reopens under the card name', () => {
   const page = historySource();
-  const load = page.slice(page.indexOf('const handleLoadProject'), page.indexOf('const getMaterialBadge'));
+  const load = page.slice(page.indexOf('const handleLoadProject'), page.indexOf('const handleDownloadPdf'));
+  assert.ok(load.length > 0, 'handleLoadProject comes before handleDownloadPdf');
   assert.match(load, /UUID_PATTERN\.test\(project\.id\)\s*&& project\.name\.trim\(\)\s*&& typeof storedName === 'string'\s*&& storedName\.trim\(\)\s*&& storedName\.trim\(\) !== project\.name\.trim\(\)/);
   assert.match(load, /\{ \.\.\.project\.options_json, projectName: project\.name\.trim\(\) \}/);
   assert.match(load, /JSON\.stringify\(restoredOptions\)/);
