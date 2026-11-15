@@ -57,14 +57,14 @@ export function HistoryTable({ rows, ...actions }: HistoryListProps) {
   );
 }
 
-function TableRow({ row, onOpen, onRename, onDownloadPdf, onViewScan, pdfPendingIds }: RowProps) {
+function TableRow({ row, onOpen, onRename, onDownloadPdf, onViewScan, pdfPendingIds, scanPendingId }: RowProps) {
   const { t, locale } = useLocale();
   const pdfBusy = pdfPendingIds?.has(row.id) ?? false;
   const figures = useRowFigures(row);
   return (
     <tr data-testid="history-row" className="hover:bg-studio-field/40 transition-colors">
       <td data-col="preview" className={`${TD} w-10`}>
-        <ScanThumb row={row} size="row" onViewScan={onViewScan} testId="history-scan" />
+        <ScanThumb row={row} size="row" onViewScan={onViewScan} busy={scanPendingId === row.id} testId="history-scan" />
       </td>
       {/* `max-w-0 w-full`: the name takes what the other columns leave and is
           truncated there, instead of widening the table; `min-w-28` keeps it
@@ -129,13 +129,13 @@ function TableRow({ row, onOpen, onRename, onDownloadPdf, onViewScan, pdfPending
  * sheets, waste. Its controls carry `-compact` test ids, since the table row
  * of the same project is in the page too (hidden).
  */
-function CompactRow({ row, onOpen, onRename, onViewScan }: RowProps) {
+function CompactRow({ row, onOpen, onRename, onViewScan, scanPendingId }: RowProps) {
   const { t, tn, locale } = useLocale();
   const figures = useRowFigures(row);
   return (
     <li data-testid="history-compact-row" className="min-w-0 p-3 rounded-xl bg-studio-panel/70 border border-studio-border space-y-1.5">
       <div className="flex items-center gap-2.5 min-w-0">
-        <ScanThumb row={row} size="row" onViewScan={onViewScan} testId="history-scan-compact" />
+        <ScanThumb row={row} size="row" onViewScan={onViewScan} busy={scanPendingId === row.id} testId="history-scan-compact" />
         <div className="flex-1 min-w-0">
           <HistoryName name={row.name} onRename={(name) => onRename(row.id, name)} size="row" />
         </div>

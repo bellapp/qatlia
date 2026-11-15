@@ -30,7 +30,7 @@ const CARD_DATE_OPTIONS: Intl.DateTimeFormatOptions = {
 };
 
 /** The history as cards: one column on a phone, two from 768px. */
-export function HistoryCards({ rows, onOpen, onRename, onDownloadPdf, onViewScan, pdfPendingIds }: HistoryListProps) {
+export function HistoryCards({ rows, onOpen, onRename, onDownloadPdf, onViewScan, pdfPendingIds, scanPendingId }: HistoryListProps) {
   return (
     <div data-testid="history-cards" className="grid grid-cols-1 md:grid-cols-2 gap-4">
       {rows.map((row) => (
@@ -42,6 +42,7 @@ export function HistoryCards({ rows, onOpen, onRename, onDownloadPdf, onViewScan
           onDownloadPdf={onDownloadPdf}
           onViewScan={onViewScan}
           pdfBusy={pdfPendingIds?.has(row.id) ?? false}
+          scanBusy={scanPendingId === row.id}
         />
       ))}
     </div>
@@ -55,7 +56,8 @@ function HistoryCard({
   onDownloadPdf,
   onViewScan,
   pdfBusy,
-}: Omit<HistoryListProps, 'rows' | 'pdfPendingIds'> & { row: HistoryRow; pdfBusy: boolean }) {
+  scanBusy,
+}: Omit<HistoryListProps, 'rows' | 'pdfPendingIds' | 'scanPendingId'> & { row: HistoryRow; pdfBusy: boolean; scanBusy: boolean }) {
   const { t, tn, locale } = useLocale();
   const figures = useRowFigures(row);
   const material = row.material?.toLowerCase();
@@ -77,7 +79,7 @@ function HistoryCard({
           </span>
         </div>
         <div className="flex items-center gap-3 min-w-0">
-          <ScanThumb row={row} size="card" onViewScan={onViewScan} testId="history-scan" />
+          <ScanThumb row={row} size="card" onViewScan={onViewScan} busy={scanBusy} testId="history-scan" />
           <div className="flex-1 min-w-0">
             <HistoryName name={row.name} onRename={(name) => onRename(row.id, name)} size="card" />
           </div>

@@ -81,6 +81,7 @@ import {
   type PendingWork,
 } from '@/lib/pending-work';
 import { QuotationDialog } from '@/components/QuotationDialog';
+import { ScanViewer, useScanViewer } from '@/components/ScanViewer';
 import { EmptyState } from '@/components/EmptyState';
 import { AccountMenu } from '@/components/AccountMenu';
 import { QatlIALogo } from '@/components/QatlIALogo';
@@ -98,6 +99,7 @@ import { buildPdfPayload } from '@/lib/pdf-payload';
 import { buildPersistedProjectPayload } from '@/lib/projects/persistence-payload';
 import { pickRestorableResult, readRestoredProjectDate } from '@/lib/projects/restore';
 import { downscaleDataUrl } from '@/lib/image-downscale';
+import { createScanKeeper } from '@/lib/projects/scan-upload';
 import { readAnalysisPass, storeAnalysisPass } from '@/lib/billing/analysis-pass-store';
 import {
   type DisplayUnit,
@@ -227,6 +229,11 @@ export default function Dashboard() {
   const [previewImage, setPreviewImage] = useState<string | null>(null);
   // Lightweight thumbnail persisted with the project (history card preview).
   const [scanThumb, setScanThumb] = useState<string | null>(null);
+  // The scan image kept in full with a saved project: the path it is stored
+  // under, and the fresh scan still to send (src/lib/projects/scan-upload.ts).
+  // Held outside React state so two saves in a row never send it twice.
+  const [scanKeeper] = useState(() => createScanKeeper({ fetch: (url, init) => fetch(url, init), downscale: downscaleDataUrl }));
+  const scanViewer = useScanViewer();
   const [pdfGeneratedAt, setPdfGeneratedAt] = useState<string | null>(null);
   // When the plan on screen was saved, set only while it is a plan reopened
   // from history as saved. A new run replaces that plan, so it clears it.
@@ -682,6 +689,9 @@ const commitPanelName = () => {
         const restoredThumb = typeof parsed.scanThumb === 'string' ? parsed.scanThumb : null;
         setScanThumb(restoredThumb);
         setPreviewImage(restoredThumb);
+        // The full image, when the project kept one, is reached by its path;
+        // the thumbnail on screen is never sent as if it were the full image.
+        scanKeeper.restore(parsed.scanPath);
         // The saved plan is put back as it was saved, with no new run and no
         // new save; an old or damaged result gives null and the atelier opens
         // without a plan, as before.
@@ -767,7 +777,9 @@ const commitPanelName = () => {
     // The name committed now, not the one this handler's render saw: the field
     // may have been left while the optimization was running.
     const committedName = projectNameRef.current.trim();
-    const payload = buildPersistedProjectPayload({
+    // Where the scan image is kept, once a signed-in save has sent it (below).
+    let savedScanPath: string | null = null;
+    const buildPayload = () => buildPersistedProjectPayload({
       // `{material}` stays the stable payload value upper-cased (MDF, VERRE, …)
       // rather than a translated label, so a project keeps the same identity in
       // history whatever language it was saved in; only the wording around it
@@ -776,6 +788,7 @@ const commitPanelName = () => {
       name: committedName || automaticProjectName,
       projectName: committedName || undefined,
       scanThumb: scanThumb || undefined,
+      scanPath: savedScanPath,
       pdfGeneratedAt: overrides.pdfGeneratedAt || pdfGeneratedAt || undefined,
       sheets,
       sheet: activeSheet,
@@ -811,10 +824,13 @@ const commitPanelName = () => {
         data: { user },
       } = await supabase.auth.getUser();
       if (user) {
+        savedScanPath = await scanKeeper.keep();
+        // The image is sent once per scan, before the project that points to
+        // it; a refusal or a failure (never thrown) leaves the thumbnail only.
         const res = await fetch('/api/projects', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload),
+          body: JSON.stringify(buildPayload()),
         });
         if (res.ok) {
           savedToCloud = true;
@@ -832,6 +848,7 @@ const commitPanelName = () => {
     } catch (err) {
       console.error('Erreur auto-save projet:', err);
     }
+    const payload = buildPayload();
     if (!savedToCloud) {
       const localId = `${source}_${Date.now()}`;
       savedLocalId = localId;
@@ -1003,6 +1020,20 @@ const commitPanelName = () => {
     }
   };
 
+  /**
+   * Shows the scan full size: a scan made on this page from memory, a reopened
+   * project's kept image through a short signed link, else its thumbnail,
+   * marked as reduced. Seeing it spends no credit.
+   */
+  const openScanViewer = () => {
+    void scanViewer.show('atelier', {
+      localImage: scanKeeper.freshImage(),
+      projectId: lastSavedProjectId,
+      hasFullScan: scanKeeper.knownPath() !== null,
+      thumb: previewImage,
+    }, t('atelier.scan.previewAlt'));
+  };
+
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -1063,6 +1094,7 @@ const commitPanelName = () => {
         // server's size cap (SCAN_THUMB_MAX_CHARS), since the history page
         // loads every project's thumbnail at once.
         setPreviewImage(scanImage);
+        scanKeeper.newScan(scanImage);
         void downscaleDataUrl(scanImage, 600, 0.7).then(setScanThumb);
         const newPieces: Piece[] = data.pieces.map((p: { name?: string; width?: number | string; height?: number | string; quantity?: number | string; material?: string; color?: string }, i: number) => {
           // /api/vision always extracts and returns canonical centimetres
@@ -1688,8 +1720,22 @@ const commitPanelName = () => {
             {/* Preview scan if present */}
             {previewImage && (
               <div className="flex items-center gap-3 p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={previewImage} alt={t('atelier.scan.previewAlt')} className="w-12 h-12 object-cover rounded-lg border border-emerald-500/30 shadow-sm" />
+                <button
+                  type="button"
+                  onClick={openScanViewer}
+                  aria-label={t('scanViewer.openAria', { name: derivedProjectName })}
+                  aria-busy={scanViewer.pendingKey === 'atelier' || undefined}
+                  data-testid="atelier-scan-preview"
+                  className="relative w-12 h-12 shrink-0 rounded-lg overflow-hidden border border-emerald-500/30 shadow-sm hover:border-emerald-400 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500 transition-colors"
+                >
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={previewImage} alt="" className="w-full h-full object-cover" />
+                  {scanViewer.pendingKey === 'atelier' && (
+                    <span aria-hidden="true" className="absolute inset-0 flex items-center justify-center bg-slate-950/50 text-white">
+                      <RefreshCw className="w-4 h-4 animate-spin" />
+                    </span>
+                  )}
+                </button>
                 <div className="text-xs">
                   <span className="text-emerald-400 font-bold block">{t('atelier.scan.analyzedTitle')}</span>
                   <span className="text-[11px] text-emerald-300/70 font-mono">{tn('atelier.scan.analyzedCount', pieces.length)}</span>
@@ -2695,6 +2741,8 @@ const commitPanelName = () => {
           projectId={lastSavedProjectId}
         />
       )}
+
+      {scanViewer.view && <ScanViewer {...scanViewer.view} onClose={scanViewer.close} />}
     </div>
   );
 }

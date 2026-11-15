@@ -134,7 +134,7 @@ test('a full project offers its scan and its PDF in both views, and its figures'
     const html = renderComponent(`src/components/history/${file}.tsx`, name, listProps([fullRow]));
     assert.equal((html.match(/data-testid="history-scan"/g) || []).length, 1, `${name}: one scan control`);
     assert.equal((html.match(/data-testid="history-pdf"/g) || []).length, 1, `${name}: one PDF button`);
-    assert.match(html, /aria-label="Voir la fiche scannée de Cuisine Alami"/);
+    assert.match(html, /aria-label="Voir l&#x27;image de Cuisine Alami"/);
     assert.match(html, new RegExp(`>${fullRow.wastePercentage.toLocaleString('fr-FR', { maximumFractionDigits: 1 }).replace(/\s/g, '\\s')}%<`));
   }
   assert.ok(fullRow.wastePercentage > 0, 'the fixture has a real waste figure');
@@ -237,4 +237,117 @@ test('the sheet count header does not read like the panel size header', () => {
   }
   // The scan thumbnail's alt text went with the old card: the scan button carries the name.
   assert.equal(translate('fr', 'historyPage.scanThumbAlt'), 'historyPage.scanThumbAlt');
+});
+
+// The scan viewer (lot 3): the image kept with a project, seen in full.
+
+const SIGNED_URL = 'https://example.supabase.co/storage/v1/object/sign/scans/u/f.jpg?token=abc';
+const unescape = (html) => html.replace(/&#x27;/g, "'").replace(/&amp;/g, '&').replace(/&quot;/g, '"');
+const REDUCED_NOTE = "Aperçu réduit : l'image d'origine n'a pas été gardée pour ce projet.";
+
+function renderViewer(props, locale = 'fr') {
+  return renderComponent('src/components/ScanViewer.tsx', 'ScanViewer', { alt: 'Cuisine Alami', onClose: () => {}, ...props }, locale);
+}
+
+test('the scan viewer is a modal dialog that names itself and shows the image with its alt text', () => {
+  const html = renderViewer({ src: SIGNED_URL, reduced: false });
+  const dialog = html.match(/<div[^>]*role="dialog"[^>]*>/)[0];
+  assert.match(dialog, /aria-modal="true"/);
+  const labelledBy = dialog.match(/aria-labelledby="([^"]+)"/);
+  assert.ok(labelledBy, 'the dialog is labelled');
+  assert.match(html, new RegExp(`id="${labelledBy[1]}"[^>]*>Image scannée<`));
+  const img = html.match(/<img[^>]*>/)[0];
+  assert.match(img, /alt="Cuisine Alami"/);
+  assert.equal(unescape(img.match(/src="([^"]+)"/)[1]), SIGNED_URL);
+  // Never cropped: the image keeps its proportions and fits the width.
+  assert.doesNotMatch(img, /object-cover/);
+  assert.match(img, /\bmax-w-full\b/);
+  assert.match(img, /\bh-auto\b/);
+});
+
+test('the full image can be opened in a new tab, and the viewer closes with a 40px button', () => {
+  const html = unescape(renderViewer({ src: SIGNED_URL, reduced: false }));
+  const link = html.match(/<a[^>]*data-testid="scan-viewer-open"[^>]*>[\s\S]*?<\/a>/)[0];
+  assert.match(link, /target="_blank"/);
+  assert.match(link, /rel="noopener noreferrer"/);
+  assert.equal(link.match(/href="([^"]+)"/)[1], SIGNED_URL);
+  assert.match(link, /Ouvrir l'image/);
+  assert.match(link, /\bmin-h-10\b/);
+  const close = html.match(/<button[^>]*data-testid="scan-viewer-close"[^>]*>/)[0];
+  assert.match(close, /type="button"/);
+  assert.match(close, /aria-label="Fermer"/);
+  assert.match(close, /\bw-10 h-10\b/);
+  assert.ok(!html.includes(REDUCED_NOTE), 'no reduced note for the full image');
+});
+
+test('a reduced preview says so, and offers no link to open it', () => {
+  const html = unescape(renderViewer({ src: TINY_JPEG, reduced: true }));
+  assert.ok(html.includes(REDUCED_NOTE), 'the reduced note is shown');
+  assert.doesNotMatch(html, /data-testid="scan-viewer-open"/);
+  assert.match(html, /role="dialog"/);
+});
+
+test('an image held in memory (a data URL) is shown in full but cannot be opened as a page', () => {
+  const html = unescape(renderViewer({ src: TINY_JPEG, reduced: false }));
+  assert.doesNotMatch(html, /data-testid="scan-viewer-open"/);
+  assert.ok(!html.includes(REDUCED_NOTE));
+});
+
+test('the viewer scrolls and lets a pinch zoom the image', () => {
+  const html = renderViewer({ src: SIGNED_URL, reduced: false });
+  const area = html.match(/<div[^>]*data-testid="scan-viewer-area"[^>]*>/)[0];
+  assert.match(area, /\boverflow-auto\b/);
+  assert.match(area, /\btouch-pinch-zoom\b/);
+  // One finger still scrolls: pinch-zoom alone would leave only two-finger gestures.
+  assert.match(area, /\btouch-pan-x\b/);
+  assert.match(area, /\btouch-pan-y\b/);
+});
+
+test('the viewer reads in Arabic, right to left, with its own words', () => {
+  const html = unescape(renderViewer({ src: TINY_JPEG, reduced: true }, 'ar'));
+  const { translate } = loadTsModule('src/i18n/index.ts');
+  assert.ok(html.includes(translate('ar', 'scanViewer.reducedNote')));
+  assert.match(html, new RegExp(`aria-label="${translate('ar', 'scanViewer.close')}"`));
+  assert.doesNotMatch(html, /\b(?:ml|mr|pl|pr)-[\d.]+|\b(?:left|right)-[\w./]+|\btext-(?:left|right)\b/, 'logical spacing only');
+});
+
+test('the viewer words exist in the three languages', () => {
+  const { translate } = loadTsModule('src/i18n/index.ts');
+  assert.equal(translate('fr', 'scanViewer.reducedNote'), REDUCED_NOTE);
+  assert.equal(translate('fr', 'scanViewer.openAria', { name: 'Cuisine' }), "Voir l'image de Cuisine");
+  assert.equal(translate('fr', 'scanViewer.openImage'), "Ouvrir l'image");
+  assert.equal(translate('fr', 'scanViewer.close'), 'Fermer');
+  for (const key of ['scanViewer.title', 'scanViewer.openAria', 'scanViewer.reducedNote', 'scanViewer.close', 'scanViewer.openImage']) {
+    const [fr, en, ar] = ['fr', 'en', 'ar'].map((locale) => translate(locale, key));
+    for (const text of [fr, en, ar]) assert.ok(text && text !== key, `${key} is translated`);
+    assert.notEqual(fr, en, key);
+    assert.match(ar, /[\u0600-\u06FF]/, key);
+  }
+  // The history's own label went with the viewer: one label for both screens.
+  assert.equal(translate('fr', 'historyPage.scanViewAria'), 'historyPage.scanViewAria');
+});
+
+test('a scan whose link is being fetched keeps its button focused and busy, in both views', () => {
+  const props = { ...listProps([fullRow]), scanPendingId: fullRow.id };
+  for (const [file, name] of [['HistoryCards', 'HistoryCards'], ['HistoryTable', 'HistoryTable']]) {
+    const busy = renderComponent(`src/components/history/${file}.tsx`, name, props)
+      .match(/<button[^>]*data-testid="history-scan"[^>]*>/)[0];
+    assert.match(busy, /aria-busy="true"/, `${name}: aria-busy`);
+    assert.doesNotMatch(busy, /\sdisabled=""/, `${name}: never disabled, so the focus stays on it`);
+    const idle = renderComponent(`src/components/history/${file}.tsx`, name, listProps([fullRow]))
+      .match(/<button[^>]*data-testid="history-scan"[^>]*>/)[0];
+    assert.doesNotMatch(idle, /aria-busy/, `${name}: idle`);
+  }
+});
+
+test('the history shows the scan in the viewer, no longer in a blank tab', () => {
+  const page = fs.readFileSync(path.resolve('src/app/(site)/history/page.tsx'), 'utf8');
+  assert.doesNotMatch(page, /window\.open\(/);
+  assert.match(page, /<ScanViewer\b/);
+  assert.match(page, /onViewScan: openScan,/);
+  assert.match(page, /scanPendingId: scanViewer\.pendingKey,/);
+  // A device-only row has no server id: only a cloud row asks for the link.
+  assert.match(page, /projectId: row\.isCloud \? row\.id : null,/);
+  assert.match(page, /hasFullScan: row\.hasFullScan,/);
+  assert.match(page, /thumb: row\.scanThumb,/);
 });
