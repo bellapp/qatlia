@@ -2,7 +2,8 @@
  * A small in-memory stand-in for the Supabase JS client, for back office tests.
  *
  * `state.tables[name]` is what a query on that table resolves to (an array, a
- * single row, or null); `state.tableErrors[name]` makes it fail instead.
+ * single row, or null), or a function of the recorded call returning one of
+ * those; `state.tableErrors[name]` makes it fail instead.
  * Filters are recorded but not applied — a test seeds exactly the rows the
  * code under test should receive. Every call is recorded for assertions.
  */
@@ -22,7 +23,10 @@ function createFakeSupabase() {
     state.fromCalls.push(call);
     const result = (mode) => {
       if (state.tableErrors[name]) return { data: null, error: state.tableErrors[name] };
-      const value = state.tables[name];
+      // A function seeds per-query answers, e.g. a lookup that finds nothing
+      // followed by an insert that returns the new row.
+      const seeded = state.tables[name];
+      const value = typeof seeded === 'function' ? seeded(call) : seeded;
       if (mode === 'single') {
         const row = Array.isArray(value) ? value[0] ?? null : value ?? null;
         return { data: row, error: null };
