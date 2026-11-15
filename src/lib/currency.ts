@@ -71,6 +71,20 @@ export function cardCurrencyFor(currency: AppCurrency, euroProductsAvailable: bo
   return currency === 'EUR' && euroProductsAvailable ? 'EUR' : 'USD';
 }
 
+/**
+ * Dirhams per unit of each currency, fixed (user decision 2026-11-15): the
+ * workshop's catalog prices are dirham figures, shown converted to a euro or
+ * dollar account as a starting point the artisan replaces with their own
+ * supplier's prices. Never used for money QatliA charges.
+ */
+export const CATALOG_MAD_PER_UNIT: Record<AppCurrency, number> = { MAD: 1, EUR: 10.8, USD: 10 };
+
+/** A dirham catalog price in an account currency, to the cent. */
+export function catalogPriceIn(priceMad: number, currency: AppCurrency | null | undefined): number {
+  const rate = CATALOG_MAD_PER_UNIT[isAppCurrency(currency) ? currency : DEFAULT_CURRENCY];
+  return Math.round((priceMad / rate) * 100) / 100;
+}
+
 /** Bank transfer and cash go to a Moroccan account, in dirhams only. */
 export function offersManualPayment(currency: AppCurrency): boolean {
   return currency === 'MAD';

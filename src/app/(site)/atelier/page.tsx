@@ -44,6 +44,8 @@ import {
   withLegacyStockPrice,
 } from '@/lib/cutting/binpacking';
 import { computeCostBreakdown } from '@/lib/costing';
+import { DEFAULT_CURRENCY } from '@/lib/currency';
+import { useCurrency } from '@/components/currency-store';
 import {
   loadDeviceEdgePrice,
   saveDeviceEdgePrice,
@@ -476,6 +478,7 @@ const commitPanelName = () => {
       const costingInput = repriceCostingInput(current.costingInput, {
         edgeBandPricePerM: ownEdgePrice ?? undefined,
         sheet: next.sheet ?? activeSheet,
+        currency,
       });
       return { ...current, costingInput, costBreakdown: computeCostBreakdown(costingInput) };
     });
@@ -549,6 +552,9 @@ const commitPanelName = () => {
   const { theme } = useTheme();
   const isDark = theme === 'dark';
   const { t, tn, n, locale } = useLocale();
+  // The account currency: the plan, the PDF and the quote are priced in it,
+  // the catalog prices (dirham figures) converted to it.
+  const currency = useCurrency().currency ?? DEFAULT_CURRENCY;
 
   /** Commits the typed project name (no uniqueness constraint — several
    *  projects may share a name). Empty reverts to the auto-name fallback.
@@ -965,7 +971,7 @@ const commitPanelName = () => {
           sheet: { ...activeSheet, kerf: options.kerfWidth },
           sheets,
           pieces,
-          options: { ...optionsWithoutStockOverride(options), ...(edgePrice !== null ? { edgeBandPricePerM: edgePrice } : {}) },
+          options: { ...optionsWithoutStockOverride(options), currency, ...(edgePrice !== null ? { edgeBandPricePerM: edgePrice } : {}) },
           cutMode,
           analysisPass: readAnalysisPass() ?? undefined,
         }),
@@ -1328,7 +1334,7 @@ const commitPanelName = () => {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(
-          buildPdfPayload(derivedProjectName, activeSheet, pieces, result, displayUnit, locale)
+          buildPdfPayload(derivedProjectName, activeSheet, pieces, result, displayUnit, locale, currency)
         ),
       });
 
@@ -1958,7 +1964,7 @@ const commitPanelName = () => {
                       onChange={(e) => setPanelPriceDraft(e.target.value)}
                       onBlur={commitPanelPrice}
                       onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur(); }}
-                      placeholder={t('atelier.stock.panelPricePlaceholder', { price: detailMoney(catalogPanelPrice(activeSheet.material, activeSheet.width, activeSheet.height)) })}
+                      placeholder={t('atelier.stock.panelPricePlaceholder', { price: detailMoney(catalogPanelPrice(activeSheet.material, activeSheet.width, activeSheet.height, currency)) })}
                       className="w-full px-2.5 py-1.5 rounded-lg bg-studio-field border border-studio-border text-slate-800 dark:text-slate-200 text-xs font-mono outline-none focus:border-brand-500/50 focus:ring-1 focus:ring-brand-500/20 transition-all"
                     />
                   </div>

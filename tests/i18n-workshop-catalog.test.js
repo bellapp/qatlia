@@ -215,12 +215,13 @@ test('dimension and unit copy keeps the unit as a placeholder instead of hardcod
   }
 });
 
-test('the MAD billing copy survives translation and never hardcodes the credit count', () => {
+test('the costing copy carries the account currency and never hardcodes the credit count', () => {
   const { LOCALES, catalogs } = loadI18n();
   for (const locale of LOCALES) {
     const flat = flatten(catalogs[locale]);
-    assert.equal(flat['atelier.cost.currency'], 'MAD');
-    assert.ok(flat['atelier.cost.amount'].includes('MAD'));
+    // The account currency (MAD, EUR or USD) is filled in by the provider.
+    assert.equal(flat['atelier.cost.currency'], '{currency}');
+    assert.ok(flat['atelier.cost.amount'].includes('{currency}'));
     for (const key of ['auth.defaultSubtitle', 'auth.perk', 'auth.switchToSignup']) {
       assert.ok(flat[key].includes('{count}'), `${locale}.${key} must interpolate the credit count`);
       assert.ok(!/\d/.test(flat[key]), `${locale}.${key} hardcodes a number: "${flat[key]}"`);
