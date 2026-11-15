@@ -4,7 +4,7 @@ import { createClient } from '@/lib/supabase/server';
 import { createClient as createAdminClient, type SupabaseClient } from '@supabase/supabase-js';
 import { getSupabaseAdminConfig } from '@/lib/billing/config';
 import { CompanyIdentitySchema, ClientIdentitySchema, QUOTATION_LOCALES } from '@/lib/quotation';
-import { sanitizePdfGeneratedAt } from '@/lib/projects/history-metadata';
+import { sanitizePdfGeneratedAt, sanitizeProjectName } from '@/lib/projects/history-metadata';
 
 /**
  * `GET /api/projects/[id]` — read-only, ownership-checked access to a single
@@ -113,11 +113,33 @@ export async function GET(_req: Request, context: { params: { id: string } }) {
  * Local-only projects (never synced to the cloud `projects` table) cannot be
  * updated here — the client renames those directly in localStorage.
  */
-const RenameSchema = z.object({
-  name: z.string().trim().min(1, 'EMPTY_NAME').max(80, 'NAME_TOO_LONG'),
-});
-
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+type OwnOptions = { ok: true; existing: Record<string, unknown> } | { ok: false; response: NextResponse };
+
+/**
+ * Reads the signed-in artisan's own row and returns its `options_json` (an
+ * empty object when it holds nothing usable). A lookup error answers 503, and
+ * a missing row and another artisan's row answer the same 404, so nothing is
+ * ever written for a row that is not theirs.
+ */
+async function readOwnOptions(db: DbClient, id: string, userId: string, label: string): Promise<OwnOptions> {
+  const { data: row, error: lookupError } = await db
+    .from('projects')
+    .select('id, user_id, options_json')
+    .eq('id', id)
+    .eq('user_id', userId)
+    .maybeSingle();
+  if (lookupError) {
+    console.error(`${label} lookup failed:`, lookupError.message);
+    return { ok: false, response: NextResponse.json({ error: 'PROJECT_LOOKUP_FAILED' }, { status: 503 }) };
+  }
+  if (!row) {
+    return { ok: false, response: NextResponse.json({ error: 'NOT_FOUND' }, { status: 404 }) };
+  }
+  const existing = row.options_json && typeof row.options_json === 'object' ? (row.options_json as Record<string, unknown>) : {};
+  return { ok: true, existing };
+}
 
 export async function PATCH(
   req: Request,
@@ -147,20 +169,9 @@ export async function PATCH(
         return NextResponse.json({ error: 'NOT_FOUND' }, { status: 404 });
       }
       const db = createDbClient();
-      const { data: row, error: lookupError } = await db
-        .from('projects')
-        .select('id, user_id, options_json')
-        .eq('id', id)
-        .eq('user_id', user.id)
-        .maybeSingle();
-      if (lookupError) {
-        console.error('project pdf marker lookup failed:', lookupError.message);
-        return NextResponse.json({ error: 'PROJECT_LOOKUP_FAILED' }, { status: 503 });
-      }
-      if (!row) {
-        return NextResponse.json({ error: 'NOT_FOUND' }, { status: 404 });
-      }
-      const existing = row.options_json && typeof row.options_json === 'object' ? (row.options_json as Record<string, unknown>) : {};
+      const own = await readOwnOptions(db, id, user.id, 'project pdf marker');
+      if (!own.ok) return own.response;
+      const existing = own.existing;
       const { error: updateError } = await db
         .from('projects')
         .update({ options_json: { ...existing, pdfGeneratedAt } })
@@ -173,29 +184,31 @@ export async function PATCH(
       return NextResponse.json({ success: true, id, pdfGeneratedAt });
     }
 
-    const parsed = RenameSchema.safeParse(body);
-    if (!parsed.success) {
+    // Same rule as the name a save carries: trimmed, not empty, 120 characters at most.
+    const name = sanitizeProjectName(body?.name);
+    if (!name) {
       return NextResponse.json({ error: 'INVALID_NAME' }, { status: 400 });
     }
-    const { name } = parsed.data;
 
     if (!UUID_PATTERN.test(id)) {
       return NextResponse.json({ error: 'NOT_FOUND' }, { status: 404 });
     }
 
     const db = createDbClient();
-    const { data, error } = await db
+    const own = await readOwnOptions(db, id, user.id, 'project rename');
+    if (!own.ok) return own.response;
+    // The atelier reads `options_json.projectName` on reopen, so a rename
+    // writes both; every other key is kept.
+    const { error: updateError } = await db
       .from('projects')
-      .update({ name })
+      .update({ name, options_json: { ...own.existing, projectName: name } })
       .eq('id', id)
-      .eq('user_id', user.id)
-      .select('id, name')
-      .single();
-
-    if (error || !data) {
-      return NextResponse.json({ error: 'NOT_FOUND' }, { status: 404 });
+      .eq('user_id', user.id);
+    if (updateError) {
+      console.error('project rename update failed:', updateError.message);
+      return NextResponse.json({ error: 'PROJECT_UPDATE_FAILED' }, { status: 503 });
     }
-    return NextResponse.json({ success: true, id: data.id, name: data.name });
+    return NextResponse.json({ success: true, id, name });
   } catch (err) {
     console.error('project update failed:', err);
     return NextResponse.json({ error: 'SERVER_ERROR' }, { status: 500 });

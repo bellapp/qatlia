@@ -187,8 +187,14 @@ export const ar: Catalog = {
       nameSheets: 'قائمة قطع {material} — {count} قطعة',
       nameLabel: 'اسم المشروع (اختياري)',
       namePlaceholder: 'مثال: مطبخ السيد العلمي',
+      nameSaved: 'تم حفظ الاسم',
+      namePending: 'سيُحفظ الاسم مع المخطط',
+      nameFailed: 'لم يُحفظ الاسم. حاول مجدداً.',
       optimized: 'تم التحسين بنجاح',
       rerun: 'إعادة التحسين',
+    },
+    restored: {
+      notice: 'مخطط محفوظ بتاريخ {date}. فُتح كما هو، دون تحسين جديد.',
     },
     scan: {
       cameraTitle: 'الكاميرا',

@@ -88,13 +88,15 @@ import { ThemeToggle } from '@/components/ThemeToggle';
 import { useTheme } from '@/components/ThemeProvider';
 import { OnboardingTour } from '@/components/OnboardingTour';
 import { LocaleSwitcher, useLocale } from '@/components/LocaleProvider';
-import type { TranslationKey } from '@/i18n';
+import { formatDateTime, type TranslationKey } from '@/i18n';
 import { edgeBandingLabelKey, materialLabelKey, visionErrorKey } from '@/i18n/domain';
 import { buildCostDetail, hasLaborCharge } from '@/lib/cost-detail';
-import { writeLocalHistoryItem, type LocalHistoryItem } from '@/lib/history';
+import { writeLocalHistoryItem, renameLocalHistoryItem, markLocalHistoryPdf, type LocalHistoryItem } from '@/lib/history';
+import { saveProjectName, type RenameOutcome } from '@/lib/projects/rename';
 import { deriveQuotationPanels, deriveQuotationPieces } from '@/lib/quotation-items';
 import { buildPdfPayload } from '@/lib/pdf-payload';
 import { buildPersistedProjectPayload } from '@/lib/projects/persistence-payload';
+import { pickRestorableResult, readRestoredProjectDate } from '@/lib/projects/restore';
 import { downscaleDataUrl } from '@/lib/image-downscale';
 import { readAnalysisPass, storeAnalysisPass } from '@/lib/billing/analysis-pass-store';
 import {
@@ -108,6 +110,15 @@ import {
 } from '@/lib/units';
 
 const DEFAULT_SHEETS: Sheet[] = [DEFAULT_STOCK_SHEET];
+
+/** Day and time of the save, as the history cards show it. */
+const RESTORED_DATE_OPTIONS: Intl.DateTimeFormatOptions = {
+  day: 'numeric',
+  month: 'short',
+  year: 'numeric',
+  hour: '2-digit',
+  minute: '2-digit',
+};
 
 /** CSS length for the whole content width of the plan viewport. Kept as the
  *  bare literal the claims audit recognises as geometry, not as a figure. */
@@ -217,6 +228,9 @@ export default function Dashboard() {
   // Lightweight thumbnail persisted with the project (history card preview).
   const [scanThumb, setScanThumb] = useState<string | null>(null);
   const [pdfGeneratedAt, setPdfGeneratedAt] = useState<string | null>(null);
+  // When the plan on screen was saved, set only while it is a plan reopened
+  // from history as saved. A new run replaces that plan, so it clears it.
+  const [restoredAt, setRestoredAt] = useState<string | null>(null);
   const [isAuthModalOpen, setIsAuthModalOpen] = useState<boolean>(false);
   // Which action opened the (shared) auth modal, so its onSuccess handler
   // resumes the right one instead of always re-triggering the PDF export.
@@ -236,6 +250,9 @@ export default function Dashboard() {
   // dialog merges its metadata into that same project's options_json.
   // Never client-guessed; only ever set from a successful save response.
   const [lastSavedProjectId, setLastSavedProjectId] = useState<string | null>(null);
+  // A project kept on this device only (no server id): reopened from the local
+  // history, or saved there when the server could not be reached.
+  const [localProjectId, setLocalProjectId] = useState<string | null>(null);
   const [showAdvancedOptions, setShowAdvancedOptions] = useState<boolean>(false);
   const advancedOptionsRef = useRef<HTMLDivElement>(null);
 
@@ -340,7 +357,21 @@ export default function Dashboard() {
 
   // Custom project name (audit feature): empty means auto-name fallback.
   const [projectName, setProjectName] = useState<string>('');
-  const [projectNameDraft, setProjectNameDraft] = useState<string>('');  const [presetNameDraft, setPresetNameDraft] = useState<string>('');
+  const [projectNameDraft, setProjectNameDraft] = useState<string>('');
+  // Outcome of the last name commit, shown under the field. `lastPersistedNameRef`
+  // is the name the saved project already carries: re-committing it does nothing,
+  // while a failed one stays different so leaving the field again retries.
+  const [nameSaveState, setNameSaveState] = useState<'idle' | 'saving' | RenameOutcome>('idle');
+  const lastPersistedNameRef = useRef<string>('');
+  const nameSaveAttemptRef = useRef(0);
+  // The committed project name, readable by an async save that started from an
+  // older render (an optimization running while the name is typed).
+  const projectNameRef = useRef<string>('');
+  const commitName = (name: string) => {
+    projectNameRef.current = name;
+    setProjectName(name);
+  };
+  const [presetNameDraft, setPresetNameDraft] = useState<string>('');
   // Price of the stock panel (MAD per panel), as typed; committed on blur.
   const [panelPriceDraft, setPanelPriceDraft] = useState<string>('');
   const [presetFeedback, setPresetFeedback] = useState<{ tone: 'success' | 'warning'; text: string } | null>(null);
@@ -520,19 +551,36 @@ const commitPanelName = () => {
   const { t, tn, n, locale } = useLocale();
 
   /** Commits the typed project name (no uniqueness constraint — several
-   *  projects may share a name). Empty reverts to the auto-name fallback. */
-  const commitProjectName = () => {
+   *  projects may share a name). Empty reverts to the auto-name fallback.
+   *  Leaving the field also writes the name to the saved project, if there is
+   *  one; the line under the field says how that went. */
+  const commitProjectName = async () => {
     const name = projectNameDraft.trim();
-    setProjectName(name);
+    commitName(name);
+    if (name === lastPersistedNameRef.current) return;
+    const attempt = ++nameSaveAttemptRef.current;
+    setNameSaveState('saving');
+    const outcome = await saveProjectName(
+      { cloudId: lastSavedProjectId, localId: localProjectId },
+      name,
+      { fetch: (input, init) => fetch(input, init), renameLocal: renameLocalHistoryItem },
+    );
+    // A newer commit, or a save of the whole project, owns the line and the
+    // name the saved project carries now.
+    if (attempt !== nameSaveAttemptRef.current) return;
+    if (outcome === 'saved') lastPersistedNameRef.current = name;
+    // An emptied name goes back to the automatic one: nothing to say. The
+    // "saved with the plan" line is for a name typed before any plan exists.
+    setNameSaveState(outcome === 'pending' && !name ? 'idle' : outcome);
   };
 
   /** The name a saved project carries: custom > panel label > auto. */
-  const derivedProjectName = projectName.trim()
-    || activeSheet.label?.trim()
+  const automaticProjectName = activeSheet.label?.trim()
     || t(cutMode === '1d' ? 'atelier.project.nameBars' : 'atelier.project.nameSheets', {
       material: (activeSheet.material || 'mdf').toUpperCase(),
       count: pieces.reduce((s, p) => s + (p.quantity || 1), 0),
     });
+  const derivedProjectName = projectName.trim() || automaticProjectName;
 
   // Re-sync the free-typed drafts whenever the canonical sheet dimensions or
   // the display unit change from *outside* the draft itself (a cm↔mm toggle,
@@ -611,6 +659,10 @@ const commitPanelName = () => {
       restoredProjectIdRaw && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(restoredProjectIdRaw)
         ? restoredProjectIdRaw
         : null;
+    // A project kept on this device only has no server id; its history entry id
+    // lets the name typed in the atelier be written back to that entry.
+    const restoredLocalIdRaw = sessionStorage.getItem('qatlia_restored_local_id');
+    const restoredLocalId = restoredLocalIdRaw && restoredLocalIdRaw.trim() ? restoredLocalIdRaw : null;
     if (savedProj) {
       try {
         const parsed = JSON.parse(savedProj);
@@ -621,13 +673,31 @@ const commitPanelName = () => {
         if (Array.isArray(parsed.sheets)) setSheets(parsed.sheets.map(restoreSheet));
         if (Array.isArray(parsed.pieces)) setPieces(normalizePiecesWithColors(parsed.pieces));
         if (typeof parsed.projectName === 'string' && parsed.projectName.trim()) {
-          setProjectName(parsed.projectName.trim());
+          commitName(parsed.projectName.trim());
           setProjectNameDraft(parsed.projectName.trim());
+          lastPersistedNameRef.current = parsed.projectName.trim();
         }
-        setScanThumb(typeof parsed.scanThumb === 'string' ? parsed.scanThumb : null);
+        // The scan image comes back with the plan: the card reads it from
+        // `previewImage`, the next save carries it on from `scanThumb`.
+        const restoredThumb = typeof parsed.scanThumb === 'string' ? parsed.scanThumb : null;
+        setScanThumb(restoredThumb);
+        setPreviewImage(restoredThumb);
+        // The saved plan is put back as it was saved, with no new run and no
+        // new save; an old or damaged result gives null and the atelier opens
+        // without a plan, as before.
+        const restoredResult = pickRestorableResult(parsed.result);
+        if (restoredResult) {
+          setResult(restoredResult);
+          setActiveSheetIndex(0);
+          // A bar plan reopens in bar mode: the header, the stock card, the
+          // project name and a re-run all follow the mode, not only the viewer.
+          if (restoredResult.cutMode === '1d' || restoredResult.cutMode === '2d') setCutMode(restoredResult.cutMode);
+          setRestoredAt(readRestoredProjectDate(sessionStorage.getItem('qatlia_restored_project_meta')));
+        }
         setPdfGeneratedAt(typeof parsed.pdfGeneratedAt === 'string' ? parsed.pdfGeneratedAt : null);
         if (parsed.options) setOptions((prev) => optionsWithoutStockOverride({ ...prev, ...parsed.options }));
         if (restoredProjectId) setLastSavedProjectId(restoredProjectId);
+        else if (restoredLocalId) setLocalProjectId(restoredLocalId);
         // Legacy saved projects carry no unit metadata at all; they predate
         // this feature and were always canonical cm. `resolveProjectUnitMetadata`
         // assumes cm in that case and flags it `migrated` so the next save
@@ -650,6 +720,8 @@ const commitPanelName = () => {
         window.setTimeout(() => {
           sessionStorage.removeItem('qatlia_saved_project');
           sessionStorage.removeItem('qatlia_restored_project_id');
+          sessionStorage.removeItem('qatlia_restored_project_meta');
+          sessionStorage.removeItem('qatlia_restored_local_id');
         }, 0);
       } catch (e) {
         console.error('Erreur restauration projet:', e);
@@ -657,6 +729,8 @@ const commitPanelName = () => {
         // sitting in sessionStorage forever — clear it right away.
         sessionStorage.removeItem('qatlia_saved_project');
         sessionStorage.removeItem('qatlia_restored_project_id');
+        sessionStorage.removeItem('qatlia_restored_project_meta');
+        sessionStorage.removeItem('qatlia_restored_local_id');
       }
     }
   }, []);
@@ -690,14 +764,17 @@ const commitPanelName = () => {
     // this save is itself the rewrite of a legacy record (pendingUnitMigration),
     // or a prior save already carried that historical origin forward.
     const persistedMigratedFromLegacyUnit = pendingUnitMigration || migratedFromLegacyUnit;
+    // The name committed now, not the one this handler's render saw: the field
+    // may have been left while the optimization was running.
+    const committedName = projectNameRef.current.trim();
     const payload = buildPersistedProjectPayload({
       // `{material}` stays the stable payload value upper-cased (MDF, VERRE, …)
       // rather than a translated label, so a project keeps the same identity in
       // history whatever language it was saved in; only the wording around it
       // follows the artisan's locale.
       // Custom project name (when the artisan named it) > panel label > auto.
-      name: derivedProjectName,
-      projectName: projectName.trim() || undefined,
+      name: committedName || automaticProjectName,
+      projectName: committedName || undefined,
       scanThumb: scanThumb || undefined,
       pdfGeneratedAt: overrides.pdfGeneratedAt || pdfGeneratedAt || undefined,
       sheets,
@@ -725,6 +802,9 @@ const commitPanelName = () => {
     // the same run twice. Local history is now the fallback for anonymous
     // users and failed uploads, never an addition to a successful cloud save.
     let savedToCloud = false;
+    // The record this save just wrote, for the name check at the end.
+    let savedCloudId: string | null = null;
+    let savedLocalId: string | null = null;
     try {
       const supabase = createClient();
       const {
@@ -742,15 +822,22 @@ const commitPanelName = () => {
           // The quotation dialog merges its metadata into *this* saved
           // project's options_json (see /api/export-quotation) — only once
           // the server confirms the save, never a client-guessed id.
-          if (data?.success && typeof data.projectId === 'string') setLastSavedProjectId(data.projectId);
+          if (data?.success && typeof data.projectId === 'string') {
+            savedCloudId = data.projectId;
+            setLastSavedProjectId(data.projectId);
+            setLocalProjectId(null);
+          }
         }
       }
     } catch (err) {
       console.error('Erreur auto-save projet:', err);
     }
     if (!savedToCloud) {
+      const localId = `${source}_${Date.now()}`;
+      savedLocalId = localId;
+      setLocalProjectId(localId);
       writeLocalHistoryItem({
-        id: `${source}_${Date.now()}`,
+        id: localId,
       name: payload.name,
       material: activeSheet.material || 'mdf',
       sheet_width: activeSheet.width,
@@ -762,6 +849,26 @@ const commitPanelName = () => {
       options_json: payload as unknown as LocalHistoryItem['options_json'],
     });
     }
+    // The saved project now carries `committedName`: the line says so, whatever
+    // it said before (not saved, saved with the plan), and a late answer from an
+    // earlier name commit no longer overwrites it.
+    const attempt = ++nameSaveAttemptRef.current;
+    lastPersistedNameRef.current = committedName;
+    const currentName = projectNameRef.current.trim();
+    if (currentName === committedName) {
+      setNameSaveState(committedName ? 'saved' : 'idle');
+      return;
+    }
+    // The field was left while this save was running: the new record carries
+    // the previous name, so the name typed since is written to it now.
+    const outcome = await saveProjectName(
+      { cloudId: savedCloudId, localId: savedLocalId },
+      currentName,
+      { fetch: (input, init) => fetch(input, init), renameLocal: renameLocalHistoryItem },
+    );
+    if (attempt !== nameSaveAttemptRef.current) return;
+    if (outcome === 'saved') lastPersistedNameRef.current = currentName;
+    setNameSaveState(outcome === 'pending' && !currentName ? 'idle' : outcome);
   };
 
   /**
@@ -785,6 +892,8 @@ const commitPanelName = () => {
         console.error('Erreur enregistrement PDF dans l’historique:', err);
       }
     }
+    // A project kept on this device only is updated on its own entry too.
+    if (!lastSavedProjectId && localProjectId && markLocalHistoryPdf(localProjectId, generatedAt)) return;
     await persistProject(result, 'pdf', { pdfGeneratedAt: generatedAt });
   };
 
@@ -821,7 +930,7 @@ const commitPanelName = () => {
     if (work.options) setOptions((prev) => optionsWithoutStockOverride({ ...prev, ...(work.options as Partial<OptimizationOptions>) }));
     if (work.cutMode) setCutMode(work.cutMode);
     if (work.projectName) {
-      setProjectName(work.projectName);
+      commitName(work.projectName);
       setProjectNameDraft(work.projectName);
     }
     // The photo is not put in the scan preview: that card reads "analysed",
@@ -883,6 +992,7 @@ const commitPanelName = () => {
       storeAnalysisPass(data.analysisPass);
       const optResult = data.result as OptimizationResult;
       setResult(optResult);
+      setRestoredAt(null);
       setActiveSheetIndex(0);
       if (typeof data.creditsRemaining === 'number') setUserCredits(data.creditsRemaining);
       void persistProject(optResult, 'optimize');
@@ -1461,14 +1571,23 @@ const commitPanelName = () => {
                 <input
                   id="project-name-input"
                   value={projectNameDraft}
-                  onChange={(e) => setProjectNameDraft(e.target.value)}
-                  onBlur={commitProjectName}
+                  onChange={(e) => { setProjectNameDraft(e.target.value); setNameSaveState('idle'); }}
+                  onBlur={() => void commitProjectName()}
                   onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur(); }}
                   placeholder={t('atelier.project.namePlaceholder')}
                   maxLength={120}
                   data-testid="project-name-input"
                   className="mt-0.5 block w-full sm:w-[260px] rounded-lg bg-studio-field border border-studio-border px-2.5 py-1.5 text-sm font-bold text-slate-900 dark:text-white outline-none focus:border-brand-500/60 focus:ring-2 focus:ring-brand-500/20 placeholder:font-normal placeholder:text-slate-400 dark:placeholder:text-slate-500"
                 />
+                <p
+                  aria-live="polite"
+                  data-testid="project-name-status"
+                  className={`text-[10px] font-semibold ${nameSaveState === 'failed' ? 'text-red-600 dark:text-red-400' : nameSaveState === 'saved' ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-500'}`}
+                >
+                  {nameSaveState === 'saved' && t('atelier.project.nameSaved')}
+                  {nameSaveState === 'pending' && t('atelier.project.namePending')}
+                  {nameSaveState === 'failed' && t('atelier.project.nameFailed')}
+                </p>
                 {/* Same figures as the cut-list chip: pieces are quantities summed,
                     lines are rows (counting distinct names merged same-named rows). */}
                 <p className="text-[10px] text-slate-500 font-mono">
@@ -1478,7 +1597,7 @@ const commitPanelName = () => {
                   })}
                 </p>
               </div>
-              {result && (
+              {result && !restoredAt && (
                 <span className="ms-auto inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-600 dark:text-emerald-400 text-[10px] font-bold">
                   <CheckCircle2 className="w-3 h-3" /> {t('atelier.project.optimized')}
                 </span>
@@ -1974,6 +2093,21 @@ const commitPanelName = () => {
             
             {result ? (
               <>
+                {/* A plan reopened from history is shown exactly as saved: this
+                    says so, with the date, until a new run replaces it. */}
+                {restoredAt && (
+                  <div
+                    role="status"
+                    data-testid="restored-plan-notice"
+                    className="flex items-start gap-3 p-3.5 rounded-xl bg-sky-500/10 border border-sky-500/20"
+                  >
+                    <CheckCircle2 className="w-4 h-4 shrink-0 mt-0.5 text-sky-500 dark:text-sky-400" aria-hidden="true" />
+                    <p className="text-xs font-semibold text-sky-700 dark:text-sky-300 min-w-0">
+                      {t('atelier.restored.notice', { date: formatDateTime(locale, restoredAt, RESTORED_DATE_OPTIONS) })}
+                    </p>
+                  </div>
+                )}
+
                 {/* Cost Summary Banner — the subtotal comes from result.costBreakdown
                     (src/lib/costing.ts), the same figure shown in the cost
                     breakdown below and rendered in the PDF export. No estimated

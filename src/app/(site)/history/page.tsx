@@ -14,7 +14,7 @@ import {
   Pencil,
   FileDown,
 } from 'lucide-react';
-import { readLocalHistory, type LocalHistoryItem } from '@/lib/history';
+import { readLocalHistory, renameLocalHistoryItem, type LocalHistoryItem } from '@/lib/history';
 import { AccountMenu } from '@/components/AccountMenu';
 import { QatlIALogo } from '@/components/QatlIALogo';
 import { EmptyState } from '@/components/EmptyState';
@@ -44,6 +44,7 @@ interface ProjectHistoryItem {
     displayUnit?: DisplayUnit;
     canonicalUnit?: 'cm';
     migratedFromLegacyUnit?: boolean;
+    projectName?: string;
   };
 }
 
@@ -167,16 +168,15 @@ export default function HistoryPage() {
       } catch { ok = false; }
     } else {
       // Local-only item: rename inside the localStorage history.
-      try {
-        const raw = window.localStorage.getItem('qatlia_local_history_v1');
-        const list = raw ? (JSON.parse(raw) as Array<{ id: string; name: string }>) : [];
-        const next = list.map((it) => (it.id === proj.id ? { ...it, name } : it));
-        window.localStorage.setItem('qatlia_local_history_v1', JSON.stringify(next));
-        ok = true;
-      } catch { ok = false; }
+      ok = renameLocalHistoryItem(proj.id, name);
     }
     if (ok) {
-      setProjects((prev) => prev.map((p) => (p.id === proj.id ? { ...p, name } : p)));
+      // The atelier reads `options_json.projectName` on reopening, so the card
+      // in memory carries the new name there too (as the server and the local
+      // history now do).
+      setProjects((prev) => prev.map((p) => (
+        p.id === proj.id ? { ...p, name, options_json: { ...p.options_json, projectName: name } } : p
+      )));
     }
   };
 
@@ -276,14 +276,35 @@ export default function HistoryPage() {
 
   const handleLoadProject = (project: ProjectHistoryItem) => {
     if (project.options_json) {
-      sessionStorage.setItem('qatlia_saved_project', JSON.stringify(project.options_json));
+      // A project renamed from the history before the name was also kept in its
+      // saved data still carries the old name there: the name on the card wins,
+      // but only over a name that is stored (an automatic name is never typed
+      // into the atelier's field).
+      const storedName = project.options_json.projectName;
+      const restoredOptions =
+        UUID_PATTERN.test(project.id)
+        && project.name.trim()
+        && typeof storedName === 'string'
+        && storedName.trim()
+        && storedName.trim() !== project.name.trim()
+          ? { ...project.options_json, projectName: project.name.trim() }
+          : project.options_json;
+      sessionStorage.setItem('qatlia_saved_project', JSON.stringify(restoredOptions));
       // Read back by atelier/page.tsx's restore effect so QuotationDialog's
       // `projectId` targets the project the artisan actually opened here,
       // not only the most recent auto-save (Task 8 remediation — item 10).
       // A locally-only history entry's id is never a real server UUID (see
-      // UUID_PATTERN's own doc comment) — nothing valid to restore there.
-      if (UUID_PATTERN.test(project.id)) sessionStorage.setItem('qatlia_restored_project_id', project.id);
-      else sessionStorage.removeItem('qatlia_restored_project_id');
+      // UUID_PATTERN's own doc comment): it goes under its own key, so a name
+      // typed in the atelier is written back to that local entry.
+      if (UUID_PATTERN.test(project.id)) {
+        sessionStorage.setItem('qatlia_restored_project_id', project.id);
+        sessionStorage.removeItem('qatlia_restored_local_id');
+      } else {
+        sessionStorage.removeItem('qatlia_restored_project_id');
+        sessionStorage.setItem('qatlia_restored_local_id', project.id);
+      }
+      // The atelier says when the plan it reopens was saved.
+      sessionStorage.setItem('qatlia_restored_project_meta', JSON.stringify({ createdAt: project.created_at }));
       window.location.href = '/atelier';
     }
   };

@@ -186,8 +186,14 @@ export const en: Catalog = {
       nameSheets: 'Cut list {material} — {count} pcs',
       nameLabel: 'Job name (optional)',
       namePlaceholder: 'e.g. Alami kitchen',
+      nameSaved: 'Name saved',
+      namePending: 'The name will be saved with the plan',
+      nameFailed: 'Name not saved. Try again.',
       optimized: 'Optimization complete',
       rerun: 'Re-run optimization',
+    },
+    restored: {
+      notice: 'Plan saved on {date}. Reopened as saved, with no new run.',
     },
     scan: {
       cameraTitle: 'Camera',

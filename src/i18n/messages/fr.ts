@@ -226,8 +226,14 @@ export const fr = {
       nameSheets: 'Débit {material} — {count} pcs',
       nameLabel: 'Nom de l’affaire (optionnel)',
       namePlaceholder: 'Ex. : Cuisine M. Alami',
+      nameSaved: 'Nom enregistré',
+      namePending: 'Le nom sera enregistré avec le plan',
+      nameFailed: 'Nom non enregistré. Réessayez.',
       optimized: 'Optimisation réussie',
       rerun: 'Relancer l’optimisation',
+    },
+    restored: {
+      notice: 'Plan enregistré le {date}. Rouvert tel quel, sans nouvelle optimisation.',
     },
     scan: {
       cameraTitle: 'Appareil photo',
