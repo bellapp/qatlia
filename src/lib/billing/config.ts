@@ -69,8 +69,10 @@ export function getCreemConfig(env: Env = process.env): CreemConfig | null {
   const key = env.CREEM_API_KEY;
   if (isPlaceholder(key)) return null;
   const apiKey = (key as string).trim();
-  const mode = /^creem_(test|live)_/.exec(apiKey)?.[1];
-  if (!mode) return null;
+  // Test keys are `creem_test_…`; production keys are plain `creem_…` (Creem
+  // docs: "Production keys start with creem_ - not creem_test_").
+  if (!/^creem_[A-Za-z0-9_]{6,}$/.test(apiKey)) return null;
+  const mode = apiKey.startsWith('creem_test_') ? 'test' : 'live';
 
   const products = {} as Record<PackId, string>;
   for (const packId of PACK_IDS) {
