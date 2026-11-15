@@ -1,6 +1,6 @@
 'use client';
 
-import { ArrowRight, Calendar, FileDown } from 'lucide-react';
+import { ArrowRight, Calendar, FileDown, Loader2 } from 'lucide-react';
 import { useLocale } from '@/components/LocaleProvider';
 import { HistoryName } from '@/components/history/HistoryName';
 import { ScanThumb, UNKNOWN, useRowFigures, type HistoryListProps } from '@/components/history/history-list';
@@ -30,7 +30,7 @@ const CARD_DATE_OPTIONS: Intl.DateTimeFormatOptions = {
 };
 
 /** The history as cards: one column on a phone, two from 768px. */
-export function HistoryCards({ rows, onOpen, onRename, onDownloadPdf, onViewScan }: HistoryListProps) {
+export function HistoryCards({ rows, onOpen, onRename, onDownloadPdf, onViewScan, pdfPendingIds }: HistoryListProps) {
   return (
     <div data-testid="history-cards" className="grid grid-cols-1 md:grid-cols-2 gap-4">
       {rows.map((row) => (
@@ -41,6 +41,7 @@ export function HistoryCards({ rows, onOpen, onRename, onDownloadPdf, onViewScan
           onRename={onRename}
           onDownloadPdf={onDownloadPdf}
           onViewScan={onViewScan}
+          pdfBusy={pdfPendingIds?.has(row.id) ?? false}
         />
       ))}
     </div>
@@ -53,7 +54,8 @@ function HistoryCard({
   onRename,
   onDownloadPdf,
   onViewScan,
-}: Omit<HistoryListProps, 'rows'> & { row: HistoryRow }) {
+  pdfBusy,
+}: Omit<HistoryListProps, 'rows' | 'pdfPendingIds'> & { row: HistoryRow; pdfBusy: boolean }) {
   const { t, tn, locale } = useLocale();
   const figures = useRowFigures(row);
   const material = row.material?.toLowerCase();
@@ -109,11 +111,15 @@ function HistoryCard({
           <button
             type="button"
             onClick={() => onDownloadPdf(row.id)}
+            disabled={pdfBusy}
+            aria-busy={pdfBusy || undefined}
             aria-label={t('historyPage.pdfAria', { name: row.name })}
             data-testid="history-pdf"
-            className="min-h-10 inline-flex items-center justify-center gap-1.5 px-3 rounded-xl bg-studio-field hover:bg-studio-border text-xs font-bold text-slate-700 dark:text-slate-300 hover:text-brand-600 dark:hover:text-brand-400 focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand-500 transition-colors"
+            className="min-h-10 disabled:opacity-60 disabled:cursor-wait inline-flex items-center justify-center gap-1.5 px-3 rounded-xl bg-studio-field hover:bg-studio-border text-xs font-bold text-slate-700 dark:text-slate-300 hover:text-brand-600 dark:hover:text-brand-400 focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand-500 transition-colors"
           >
-            <FileDown className="w-4 h-4" aria-hidden="true" />
+            {pdfBusy
+              ? <Loader2 className="w-4 h-4 animate-spin" aria-hidden="true" />
+              : <FileDown className="w-4 h-4" aria-hidden="true" />}
             {t('historyPage.pdfLabel')}
           </button>
         )}

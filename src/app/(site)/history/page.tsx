@@ -20,7 +20,7 @@ import { HistoryTable } from '@/components/history/HistoryTable';
 import { HistoryViewToggle } from '@/components/history/HistoryViewToggle';
 import { materialLabelKey } from '@/i18n/domain';
 import { type TranslationKey } from '@/i18n';
-import { readHistoryView, toHistoryRow, writeHistoryView, type HistoryView } from '@/lib/projects/history-row';
+import { readHistoryView, restoreSeedFromRow, toHistoryRow, writeHistoryView, type HistoryView } from '@/lib/projects/history-row';
 import type { DisplayUnit } from '@/lib/units';
 
 interface ProjectHistoryItem {
@@ -126,6 +126,10 @@ export default function HistoryPage() {
   // Cards until the remembered choice is read after mounting (the server has
   // no localStorage, and the first render has to match it).
   const [view, setView] = useState<HistoryView>('cards');
+  // Rows whose PDF is being built (their button is busy), and whether the
+  // last attempt failed (a line above the list says so).
+  const [pdfPendingIds, setPdfPendingIds] = useState<ReadonlySet<string>>(() => new Set());
+  const [pdfFailed, setPdfFailed] = useState(false);
 
   useEffect(() => { setView(readHistoryView(browserStorage())); }, []);
 
@@ -167,8 +171,9 @@ export default function HistoryPage() {
   };
 
   /** Rebuilds and downloads the cutting-plan PDF from the stored project
-   *  data — the PDF itself is never persisted, only regenerated on demand. */
-  const downloadPdf = async (proj: ProjectHistoryItem) => {
+   *  data — the PDF itself is never persisted, only regenerated on demand.
+   *  Resolves true once the file is handed to the browser, false otherwise. */
+  const downloadPdf = async (proj: ProjectHistoryItem): Promise<boolean> => {
     try {
       const optJson = (proj.options_json || {}) as {
         sheet?: unknown; sheets?: unknown; pieces?: unknown; options?: unknown; result?: unknown;
@@ -188,7 +193,7 @@ export default function HistoryPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
       });
-      if (!res.ok) return;
+      if (!res.ok) return false;
       const blob = await res.blob();
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
@@ -198,8 +203,9 @@ export default function HistoryPage() {
       a.click();
       a.remove();
       window.URL.revokeObjectURL(url);
+      return true;
     } catch {
-      /* download failed silently — the card stays usable */
+      return false;
     }
   };
 
@@ -279,7 +285,7 @@ export default function HistoryPage() {
         && storedName.trim()
         && storedName.trim() !== project.name.trim()
           ? { ...project.options_json, projectName: project.name.trim() }
-          : project.options_json ?? {};
+          : project.options_json ?? restoreSeedFromRow(project);
       sessionStorage.setItem('qatlia_saved_project', JSON.stringify(restoredOptions));
       // Read back by atelier/page.tsx's restore effect so QuotationDialog's
       // `projectId` targets the project the artisan actually opened here,
@@ -300,9 +306,18 @@ export default function HistoryPage() {
     }
   };
 
-  const handleDownloadPdf = (id: string) => {
+  const handleDownloadPdf = async (id: string) => {
     const project = projects.find((p) => p.id === id);
-    if (project) void downloadPdf(project);
+    if (!project || pdfPendingIds.has(id)) return;
+    setPdfPendingIds((prev) => new Set(prev).add(id));
+    setPdfFailed(false);
+    const ok = await downloadPdf(project);
+    setPdfPendingIds((prev) => {
+      const next = new Set(prev);
+      next.delete(id);
+      return next;
+    });
+    if (!ok) setPdfFailed(true);
   };
 
   /**
@@ -330,7 +345,8 @@ export default function HistoryPage() {
     rows,
     onOpen: handleLoadProject,
     onRename: commitRename,
-    onDownloadPdf: handleDownloadPdf,
+    onDownloadPdf: (id: string) => { void handleDownloadPdf(id); },
+    pdfPendingIds,
     onViewScan: openScan,
   };
 
@@ -411,6 +427,11 @@ export default function HistoryPage() {
             <HistoryViewToggle view={view} onChange={changeView} />
           </div>
         )}
+
+        {/* Always in the page, so a screen reader hears the failure when it appears. */}
+        <p role="status" aria-live="polite" data-testid="history-pdf-failed" className={pdfFailed ? 'text-xs font-semibold text-red-600 dark:text-red-400' : 'sr-only'}>
+          {pdfFailed ? t('historyPage.pdfFailed') : ''}
+        </p>
 
         {loading ? (
           <div role="status" aria-label={t('historyPage.loadingAria')} className="grid grid-cols-1 md:grid-cols-2 gap-4">

@@ -798,7 +798,6 @@ export const fr = {
     back: 'Retourner au Débit de Panneaux',
   },
   historyPage: {
-      scanThumbAlt: 'Photo de la fiche de débit scannée pour {name}',
       pdfAria: 'Télécharger le PDF du projet {name}',
       pdfLabel: 'PDF',
       renameAria: 'Renommer le projet {name}',
@@ -820,7 +819,7 @@ export const fr = {
       panel: 'Panneau',
       pieces: 'Pièces',
       waste: 'Chute',
-      sheets: 'Panneaux',
+      sheets: 'Feuilles',
     },
     /** Table headers the stats above do not already name. */
     columns: {
@@ -837,6 +836,7 @@ export const fr = {
       table: 'Tableau',
     },
     scanViewAria: 'Voir la fiche scannée de {name}',
+    pdfFailed: 'Le PDF n’a pas pu être créé. Réessayez.',
     // Canonical panel size. `{unit}` is the SI symbol, not prose.
     sheetSize: '{height} × {width} {unit}',
     piecesValue: '{count} pcs',

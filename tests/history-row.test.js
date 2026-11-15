@@ -81,3 +81,31 @@ test('a storage that throws never breaks the history', () => {
   assert.doesNotThrow(() => rows().writeHistoryView(broken, 'table'));
   assert.doesNotThrow(() => rows().writeHistoryView(null, 'table'));
 });
+
+// A project that kept no saved data reopens with what its row knows.
+
+test('restoreSeedFromRow gives the atelier the panel and the name of a project with no saved data', () => {
+  const seed = rows().restoreSeedFromRow({ name: '  Placard Benali ', material: 'verre', sheet_width: 250, sheet_height: 321, kerf: 0.4, grain_direction: true });
+  assert.deepEqual(seed, {
+    sheet: { id: 's0', width: 250, height: 321, kerf: 0.4, margin: 0, grainDirection: true, material: 'verre', quantity: 1 },
+    projectName: 'Placard Benali',
+  });
+});
+
+test('restoreSeedFromRow leaves to the atelier what the row does not hold in a usable form', () => {
+  const { restoreSeedFromRow } = rows();
+  const unknown = restoreSeedFromRow({ name: 'Cuisine', material: 'bois-exotique', sheet_width: 206, sheet_height: 279 });
+  assert.equal(unknown.sheet.material, 'mdf');
+  assert.equal(unknown.sheet.kerf, 0);
+  assert.equal(unknown.sheet.grainDirection, false);
+  assert.deepEqual(restoreSeedFromRow({ name: '', material: 'mdf', sheet_width: 0, sheet_height: NaN, kerf: -1 }), {});
+  assert.equal(restoreSeedFromRow({ name: 'x'.repeat(121), material: 'mdf', sheet_width: 206, sheet_height: 279 }).projectName, undefined);
+});
+
+test('the history reopens a project with no saved data through restoreSeedFromRow, in the shape the atelier reads', () => {
+  const fs = require('node:fs');
+  const path = require('node:path');
+  const atelier = fs.readFileSync(path.resolve('src/app/(site)/atelier/page.tsx'), 'utf8');
+  assert.match(atelier, /if \(parsed\.sheet\) setSheets\(\[restoreSheet\(parsed\.sheet\)\]\);/);
+  assert.match(atelier, /typeof parsed\.projectName === 'string' && parsed\.projectName\.trim\(\)/);
+});

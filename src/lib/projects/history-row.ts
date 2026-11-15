@@ -9,7 +9,8 @@
  * Pure module: no Supabase, no env, no network.
  */
 
-import { sanitizePdfGeneratedAt, sanitizeScanThumb } from '@/lib/projects/history-metadata';
+import { MATERIAL_LABEL_KEYS } from '@/i18n/domain';
+import { sanitizePdfGeneratedAt, sanitizeProjectName, sanitizeScanThumb } from '@/lib/projects/history-metadata';
 import { pickRestorableResult } from '@/lib/projects/restore';
 
 export interface HistoryRow {
@@ -86,6 +87,46 @@ export function toHistoryRow(project: HistoryProject): HistoryRow {
     hasPlan: pickRestorableResult(options.result) !== null,
     isCloud: UUID_PATTERN.test(project.id),
   };
+}
+
+/** The columns a project row keeps outside `options_json`. */
+export interface ProjectRowGeometry {
+  name: string;
+  material: string;
+  sheet_width: number;
+  sheet_height: number;
+  kerf?: number;
+  grain_direction?: boolean;
+}
+
+function isPositive(value: unknown): value is number {
+  return typeof value === 'number' && Number.isFinite(value) && value > 0;
+}
+
+/**
+ * What the atelier can reopen for a project that kept no saved data
+ * (`options_json` null): its panel and its name, in the shape the atelier's
+ * restore reads (`sheet` as a stock panel, `projectName`). A value the row does
+ * not hold in a usable form is left to the atelier's defaults.
+ */
+export function restoreSeedFromRow(project: ProjectRowGeometry): Record<string, unknown> {
+  const seed: Record<string, unknown> = {};
+  if (isPositive(project.sheet_width) && isPositive(project.sheet_height)) {
+    const kerf = typeof project.kerf === 'number' && Number.isFinite(project.kerf) && project.kerf >= 0 ? project.kerf : 0;
+    seed.sheet = {
+      id: 's0',
+      width: project.sheet_width,
+      height: project.sheet_height,
+      kerf,
+      margin: 0,
+      grainDirection: project.grain_direction === true,
+      material: Object.prototype.hasOwnProperty.call(MATERIAL_LABEL_KEYS, project.material) ? project.material : 'mdf',
+      quantity: 1,
+    };
+  }
+  const projectName = sanitizeProjectName(project.name);
+  if (projectName) seed.projectName = projectName;
+  return seed;
 }
 
 export type HistoryView = 'cards' | 'table';

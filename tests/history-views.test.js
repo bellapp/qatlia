@@ -14,7 +14,7 @@ test('the rename button is always shown where there is no hover', () => {
   assert.doesNotMatch(button, /(^|[\s"])opacity-0(\s|")/, 'never hidden by default');
   assert.match(button, /\[@media\(hover:hover\)\]:opacity-0/);
   assert.match(button, /\[@media\(hover:hover\)\]:group-hover:opacity-100/);
-  assert.match(button, /w-8 h-8/);
+  assert.match(button, /\bw-10 h-10\b/, 'a 40px touch target');
 });
 
 test('a long name is truncated and never widens its container', () => {
@@ -135,7 +135,7 @@ test('a full project offers its scan and its PDF in both views, and its figures'
     assert.equal((html.match(/data-testid="history-scan"/g) || []).length, 1, `${name}: one scan control`);
     assert.equal((html.match(/data-testid="history-pdf"/g) || []).length, 1, `${name}: one PDF button`);
     assert.match(html, /aria-label="Voir la fiche scannée de Cuisine Alami"/);
-    assert.match(html, new RegExp(`>${fullRow.wastePercentage.toLocaleString('fr-FR', { maximumFractionDigits: 1 }).replace(/\s/g, '\s')}%<`));
+    assert.match(html, new RegExp(`>${fullRow.wastePercentage.toLocaleString('fr-FR', { maximumFractionDigits: 1 }).replace(/\s/g, '\\s')}%<`));
   }
   assert.ok(fullRow.wastePercentage > 0, 'the fixture has a real waste figure');
 });
@@ -186,6 +186,55 @@ test('an old project with no saved data still opens from the history', () => {
   assert.doesNotMatch(load, /if \(project\?\.options_json\)/, 'no data is not a reason to do nothing');
   assert.match(load, /if \(project\) \{/);
   assert.match(load, /project\.options_json\?\.projectName/);
-  assert.match(load, /: project\.options_json \?\? \{\};/);
+  assert.match(load, /: project\.options_json \?\? restoreSeedFromRow\(project\);/);
   assert.match(load, /window\.location\.href = '\/atelier'/);
+});
+
+test('the rename controls are 40px touch targets while editing too', () => {
+  const source = fs.readFileSync(path.resolve('src/components/history/HistoryName.tsx'), 'utf8');
+  for (const id of ['history-rename-btn', 'history-rename-save', 'history-rename-cancel']) {
+    const at = source.indexOf(`data-testid="${id}"`);
+    const className = source.slice(at).match(/className="([^"]*)"/)[1];
+    assert.match(className, /\bw-10 h-10\b/, id);
+    // A mouse needs no 40px target: keep the table's name column readable from 640px.
+    assert.match(className, /\[@media\(pointer:fine\)\]:w-8 \[@media\(pointer:fine\)\]:h-8/, id);
+  }
+  assert.doesNotMatch(source, /\bw-(?:8|9) h-(?:8|9)\b/);
+});
+
+test('a PDF being built keeps its button busy, in both views', () => {
+  const props = { ...listProps([fullRow]), pdfPendingIds: new Set([fullRow.id]) };
+  for (const [file, name] of [['HistoryCards', 'HistoryCards'], ['HistoryTable', 'HistoryTable']]) {
+    const busy = renderComponent(`src/components/history/${file}.tsx`, name, props)
+      .match(/<button[^>]*data-testid="history-pdf"[^>]*>/)[0];
+    assert.match(busy, /\bdisabled=""/, `${name}: disabled while busy`);
+    assert.match(busy, /aria-busy="true"/, `${name}: aria-busy`);
+    const idle = renderComponent(`src/components/history/${file}.tsx`, name, listProps([fullRow]))
+      .match(/<button[^>]*data-testid="history-pdf"[^>]*>/)[0];
+    assert.doesNotMatch(idle, /\sdisabled=""|aria-busy/, `${name}: idle button`);
+  }
+});
+
+test('a failed PDF is said in the page, in a live region, in the three languages', () => {
+  const { translate } = loadTsModule('src/i18n/index.ts');
+  const [fr, en, ar] = ['fr', 'en', 'ar'].map((l) => translate(l, 'historyPage.pdfFailed'));
+  assert.equal(fr, 'Le PDF n’a pas pu être créé. Réessayez.');
+  assert.ok(en && en !== 'historyPage.pdfFailed' && en !== fr);
+  assert.match(ar, /[\u0600-\u06FF]/);
+  const page = fs.readFileSync(path.resolve('src/app/(site)/history/page.tsx'), 'utf8');
+  assert.match(page, /<p role="status" aria-live="polite" data-testid="history-pdf-failed"/);
+  assert.match(page, /\{pdfFailed \? t\('historyPage\.pdfFailed'\) : ''\}/);
+  const pdf = page.slice(page.indexOf('const downloadPdf'), page.indexOf('const fetchHistory'));
+  assert.match(pdf, /if \(!res\.ok\) return false;/);
+  assert.match(pdf, /return true;/);
+});
+
+test('the sheet count header does not read like the panel size header', () => {
+  const { translate } = loadTsModule('src/i18n/index.ts');
+  assert.deepEqual(['fr', 'en', 'ar'].map((l) => translate(l, 'historyPage.stats.sheets')), ['Feuilles', 'Sheets', 'عدد الألواح']);
+  for (const locale of ['fr', 'en', 'ar']) {
+    assert.notEqual(translate(locale, 'historyPage.stats.sheets'), translate(locale, 'historyPage.stats.panel'));
+  }
+  // The scan thumbnail's alt text went with the old card: the scan button carries the name.
+  assert.equal(translate('fr', 'historyPage.scanThumbAlt'), 'historyPage.scanThumbAlt');
 });

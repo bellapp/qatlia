@@ -715,7 +715,6 @@ export const en: Catalog = {
     back: 'Back to panel cutting',
   },
   historyPage: {
-      scanThumbAlt: 'Scanned cut-list photo for {name}',
       pdfAria: 'Download project {name} PDF',
       pdfLabel: 'PDF',
       renameAria: 'Rename project {name}',
@@ -752,6 +751,7 @@ export const en: Catalog = {
       table: 'Table',
     },
     scanViewAria: 'View the scanned list for {name}',
+    pdfFailed: 'The PDF could not be created. Try again.',
     sheetSize: '{height} × {width} {unit}',
     piecesValue: '{count} pcs',
     sheetsUsed: { one: '{count} sheet', many: '{count} sheets' },

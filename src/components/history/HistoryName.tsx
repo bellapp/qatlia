@@ -106,7 +106,7 @@ export function HistoryName({ name, onRename, size }: HistoryNameProps) {
           onClick={open}
           aria-label={t('historyPage.renameAria', { name })}
           data-testid="history-rename-btn"
-          className="shrink-0 w-8 h-8 rounded-lg flex items-center justify-center text-slate-500 dark:text-slate-400 hover:text-brand-500 dark:hover:text-brand-400 hover:bg-studio-field focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand-500 transition-all [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover:opacity-100 [@media(hover:hover)]:focus-visible:opacity-100"
+          className="shrink-0 w-10 h-10 [@media(pointer:fine)]:w-8 [@media(pointer:fine)]:h-8 rounded-lg flex items-center justify-center text-slate-500 dark:text-slate-400 hover:text-brand-500 dark:hover:text-brand-400 hover:bg-studio-field focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand-500 transition-all [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover:opacity-100 [@media(hover:hover)]:focus-visible:opacity-100"
         >
           <Pencil className="w-4 h-4" aria-hidden="true" />
         </button>
@@ -149,7 +149,7 @@ export function HistoryName({ name, onRename, size }: HistoryNameProps) {
           disabled={saving}
           aria-label={t('historyPage.renameSave')}
           data-testid="history-rename-save"
-          className="shrink-0 w-9 h-9 rounded-lg flex items-center justify-center text-brand-600 dark:text-brand-400 hover:bg-studio-field disabled:opacity-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand-500 transition-all"
+          className="shrink-0 w-10 h-10 [@media(pointer:fine)]:w-8 [@media(pointer:fine)]:h-8 rounded-lg flex items-center justify-center text-brand-600 dark:text-brand-400 hover:bg-studio-field disabled:opacity-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand-500 transition-all"
         >
           <Check className="w-4 h-4" aria-hidden="true" />
         </button>
@@ -161,7 +161,7 @@ export function HistoryName({ name, onRename, size }: HistoryNameProps) {
           disabled={saving}
           aria-label={t('historyPage.renameCancel')}
           data-testid="history-rename-cancel"
-          className="shrink-0 w-9 h-9 rounded-lg flex items-center justify-center text-slate-500 dark:text-slate-400 hover:bg-studio-field disabled:opacity-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand-500 transition-all"
+          className="shrink-0 w-10 h-10 [@media(pointer:fine)]:w-8 [@media(pointer:fine)]:h-8 rounded-lg flex items-center justify-center text-slate-500 dark:text-slate-400 hover:bg-studio-field disabled:opacity-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand-500 transition-all"
         >
           <X className="w-4 h-4" aria-hidden="true" />
         </button>

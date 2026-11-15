@@ -13,6 +13,8 @@ export interface HistoryListProps {
   onRename: (id: string, name: string) => Promise<boolean>;
   onDownloadPdf: (id: string) => void;
   onViewScan: (id: string) => void;
+  /** Rows whose PDF is being built: their button is busy until it is done. */
+  pdfPendingIds?: ReadonlySet<string>;
 }
 
 /**

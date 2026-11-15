@@ -1,6 +1,6 @@
 'use client';
 
-import { ArrowRight, FileDown } from 'lucide-react';
+import { ArrowRight, FileDown, Loader2 } from 'lucide-react';
 import { useLocale } from '@/components/LocaleProvider';
 import { HistoryName } from '@/components/history/HistoryName';
 import {
@@ -57,8 +57,9 @@ export function HistoryTable({ rows, ...actions }: HistoryListProps) {
   );
 }
 
-function TableRow({ row, onOpen, onRename, onDownloadPdf, onViewScan }: RowProps) {
+function TableRow({ row, onOpen, onRename, onDownloadPdf, onViewScan, pdfPendingIds }: RowProps) {
   const { t, locale } = useLocale();
+  const pdfBusy = pdfPendingIds?.has(row.id) ?? false;
   const figures = useRowFigures(row);
   return (
     <tr data-testid="history-row" className="hover:bg-studio-field/40 transition-colors">
@@ -95,11 +96,15 @@ function TableRow({ row, onOpen, onRename, onDownloadPdf, onViewScan }: RowProps
             <button
               type="button"
               onClick={() => onDownloadPdf(row.id)}
+              disabled={pdfBusy}
+              aria-busy={pdfBusy || undefined}
               aria-label={t('historyPage.pdfAria', { name: row.name })}
               data-testid="history-pdf"
-              className="min-h-10 min-w-10 inline-flex items-center justify-center gap-1 px-2 lg:px-2.5 rounded-xl bg-studio-field hover:bg-studio-border font-bold text-slate-700 dark:text-slate-300 hover:text-brand-600 dark:hover:text-brand-400 focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand-500 transition-colors"
+              className="min-h-10 min-w-10 disabled:opacity-60 disabled:cursor-wait inline-flex items-center justify-center gap-1 px-2 lg:px-2.5 rounded-xl bg-studio-field hover:bg-studio-border font-bold text-slate-700 dark:text-slate-300 hover:text-brand-600 dark:hover:text-brand-400 focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand-500 transition-colors"
             >
-              <FileDown className="w-4 h-4" aria-hidden="true" />
+              {pdfBusy
+                ? <Loader2 className="w-4 h-4 animate-spin" aria-hidden="true" />
+                : <FileDown className="w-4 h-4" aria-hidden="true" />}
               <span className="hidden lg:inline">{t('historyPage.pdfLabel')}</span>
             </button>
           )}

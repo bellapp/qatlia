@@ -715,7 +715,6 @@ export const ar: Catalog = {
     back: 'العودة إلى قطع الألواح',
   },
   historyPage: {
-      scanThumbAlt: 'صورة ورقة القياسات الممسوحة لـ {name}',
       pdfAria: 'تحميل PDF المشروع {name}',
       pdfLabel: 'PDF',
       renameAria: 'إعادة تسمية المشروع {name}',
@@ -737,7 +736,7 @@ export const ar: Catalog = {
       panel: 'اللوح',
       pieces: 'القطع',
       waste: 'الهدر',
-      sheets: 'الألواح',
+      sheets: 'عدد الألواح',
     },
     columns: {
       preview: 'معاينة',
@@ -752,6 +751,7 @@ export const ar: Catalog = {
       table: 'جدول',
     },
     scanViewAria: 'عرض الورقة الممسوحة لـ {name}',
+    pdfFailed: 'تعذّر إنشاء ملف PDF. حاول مجدداً.',
     sheetSize: '{height} × {width} {unit}',
     piecesValue: '{count} قطعة',
     sheetsUsed: { one: '{count} لوح', many: '{count} ألواح' },
