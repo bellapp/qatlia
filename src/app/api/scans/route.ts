@@ -1,3 +1,4 @@
+import { randomUUID } from 'crypto';
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { createClient as createAdminClient } from '@supabase/supabase-js';
@@ -67,7 +68,7 @@ export async function POST(request: Request) {
     if (!adminConfig) return NextResponse.json(STORAGE_UNAVAILABLE, { status: 503 });
 
     const admin = createAdminClient(adminConfig.url, adminConfig.serviceRoleKey);
-    const scanPath = scanPathFor(user.id, crypto.randomUUID(), image.ext);
+    const scanPath = scanPathFor(user.id, randomUUID(), image.ext);
     const { error } = await admin.storage
       .from(SCAN_BUCKET)
       .upload(scanPath, image.bytes, { contentType: image.mime, upsert: false });
