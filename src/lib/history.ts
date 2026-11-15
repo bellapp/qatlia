@@ -24,6 +24,7 @@ export interface LocalHistoryItem {
     displayUnit?: DisplayUnit;
     canonicalUnit?: 'cm';
     migratedFromLegacyUnit?: boolean;
+    projectName?: string;
   };
 }
 
@@ -44,4 +45,26 @@ export function writeLocalHistoryItem(item: LocalHistoryItem) {
   const current = readLocalHistory().filter((p) => p.id !== item.id);
   const next = [item, ...current].slice(0, 50);
   window.localStorage.setItem(LOCAL_HISTORY_KEY, JSON.stringify(next));
+}
+
+/**
+ * Renames an entry of the localStorage history: its `name` and the
+ * `options_json.projectName` the atelier reads when the project is reopened.
+ * Returns false when the entry is not there or the storage cannot be written.
+ */
+export function renameLocalHistoryItem(id: string, name: string): boolean {
+  if (typeof window === 'undefined') return false;
+  try {
+    const list = readLocalHistory();
+    if (!list.some((item) => item.id === id)) return false;
+    const next = list.map((item) =>
+      item.id === id
+        ? { ...item, name, options_json: { ...item.options_json, projectName: name } }
+        : item,
+    );
+    window.localStorage.setItem(LOCAL_HISTORY_KEY, JSON.stringify(next));
+    return true;
+  } catch {
+    return false;
+  }
 }

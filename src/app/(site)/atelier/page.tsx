@@ -91,7 +91,8 @@ import { LocaleSwitcher, useLocale } from '@/components/LocaleProvider';
 import { formatDateTime, type TranslationKey } from '@/i18n';
 import { edgeBandingLabelKey, materialLabelKey, visionErrorKey } from '@/i18n/domain';
 import { buildCostDetail, hasLaborCharge } from '@/lib/cost-detail';
-import { writeLocalHistoryItem, type LocalHistoryItem } from '@/lib/history';
+import { writeLocalHistoryItem, renameLocalHistoryItem, type LocalHistoryItem } from '@/lib/history';
+import { saveProjectName, type RenameOutcome } from '@/lib/projects/rename';
 import { deriveQuotationPanels, deriveQuotationPieces } from '@/lib/quotation-items';
 import { buildPdfPayload } from '@/lib/pdf-payload';
 import { buildPersistedProjectPayload } from '@/lib/projects/persistence-payload';
@@ -249,6 +250,9 @@ export default function Dashboard() {
   // dialog merges its metadata into that same project's options_json.
   // Never client-guessed; only ever set from a successful save response.
   const [lastSavedProjectId, setLastSavedProjectId] = useState<string | null>(null);
+  // A project kept on this device only (no server id): reopened from the local
+  // history, or saved there when the server could not be reached.
+  const [localProjectId, setLocalProjectId] = useState<string | null>(null);
   const [showAdvancedOptions, setShowAdvancedOptions] = useState<boolean>(false);
   const advancedOptionsRef = useRef<HTMLDivElement>(null);
 
@@ -353,7 +357,14 @@ export default function Dashboard() {
 
   // Custom project name (audit feature): empty means auto-name fallback.
   const [projectName, setProjectName] = useState<string>('');
-  const [projectNameDraft, setProjectNameDraft] = useState<string>('');  const [presetNameDraft, setPresetNameDraft] = useState<string>('');
+  const [projectNameDraft, setProjectNameDraft] = useState<string>('');
+  // Outcome of the last name commit, shown under the field. `lastPersistedNameRef`
+  // is the name the saved project already carries: re-committing it does nothing,
+  // while a failed one stays different so leaving the field again retries.
+  const [nameSaveState, setNameSaveState] = useState<'idle' | 'saving' | RenameOutcome>('idle');
+  const lastPersistedNameRef = useRef<string>('');
+  const nameSaveAttemptRef = useRef(0);
+  const [presetNameDraft, setPresetNameDraft] = useState<string>('');
   // Price of the stock panel (MAD per panel), as typed; committed on blur.
   const [panelPriceDraft, setPanelPriceDraft] = useState<string>('');
   const [presetFeedback, setPresetFeedback] = useState<{ tone: 'success' | 'warning'; text: string } | null>(null);
@@ -533,10 +544,23 @@ const commitPanelName = () => {
   const { t, tn, n, locale } = useLocale();
 
   /** Commits the typed project name (no uniqueness constraint — several
-   *  projects may share a name). Empty reverts to the auto-name fallback. */
-  const commitProjectName = () => {
+   *  projects may share a name). Empty reverts to the auto-name fallback.
+   *  Leaving the field also writes the name to the saved project, if there is
+   *  one; the line under the field says how that went. */
+  const commitProjectName = async () => {
     const name = projectNameDraft.trim();
     setProjectName(name);
+    if (name === lastPersistedNameRef.current) return;
+    const attempt = ++nameSaveAttemptRef.current;
+    setNameSaveState('saving');
+    const outcome = await saveProjectName(
+      { cloudId: lastSavedProjectId, localId: localProjectId },
+      name,
+      { fetch: (input, init) => fetch(input, init), renameLocal: renameLocalHistoryItem },
+    );
+    if (outcome === 'saved') lastPersistedNameRef.current = name;
+    // A newer commit owns the line now.
+    if (attempt === nameSaveAttemptRef.current) setNameSaveState(outcome);
   };
 
   /** The name a saved project carries: custom > panel label > auto. */
@@ -624,6 +648,10 @@ const commitPanelName = () => {
       restoredProjectIdRaw && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(restoredProjectIdRaw)
         ? restoredProjectIdRaw
         : null;
+    // A project kept on this device only has no server id; its history entry id
+    // lets the name typed in the atelier be written back to that entry.
+    const restoredLocalIdRaw = sessionStorage.getItem('qatlia_restored_local_id');
+    const restoredLocalId = restoredLocalIdRaw && restoredLocalIdRaw.trim() ? restoredLocalIdRaw : null;
     if (savedProj) {
       try {
         const parsed = JSON.parse(savedProj);
@@ -636,6 +664,7 @@ const commitPanelName = () => {
         if (typeof parsed.projectName === 'string' && parsed.projectName.trim()) {
           setProjectName(parsed.projectName.trim());
           setProjectNameDraft(parsed.projectName.trim());
+          lastPersistedNameRef.current = parsed.projectName.trim();
         }
         // The scan image comes back with the plan: the card reads it from
         // `previewImage`, the next save carries it on from `scanThumb`.
@@ -657,6 +686,7 @@ const commitPanelName = () => {
         setPdfGeneratedAt(typeof parsed.pdfGeneratedAt === 'string' ? parsed.pdfGeneratedAt : null);
         if (parsed.options) setOptions((prev) => optionsWithoutStockOverride({ ...prev, ...parsed.options }));
         if (restoredProjectId) setLastSavedProjectId(restoredProjectId);
+        else if (restoredLocalId) setLocalProjectId(restoredLocalId);
         // Legacy saved projects carry no unit metadata at all; they predate
         // this feature and were always canonical cm. `resolveProjectUnitMetadata`
         // assumes cm in that case and flags it `migrated` so the next save
@@ -680,6 +710,7 @@ const commitPanelName = () => {
           sessionStorage.removeItem('qatlia_saved_project');
           sessionStorage.removeItem('qatlia_restored_project_id');
           sessionStorage.removeItem('qatlia_restored_project_meta');
+          sessionStorage.removeItem('qatlia_restored_local_id');
         }, 0);
       } catch (e) {
         console.error('Erreur restauration projet:', e);
@@ -688,6 +719,7 @@ const commitPanelName = () => {
         sessionStorage.removeItem('qatlia_saved_project');
         sessionStorage.removeItem('qatlia_restored_project_id');
         sessionStorage.removeItem('qatlia_restored_project_meta');
+        sessionStorage.removeItem('qatlia_restored_local_id');
       }
     }
   }, []);
@@ -773,15 +805,22 @@ const commitPanelName = () => {
           // The quotation dialog merges its metadata into *this* saved
           // project's options_json (see /api/export-quotation) — only once
           // the server confirms the save, never a client-guessed id.
-          if (data?.success && typeof data.projectId === 'string') setLastSavedProjectId(data.projectId);
+          if (data?.success && typeof data.projectId === 'string') {
+            setLastSavedProjectId(data.projectId);
+            setLocalProjectId(null);
+          }
         }
       }
     } catch (err) {
       console.error('Erreur auto-save projet:', err);
     }
+    // The name this save carries is the one the saved project now has.
+    lastPersistedNameRef.current = payload.projectName ?? '';
     if (!savedToCloud) {
+      const localId = `${source}_${Date.now()}`;
+      setLocalProjectId(localId);
       writeLocalHistoryItem({
-        id: `${source}_${Date.now()}`,
+        id: localId,
       name: payload.name,
       material: activeSheet.material || 'mdf',
       sheet_width: activeSheet.width,
@@ -1493,14 +1532,23 @@ const commitPanelName = () => {
                 <input
                   id="project-name-input"
                   value={projectNameDraft}
-                  onChange={(e) => setProjectNameDraft(e.target.value)}
-                  onBlur={commitProjectName}
+                  onChange={(e) => { setProjectNameDraft(e.target.value); setNameSaveState('idle'); }}
+                  onBlur={() => void commitProjectName()}
                   onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur(); }}
                   placeholder={t('atelier.project.namePlaceholder')}
                   maxLength={120}
                   data-testid="project-name-input"
                   className="mt-0.5 block w-full sm:w-[260px] rounded-lg bg-studio-field border border-studio-border px-2.5 py-1.5 text-sm font-bold text-slate-900 dark:text-white outline-none focus:border-brand-500/60 focus:ring-2 focus:ring-brand-500/20 placeholder:font-normal placeholder:text-slate-400 dark:placeholder:text-slate-500"
                 />
+                <p
+                  aria-live="polite"
+                  data-testid="project-name-status"
+                  className={`text-[10px] font-semibold ${nameSaveState === 'failed' ? 'text-red-600 dark:text-red-400' : nameSaveState === 'saved' ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-500'}`}
+                >
+                  {nameSaveState === 'saved' && t('atelier.project.nameSaved')}
+                  {nameSaveState === 'pending' && t('atelier.project.namePending')}
+                  {nameSaveState === 'failed' && t('atelier.project.nameFailed')}
+                </p>
                 {/* Same figures as the cut-list chip: pieces are quantities summed,
                     lines are rows (counting distinct names merged same-named rows). */}
                 <p className="text-[10px] text-slate-500 font-mono">
