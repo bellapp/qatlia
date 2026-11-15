@@ -694,6 +694,10 @@ export const en: Catalog = {
       close: 'I saved my reference',
       historyTitle: 'My payment orders',
       status: { pending: 'Pending', granted: 'Credits added', refused: 'Refused' },
+      sendProof: 'Send the payment proof on WhatsApp',
+      sendProofHint: 'After paying, send a photo of the receipt: the message with your order number is already filled in. Number:',
+      emailAlternative: 'Or by email:',
+      proofMessage: 'Hello QatliA, here is the payment proof for my order {orderNumber}.',
       bank: {
         title: 'Bank details for the transfer',
         holder: 'Account holder',
