@@ -5,7 +5,9 @@ import { Sparkles, Check, Zap, ArrowLeft, ShieldCheck, CreditCard, Landmark, Mes
 import { SUPPORT_EMAIL, SUPPORT_WHATSAPP_DISPLAY, supportMailto, supportWhatsAppUrl } from '@/lib/support';
 import Link from 'next/link';
 import { createClient } from '@/lib/supabase/client';
-import { CREDIT_PACKS, PACK_IDS, formatMAD, formatUSD, BILLING_CURRENCY, CARD_CURRENCY } from '@/lib/billing/catalog';
+import { CREDIT_PACKS, PACK_IDS, formatPrice, packPrice, BILLING_CURRENCY } from '@/lib/billing/catalog';
+import { cardCurrencyFor, offersManualPayment, type AppCurrency } from '@/lib/currency';
+import { CurrencySwitcher, useCurrency } from '@/components/CurrencySwitcher';
 import { LocaleSwitcher, useLocale } from '@/components/LocaleProvider';
 import { SupportContact } from '@/components/SupportContact';
 import { BankTransferDetails, type BankTransferDetailsData } from '@/components/BankTransferDetails';
@@ -25,6 +27,10 @@ export default function CreditsPage() {
   // Creem charges the USD price, Stripe the MAD one: the card price is only
   // shown once the server has said which provider will take the payment.
   const [cardProvider, setCardProvider] = useState<CardProvider | null>(null);
+  // Creem charges a euro account in euros only once the euro products exist.
+  const [euroCard, setEuroCard] = useState(false);
+  const [providerKnown, setProviderKnown] = useState(false);
+  const { currency } = useCurrency();
 
   const packs = PACK_IDS.map((id) => CREDIT_PACKS[id]);
 
@@ -36,7 +42,10 @@ export default function CreditsPage() {
         if (!res.ok) return;
         const data = await res.json();
         if (!cancelled && (data?.provider === 'creem' || data?.provider === 'stripe')) setCardProvider(data.provider);
-      } catch { /* the cards keep their MAD price */ }
+        if (!cancelled) setEuroCard(data?.euroCard === true);
+      } catch { /* the cards keep their account-currency price */ } finally {
+        if (!cancelled) setProviderKnown(true);
+      }
     })();
     return () => { cancelled = true; };
   }, []);
@@ -178,6 +187,19 @@ export default function CreditsPage() {
     }
   };
 
+  // The currency the packs are priced in: the account's, except a euro
+  // account before the euro products exist, which is charged (so shown) in
+  // dollars. Null until both answers are in, so no price flips on screen.
+  const shownCurrency: AppCurrency | null =
+    currency === null || !providerKnown ? null : currency === 'EUR' && !euroCard ? 'USD' : currency;
+  // A dirham account pays by card through Creem in dollars: that price is
+  // shown under the button. Other accounts are charged the price on the card.
+  const cardCurrency = shownCurrency ? cardCurrencyFor(shownCurrency, euroCard) : 'USD';
+  const showCardPrice = cardProvider === 'creem' && shownCurrency === 'MAD';
+  const manualOffered = shownCurrency !== null && offersManualPayment(shownCurrency);
+  const priceOf = (pack: (typeof packs)[number]) =>
+    shownCurrency ? formatPrice(packPrice(pack, shownCurrency), shownCurrency) : '…';
+
   // Rendered around the placeholders so the figure and the provider stay bold.
   const [headlineBefore, headlineAfter = ''] = t('creditsPage.headline', {
     count: CREDIT_PACKS.starter.credits,
@@ -186,7 +208,7 @@ export default function CreditsPage() {
   // only cash and bank transfer are offered, so no card brand may be named.
   const [secureBefore, secureAfter = ''] = cardProvider
     ? (cardProvider === 'creem'
-        ? t('creditsPage.securePaymentInternational', { currency: CARD_CURRENCY })
+        ? t(cardCurrency === 'EUR' ? 'creditsPage.securePaymentInternationalEur' : 'creditsPage.securePaymentInternational', { currency: cardCurrency })
         : t('creditsPage.securePayment', { currency: BILLING_CURRENCY })
       ).split('{provider}')
     : [];
@@ -204,6 +226,7 @@ export default function CreditsPage() {
             {t('creditsPage.back')}
           </Link>
           <div className="flex items-center gap-2">
+            <CurrencySwitcher />
             <LocaleSwitcher />
             {/* The balance arrives after the profile is read, so it is a live
                 region: the artisan hears the real figure, never the placeholder. */}
@@ -227,7 +250,7 @@ export default function CreditsPage() {
           </span>
           <h1 className="text-3xl md:text-4xl font-black text-slate-900 dark:text-white">
             {headlineBefore}
-            <span dir="ltr" translate="no">{formatMAD(CREDIT_PACKS.starter.priceMAD)}</span>
+            <span dir="ltr" translate="no">{priceOf(CREDIT_PACKS.starter)}</span>
             {headlineAfter}
           </h1>
           <p className="text-sm text-slate-600 dark:text-slate-400 max-w-xl mx-auto">{t('creditsPage.policy')}</p>
@@ -417,11 +440,8 @@ export default function CreditsPage() {
                     <h3 className={`text-base font-bold ${tone.strong}`}>{packName}</h3>
                   </div>
                   <div className="flex items-baseline gap-1 my-3" translate="no">
-                    <span dir="ltr" className={`text-3xl font-black ${tone.strong}`}>
-                      {n(p.priceMAD)}
-                    </span>
-                    <span className={`text-sm font-bold ${tone.muted}`}>
-                      {t('creditsPage.currency')}
+                    <span dir="ltr" data-testid="pack-price" className={`text-3xl font-black ${tone.strong}`}>
+                      {priceOf(p)}
                     </span>
                   </div>
                   <p className={`text-xs leading-relaxed mb-6 ${tone.muted}`}>
@@ -471,11 +491,13 @@ export default function CreditsPage() {
                     </>
                   )}
                 </button>
-                {cardProvider === 'creem' && (
+                {showCardPrice && (
                   <p className={`mt-1.5 text-center text-[11px] font-semibold ${tone.muted}`}>
-                    <span dir="ltr" translate="no">{t('creditsPage.cardPrice',{ price: formatUSD(p.priceUSD) })}</span>
+                    <span dir="ltr" translate="no">{t('creditsPage.cardPrice', { price: formatPrice(packPrice(p, cardCurrency), cardCurrency) })}</span>
                   </p>
                 )}
+                {/* Transfer and cash go to a Moroccan account, in dirhams. */}
+                {manualOffered && (
                 <button
                   onClick={() => handleManualOrder(p.id)}
                   disabled={loadingPack === `manual-${p.id}`}
@@ -487,6 +509,7 @@ export default function CreditsPage() {
                   <Landmark className="w-3.5 h-3.5" aria-hidden="true" />
                   {t('creditsPage.manual.button')}
                 </button>
+                )}
               </div>
             );
           })}

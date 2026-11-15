@@ -5,10 +5,11 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { clearPendingWork } from '@/lib/pending-work';
-import { ArrowLeft, ArrowRight, KeyRound, LogOut, Receipt, Shield, Zap } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Coins, KeyRound, LogOut, Receipt, Shield, Zap } from 'lucide-react';
 import { AccountMenu } from '@/components/AccountMenu';
 import { QatlIALogo } from '@/components/QatlIALogo';
 import { LocaleSwitcher, useLocale } from '@/components/LocaleProvider';
+import { CurrencySwitcher } from '@/components/CurrencySwitcher';
 import { authErrorKey } from '@/components/AuthModal';
 import { formatDateTime } from '@/i18n';
 
@@ -182,7 +183,20 @@ export default function AccountPage() {
           )}
         </section>
 
-        <section id="password" className="p-5 rounded-2xl bg-studio-panel/70 border border-studio-border space-y-4">
+        {/* One currency for the whole account, assigned from the country on
+            the first visit; the artisan can change it here. */}
+        <section id="currency" className="p-5 rounded-2xl bg-studio-panel/70 border border-studio-border space-y-3">
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2">
+              <Coins className="w-4 h-4 text-brand-400" aria-hidden="true" />
+              <h2 className="text-sm font-bold text-slate-900 dark:text-white">{t('accountPage.currencyTitle')}</h2>
+            </div>
+            <CurrencySwitcher />
+          </div>
+          <p className="text-xs text-slate-600 dark:text-slate-400">{t('accountPage.currencyHint')}</p>
+        </section>
+
+        <section id="password"className="p-5 rounded-2xl bg-studio-panel/70 border border-studio-border space-y-4">
           <div className="flex items-center gap-2">
             <KeyRound className="w-4 h-4 text-brand-400" aria-hidden="true" />
             <h2 className="text-sm font-bold text-slate-900 dark:text-white">{t('account.changePassword')}</h2>
