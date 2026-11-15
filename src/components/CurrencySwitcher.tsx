@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { Coins } from 'lucide-react';
-import { APP_CURRENCIES, isAppCurrency, type AppCurrency } from '@/lib/currency';
+import { APP_CURRENCIES, DEFAULT_CURRENCY, isAppCurrency, type AppCurrency } from '@/lib/currency';
 import { useLocale } from '@/components/LocaleProvider';
 
 /*
@@ -44,8 +44,13 @@ export function useCurrency(): {
     listeners.add(setLocal);
     let cancelled = false;
     // Asked again on every page: signing in may have changed the answer.
+    // A server that cannot answer must not leave prices on "…": the home
+    // market's currency is shown (a euro account then pays as it is told at
+    // checkout, where the server decides again).
     void fetchCurrency().then((answer) => {
-      if (!cancelled && answer) publish(answer);
+      if (cancelled) return;
+      if (answer) publish(answer);
+      else if (current === null) publish(DEFAULT_CURRENCY);
     });
     return () => {
       cancelled = true;
