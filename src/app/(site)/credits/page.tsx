@@ -7,6 +7,7 @@ import { createClient } from '@/lib/supabase/client';
 import { CREDIT_PACKS, PACK_IDS, formatMAD, formatUSD, BILLING_CURRENCY, CARD_CURRENCY } from '@/lib/billing/catalog';
 import { LocaleSwitcher, useLocale } from '@/components/LocaleProvider';
 import { SupportContact } from '@/components/SupportContact';
+import { BankTransferDetails, type BankTransferDetailsData } from '@/components/BankTransferDetails';
 import { checkoutErrorKey, creditPackLabelKeys } from '@/i18n/domain';
 import { LEGAL_DOCS, LEGAL_ROUTES } from '@/lib/legal';
 
@@ -98,6 +99,9 @@ export default function CreditsPage() {
   const [myManualOrders, setMyManualOrders] = useState<Array<{
     order_number: string; status: string; amount_mad: number; credits: number; created_at: string;
   }>>([]);
+  // The account to pay into, sent by the server only to the signed-in buyer of
+  // an order still to be paid (null when not configured).
+  const [bankDetails, setBankDetails] = useState<BankTransferDetailsData | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -106,7 +110,10 @@ export default function CreditsPage() {
         const res = await fetch('/api/credits/manual');
         if (!res.ok) return;
         const data = await res.json();
-        if (!cancelled && data.success) setMyManualOrders(data.orders || []);
+        if (!cancelled && data.success) {
+          setMyManualOrders(data.orders || []);
+          setBankDetails(data.bank ?? null);
+        }
       } catch { /* tracking is best-effort */ }
     })();
     return () => { cancelled = true; };
@@ -124,6 +131,7 @@ export default function CreditsPage() {
       const data = await res.json();
       if (res.ok && data.success && data.order) {
         setManualOrder(data.order);
+        setBankDetails(data.bank ?? null);
       } else {
         setCheckoutError(t(checkoutErrorKey(data?.error)) || t('creditsPage.errors.network'));
       }
@@ -211,6 +219,7 @@ export default function CreditsPage() {
               <li>{t('creditsPage.manual.step2')}</li>
               <li>{t('creditsPage.manual.step3')}</li>
             </ol>
+            {bankDetails && <BankTransferDetails bank={bankDetails} />}
             <p className="text-[11px] text-amber-300/90 bg-amber-500/10 border border-amber-500/30 rounded-lg px-3 py-2">
               {t('creditsPage.manual.keepReference')}
             </p>
@@ -245,6 +254,11 @@ export default function CreditsPage() {
                 </span>
               </div>
             ))}
+            {bankDetails && myManualOrders.some((o) => o.status === 'pending') && (
+              <div className="rounded-2xl bg-gradient-to-b from-[#1E3A5F] to-[#0F172A] p-3">
+                <BankTransferDetails bank={bankDetails} />
+              </div>
+            )}
             <SupportContact
               label={t('support.paymentHelp')}
               message={t('support.prefill')}

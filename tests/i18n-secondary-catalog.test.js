@@ -45,7 +45,13 @@ const SHARED_TOKENS = new Set([
 ]);
 
 /** French and English strings that legitimately coincide. */
-const IDENTICAL_IN_ENGLISH = new Set([...SHARED_TOKENS, 'historyPage.piecesValue']);
+const IDENTICAL_IN_ENGLISH = new Set([
+  ...SHARED_TOKENS,
+  'historyPage.piecesValue',
+  // Banking codes, written the same way in French and English.
+  'creditsPage.manual.bank.iban',
+  'creditsPage.manual.bank.bic',
+]);
 
 function loadI18n() {
   return loadTsModule(path.join(PROJECT_ROOT, 'src/i18n/index.ts'));

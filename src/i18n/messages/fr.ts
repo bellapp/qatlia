@@ -772,6 +772,16 @@ export const fr = {
       close: 'J’ai noté ma référence',
       historyTitle: 'Mes commandes de paiement',
       status: { pending: 'En attente', granted: 'Crédits ajoutés', refused: 'Refusée' },
+      bank: {
+        title: 'Coordonnées pour le virement',
+        holder: 'Titulaire du compte',
+        rib: 'RIB (24 chiffres)',
+        iban: 'IBAN',
+        bic: 'BIC / SWIFT',
+        copy: 'Copier',
+        copied: 'Copié',
+        copyAria: 'Copier : {label}',
+      },
     },
     /**
      * One entry per machine-readable code returned by /api/credits/checkout. The

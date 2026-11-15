@@ -695,6 +695,16 @@ export const ar: Catalog = {
       close: 'حفظت المرجع',
       historyTitle: 'طلبات الدفع الخاصة بي',
       status: { pending: 'في الانتظار', granted: 'تمت الإضافة', refused: 'مرفوضة' },
+      bank: {
+        title: 'المعلومات البنكية للتحويل',
+        holder: 'صاحب الحساب',
+        rib: 'رقم RIB (24 رقماً)',
+        iban: 'رقم IBAN',
+        bic: 'رمز BIC / SWIFT',
+        copy: 'نسخ',
+        copied: 'تم النسخ',
+        copyAria: 'نسخ: {label}',
+      },
     },
     errors: {
       authRequired: 'سجّل الدخول لشراء الأرصدة.',

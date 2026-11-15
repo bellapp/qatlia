@@ -4,6 +4,7 @@ import { createClient } from '@/lib/supabase/server';
 import { createClient as createSupabaseClient } from '@supabase/supabase-js';
 import { getSupabaseAdminConfig } from '@/lib/billing/config';
 import { CREDIT_PACKS, PackId } from '@/lib/billing/catalog';
+import { readBankTransferDetails } from '@/lib/billing/bank-transfer';
 
 export const dynamic = 'force-dynamic';
 
@@ -71,7 +72,8 @@ export async function POST(req: Request) {
         .single();
 
       if (!error && data) {
-        return NextResponse.json({ success: true, order: data });
+        // The account to pay into goes only to the signed-in buyer of this order.
+        return NextResponse.json({ success: true, order: data, bank: readBankTransferDetails() });
       }
       if (error && !/duplicate|unique/i.test(error.message)) {
         console.error('manual payment insert failed:', error.message);
@@ -105,7 +107,10 @@ export async function GET() {
       console.error('manual payment GET failed:', error.message);
       return NextResponse.json({ error: 'DB_ERROR' }, { status: 500 });
     }
-    return NextResponse.json({ success: true, orders: data || [] });
+    const orders = data || [];
+    // Shown again only while the customer still has an order to pay.
+    const hasPendingOrder = orders.some((order) => order.status === 'pending');
+    return NextResponse.json({ success: true, orders, bank: hasPendingOrder ? readBankTransferDetails() : null });
   } catch (err) {
     console.error('manual payment GET error:', err);
     return NextResponse.json({ error: 'SERVER_ERROR' }, { status: 500 });
