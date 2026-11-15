@@ -9,6 +9,7 @@ import {
   type SheetCostLine,
   type EdgeSegmentCostLine,
 } from '@/lib/costing';
+import { catalogPriceIn, type AppCurrency } from '@/lib/currency';
 
 // Single source of truth for supported material types, shared by the API
 // schema (enum validation) and the material library below, so neither can
@@ -56,14 +57,15 @@ function isPrice(value: unknown): value is number {
 }
 
 /**
- * MAD per metre for an edge-banding colour. The artisan sets one price for
- * every colour (user request, 2026-11-13: a price per colour was too much
- * detail); without it each colour keeps its catalog price.
+ * Price per metre for an edge-banding colour, in the account currency. The
+ * artisan sets one price for every colour (user request, 2026-11-13: a price
+ * per colour was too much detail); without it each colour keeps its catalog
+ * price — a dirham figure, converted for a euro or dollar account.
  */
-export function edgePricePerM(edgeId: string, ownPricePerM?: number): number {
+export function edgePricePerM(edgeId: string, ownPricePerM?: number, currency?: AppCurrency): number {
   const preset = EDGEBANDING_PRESETS.find((e) => e.id === edgeId) || EDGEBANDING_PRESETS[0];
   if (preset.id === 'none') return 0;
-  return isPrice(ownPricePerM) ? ownPricePerM : preset.pricePerM;
+  return isPrice(ownPricePerM) ? ownPricePerM : catalogPriceIn(preset.pricePerM, currency);
 }
 
 /**
@@ -71,8 +73,14 @@ export function edgePricePerM(edgeId: string, ownPricePerM?: number): number {
  * its area, to the cent. Artisans buy and price panels by the panel, so the
  * catalog default is a price per panel too (user request, 2026-11-13).
  */
-export function catalogPanelPrice(material: MaterialType | null | undefined, widthCm: number, heightCm: number): number {
-  return roundCurrency(getMaterialDef((material || 'mdf') as MaterialType).pricePerM2 * ((widthCm * heightCm) / 10000));
+export function catalogPanelPrice(
+  material: MaterialType | null | undefined,
+  widthCm: number,
+  heightCm: number,
+  currency?: AppCurrency
+): number {
+  const priceMad = roundCurrency(getMaterialDef((material || 'mdf') as MaterialType).pricePerM2 * ((widthCm * heightCm) / 10000));
+  return catalogPriceIn(priceMad, currency);
 }
 
 /**
@@ -83,11 +91,12 @@ export function catalogPanelPrice(material: MaterialType | null | undefined, wid
  */
 export function sheetPricing(
   sheet: { material?: MaterialType | null; pricePerSheet?: number; width: number; height: number },
-  overrides?: Partial<Record<MaterialType, StockPricing>>
+  overrides?: Partial<Record<MaterialType, StockPricing>>,
+  currency?: AppCurrency
 ): StockPricing {
   if (isPrice(sheet.pricePerSheet)) return { mode: 'per_sheet', value: sheet.pricePerSheet };
   const material = (sheet.material || 'mdf') as MaterialType;
-  return overrides?.[material] ?? { mode: 'per_sheet', value: catalogPanelPrice(material, sheet.width, sheet.height) };
+  return overrides?.[material] ?? { mode: 'per_sheet', value: catalogPanelPrice(material, sheet.width, sheet.height, currency) };
 }
 
 /**
@@ -158,6 +167,11 @@ export interface OptimizationOptions {
   laborPricing?: LaborPricing;
   /** The artisan's price per metre of edge banding, every colour (see `edgePricePerM`). */
   edgeBandPricePerM?: number;
+  /**
+   * The account currency the plan is priced in: the catalog prices (dirham
+   * figures) are converted to it. Absent: dirhams, as before.
+   */
+  currency?: AppCurrency;
   /**
    * Per-material stock price override fed into the shared cost calculator.
    * A material absent from this map keeps using the material library's
@@ -290,6 +304,8 @@ export function repriceCostingInput(
   prices: {
     edgeBandPricePerM?: number;
     sheet?: Pick<Sheet, 'material' | 'width' | 'height' | 'color' | 'pricePerSheet'>;
+    /** The account currency, for the catalog prices (see `catalogPriceIn`). */
+    currency?: AppCurrency;
   }
 ): CostBreakdownInput {
   const { sheet } = prices;
@@ -307,13 +323,13 @@ export function repriceCostingInput(
         const { color: _previousColor, ...rest } = line;
         void _previousColor;
         const color = sheet.color?.trim().slice(0, 60);
-        return { ...rest, pricing: sheetPricing(sheet), ...(color ? { color } : {}) };
+        return { ...rest, pricing: sheetPricing(sheet, undefined, prices.currency), ...(color ? { color } : {}) };
       }),
     },
     edge: {
       ...input.edge,
       segments: input.edge.segments.map((segment) =>
-        segment.edgeId ? { ...segment, pricePerMeter: edgePricePerM(segment.edgeId, prices.edgeBandPricePerM) } : segment
+        segment.edgeId ? { ...segment, pricePerMeter: edgePricePerM(segment.edgeId, prices.edgeBandPricePerM, prices.currency) } : segment
       ),
     },
   };
@@ -2216,7 +2232,7 @@ export function optimizeCutting2D(
   const sheetCostLines: SheetCostLine[] = finalPlan.sheets.map((sheet) => ({
     areaM2: (sheet.width * sheet.height) / 10000,
     quantity: 1,
-    pricing: sheetPricing(sheet, mergedOptions.stockPricingOverrides),
+    pricing: sheetPricing(sheet, mergedOptions.stockPricingOverrides, mergedOptions.currency),
     // Which panel this is, for the price detail (src/lib/cost-detail.ts) only.
     material: sheet.material,
     ...(sheet.label ? { label: sheet.label.slice(0, 80) } : {}),
@@ -2239,7 +2255,7 @@ export function optimizeCutting2D(
     const pricePerMeter = resolveEdgeRatePerMeter(
       placed.edges.pricePerM !== undefined
         ? { kind: 'explicit', pricePerMeter: placed.edges.pricePerM }
-        : { kind: 'preset', preset: { id: preset.id, pricePerMeter: edgePricePerM(preset.id, mergedOptions.edgeBandPricePerM) } }
+        : { kind: 'preset', preset: { id: preset.id, pricePerMeter: edgePricePerM(preset.id, mergedOptions.edgeBandPricePerM, mergedOptions.currency) } }
     );
     if (pricePerMeter <= 0) continue;
     // Edge flags (top/bottom/left/right) refer to the piece's own labeled

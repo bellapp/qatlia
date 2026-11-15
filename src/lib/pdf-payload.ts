@@ -1,6 +1,7 @@
 import type { Piece, Sheet, OptimizationResult, MaterialType } from '@/lib/cutting/binpacking';
 import { DEFAULT_DISPLAY_UNIT, type DisplayUnit } from '@/lib/units';
 import { DEFAULT_LOCALE, type Locale } from '@/i18n';
+import { DEFAULT_CURRENCY, type AppCurrency } from '@/lib/currency';
 
 export interface PdfPayloadSheet {
   width: number;
@@ -26,6 +27,8 @@ export interface PdfExportPayload {
   material: MaterialType | string;
   sheet: PdfPayloadSheet;
   pieces: Piece[];
+  /** The account currency the plan is priced in (see ExportSchema.currency). */
+  currency: AppCurrency;
   result: OptimizationResult;
   /**
    * The unit the artisan had selected for display at export time. All
@@ -52,7 +55,8 @@ export function buildPdfPayload(
   pieces: Piece[],
   result: OptimizationResult,
   displayUnit: DisplayUnit = DEFAULT_DISPLAY_UNIT,
-  locale: Locale = DEFAULT_LOCALE
+  locale: Locale = DEFAULT_LOCALE,
+  currency: AppCurrency = DEFAULT_CURRENCY
 ): PdfExportPayload {
   return {
     projectName,
@@ -67,5 +71,6 @@ export function buildPdfPayload(
     result,
     displayUnit,
     locale,
+    currency,
   };
 }

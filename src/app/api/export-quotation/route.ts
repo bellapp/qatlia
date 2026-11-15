@@ -17,6 +17,7 @@ import {
   type QuotationPieceLine,
 } from '@/lib/quotation';
 import { quotationCatalogFor, localizeQuotationMaterial, type QuotationCatalog } from '@/lib/exports/quotation-catalog';
+import { formatExportMoney } from '@/lib/exports/currency-labels';
 import { UNNAMED_PIECE_NAME_PLACEHOLDER } from '@/lib/quotation-items';
 import { validateLogoDataUrl } from '@/lib/exports/quotation-logo';
 import {
@@ -98,7 +99,6 @@ async function lookupOwnedProject(db: DbClient, projectId: string, userId: strin
   return { status: 'found', row: data as ProjectRow };
 }
 
-const fmtMad = (valueMad: number) => `${valueMad.toFixed(2).replace('.', ',')} MAD`;
 
 /**
  * Reads the request body up to `maxBytes`, aborting the underlying stream as
@@ -349,7 +349,10 @@ async function renderQuotationPdf(input: QuotationInputData, totals: QuotationTo
   const { pageWidthMm: pageWidth, marginMm: margin, contentTopMm: contentTop } = QUOTATION_PDF_LAYOUT;
   const locale = input.locale as QuotationLocale;
   const isRtl = locale === 'ar';
-  const cat = quotationCatalogFor(locale);
+  // Amounts and labels in the account currency the atelier priced the plan in.
+  const currency = input.currency;
+  const cat = quotationCatalogFor(locale, currency);
+  const fmtMad = (value: number) => formatExportMoney(value, currency);
 
   // Every free-typed field is stripped of invisible bidi control characters
   // once, up front — independent of whether it happens to contain Arabic
@@ -671,7 +674,7 @@ async function renderQuotationPdf(input: QuotationInputData, totals: QuotationTo
     drawText(cat.amountInWordsLabel, startX, cursor.y, { align: startAlign });
     cursor.y += 5;
     doc.setFont(BASE_FONT, 'normal');
-    const words = amountInWords(totals.total, locale);
+    const words = amountInWords(totals.total, locale, currency);
     const lines = splitTextForWrap(doc, words, pageWidth - 2 * margin, fontRegistration);
     for (const line of lines) {
       ensureRoom(doc, cursor, 4.5);

@@ -103,6 +103,8 @@ export const OptimizeSchema = z.object({
     // A page still open from before carries a price per colour
     // (`edgePricesPerM`): it passes through and is ignored.
     edgeBandPricePerM: z.number().finite().min(0).max(MAX_UNIT_PRICE).optional(),
+    // The account currency the catalog prices are converted to (absent: MAD).
+    currency: z.enum(['MAD', 'EUR', 'USD']).optional(),
   }).passthrough().optional(),
 }).refine((data) => data.sheet !== undefined || (data.sheets !== undefined && data.sheets.length > 0), {
   message: 'Either `sheet` or a non-empty `sheets` array must be provided',
