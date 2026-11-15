@@ -537,3 +537,12 @@ test('a kept image with no thumbnail whose link failed still opens, with the lin
   const view = await quietly(() => scanUpload().resolveScanView({ projectId: PROJECT_ID, hasFullScan: true, thumb: null }, recordingFetch(() => jsonResponse(503, {}))));
   assert.deepEqual(view, { src: null, reduced: true, reducedReason: 'link-failed' });
 });
+
+test('the PDF file is handed over before the history marker, which may wait for the scan attach', () => {
+  const page = atelierSource();
+  const download = page.slice(page.indexOf("fetch('/api/export-pdf'"));
+  const click = download.indexOf('a.click();');
+  const marker = download.indexOf('await recordPdfGenerated(generatedAt);');
+  assert.ok(click > 0 && marker > 0, 'download and marker are both in the PDF handler');
+  assert.ok(click < marker, 'the file is downloaded before the marker is recorded');
+});

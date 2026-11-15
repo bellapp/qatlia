@@ -1368,8 +1368,10 @@ const commitPanelName = () => {
       if (res.ok) {
         const generatedAt = new Date().toISOString();
         setPdfGeneratedAt(generatedAt);
-        await recordPdfGenerated(generatedAt);
 
+        // The file first: recording the PDF in the history may wait for the
+        // scan image to be attached (see recordPdfGenerated), and the artisan
+        // must not wait for that to get the PDF.
         const blob = await res.blob();
         const url = window.URL.createObjectURL(blob);
         const a = document.createElement('a');
@@ -1379,6 +1381,8 @@ const commitPanelName = () => {
         a.click();
         window.URL.revokeObjectURL(url);
         document.body.removeChild(a);
+
+        await recordPdfGenerated(generatedAt);
       }
     } catch (err) {
       console.error('Erreur téléchargement PDF:', err);
