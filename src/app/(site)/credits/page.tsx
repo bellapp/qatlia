@@ -1,7 +1,8 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import { Sparkles, Check, Zap, ArrowLeft, ShieldCheck, CreditCard, Landmark } from 'lucide-react';
+import { Sparkles, Check, Zap, ArrowLeft, ShieldCheck, CreditCard, Landmark, MessageCircle, Mail } from 'lucide-react';
+import { SUPPORT_EMAIL, SUPPORT_WHATSAPP_DISPLAY, supportMailto, supportWhatsAppUrl } from '@/lib/support';
 import Link from 'next/link';
 import { createClient } from '@/lib/supabase/client';
 import { CREDIT_PACKS, PACK_IDS, formatMAD, formatUSD, BILLING_CURRENCY, CARD_CURRENCY } from '@/lib/billing/catalog';
@@ -223,11 +224,35 @@ export default function CreditsPage() {
             <p className="text-[11px] text-amber-300/90 bg-amber-500/10 border border-amber-500/30 rounded-lg px-3 py-2">
               {t('creditsPage.manual.keepReference')}
             </p>
-            <SupportContact
-              label={t('support.paymentHelp')}
-              message={t('support.prefillOrder', { orderNumber: manualOrder.order_number })}
-              className="text-slate-300"
-            />
+            {/* One obvious next step after paying: send the proof on WhatsApp,
+                the message already carrying the order number. */}
+            <div className="space-y-1.5">
+              <a
+                href={supportWhatsAppUrl(t('creditsPage.manual.proofMessage', { orderNumber: manualOrder.order_number }))}
+                target="_blank"
+                rel="noopener noreferrer"
+                data-testid="send-proof-whatsapp"
+                className="w-full py-3 px-4 rounded-xl bg-[#25D366] hover:bg-[#1FBF5B] text-[#0B2E13] text-sm font-black transition-colors flex items-center justify-center gap-2"
+              >
+                <MessageCircle className="w-5 h-5 shrink-0" aria-hidden="true" />
+                <span>{t('creditsPage.manual.sendProof')}</span>
+              </a>
+              <p className="text-center text-[11px] text-slate-300 leading-relaxed">
+                {t('creditsPage.manual.sendProofHint')}{' '}
+                <span dir="ltr" translate="no" className="font-mono font-bold text-white whitespace-nowrap">{SUPPORT_WHATSAPP_DISPLAY}</span>
+              </p>
+              <p className="text-center text-[11px] text-slate-400">
+                {t('creditsPage.manual.emailAlternative')}{' '}
+                <a
+                  href={supportMailto(t('creditsPage.manual.proofMessage', { orderNumber: manualOrder.order_number }))}
+                  dir="ltr"
+                  className="inline-flex items-center gap-1 font-bold text-slate-200 underline underline-offset-2"
+                >
+                  <Mail className="w-3.5 h-3.5" aria-hidden="true" />
+                  {SUPPORT_EMAIL}
+                </a>
+              </p>
+            </div>
             <button
               onClick={() => setManualOrder(null)}
               className="w-full py-2.5 rounded-xl bg-white/10 hover:bg-white/20 text-white text-xs font-bold transition-colors"

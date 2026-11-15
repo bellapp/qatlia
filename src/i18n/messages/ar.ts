@@ -695,6 +695,10 @@ export const ar: Catalog = {
       close: 'حفظت المرجع',
       historyTitle: 'طلبات الدفع الخاصة بي',
       status: { pending: 'في الانتظار', granted: 'تمت الإضافة', refused: 'مرفوضة' },
+      sendProof: 'أرسل إثبات الدفع عبر واتساب',
+      sendProofHint: 'بعد الدفع، أرسل صورة الوصل: الرسالة مع رقم طلبك جاهزة. الرقم:',
+      emailAlternative: 'أو عبر البريد الإلكتروني:',
+      proofMessage: 'السلام عليكم QatliA، هذا إثبات الدفع لطلبي رقم {orderNumber}.',
       bank: {
         title: 'المعلومات البنكية للتحويل',
         holder: 'صاحب الحساب',

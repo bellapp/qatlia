@@ -772,6 +772,10 @@ export const fr = {
       close: 'J’ai noté ma référence',
       historyTitle: 'Mes commandes de paiement',
       status: { pending: 'En attente', granted: 'Crédits ajoutés', refused: 'Refusée' },
+      sendProof: 'Envoyer la preuve de paiement sur WhatsApp',
+      sendProofHint: 'Après le paiement, envoyez une photo du reçu : le message avec votre numéro de commande est déjà rempli. Numéro :',
+      emailAlternative: 'Ou par email :',
+      proofMessage: 'Bonjour QatliA, voici la preuve de paiement de ma commande {orderNumber}.',
       bank: {
         title: 'Coordonnées pour le virement',
         holder: 'Titulaire du compte',
