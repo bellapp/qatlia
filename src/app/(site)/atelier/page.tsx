@@ -128,6 +128,17 @@ const FULL_WIDTH = '100%';
 /** Width of the cutting plan at 100% zoom: 560px, or the whole viewport when
  *  that is narrower (a phone). Every zoom step multiplies this width. */
 const PLAN_FIT_WIDTH = `min(560px, ${FULL_WIDTH})`;
+/** The plan viewport once the plan is zoomed in: a box of its own. The plan is
+ *  larger than it, a finger (or the wheel) moves the plan inside it, and
+ *  reaching an edge of the plan does not drag the page along. */
+const PLAN_VIEWPORT_ZOOMED = 'max-h-[70vh] overflow-auto overscroll-contain';
+/** The plan viewport at 100% or less. On a phone or a tablet (one column,
+ *  below lg) it is no scrolling box at all: the plan is shown whole and a
+ *  finger on it scrolls the page. The two-column layout keeps its height cap,
+ *  and the scroll passes on to the page at the plan's edges. Confining the
+ *  scroll here is what the 2026-11-15 report was about: the plan fits the box
+ *  at 100%, so there was nothing to scroll and the gesture went nowhere. */
+const PLAN_VIEWPORT_FITTED = 'lg:max-h-[70vh] lg:overflow-auto';
 
 /**
  * The French name the default panel used to carry. It described the 278×208
@@ -2235,7 +2246,7 @@ const commitPanelName = () => {
                         {options.kerfWidth} mm
                       </span>
                     </div>
-                    <div dir="ltr" data-testid="cut-plan-viewport" className={`min-h-[420px] max-h-[70vh] overflow-auto overscroll-contain p-5 flex ${isDark ? 'bg-[#040812]' : 'bg-[#F1F5F9]'}`}>
+                    <div dir="ltr" data-testid="cut-plan-viewport" className={`min-h-[420px] ${zoomLevel > 1 ? PLAN_VIEWPORT_ZOOMED : PLAN_VIEWPORT_FITTED} p-5 flex ${isDark ? 'bg-[#040812]' : 'bg-[#F1F5F9]'}`}>
                     {/* m-auto (not justify-center): when the zoomed plan is wider
                         than the viewport, auto margins clamp to 0 and BOTH edges
                         stay reachable by scrolling — centered overflow via
