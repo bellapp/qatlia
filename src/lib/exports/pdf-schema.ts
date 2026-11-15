@@ -111,7 +111,7 @@ export const CostBreakdownInputSchema = z.object({
 // route never renders this field directly (see route.ts) — only a
 // `costBreakdown` recomputed from `costingInput` above is ever shown.
 export const CostBreakdownSchema = z.object({
-  currency: z.literal('MAD'),
+  currency: z.enum(['MAD', 'EUR', 'USD']),
   materialCost: money(),
   materialCostBasis: CostBasisSchema,
   edgeCost: money(),
@@ -139,6 +139,11 @@ export const ExportSchema = z.object({
    * default locale (see DEFAULT_LOCALE in src/i18n).
    */
   locale: z.enum(PDF_LOCALES).default('fr'),
+  /**
+   * The account currency the plan's amounts are in (they are computed by the
+   * atelier in it). Older clients that never send it get dirhams.
+   */
+  currency: z.enum(['MAD', 'EUR', 'USD']).default('MAD'),
   sheet: z.object({
     width: geometryValue(),
     height: geometryValue(),
