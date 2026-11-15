@@ -257,8 +257,21 @@ test('checkout sends the session user to Creem with the pack product, ignoring a
     const data = await res.json();
 
     assert.equal(res.status, 200);
-    assert.equal(data.url, 'https://creem.io/test/checkout/prod/ch_1');
+    // No interface language sent: the checkout opens in French, the site default.
+    assert.equal(data.url, 'https://creem.io/test/checkout/prod/ch_1?locale=fr');
     assert.equal(state.fetchCalls.length, 1);
+
+    for (const [locale, expected] of [['en', 'en'], ['ar', 'fr'], ['fr', 'fr']]) {
+      const localized = await POST(
+        new Request('https://qatlia.example/api/credits/checkout', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ packId: 'standard', locale }),
+        })
+      );
+      assert.equal((await localized.json()).url, `https://creem.io/test/checkout/prod/ch_1?locale=${expected}`, locale);
+    }
+    state.fetchCalls.length = 1; // the assertions below are about the first call
 
     const call = state.fetchCalls[0];
     assert.equal(call.url, 'https://test-api.creem.io/v1/checkouts', 'a test key must call the test API');
@@ -393,4 +406,26 @@ test('an unrelated Creem event is acknowledged so it is never retried', async ()
     assert.equal(body.granted, false);
     assert.equal(state.rpcCalls.length, 0);
   });
+});
+
+// The Creem checkout must open in the language the customer uses on QatliA.
+// Creem reads `?locale=` on its hosted checkout (checked on a live checkout:
+// `fr` switches the page to French, `ar` falls back to English since Creem has
+// no Arabic), so Arabic customers get French, the closer language in Morocco.
+test('the Creem checkout opens in the language of the QatliA interface', () => {
+  const { creemCheckoutLocale, withCreemCheckoutLocale } = loadTsModule('src/lib/billing/creem.ts');
+  assert.equal(creemCheckoutLocale('fr'), 'fr');
+  assert.equal(creemCheckoutLocale('en'), 'en');
+  assert.equal(creemCheckoutLocale('ar'), 'fr', 'Creem has no Arabic: French rather than English');
+  assert.equal(creemCheckoutLocale(undefined), 'fr');
+  assert.equal(creemCheckoutLocale('de'), 'fr');
+
+  const url = 'https://www.creem.io/checkout/prod_abc/ch_123';
+  assert.equal(withCreemCheckoutLocale(url, 'en'), `${url}?locale=en`);
+  assert.equal(withCreemCheckoutLocale(url, 'ar'), `${url}?locale=fr`);
+  assert.equal(withCreemCheckoutLocale(`${url}?theme=dark`, 'fr'), `${url}?theme=dark&locale=fr`);
+  assert.equal(withCreemCheckoutLocale(`${url}?locale=de`, 'en'), `${url}?locale=en`, 'replaces, never duplicates');
+  // Anything that is not a Creem https URL is passed through untouched.
+  assert.equal(withCreemCheckoutLocale('https://evil.example/pay', 'fr'), 'https://evil.example/pay');
+  assert.equal(withCreemCheckoutLocale('not a url', 'fr'), 'not a url');
 });

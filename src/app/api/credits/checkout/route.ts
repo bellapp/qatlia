@@ -5,7 +5,7 @@ import { createClient } from '@/lib/supabase/server';
 import { CREDIT_PACKS, PackId } from '@/lib/billing/catalog';
 import { buildCheckoutParams, resolveCheckoutOrigin } from '@/lib/billing/checkout-params';
 import { allowDemoCheckout, getCardProvider, getCreemConfig, isStripeConfigured } from '@/lib/billing/config';
-import { buildCreemCheckoutBody } from '@/lib/billing/creem';
+import { buildCreemCheckoutBody, withCreemCheckoutLocale } from '@/lib/billing/creem';
 import { getStripe } from '@/lib/billing/stripe-client';
 
 export const dynamic = 'force-dynamic';
@@ -22,6 +22,9 @@ export async function GET() {
 // a client-supplied user id would let anyone credit an arbitrary account.
 const CheckoutSchema = z.object({
   packId: z.enum(['starter', 'standard', 'pro', 'atelier_max']),
+  // The QatliA interface language, so the Creem checkout opens in it too.
+  // Optional: an older page without it still gets a checkout (in French).
+  locale: z.enum(['fr', 'en', 'ar']).optional(),
 });
 
 export async function POST(req: Request) {
@@ -81,7 +84,7 @@ export async function POST(req: Request) {
         );
       }
 
-      return NextResponse.json({ success: true, url: checkout.checkout_url });
+      return NextResponse.json({ success: true, url: withCreemCheckoutLocale(checkout.checkout_url, parsed.data.locale) });
     }
 
     if (!isStripeConfigured()) {

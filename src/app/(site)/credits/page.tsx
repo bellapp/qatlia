@@ -17,7 +17,7 @@ const PAYMENT_PROVIDER_NAMES = { creem: 'Creem', stripe: 'Stripe' } as const;
 type CardProvider = keyof typeof PAYMENT_PROVIDER_NAMES;
 
 export default function CreditsPage() {
-  const { t, tn, n } = useLocale();
+  const { t, tn, n, locale } = useLocale();
   const [loadingPack, setLoadingPack] = useState<string | null>(null);
   const [checkoutError, setCheckoutError] = useState<string | null>(null);
   // null until the real balance is known — never a hardcoded placeholder.
@@ -68,7 +68,9 @@ export default function CreditsPage() {
       const res = await fetch('/api/credits/checkout', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ packId }),
+        // The card checkout opens in the language chosen here (Creem has no
+        // Arabic: the server maps it to French).
+        body: JSON.stringify({ packId, locale }),
       });
       const data = await res.json();
       if (res.ok && data.url) {
