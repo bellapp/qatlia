@@ -8,6 +8,8 @@ import { useCurrency } from '@/components/currency-store';
 
 export { useCurrency };
 
+const OPTION_CLASS = 'bg-white text-slate-900 dark:bg-slate-900 dark:text-slate-100';
+
 /** MAD / EUR / USD picker, saved on the account (or the browser before sign-in). */
 export function CurrencySwitcher({ className = '' }: { className?: string }) {
   const { t } = useLocale();
@@ -32,11 +34,14 @@ export function CurrencySwitcher({ className = '' }: { className?: string }) {
           setSaving(false);
         }}
         translate="no"
-        className="bg-transparent outline-none cursor-pointer disabled:cursor-wait"
+        // The open list is drawn by the browser: in dark mode it must be told
+        // so, and each option gets its own colours, or it inherits the light
+        // label text on the white native list (unreadable).
+        className="bg-transparent outline-none cursor-pointer disabled:cursor-wait dark:[color-scheme:dark]"
       >
-        {currency === null && <option value="">…</option>}
+        {currency === null && <option value="" className={OPTION_CLASS}>…</option>}
         {APP_CURRENCIES.map((code) => (
-          <option key={code} value={code}>
+          <option key={code} value={code} className={OPTION_CLASS}>
             {t(`currency.names.${code}`)}
           </option>
         ))}
