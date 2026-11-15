@@ -1,6 +1,6 @@
 'use client';
 
-import { FileImage } from 'lucide-react';
+import { FileImage, Loader2 } from 'lucide-react';
 import { useLocale } from '@/components/LocaleProvider';
 import type { HistoryRow } from '@/lib/projects/history-row';
 import type { DisplayUnit } from '@/lib/units';
@@ -15,6 +15,8 @@ export interface HistoryListProps {
   onViewScan: (id: string) => void;
   /** Rows whose PDF is being built: their button is busy until it is done. */
   pdfPendingIds?: ReadonlySet<string>;
+  /** The row whose full scan image is being fetched: its thumbnail is busy. */
+  scanPendingId?: string | null;
 }
 
 /**
@@ -54,24 +56,29 @@ export function useRowFigures(row: HistoryRow): RowFigures {
 }
 
 /**
- * The scan thumbnail, as a button that shows the scan. A project without a
- * thumbnail gets no button: in the table a neutral tile keeps the column
- * aligned, in a card nothing is drawn.
+ * The scan thumbnail, as a button that shows the scan. A project that kept its
+ * full image but no thumbnail gets the same button, drawn as the neutral tile.
+ * A project with neither gets no button: in the table the tile keeps the
+ * column aligned, in a card nothing is drawn. While the full image's link is fetched
+ * the button is busy but stays enabled, so it keeps the focus the viewer gives
+ * back on closing (a second tap is ignored by the page).
  */
 export function ScanThumb({
   row,
   size,
   onViewScan,
+  busy = false,
   testId,
 }: {
   row: HistoryRow;
   size: 'card' | 'row';
   onViewScan: (id: string) => void;
+  busy?: boolean;
   testId: string;
 }) {
   const { t } = useLocale();
   const box = size === 'card' ? 'w-14 h-14' : 'w-10 h-10';
-  if (!row.scanThumb) {
+  if (!row.scanThumb && !row.hasFullScan) {
     if (size === 'card') return null;
     return (
       <span aria-hidden="true" className={`${box} shrink-0 rounded-lg bg-studio-field/70 border border-studio-border flex items-center justify-center text-slate-400 dark:text-slate-500`}>
@@ -83,11 +90,23 @@ export function ScanThumb({
     <button
       type="button"
       onClick={() => onViewScan(row.id)}
-      aria-label={t('historyPage.scanViewAria', { name: row.name })}
+      aria-label={t('scanViewer.openAria', { name: row.name })}
+      aria-busy={busy || undefined}
       data-testid={testId}
-      className={`${box} shrink-0 block rounded-lg overflow-hidden border border-studio-border shadow-sm hover:border-brand-400/60 focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand-500 transition-colors`}
+      className={`${box} relative shrink-0 block rounded-lg overflow-hidden border border-studio-border shadow-sm hover:border-brand-400/60 focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand-500 transition-colors`}
     >
-      <img src={row.scanThumb} alt="" className="w-full h-full object-cover" loading="lazy" />
+      {row.scanThumb ? (
+        <img src={row.scanThumb} alt="" className="w-full h-full object-cover" loading="lazy" />
+      ) : (
+        <span aria-hidden="true" className="w-full h-full flex items-center justify-center bg-studio-field/70 text-slate-500 dark:text-slate-400">
+          <FileImage className="w-4 h-4" />
+        </span>
+      )}
+      {busy && (
+        <span aria-hidden="true" className="absolute inset-0 flex items-center justify-center bg-slate-950/50 text-white">
+          <Loader2 className="w-4 h-4 animate-spin" />
+        </span>
+      )}
     </button>
   );
 }

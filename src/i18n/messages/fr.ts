@@ -864,7 +864,6 @@ export const fr = {
       cards: 'Cartes',
       table: 'Tableau',
     },
-    scanViewAria: 'Voir la fiche scannée de {name}',
     pdfFailed: 'Le PDF n’a pas pu être créé. Réessayez.',
     // Canonical panel size. `{unit}` is the SI symbol, not prose.
     sheetSize: '{height} × {width} {unit}',
@@ -879,6 +878,15 @@ export const fr = {
       cloudUnavailable: 'Historique cloud indisponible — affichage local.',
       offline: 'Impossible de joindre le serveur — historique local affiché.',
     },
+  },
+  /** The scan image of a project, seen full size (atelier and history). */
+  scanViewer: {
+    title: 'Image scannée',
+    openAria: "Voir l'image de {name}",
+    reducedNote: "Aperçu réduit : l'image d'origine n'a pas été gardée pour ce projet.",
+    linkFailedNote: 'L’image complète n’a pas pu être chargée. Aperçu réduit affiché.',
+    close: 'Fermer',
+    openImage: "Ouvrir l'image",
   },
   accountPage: {
     eyebrow: 'Compte',

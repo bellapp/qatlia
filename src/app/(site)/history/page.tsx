@@ -14,6 +14,7 @@ import { readLocalHistory, renameLocalHistoryItem, type LocalHistoryItem } from 
 import { AccountMenu } from '@/components/AccountMenu';
 import { QatlIALogo } from '@/components/QatlIALogo';
 import { EmptyState } from '@/components/EmptyState';
+import { ScanViewer, useScanViewer } from '@/components/ScanViewer';
 import { LocaleSwitcher, useLocale } from '@/components/LocaleProvider';
 import { HistoryCards } from '@/components/history/HistoryCards';
 import { HistoryTable } from '@/components/history/HistoryTable';
@@ -320,25 +321,21 @@ export default function HistoryPage() {
     if (!ok) setPdfFailed(true);
   };
 
+  const scanViewer = useScanViewer();
+
   /**
-   * Shows the scan thumbnail in a new tab until the scan viewer exists. A
-   * browser refuses to open a `data:` URL as a page, so the tab is opened
-   * blank and the image written into it; the thumbnail passed the
-   * `sanitizeScanThumb` check (a `data:image/...;base64` URL) in `toHistoryRow`.
+   * Shows a project's scan in the viewer: the full image through a short
+   * signed link when the project kept it (a cloud row only), else the
+   * thumbnail, marked as reduced. Seeing it spends no credit.
    */
   const openScan = (id: string) => {
     const row = rows.find((candidate) => candidate.id === id);
-    if (!row?.scanThumb) return;
-    const tab = window.open('', '_blank');
-    if (!tab) return;
-    tab.opener = null;
-    const img = tab.document.createElement('img');
-    img.src = row.scanThumb;
-    img.alt = row.name;
-    img.style.maxWidth = '100vw';
-    img.style.height = 'auto';
-    tab.document.body.style.margin = '0';
-    tab.document.body.appendChild(img);
+    if (!row) return;
+    void scanViewer.show(row.id, {
+      projectId: row.isCloud ? row.id : null,
+      hasFullScan: row.hasFullScan,
+      thumb: row.scanThumb,
+    }, row.name);
   };
 
   const listProps = {
@@ -348,6 +345,7 @@ export default function HistoryPage() {
     onDownloadPdf: (id: string) => { void handleDownloadPdf(id); },
     pdfPendingIds,
     onViewScan: openScan,
+    scanPendingId: scanViewer.pendingKey,
   };
 
   return (
@@ -447,6 +445,8 @@ export default function HistoryPage() {
           <HistoryCards {...listProps} />
         )}
       </main>
+
+      {scanViewer.view && <ScanViewer {...scanViewer.view} onClose={scanViewer.close} />}
     </div>
   );
 }

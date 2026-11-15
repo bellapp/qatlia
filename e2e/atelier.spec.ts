@@ -496,11 +496,33 @@ test.describe('Atelier reopening a saved project', () => {
     await expect(page.getByTestId('cut-plan-svg')).toBeVisible({ timeout: 15000 });
     await expect(page.getByTestId('restored-plan-notice')).toBeVisible();
     await expect(page.getByTestId('cost-banner-total')).toContainText('72');
-    // The scan image comes back with the plan.
-    await expect(page.getByRole('img', { name: 'Aperçu de la fiche de débit scannée' })).toBeVisible();
+    // The scan image comes back with the plan, as a button that shows it.
+    await expect(page.getByTestId('atelier-scan-preview')).toBeVisible();
 
     // Nothing in the page ran the optimizer (which would spend a credit).
     await page.waitForTimeout(1000);
     expect(optimizeRequests).toEqual([]);
+  });
+
+  test('the scan of a reopened project opens full size, marked reduced when only its thumbnail was kept', async ({ page }) => {
+    await page.addInitScript((project) => {
+      sessionStorage.setItem('qatlia_saved_project', JSON.stringify(project));
+    }, SAVED_PROJECT);
+    await page.goto('/atelier', { waitUntil: 'domcontentloaded' });
+
+    const preview = page.getByTestId('atelier-scan-preview');
+    await expect(preview).toBeVisible({ timeout: 15000 });
+    await expect(preview).toHaveAttribute('aria-label', "Voir l'image de Côté seul");
+    await preview.focus();
+    await page.keyboard.press('Enter');
+
+    const viewer = page.getByRole('dialog', { name: 'Image scannée' });
+    await expect(viewer).toBeVisible();
+    await expect(viewer).toContainText("Aperçu réduit : l'image d'origine n'a pas été gardée pour ce projet.");
+    await viewer.locator('img').click();
+    await expect(viewer).toBeVisible();
+    await page.keyboard.press('Escape');
+    await expect(page.getByTestId('scan-viewer')).toHaveCount(0);
+    await expect(preview).toBeFocused();
   });
 });

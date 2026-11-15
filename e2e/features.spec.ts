@@ -286,3 +286,70 @@ test.describe('History: cards or table, readable on a phone', () => {
     expect(stillFits).toBe(true);
   });
 });
+
+test.describe('History: the scan seen full size', () => {
+  // A project kept on this device only, with its scan thumbnail and no full
+  // image: the viewer shows the thumbnail and says it is reduced.
+  const SCANNED_PROJECT = {
+    id: 'optimize_1763203200000',
+    name: 'Cuisine Alami',
+    material: 'mdf',
+    sheet_width: 206,
+    sheet_height: 279,
+    kerf: 0.3,
+    grain_direction: false,
+    status: 'completed',
+    created_at: '2026-11-15T10:40:00.000Z',
+    options_json: {
+      pieces: [{ name: 'Côté', height: 70, width: 40, quantity: 3 }],
+      result: { sheetsUsed: 1, wastePercentage: 12.5 },
+      scanThumb: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==',
+    },
+  };
+  const REDUCED_NOTE = "Aperçu réduit : l'image d'origine n'a pas été gardée pour ce projet.";
+
+  test('the thumbnail opens the viewer, which closes with Escape or outside the image and gives the focus back', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.addInitScript((project) => {
+      localStorage.setItem('qatlia-locale', 'fr');
+      localStorage.setItem('qatlia_local_history_v1', JSON.stringify([project]));
+    }, SCANNED_PROJECT);
+    await page.goto('/history', { waitUntil: 'domcontentloaded' });
+
+    const thumb = page.getByTestId('history-scan');
+    await expect(thumb).toBeVisible({ timeout: 15000 });
+    await expect(thumb).toHaveAttribute('aria-label', "Voir l'image de Cuisine Alami");
+
+    // Opened from the keyboard: the focus moves into the viewer.
+    await thumb.focus();
+    await page.keyboard.press('Enter');
+    const viewer = page.getByRole('dialog', { name: 'Image scannée' });
+    await expect(viewer).toBeVisible();
+    await expect(viewer).toHaveAttribute('aria-modal', 'true');
+    await expect(viewer).toContainText(REDUCED_NOTE);
+    // A thumbnail held in memory cannot be opened as a page.
+    await expect(page.getByTestId('scan-viewer-open')).toHaveCount(0);
+    await expect(page.getByTestId('scan-viewer-close')).toBeFocused();
+    expect(await page.evaluate(() => document.body.style.overflow)).toBe('hidden');
+
+    // Escape closes it and gives the focus back to the thumbnail.
+    await page.keyboard.press('Escape');
+    await expect(page.getByTestId('scan-viewer')).toHaveCount(0);
+    await expect(thumb).toBeFocused();
+    expect(await page.evaluate(() => document.body.style.overflow)).toBe('');
+
+    // A click on the image keeps it open; a click beside it closes it.
+    await thumb.click();
+    await expect(viewer).toBeVisible();
+    await viewer.locator('img').click();
+    await expect(viewer).toBeVisible();
+    await page.getByTestId('scan-viewer-area').click({ position: { x: 4, y: 4 } });
+    await expect(page.getByTestId('scan-viewer')).toHaveCount(0);
+
+    // The close button closes it too.
+    await thumb.click();
+    await expect(viewer).toBeVisible();
+    await page.getByTestId('scan-viewer-close').click();
+    await expect(page.getByTestId('scan-viewer')).toHaveCount(0);
+  });
+});

@@ -779,7 +779,6 @@ export const ar: Catalog = {
       cards: 'بطاقات',
       table: 'جدول',
     },
-    scanViewAria: 'عرض الورقة الممسوحة لـ {name}',
     pdfFailed: 'تعذّر إنشاء ملف PDF. حاول مجدداً.',
     sheetSize: '{height} × {width} {unit}',
     piecesValue: '{count} قطعة',
@@ -792,6 +791,15 @@ export const ar: Catalog = {
       cloudUnavailable: 'السجل السحابي غير متوفر — يتم عرض المخططات المحلية.',
       offline: 'تعذّر الوصول إلى الخادم — يتم عرض السجل المحلي.',
     },
+  },
+  /** The scan image of a project, seen full size (atelier and history). */
+  scanViewer: {
+    title: 'الصورة الممسوحة',
+    openAria: 'عرض صورة {name}',
+    reducedNote: 'معاينة مصغّرة: لم يتم الاحتفاظ بالصورة الأصلية لهذا المشروع.',
+    linkFailedNote: 'تعذّر تحميل الصورة الكاملة. تُعرض معاينة مصغّرة.',
+    close: 'إغلاق',
+    openImage: 'فتح الصورة',
   },
   accountPage: {
     eyebrow: 'الحساب',

@@ -80,8 +80,9 @@ export async function POST(request: Request) {
     // resolveProjectUnitMetadata uses (missing/garbage -> cm/cm/migratedFromLegacyUnit=true).
     const unitMetadata = resolveRequestUnitMetadata(body as RequestUnitMetadataInput);
     // Job name, scan thumbnail, PDF marker and stock sheets: what the history
-    // page and the atelier restore read back. Validated, never stored raw.
-    const historyMetadata = pickProjectHistoryMetadata(body);
+    // page and the atelier restore read back. Validated, never stored raw; a
+    // scan path survives only when it is this artisan's own.
+    const historyMetadata = pickProjectHistoryMetadata(body, user.id);
 
     await db.from('profiles').upsert(
       {

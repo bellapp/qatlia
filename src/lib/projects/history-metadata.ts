@@ -11,6 +11,8 @@
  * Pure module: no Supabase, no env, no network.
  */
 
+import { isOwnScanPath } from './scan-image';
+
 /**
  * Upper bound on a stored thumbnail, in dataURL characters (~110 KB of image).
  * `GET /api/projects` returns every project's options_json at once, so the
@@ -53,15 +55,19 @@ export interface ProjectHistoryMetadata {
   projectName?: string;
   scanThumb?: string;
   pdfGeneratedAt?: string;
+  /** Path of the private scan image; only ever the saving artisan's own. */
+  scanPath?: string;
   sheets?: unknown[];
 }
 
 /**
  * The extras worth storing from a save request, under the exact keys the
  * history page and the atelier restore already read from `options_json`.
- * Absent or invalid fields are left out rather than stored as null.
+ * Absent or invalid fields are left out rather than stored as null. A
+ * `scanPath` is kept only when it belongs to `ownerId`; without an owner no
+ * path can be vouched for, so none is kept.
  */
-export function pickProjectHistoryMetadata(body: unknown): ProjectHistoryMetadata {
+export function pickProjectHistoryMetadata(body: unknown, ownerId?: string): ProjectHistoryMetadata {
   const source = body && typeof body === 'object' ? (body as Record<string, unknown>) : {};
   const metadata: ProjectHistoryMetadata = {};
   const projectName = sanitizeProjectName(source.projectName);
@@ -70,6 +76,7 @@ export function pickProjectHistoryMetadata(body: unknown): ProjectHistoryMetadat
   if (scanThumb) metadata.scanThumb = scanThumb;
   const pdfGeneratedAt = sanitizePdfGeneratedAt(source.pdfGeneratedAt);
   if (pdfGeneratedAt) metadata.pdfGeneratedAt = pdfGeneratedAt;
+  if (ownerId && isOwnScanPath(source.scanPath, ownerId)) metadata.scanPath = source.scanPath;
   const sheets = sanitizeSheets(source.sheets);
   if (sheets) metadata.sheets = sheets;
   return metadata;

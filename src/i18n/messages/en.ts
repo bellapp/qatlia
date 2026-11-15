@@ -779,7 +779,6 @@ export const en: Catalog = {
       cards: 'Cards',
       table: 'Table',
     },
-    scanViewAria: 'View the scanned list for {name}',
     pdfFailed: 'The PDF could not be created. Try again.',
     sheetSize: '{height} × {width} {unit}',
     piecesValue: '{count} pcs',
@@ -792,6 +791,15 @@ export const en: Catalog = {
       cloudUnavailable: 'Cloud history unavailable — showing the local plans.',
       offline: 'The server could not be reached — showing the local history.',
     },
+  },
+  /** The scan image of a project, seen full size (atelier and history). */
+  scanViewer: {
+    title: 'Scanned image',
+    openAria: 'View the image of {name}',
+    reducedNote: 'Reduced preview: the original image was not kept for this project.',
+    linkFailedNote: 'The full image could not be loaded. Showing a reduced preview.',
+    close: 'Close',
+    openImage: 'Open the image',
   },
   accountPage: {
     eyebrow: 'Account',

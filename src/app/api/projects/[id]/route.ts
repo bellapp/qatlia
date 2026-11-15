@@ -5,6 +5,7 @@ import { createClient as createAdminClient, type SupabaseClient } from '@supabas
 import { getSupabaseAdminConfig } from '@/lib/billing/config';
 import { CompanyIdentitySchema, ClientIdentitySchema, QUOTATION_LOCALES } from '@/lib/quotation';
 import { sanitizePdfGeneratedAt, sanitizeProjectName } from '@/lib/projects/history-metadata';
+import { isOwnScanPath } from '@/lib/projects/scan-image';
 
 /**
  * `GET /api/projects/[id]` — read-only, ownership-checked access to a single
@@ -100,8 +101,9 @@ export async function GET(_req: Request, context: { params: { id: string } }) {
 
 
 /**
- * `PATCH /api/projects/[id]` — rename a saved project, or record that its
- * PDF was generated. Ownership-checked: the row only updates when it belongs
+ * `PATCH /api/projects/[id]` — rename a saved project, record that its PDF
+ * was generated, or attach the scan image the atelier sent after the save
+ * (`{ scanPath }` alone: only a path under the artisan's own folder). Ownership-checked: the row only updates when it belongs
  * to the signed-in artisan, and "doesn't exist" / "belongs to someone else"
  * answer identically (the same enumeration-protection convention as the GET
  * handler).
@@ -156,6 +158,7 @@ export async function PATCH(
 
     const body = (await req.json().catch(() => null)) as Record<string, unknown> | null;
     const isPdfMarker = !!body && typeof body === 'object' && 'pdfGeneratedAt' in body && !('name' in body);
+    const isScanPath = !!body && typeof body === 'object' && 'scanPath' in body && !('name' in body) && !('pdfGeneratedAt' in body);
 
     // UUID guard: a non-UUID id can never be a cloud row; refuse early.
     const { id } = await params;
@@ -182,6 +185,30 @@ export async function PATCH(
         return NextResponse.json({ error: 'PROJECT_UPDATE_FAILED' }, { status: 503 });
       }
       return NextResponse.json({ success: true, id, pdfGeneratedAt });
+    }
+
+    if (isScanPath) {
+      // Never another artisan's image, nor anything that is not a kept-image path.
+      if (!isOwnScanPath(body.scanPath, user.id)) {
+        return NextResponse.json({ error: 'INVALID_SCAN_PATH' }, { status: 400 });
+      }
+      const scanPath = body.scanPath;
+      if (!UUID_PATTERN.test(id)) {
+        return NextResponse.json({ error: 'NOT_FOUND' }, { status: 404 });
+      }
+      const db = createDbClient();
+      const own = await readOwnOptions(db, id, user.id, 'project scan path');
+      if (!own.ok) return own.response;
+      const { error: updateError } = await db
+        .from('projects')
+        .update({ options_json: { ...own.existing, scanPath } })
+        .eq('id', id)
+        .eq('user_id', user.id);
+      if (updateError) {
+        console.error('project scan path update failed:', updateError.message);
+        return NextResponse.json({ error: 'PROJECT_UPDATE_FAILED' }, { status: 503 });
+      }
+      return NextResponse.json({ success: true, id, scanPath });
     }
 
     // Same rule as the name a save carries: trimmed, not empty, 120 characters at most.

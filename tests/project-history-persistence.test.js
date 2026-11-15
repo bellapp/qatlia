@@ -13,15 +13,19 @@ const OTHER_UUID = '99999999-8888-7777-6666-555555555555';
 const PROJECT_ID = '22222222-3333-4444-8888-555555555555';
 const OTHER_PROJECT_ID = '33333333-3333-4444-8888-555555555555';
 
-const TINY_JPEG = 'data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAgGBgcGBQgHBwcJCQgKDBQNDAsLDBkSEw8UHRofHh0aHBwgJC4nICIsIxwcKDcpLDAxNDQ0Hyc5PTgyPC4zNDL/';
+// A real, decodable 8x8 JPEG (224 bytes).
+const TINY_JPEG =
+  'data:image/jpeg;base64,/9j/4AAQSkZJRgABAgAAAQABAAD//gAPTGF2YzYzLjEuMTAyAP/bAEMACAQEBAQEBQUFBQUFBgYGBgYGBgYGBgYGBgcHBwgICAcHBwYGBwcICAgICQkJCAgICAkJCgoKDAwLCw4ODhERFP/EAEwAAQEAAAAAAAAAAAAAAAAAAAAGAQEBAAAAAAAAAAAAAAAAAAAGBxABAAAAAAAAAAAAAAAAAAAAABEBAAAAAAAAAAAAAAAAAAAAAP/AABEIAAgACAMBIgACEQADEQD/2gAMAwEAAhEDEQA/AK0BHTp//9k=';
 
-const state = { user: null, projects: new Map(), inserts: [], updates: [] };
+const state = { user: null, projects: new Map(), inserts: [], updates: [], uploads: [], uploadError: null };
 
 function resetState() {
   state.user = null;
   state.projects = new Map();
   state.inserts = [];
   state.updates = [];
+  state.uploads = [];
+  state.uploadError = null;
 }
 
 function projectsTable() {
@@ -56,8 +60,21 @@ function projectsTable() {
   };
 }
 
+// storage.from(bucket).upload(path, bytes, opts), recording every call.
+function storage() {
+  return {
+    from: (bucket) => ({
+      upload: async (path, bytes, opts) => {
+        state.uploads.push({ bucket, path, bytes, opts });
+        return state.uploadError ? { data: null, error: state.uploadError } : { data: { path }, error: null };
+      },
+    }),
+  };
+}
+
 function db() {
   return {
+    storage: storage(),
     from: (table) => {
       if (table === 'projects') return projectsTable();
       if (table === 'profiles') return { upsert: async () => ({ error: null }) };
@@ -93,6 +110,8 @@ async function withEnv(overrides, fn) {
 
 const metadata = () => loadTsModule('src/lib/projects/history-metadata.ts');
 const projectsRoute = () => loadTsModule('src/app/api/projects/route.ts');
+const scansRoute = () => loadTsModule('src/app/api/scans/route.ts');
+const scan = () => loadTsModule('src/lib/projects/scan-image.ts');
 const projectRoute = () => loadTsModule('src/app/api/projects/[id]/route.ts');
 
 function savePayload(extra = {}) {
@@ -113,6 +132,14 @@ function post(body) {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
+  });
+}
+
+function postScan(body) {
+  return new Request('https://qatlia.example/api/scans', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: typeof body === 'string' ? body : JSON.stringify(body),
   });
 }
 
@@ -195,6 +222,144 @@ test('a save drops an oversized or non-image thumbnail and a bad date instead of
     assert.equal('pdfGeneratedAt' in stored, false);
     assert.equal('projectName' in stored, false);
   });
+});
+
+test('a save keeps the artisan\'s own scan path and drops anyone else\'s', async () => {
+  resetState();
+  state.user = { id: UUID };
+  await withEnv(CONFIGURED, () => projectsRoute().POST(post(savePayload({ scanPath: `${UUID}/${PROJECT_ID}.jpg` }))));
+  await withEnv(CONFIGURED, () => projectsRoute().POST(post(savePayload({ scanPath: `${OTHER_UUID}/${PROJECT_ID}.jpg` }))));
+  await withEnv(CONFIGURED, () => projectsRoute().POST(post(savePayload({ scanPath: `${UUID}/../${OTHER_UUID}/${PROJECT_ID}.jpg` }))));
+  assert.equal(state.inserts[0].options_json.scanPath, `${UUID}/${PROJECT_ID}.jpg`);
+  assert.equal('scanPath' in state.inserts[1].options_json, false);
+  assert.equal('scanPath' in state.inserts[2].options_json, false);
+});
+
+test('the history metadata keeps a scan path only for the owner it is given', () => {
+  const { pickProjectHistoryMetadata } = metadata();
+  const body = { scanPath: `${UUID}/${PROJECT_ID}.jpg`, projectName: 'Cuisine' };
+  assert.equal(pickProjectHistoryMetadata(body, UUID).scanPath, `${UUID}/${PROJECT_ID}.jpg`);
+  assert.equal('scanPath' in pickProjectHistoryMetadata(body, OTHER_UUID), false);
+  // Without an owner (the old one-argument call) no path can be vouched for.
+  assert.equal('scanPath' in pickProjectHistoryMetadata(body), false);
+  assert.equal(pickProjectHistoryMetadata(body).projectName, 'Cuisine');
+});
+
+// ─── POST /api/scans ────────────────────────────────────────────────────────
+
+test('storing a scan requires a signed-in artisan and sends nothing otherwise', async () => {
+  resetState();
+  const res = await withEnv(CONFIGURED, () => scansRoute().POST(postScan({ image: TINY_JPEG })));
+  assert.equal(res.status, 401);
+  assert.equal((await res.json()).error, 'AUTH_REQUIRED');
+  assert.equal(state.uploads.length, 0);
+});
+
+test('an invalid image answers 400 INVALID_IMAGE and sends nothing', async () => {
+  resetState();
+  state.user = { id: UUID };
+  const bodies = [
+    { image: 'data:image/svg+xml;base64,PHN2Zz4=' },
+    { image: 'https://evil.example/x.jpg' },
+    { image: `data:image/jpeg;base64,${Buffer.from('<html>').toString('base64')}` },
+    { image: 42 },
+    {},
+    '{not json',
+  ];
+  for (const body of bodies) {
+    const res = await withEnv(CONFIGURED, () => scansRoute().POST(postScan(body)));
+    assert.equal(res.status, 400, JSON.stringify(body));
+    assert.equal((await res.json()).error, 'INVALID_IMAGE');
+  }
+  assert.equal(state.uploads.length, 0);
+});
+
+test('a valid image is stored once, privately, under the artisan\'s own server-made path', async () => {
+  resetState();
+  state.user = { id: UUID };
+  const res = await withEnv(CONFIGURED, () => scansRoute().POST(postScan({ image: TINY_JPEG, scanPath: `${OTHER_UUID}/${PROJECT_ID}.jpg` })));
+  assert.equal(res.status, 200);
+  const body = await res.json();
+  assert.equal(body.success, true);
+  assert.equal(state.uploads.length, 1);
+  const [upload] = state.uploads;
+  assert.equal(upload.bucket, 'scans');
+  assert.equal(upload.path, body.scanPath);
+  assert.equal(scan().isOwnScanPath(upload.path, UUID), true);
+  assert.equal(upload.path.endsWith('.jpg'), true);
+  assert.equal(upload.opts.contentType, 'image/jpeg');
+  assert.equal(upload.opts.upsert, false);
+  assert.equal(Buffer.isBuffer(upload.bytes), true);
+  assert.equal(upload.bytes[0], 0xff);
+  assert.equal(upload.bytes.length, 224);
+});
+
+test('every stored scan gets a fresh file id', async () => {
+  resetState();
+  state.user = { id: UUID };
+  const first = await withEnv(CONFIGURED, async () => (await scansRoute().POST(postScan({ image: TINY_JPEG }))).json());
+  const second = await withEnv(CONFIGURED, async () => (await scansRoute().POST(postScan({ image: TINY_JPEG }))).json());
+  assert.notEqual(first.scanPath, second.scanPath);
+});
+
+test('the eleventh scan inside the window is refused with Retry-After and stores nothing', async () => {
+  resetState();
+  state.user = { id: UUID };
+  const { SCAN_RATE_LIMIT } = loadTsModule('src/lib/rate-limit.ts');
+  assert.deepEqual([SCAN_RATE_LIMIT.limit, SCAN_RATE_LIMIT.windowMs], [10, 60_000]);
+  await withEnv(CONFIGURED, async () => {
+    const { POST } = scansRoute();
+    for (let i = 0; i < SCAN_RATE_LIMIT.limit; i += 1) {
+      // eslint-disable-next-line no-await-in-loop
+      assert.equal((await POST(postScan({ image: TINY_JPEG }))).status, 200);
+    }
+    assert.equal(state.uploads.length, SCAN_RATE_LIMIT.limit);
+
+    // The brake sits right after auth: even an unreadable body is refused as 429.
+    const denied = await POST(postScan('{not json'));
+    assert.equal(denied.status, 429);
+    assert.ok(Number(denied.headers.get('Retry-After')) > 0);
+    const body = await denied.json();
+    assert.equal(body.error, 'RATE_LIMITED');
+    assert.equal(state.uploads.length, SCAN_RATE_LIMIT.limit, 'no eleventh upload');
+
+    // Another artisan has a budget of their own.
+    state.user = { id: OTHER_UUID };
+    assert.equal((await POST(postScan({ image: TINY_JPEG }))).status, 200);
+  });
+});
+
+test('a signed-out call is refused before it counts against any budget', async () => {
+  resetState();
+  const { SCAN_RATE_LIMIT } = loadTsModule('src/lib/rate-limit.ts');
+  await withEnv(CONFIGURED, async () => {
+    const { POST } = scansRoute();
+    for (let i = 0; i < SCAN_RATE_LIMIT.limit + 2; i += 1) {
+      // eslint-disable-next-line no-await-in-loop
+      assert.equal((await POST(postScan({ image: TINY_JPEG }))).status, 401);
+    }
+  });
+});
+
+test('without a service key a scan answers 503 SCAN_STORAGE_UNAVAILABLE and sends nothing', async () => {
+  resetState();
+  state.user = { id: UUID };
+  const res = await withEnv({ NEXT_PUBLIC_SUPABASE_URL: 'https://real.supabase.co', SUPABASE_SERVICE_ROLE_KEY: '' }, () => scansRoute().POST(postScan({ image: TINY_JPEG })));
+  assert.equal(res.status, 503);
+  assert.equal((await res.json()).error, 'SCAN_STORAGE_UNAVAILABLE');
+  assert.equal(state.uploads.length, 0);
+});
+
+test('a refused or failing upload answers 503 SCAN_STORAGE_UNAVAILABLE', async () => {
+  resetState();
+  state.user = { id: UUID };
+  state.uploadError = { message: 'Bucket not found' };
+  const refused = await withEnv(CONFIGURED, () => scansRoute().POST(postScan({ image: TINY_JPEG })));
+  assert.equal(refused.status, 503);
+  const refusedBody = await refused.json();
+  assert.equal(refusedBody.error, 'SCAN_STORAGE_UNAVAILABLE');
+  assert.equal('scanPath' in refusedBody, false);
+  assert.doesNotMatch(JSON.stringify(refusedBody), /Bucket not found/, 'the storage error text stays server-side');
 });
 
 // ─── PATCH /api/projects/[id] — PDF marker ──────────────────────────────────
@@ -293,4 +458,64 @@ test('renaming another artisan\'s project answers 404 and writes nothing', async
   assert.equal(res.status, 404);
   assert.deepEqual(state.updates, []);
   assert.equal(state.projects.get(OTHER_PROJECT_ID).name, 'Autre');
+});
+
+// ─── PATCH /api/projects/[id] — scan image sent after the save ──────────────
+
+const OWN_SCAN = `${UUID}/44444444-3333-4444-8888-555555555555.jpg`;
+
+test('the scan image sent after the save is attached to the artisan\'s own project, every other key kept', async () => {
+  resetState();
+  state.user = { id: UUID };
+  const quotation = { quoteNumber: 'D-2026-001' };
+  state.projects.set(PROJECT_ID, { user_id: UUID, name: 'Cuisine', options_json: { scanThumb: TINY_JPEG, quotation, pdfGeneratedAt: '2026-11-12T10:20:39.123Z' } });
+  const res = await withEnv(CONFIGURED, async () => projectRoute().PATCH(...patch(PROJECT_ID, { scanPath: OWN_SCAN })));
+  assert.equal(res.status, 200);
+  assert.deepEqual(await res.json(), { success: true, id: PROJECT_ID, scanPath: OWN_SCAN });
+  assert.deepEqual(state.updates, [{ id: PROJECT_ID, patch: { options_json: { scanThumb: TINY_JPEG, quotation, pdfGeneratedAt: '2026-11-12T10:20:39.123Z', scanPath: OWN_SCAN } } }]);
+  assert.equal(state.projects.get(PROJECT_ID).name, 'Cuisine', 'the name is not touched');
+});
+
+test('another artisan\'s image path, or anything that is not a kept-image path, is refused with no write', async () => {
+  resetState();
+  state.user = { id: UUID };
+  state.projects.set(PROJECT_ID, { user_id: UUID, options_json: {} });
+  for (const scanPath of [`${OTHER_UUID}/44444444-3333-4444-8888-555555555555.jpg`, `${UUID}/../${OTHER_UUID}/a.jpg`, '', null, 42, TINY_JPEG]) {
+    const res = await withEnv(CONFIGURED, async () => projectRoute().PATCH(...patch(PROJECT_ID, { scanPath })));
+    assert.equal(res.status, 400, String(scanPath).slice(0, 40));
+    assert.equal((await res.json()).error, 'INVALID_SCAN_PATH');
+  }
+  assert.deepEqual(state.updates, []);
+  assert.equal('scanPath' in state.projects.get(PROJECT_ID).options_json, false);
+});
+
+test('an own image path on another artisan\'s project answers 404 and writes nothing', async () => {
+  resetState();
+  state.user = { id: UUID };
+  state.projects.set(OTHER_PROJECT_ID, { user_id: OTHER_UUID, options_json: {} });
+  const notOwned = await withEnv(CONFIGURED, async () => projectRoute().PATCH(...patch(OTHER_PROJECT_ID, { scanPath: OWN_SCAN })));
+  const missing = await withEnv(CONFIGURED, async () => projectRoute().PATCH(...patch(PROJECT_ID, { scanPath: OWN_SCAN })));
+  assert.equal(notOwned.status, 404);
+  assert.equal(missing.status, 404);
+  assert.deepEqual(state.updates, []);
+  assert.equal('scanPath' in state.projects.get(OTHER_PROJECT_ID).options_json, false);
+});
+
+test('attaching an image requires a signed-in artisan', async () => {
+  resetState();
+  const res = await withEnv(CONFIGURED, async () => projectRoute().PATCH(...patch(PROJECT_ID, { scanPath: OWN_SCAN })));
+  assert.equal(res.status, 401);
+});
+
+test('a name or a PDF marker sent with a scan path keeps its own branch, and the path is not written', async () => {
+  resetState();
+  state.user = { id: UUID };
+  state.projects.set(PROJECT_ID, { user_id: UUID, name: 'Débit', options_json: {} });
+  const renamed = await withEnv(CONFIGURED, async () => projectRoute().PATCH(...patch(PROJECT_ID, { name: 'Salon', scanPath: OWN_SCAN })));
+  assert.equal(renamed.status, 200);
+  assert.deepEqual(await renamed.json(), { success: true, id: PROJECT_ID, name: 'Salon' });
+  const marked = await withEnv(CONFIGURED, async () => projectRoute().PATCH(...patch(PROJECT_ID, { pdfGeneratedAt: '2026-11-12T10:20:39.123Z', scanPath: OWN_SCAN })));
+  assert.equal(marked.status, 200);
+  assert.deepEqual(await marked.json(), { success: true, id: PROJECT_ID, pdfGeneratedAt: '2026-11-12T10:20:39.123Z' });
+  assert.equal('scanPath' in state.projects.get(PROJECT_ID).options_json, false);
 });
