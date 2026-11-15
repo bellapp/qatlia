@@ -459,3 +459,63 @@ test('renaming another artisan\'s project answers 404 and writes nothing', async
   assert.deepEqual(state.updates, []);
   assert.equal(state.projects.get(OTHER_PROJECT_ID).name, 'Autre');
 });
+
+// ─── PATCH /api/projects/[id] — scan image sent after the save ──────────────
+
+const OWN_SCAN = `${UUID}/44444444-3333-4444-8888-555555555555.jpg`;
+
+test('the scan image sent after the save is attached to the artisan\'s own project, every other key kept', async () => {
+  resetState();
+  state.user = { id: UUID };
+  const quotation = { quoteNumber: 'D-2026-001' };
+  state.projects.set(PROJECT_ID, { user_id: UUID, name: 'Cuisine', options_json: { scanThumb: TINY_JPEG, quotation, pdfGeneratedAt: '2026-11-12T10:20:39.123Z' } });
+  const res = await withEnv(CONFIGURED, async () => projectRoute().PATCH(...patch(PROJECT_ID, { scanPath: OWN_SCAN })));
+  assert.equal(res.status, 200);
+  assert.deepEqual(await res.json(), { success: true, id: PROJECT_ID, scanPath: OWN_SCAN });
+  assert.deepEqual(state.updates, [{ id: PROJECT_ID, patch: { options_json: { scanThumb: TINY_JPEG, quotation, pdfGeneratedAt: '2026-11-12T10:20:39.123Z', scanPath: OWN_SCAN } } }]);
+  assert.equal(state.projects.get(PROJECT_ID).name, 'Cuisine', 'the name is not touched');
+});
+
+test('another artisan\'s image path, or anything that is not a kept-image path, is refused with no write', async () => {
+  resetState();
+  state.user = { id: UUID };
+  state.projects.set(PROJECT_ID, { user_id: UUID, options_json: {} });
+  for (const scanPath of [`${OTHER_UUID}/44444444-3333-4444-8888-555555555555.jpg`, `${UUID}/../${OTHER_UUID}/a.jpg`, '', null, 42, TINY_JPEG]) {
+    const res = await withEnv(CONFIGURED, async () => projectRoute().PATCH(...patch(PROJECT_ID, { scanPath })));
+    assert.equal(res.status, 400, String(scanPath).slice(0, 40));
+    assert.equal((await res.json()).error, 'INVALID_SCAN_PATH');
+  }
+  assert.deepEqual(state.updates, []);
+  assert.equal('scanPath' in state.projects.get(PROJECT_ID).options_json, false);
+});
+
+test('an own image path on another artisan\'s project answers 404 and writes nothing', async () => {
+  resetState();
+  state.user = { id: UUID };
+  state.projects.set(OTHER_PROJECT_ID, { user_id: OTHER_UUID, options_json: {} });
+  const notOwned = await withEnv(CONFIGURED, async () => projectRoute().PATCH(...patch(OTHER_PROJECT_ID, { scanPath: OWN_SCAN })));
+  const missing = await withEnv(CONFIGURED, async () => projectRoute().PATCH(...patch(PROJECT_ID, { scanPath: OWN_SCAN })));
+  assert.equal(notOwned.status, 404);
+  assert.equal(missing.status, 404);
+  assert.deepEqual(state.updates, []);
+  assert.equal('scanPath' in state.projects.get(OTHER_PROJECT_ID).options_json, false);
+});
+
+test('attaching an image requires a signed-in artisan', async () => {
+  resetState();
+  const res = await withEnv(CONFIGURED, async () => projectRoute().PATCH(...patch(PROJECT_ID, { scanPath: OWN_SCAN })));
+  assert.equal(res.status, 401);
+});
+
+test('a name or a PDF marker sent with a scan path keeps its own branch, and the path is not written', async () => {
+  resetState();
+  state.user = { id: UUID };
+  state.projects.set(PROJECT_ID, { user_id: UUID, name: 'Débit', options_json: {} });
+  const renamed = await withEnv(CONFIGURED, async () => projectRoute().PATCH(...patch(PROJECT_ID, { name: 'Salon', scanPath: OWN_SCAN })));
+  assert.equal(renamed.status, 200);
+  assert.deepEqual(await renamed.json(), { success: true, id: PROJECT_ID, name: 'Salon' });
+  const marked = await withEnv(CONFIGURED, async () => projectRoute().PATCH(...patch(PROJECT_ID, { pdfGeneratedAt: '2026-11-12T10:20:39.123Z', scanPath: OWN_SCAN })));
+  assert.equal(marked.status, 200);
+  assert.deepEqual(await marked.json(), { success: true, id: PROJECT_ID, pdfGeneratedAt: '2026-11-12T10:20:39.123Z' });
+  assert.equal('scanPath' in state.projects.get(PROJECT_ID).options_json, false);
+});

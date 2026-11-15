@@ -3,12 +3,14 @@
 import { useEffect, useId, useRef, useState, type MouseEvent } from 'react';
 import { ExternalLink, X } from 'lucide-react';
 import { useLocale } from '@/components/LocaleProvider';
-import { resolveScanView, scanViewNeedsFetch, type ScanViewInput } from '@/lib/projects/scan-upload';
+import { resolveScanView, scanViewNeedsFetch, type ScanReducedReason, type ScanViewInput } from '@/lib/projects/scan-upload';
 
 export interface ScanViewerProps {
   src: string;
   /** Only the thumbnail could be shown: the viewer says so. */
   reduced: boolean;
+  /** Why (default: the full image was never kept). */
+  reducedReason?: ScanReducedReason;
   alt: string;
   onClose: () => void;
 }
@@ -22,7 +24,7 @@ const FOCUSABLE_SELECTOR = 'a[href], button:not([disabled])';
  * it. A full image reached by a link can also be opened in a new tab; an image
  * held in memory (a `data:` URL) cannot be opened as a page.
  */
-export function ScanViewer({ src, reduced, alt, onClose }: ScanViewerProps) {
+export function ScanViewer({ src, reduced, reducedReason = 'not-kept', alt, onClose }: ScanViewerProps) {
   const { t } = useLocale();
   const titleId = useId();
   const dialogRef = useRef<HTMLDivElement>(null);
@@ -110,7 +112,7 @@ export function ScanViewer({ src, reduced, alt, onClose }: ScanViewerProps) {
       </div>
       {reduced && (
         <p className="shrink-0 px-3 sm:px-4 py-2 text-xs text-amber-200 bg-amber-500/10 border-b border-amber-400/20">
-          {t('scanViewer.reducedNote')}
+          {t(reducedReason === 'link-failed' ? 'scanViewer.linkFailedNote' : 'scanViewer.reducedNote')}
         </p>
       )}
       {/* Scrolls both ways; one finger pans, two fingers zoom. */}

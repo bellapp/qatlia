@@ -287,6 +287,23 @@ test('a reduced preview says so, and offers no link to open it', () => {
   assert.match(html, /role="dialog"/);
 });
 
+const LINK_FAILED_NOTE = 'L’image complète n’a pas pu être chargée. Aperçu réduit affiché.';
+
+test('a kept image whose link failed says so, not that it was never kept', () => {
+  const failed = unescape(renderViewer({ src: TINY_JPEG, reduced: true, reducedReason: 'link-failed' }));
+  assert.ok(failed.includes(LINK_FAILED_NOTE), 'the link-failed note is shown');
+  assert.ok(!failed.includes(REDUCED_NOTE), 'not the never-kept note');
+  assert.doesNotMatch(failed, /data-testid="scan-viewer-open"/);
+  const notKept = unescape(renderViewer({ src: TINY_JPEG, reduced: true, reducedReason: 'not-kept' }));
+  assert.ok(notKept.includes(REDUCED_NOTE));
+  assert.ok(!notKept.includes(LINK_FAILED_NOTE));
+  const { translate } = loadTsModule('src/i18n/index.ts');
+  assert.equal(translate('fr', 'scanViewer.linkFailedNote'), LINK_FAILED_NOTE);
+  const [en, ar] = ['en', 'ar'].map((l) => translate(l, 'scanViewer.linkFailedNote'));
+  assert.ok(en && en !== 'scanViewer.linkFailedNote' && en !== LINK_FAILED_NOTE);
+  assert.match(ar, /[\u0600-\u06FF]/);
+});
+
 test('an image held in memory (a data URL) is shown in full but cannot be opened as a page', () => {
   const html = unescape(renderViewer({ src: TINY_JPEG, reduced: false }));
   assert.doesNotMatch(html, /data-testid="scan-viewer-open"/);

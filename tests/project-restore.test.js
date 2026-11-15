@@ -282,16 +282,134 @@ test('the upload to /api/scans sits in a try, so its failure cannot stop the sav
   assert.match(source, /import \{ SCAN_IMAGE_MAX_CHARS \} from '@\/lib\/projects\/scan-image';/);
 });
 
-test('the atelier wires the scan path: restored, reset by a new scan, kept by a signed-in save only', () => {
+test('the atelier wires the scan path: restored, reset by a new scan, sent after a signed-in save only', () => {
   const page = atelierSource();
   assert.match(page, /scanKeeper\.restore\(parsed\.scanPath\);/);
   assert.match(page, /setPreviewImage\(scanImage\);\s*scanKeeper\.newScan\(scanImage\);/);
   const persist = page.slice(page.indexOf('const persistProject = async'), page.indexOf('const recordPdfGenerated'));
-  // Only a signed-in save sends the image; its path goes into the payload.
-  assert.match(persist, /if \(user\) \{\s*savedScanPath = await scanKeeper\.keep\(\);/);
-  assert.match(persist, /buildPersistedProjectPayload\(\{[\s\S]*?scanPath: savedScanPath,[\s\S]*?\}\)/);
-  assert.equal(persist.match(/scanKeeper\.keep\(\)/g).length, 1);
-  assert.doesNotMatch(persist, /\/api\/scans/);
+  // The save carries the path already known; the image itself never holds it up.
+  assert.match(persist, /buildPersistedProjectPayload\(\{[\s\S]*?scanPath: scanKeeper\.knownPath\(\),[\s\S]*?\}\)/);
+  // Only a signed-in save reaches the cloud, and so the image.
+  assert.match(persist, /if \(user\) \{\s*const saved = await saveProjectToCloud\(payload, scanKeeper, \(url, init\) => fetch\(url, init\)\);/);
+  assert.equal(persist.match(/saveProjectToCloud\(/g).length, 1);
+  assert.doesNotMatch(persist, /scanKeeper\.keep\(\)|\/api\/scans/);
+});
+
+// R16: the project save never waits for the image; the image follows with a
+// PATCH on the project the save created.
+
+/** A fetch for the save: POST /api/projects answers ids in turn, uploads wait for `gate`. */
+function saveFetch({ uploadAnswer = () => jsonResponse(200, { success: true, scanPath: PATH }), gate = Promise.resolve() } = {}) {
+  let n = 0;
+  return recordingFetch(async (call) => {
+    if (call.input === '/api/projects') return jsonResponse(200, { success: true, projectId: `${PROJECT_ID.slice(0, -1)}${++n}` });
+    if (call.input === '/api/scans') { await gate; return uploadAnswer(call); }
+    if (call.init && call.init.method === 'PATCH') return jsonResponse(200, { success: true });
+    throw new Error(`unexpected ${call.input}`);
+  });
+}
+
+const savePayload = (extra = {}) => ({ name: 'Cuisine', pieces: [], ...extra });
+
+test('the project is saved at once, before the image is sent, then the image is attached to it', async () => {
+  let release;
+  const gate = new Promise((resolve) => { release = resolve; });
+  const fetchImpl = saveFetch({ gate });
+  const k = keeper(fetchImpl);
+  k.newScan(ORIGINAL);
+  const saved = await scanUpload().saveProjectToCloud(savePayload(), k, fetchImpl);
+  // The save answered while the upload is still waiting.
+  assert.equal(saved.ok, true);
+  assert.equal(saved.projectId, `${PROJECT_ID.slice(0, -1)}1`);
+  assert.equal(fetchImpl.calls[0].input, '/api/projects');
+  assert.equal('scanPath' in fetchImpl.calls[0].body, false);
+  assert.equal(fetchImpl.calls.some((c) => c.init && c.init.method === 'PATCH'), false);
+  release();
+  assert.equal(await saved.scanAttached, true);
+  assert.deepEqual(fetchImpl.calls.map((c) => c.input), ['/api/projects', '/api/scans', `/api/projects/${saved.projectId}`]);
+  const attach = fetchImpl.calls[2];
+  assert.equal(attach.init.method, 'PATCH');
+  assert.deepEqual(attach.body, { scanPath: PATH });
+});
+
+test('two saves during one upload send the image once, and each attaches it to its own project', async () => {
+  let release;
+  const gate = new Promise((resolve) => { release = resolve; });
+  const fetchImpl = saveFetch({ gate });
+  const k = keeper(fetchImpl);
+  k.newScan(ORIGINAL);
+  const first = await scanUpload().saveProjectToCloud(savePayload(), k, fetchImpl);
+  const second = await scanUpload().saveProjectToCloud(savePayload(), k, fetchImpl);
+  assert.notEqual(first.projectId, second.projectId);
+  release();
+  assert.deepEqual(await Promise.all([first.scanAttached, second.scanAttached]), [true, true]);
+  assert.equal(fetchImpl.calls.filter((c) => c.input === '/api/scans').length, 1);
+  const patched = fetchImpl.calls.filter((c) => c.init && c.init.method === 'PATCH').map((c) => c.input).sort();
+  assert.deepEqual(patched, [`/api/projects/${first.projectId}`, `/api/projects/${second.projectId}`].sort());
+});
+
+test('a refused upload sends no PATCH and the save stands with its thumbnail', async () => {
+  await quietly(async () => {
+    for (const uploadAnswer of [() => jsonResponse(503, { error: 'SCAN_STORAGE_UNAVAILABLE' }), () => jsonResponse(400, { error: 'INVALID_IMAGE' }), () => { throw new Error('offline'); }]) {
+      const fetchImpl = saveFetch({ uploadAnswer });
+      const k = keeper(fetchImpl);
+      k.newScan(ORIGINAL);
+      const saved = await scanUpload().saveProjectToCloud(savePayload(), k, fetchImpl);
+      assert.equal(saved.ok, true);
+      assert.equal(await saved.scanAttached, false);
+      assert.equal(fetchImpl.calls.filter((c) => c.init && c.init.method === 'PATCH').length, 0);
+    }
+  });
+});
+
+test('a failed PATCH is only logged, and nothing is attached when the save carried the path or kept no scan', async () => {
+  await quietly(async () => {
+    for (const patchAnswer of [() => { throw new Error('offline'); }, () => jsonResponse(400, { error: 'INVALID_SCAN_PATH' })]) {
+      const failingPatch = recordingFetch(async (call) => {
+        if (call.input === '/api/projects') return jsonResponse(200, { success: true, projectId: PROJECT_ID });
+        if (call.input === '/api/scans') return jsonResponse(200, { success: true, scanPath: PATH });
+        return patchAnswer();
+      });
+      const k = keeper(failingPatch);
+      k.newScan(ORIGINAL);
+      const saved = await scanUpload().saveProjectToCloud(savePayload(), k, failingPatch);
+      assert.equal(await saved.scanAttached, false);
+    }
+  });
+  const known = saveFetch();
+  const restored = keeper(known);
+  restored.restore(PATH);
+  const carried = await scanUpload().saveProjectToCloud(savePayload({ scanPath: PATH }), restored, known);
+  assert.equal(await carried.scanAttached, false);
+  const none = keeper(known);
+  const plain = await scanUpload().saveProjectToCloud(savePayload(), none, known);
+  assert.equal(await plain.scanAttached, false);
+  assert.deepEqual(known.calls.map((c) => c.input), ['/api/projects', '/api/projects']);
+});
+
+test('a refused project save attaches nothing, and a newer scan is never attached to the older project', async () => {
+  const refused = recordingFetch(() => jsonResponse(500, { error: 'SERVER_ERROR' }));
+  const k = keeper(refused);
+  k.newScan(ORIGINAL);
+  const saved = await scanUpload().saveProjectToCloud(savePayload(), k, refused);
+  assert.equal(saved.ok, false);
+  assert.equal(saved.projectId, null);
+  assert.equal(await saved.scanAttached, false);
+  assert.equal(refused.calls.length, 1);
+
+  let answer;
+  const pending = new Promise((resolve) => { answer = resolve; });
+  const slowSave = recordingFetch(async (call) => {
+    if (call.input === '/api/projects') { await pending; return jsonResponse(200, { success: true, projectId: PROJECT_ID }); }
+    return jsonResponse(200, { success: true, scanPath: PATH });
+  });
+  const k2 = keeper(slowSave);
+  k2.newScan(ORIGINAL);
+  const running = scanUpload().saveProjectToCloud(savePayload(), k2, slowSave);
+  k2.newScan('data:image/jpeg;base64,/9j/SECOND');
+  answer();
+  assert.equal(await (await running).scanAttached, false);
+  assert.deepEqual(slowSave.calls.map((c) => c.input), ['/api/projects']);
 });
 
 // Seeing the scan: the full image through a short signed link when one was
@@ -315,7 +433,7 @@ test('both requests can be given up, so a hung server never keeps the scan butto
   for (const call of fetchImpl.calls) assert.ok(call.init.signal instanceof AbortSignal, `${call.input} carries an abort signal`);
 });
 
-test('a link that cannot be had falls back to the thumbnail, marked reduced', async () => {
+test('a kept image whose link cannot be had falls back to the thumbnail, saying the link failed', async () => {
   const answers = [
     () => jsonResponse(404, { error: 'NOT_FOUND' }),
     () => jsonResponse(503, { error: 'SCAN_UNAVAILABLE' }),
@@ -327,7 +445,7 @@ test('a link that cannot be had falls back to the thumbnail, marked reduced', as
   await quietly(async () => {
     for (const answer of answers) {
       const view = await scanUpload().resolveScanView({ projectId: PROJECT_ID, hasFullScan: true, thumb: REDUCED }, recordingFetch(answer));
-      assert.deepEqual(view, { src: REDUCED, reduced: true });
+      assert.deepEqual(view, { src: REDUCED, reduced: true, reducedReason: 'link-failed' });
     }
   });
 });
@@ -335,9 +453,11 @@ test('a link that cannot be had falls back to the thumbnail, marked reduced', as
 test('no link is asked for without a kept image or a server id, and an image in memory needs none', async () => {
   const { resolveScanView, scanViewNeedsFetch } = scanUpload();
   const fetchImpl = recordingFetch();
-  assert.deepEqual(await resolveScanView({ projectId: PROJECT_ID, hasFullScan: false, thumb: REDUCED }, fetchImpl), { src: REDUCED, reduced: true });
-  assert.deepEqual(await resolveScanView({ projectId: null, hasFullScan: true, thumb: REDUCED }, fetchImpl), { src: REDUCED, reduced: true });
-  assert.deepEqual(await resolveScanView({ projectId: 'optimize_1699999999999', hasFullScan: true, thumb: REDUCED }, fetchImpl), { src: REDUCED, reduced: true });
+  // Nothing kept: the thumbnail is all there is.
+  assert.deepEqual(await resolveScanView({ projectId: PROJECT_ID, hasFullScan: false, thumb: REDUCED }, fetchImpl), { src: REDUCED, reduced: true, reducedReason: 'not-kept' });
+  // Kept, but no server id to ask a link for: the full image cannot be loaded here.
+  assert.deepEqual(await resolveScanView({ projectId: null, hasFullScan: true, thumb: REDUCED }, fetchImpl), { src: REDUCED, reduced: true, reducedReason: 'link-failed' });
+  assert.deepEqual(await resolveScanView({ projectId: 'optimize_1699999999999', hasFullScan: true, thumb: REDUCED }, fetchImpl), { src: REDUCED, reduced: true, reducedReason: 'link-failed' });
   assert.deepEqual(await resolveScanView({ localImage: ORIGINAL, projectId: PROJECT_ID, hasFullScan: true, thumb: REDUCED }, fetchImpl), { src: ORIGINAL, reduced: false });
   assert.equal(await resolveScanView({ projectId: null, hasFullScan: false, thumb: null }, fetchImpl), null);
   assert.equal(fetchImpl.calls.length, 0);

@@ -2,6 +2,9 @@
  * The client side of the scan image kept with a saved project: sending it once
  * when a signed-in artisan saves, and finding it again to show it in full.
  *
+ * The project save never waits for the image: it goes first, and the image
+ * follows and is attached to the project it created (`saveProjectToCloud`).
+ *
  * Only the reduced 1600 px JPEG is ever sent, never a phone original: the
  * image is passed through the atelier's own downscale right before it is sent,
  * which returns an already reduced JPEG unchanged and gives null when it
@@ -117,6 +120,66 @@ export function createScanKeeper(deps: { fetch: FetchLike; downscale: Downscale 
   };
 }
 
+/**
+ * Attaches a kept image to a project already saved (`PATCH { scanPath }`).
+ * Resolves true once the server took it; a refusal or a failure is only
+ * logged, and the project keeps its thumbnail.
+ */
+export async function attachScanPath(projectId: string, scanPath: string, fetchImpl: FetchLike): Promise<boolean> {
+  try {
+    const res = await fetchImpl(`/api/projects/${encodeURIComponent(projectId)}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ scanPath }),
+    });
+    if (!res.ok) console.warn('Image du scan non rattachée au projet:', res.status);
+    return res.ok;
+  } catch (err) {
+    console.warn('Image du scan non rattachée au projet:', err);
+    return false;
+  }
+}
+
+export interface CloudSave {
+  /** The server confirmed the save. */
+  ok: boolean;
+  /** The id of the project the save created, when the server gave one. */
+  projectId: string | null;
+  /** Settles once the scan image is attached (true) or will not be (false). Never rejects. */
+  scanAttached: Promise<boolean>;
+}
+
+/**
+ * Saves a signed-in artisan's project to the cloud at once, never waiting for
+ * the scan image. When the save carried no image path and a scan made on this
+ * page is still to be kept, the image is sent afterwards (once, shared by
+ * every save that needs it) and attached to the project this save created.
+ * A scan replaced while the save was running is not attached to it.
+ *
+ * A network error of the save itself is thrown, as `fetch` would; the caller
+ * falls back to the device then.
+ */
+export async function saveProjectToCloud(
+  payload: { scanPath?: string | null },
+  keeper: ScanKeeper,
+  fetchImpl: FetchLike
+): Promise<CloudSave> {
+  const scanAtSave = keeper.freshImage();
+  const res = await fetchImpl('/api/projects', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+  if (!res.ok) return { ok: false, projectId: null, scanAttached: Promise.resolve(false) };
+  const data = await res.json().catch(() => null);
+  const projectId = data?.success && typeof data.projectId === 'string' ? data.projectId : null;
+  const needsImage = !!projectId && !payload.scanPath && !!scanAtSave && keeper.freshImage() === scanAtSave;
+  const scanAttached = needsImage
+    ? keeper.keep().then((path) => (path ? attachScanPath(projectId as string, path, fetchImpl) : false), () => false)
+    : Promise.resolve(false);
+  return { ok: true, projectId, scanAttached };
+}
+
 /** A signed link slower than this is given up: the thumbnail is shown instead. */
 const LINK_TIMEOUT_MS = 15_000;
 
@@ -155,11 +218,15 @@ export interface ScanViewInput {
   thumb?: string | null;
 }
 
-export interface ScanViewSource {
-  src: string;
-  /** True when only the thumbnail can be shown. */
-  reduced: boolean;
-}
+/**
+ * Why only the thumbnail is shown: the project never kept its full image, or
+ * it did but the link to it could not be had (offline, server refused).
+ */
+export type ScanReducedReason = 'not-kept' | 'link-failed';
+
+export type ScanViewSource =
+  | { src: string; reduced: false }
+  | { src: string; reduced: true; reducedReason: ScanReducedReason };
 
 /** True when showing the scan needs a signed link from the server first. */
 export function scanViewNeedsFetch(input: ScanViewInput): boolean {
@@ -173,5 +240,6 @@ export async function resolveScanView(input: ScanViewInput, fetchImpl: FetchLike
     const url = await fetchScanUrl(input.projectId as string, fetchImpl);
     if (url) return { src: url, reduced: false };
   }
-  return input.thumb ? { src: input.thumb, reduced: true } : null;
+  if (!input.thumb) return null;
+  return { src: input.thumb, reduced: true, reducedReason: input.hasFullScan ? 'link-failed' : 'not-kept' };
 }

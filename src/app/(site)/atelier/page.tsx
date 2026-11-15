@@ -99,7 +99,7 @@ import { buildPdfPayload } from '@/lib/pdf-payload';
 import { buildPersistedProjectPayload } from '@/lib/projects/persistence-payload';
 import { pickRestorableResult, readRestoredProjectDate } from '@/lib/projects/restore';
 import { downscaleDataUrl } from '@/lib/image-downscale';
-import { createScanKeeper } from '@/lib/projects/scan-upload';
+import { createScanKeeper, saveProjectToCloud } from '@/lib/projects/scan-upload';
 import { readAnalysisPass, storeAnalysisPass } from '@/lib/billing/analysis-pass-store';
 import {
   type DisplayUnit,
@@ -777,9 +777,7 @@ const commitPanelName = () => {
     // The name committed now, not the one this handler's render saw: the field
     // may have been left while the optimization was running.
     const committedName = projectNameRef.current.trim();
-    // Where the scan image is kept, once a signed-in save has sent it (below).
-    let savedScanPath: string | null = null;
-    const buildPayload = () => buildPersistedProjectPayload({
+    const payload = buildPersistedProjectPayload({
       // `{material}` stays the stable payload value upper-cased (MDF, VERRE, …)
       // rather than a translated label, so a project keeps the same identity in
       // history whatever language it was saved in; only the wording around it
@@ -788,7 +786,9 @@ const commitPanelName = () => {
       name: committedName || automaticProjectName,
       projectName: committedName || undefined,
       scanThumb: scanThumb || undefined,
-      scanPath: savedScanPath,
+      // The path already known (a reopened project, an earlier save of this
+      // scan); a new scan's image follows this save (see saveProjectToCloud).
+      scanPath: scanKeeper.knownPath(),
       pdfGeneratedAt: overrides.pdfGeneratedAt || pdfGeneratedAt || undefined,
       sheets,
       sheet: activeSheet,
@@ -824,23 +824,18 @@ const commitPanelName = () => {
         data: { user },
       } = await supabase.auth.getUser();
       if (user) {
-        savedScanPath = await scanKeeper.keep();
-        // The image is sent once per scan, before the project that points to
-        // it; a refusal or a failure (never thrown) leaves the thumbnail only.
-        const res = await fetch('/api/projects', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(buildPayload()),
-        });
-        if (res.ok) {
+        const saved = await saveProjectToCloud(payload, scanKeeper, (url, init) => fetch(url, init));
+        // The project is saved without waiting for the scan image: a new scan's
+        // image is sent afterwards and attached to it (`saved.scanAttached`,
+        // never rejected); a refusal leaves the thumbnail only.
+        if (saved.ok) {
           savedToCloud = true;
-          const data = await res.json().catch(() => null);
           // The quotation dialog merges its metadata into *this* saved
           // project's options_json (see /api/export-quotation) — only once
           // the server confirms the save, never a client-guessed id.
-          if (data?.success && typeof data.projectId === 'string') {
-            savedCloudId = data.projectId;
-            setLastSavedProjectId(data.projectId);
+          if (saved.projectId) {
+            savedCloudId = saved.projectId;
+            setLastSavedProjectId(saved.projectId);
             setLocalProjectId(null);
           }
         }
@@ -848,7 +843,6 @@ const commitPanelName = () => {
     } catch (err) {
       console.error('Erreur auto-save projet:', err);
     }
-    const payload = buildPayload();
     if (!savedToCloud) {
       const localId = `${source}_${Date.now()}`;
       savedLocalId = localId;

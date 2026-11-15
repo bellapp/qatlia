@@ -768,6 +768,7 @@ export const en: Catalog = {
     title: 'Scanned image',
     openAria: 'View the image of {name}',
     reducedNote: 'Reduced preview: the original image was not kept for this project.',
+    linkFailedNote: 'The full image could not be loaded. Showing a reduced preview.',
     close: 'Close',
     openImage: 'Open the image',
   },

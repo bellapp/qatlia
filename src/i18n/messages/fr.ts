@@ -855,6 +855,7 @@ export const fr = {
     title: 'Image scannée',
     openAria: "Voir l'image de {name}",
     reducedNote: "Aperçu réduit : l'image d'origine n'a pas été gardée pour ce projet.",
+    linkFailedNote: 'L’image complète n’a pas pu être chargée. Aperçu réduit affiché.',
     close: 'Fermer',
     openImage: "Ouvrir l'image",
   },
