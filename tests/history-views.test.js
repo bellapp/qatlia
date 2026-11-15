@@ -2,7 +2,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
-const { renderComponent } = require('./helpers/render-component');
+const { renderComponent, loadComponentModule } = require('./helpers/render-component');
 const { loadTsModule } = require('./helpers/load-ts-module');
 
 // The history's building blocks, rendered for real on the server.
@@ -51,4 +51,23 @@ test('the component loader follows "@/" imports between .tsx files', () => {
   } finally {
     fs.rmSync(probe, { force: true });
   }
+});
+
+test('resolveRename: nothing to save for an empty or unchanged draft, and the API is not called', async () => {
+  const { resolveRename } = loadComponentModule('src/components/history/HistoryName.tsx');
+  let calls = 0;
+  const onRename = async () => { calls += 1; return true; };
+  assert.equal(await resolveRename('   ', 'Cuisine', onRename), 'noop');
+  assert.equal(await resolveRename('', 'Cuisine', onRename), 'noop');
+  assert.equal(await resolveRename('  Cuisine ', 'Cuisine', onRename), 'noop');
+  assert.equal(calls, 0);
+});
+
+test('resolveRename: saves the trimmed name, and says failed when refused or when it throws', async () => {
+  const { resolveRename } = loadComponentModule('src/components/history/HistoryName.tsx');
+  const sent = [];
+  assert.equal(await resolveRename('  Salon  ', 'Cuisine', async (n) => { sent.push(n); return true; }), 'saved');
+  assert.deepEqual(sent, ['Salon']);
+  assert.equal(await resolveRename('Salon', 'Cuisine', async () => false), 'failed');
+  assert.equal(await resolveRename('Salon', 'Cuisine', async () => { throw new Error('offline'); }), 'failed');
 });

@@ -15,6 +15,27 @@ type HistoryNameProps = {
   size: 'card' | 'row';
 };
 
+export type RenameOutcome = 'noop' | 'saved' | 'failed';
+
+/**
+ * Decides what a rename attempt does: an empty or unchanged draft is nothing to
+ * save (and never calls `onRename`); otherwise the trimmed name is sent, and a
+ * refusal or an error both count as not saved.
+ */
+export async function resolveRename(
+  draft: string,
+  current: string,
+  onRename: (name: string) => Promise<boolean>,
+): Promise<RenameOutcome> {
+  const next = draft.trim();
+  if (!next || next === current) return 'noop';
+  try {
+    return (await onRename(next)) ? 'saved' : 'failed';
+  } catch {
+    return 'failed';
+  }
+}
+
 /**
  * A project name with its rename control, shared by the cards and the table.
  *
@@ -30,6 +51,7 @@ export function HistoryName({ name, onRename, size }: HistoryNameProps) {
   const [saving, setSaving] = useState(false);
   const [failed, setFailed] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
+  const controlRef = useRef<HTMLDivElement>(null);
   // True only while the editor is open, so a blur caused by closing it (cancel,
   // or the field unmounting) can never save a draft that was abandoned.
   const activeRef = useRef(false);
@@ -61,24 +83,14 @@ export function HistoryName({ name, onRename, size }: HistoryNameProps) {
 
   const commit = async () => {
     if (!activeRef.current || savingRef.current) return;
-    const next = draft.trim();
-    if (!next || next === name) {
-      close();
-      return;
-    }
     savingRef.current = true;
     setSaving(true);
     setFailed(false);
-    let ok = false;
-    try {
-      ok = await onRename(next);
-    } catch {
-      ok = false;
-    }
+    const outcome = await resolveRename(draft, name, onRename);
     savingRef.current = false;
     setSaving(false);
-    if (ok) close();
-    else setFailed(true);
+    if (outcome === 'failed') setFailed(true);
+    else close();
   };
 
   const nameClass = size === 'card'
@@ -103,7 +115,7 @@ export function HistoryName({ name, onRename, size }: HistoryNameProps) {
   }
 
   return (
-    <div className="min-w-0 space-y-1">
+    <div ref={controlRef} className="min-w-0 space-y-1">
       <div className="flex items-center gap-1 min-w-0">
         <input
           ref={inputRef}
@@ -112,7 +124,13 @@ export function HistoryName({ name, onRename, size }: HistoryNameProps) {
           readOnly={saving}
           dir="auto"
           onChange={(e) => { setDraft(e.target.value); setFailed(false); }}
-          onBlur={() => void commit()}
+          onBlur={(e) => {
+            // Focus moving to the tick or the cross is not "leaving the field":
+            // that button's own click decides, so Cancel can never save.
+            const to = e.relatedTarget;
+            if (to instanceof Node && controlRef.current?.contains(to)) return;
+            void commit();
+          }}
           onKeyDown={(e) => {
             if (e.nativeEvent.isComposing) return;
             if (e.key === 'Enter') { e.preventDefault(); void commit(); }
@@ -126,6 +144,7 @@ export function HistoryName({ name, onRename, size }: HistoryNameProps) {
         <button
           type="button"
           onPointerDown={(e) => e.preventDefault()}
+          onMouseDown={(e) => e.preventDefault()}
           onClick={() => void commit()}
           disabled={saving}
           aria-label={t('historyPage.renameSave')}
@@ -137,6 +156,7 @@ export function HistoryName({ name, onRename, size }: HistoryNameProps) {
         <button
           type="button"
           onPointerDown={(e) => e.preventDefault()}
+          onMouseDown={(e) => e.preventDefault()}
           onClick={cancel}
           disabled={saving}
           aria-label={t('historyPage.renameCancel')}
