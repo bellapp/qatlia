@@ -72,7 +72,54 @@ test('the zoom buttons and the sheet readout stay put while the plan scrolls', (
   assert.match(frameTag, /className="relative"/);
   assert.doesNotMatch(frameTag, /overflow/, 'the frame itself does not scroll');
 
-  const viewportStart = source.lastIndexOf('<div', viewport);
-  const viewportTag = source.slice(viewportStart, source.indexOf('>', viewport) + 1);
-  assert.match(viewportTag, /overflow-auto/);
+  assert.match(viewportTag(), /PLAN_VIEWPORT_ZOOMED/, 'the viewport is the box the zoomed plan scrolls in');
+  assert.ok(planViewportClasses('ZOOMED').includes('overflow-auto'));
+});
+
+// User report, 2026-11-15: on a phone, a finger put on the plan did not
+// scroll the page. The viewport was a scrolling box at every zoom level, with
+// its scroll confined to itself: at 100% the plan fits it, so the box had
+// nothing to scroll and still kept the gesture from reaching the page.
+
+/** The opening tag of the box the plan sits in. */
+function viewportTag() {
+  const viewport = source.indexOf('data-testid="cut-plan-viewport"');
+  assert.ok(viewport > 0, 'the plan has a viewport');
+  // The tag ends where its className expression does: the expression itself
+  // holds a ">" (zoomLevel > 1), so the first ">" is not the end of the tag.
+  return source.slice(source.lastIndexOf('<div', viewport), source.indexOf('`}>', viewport) + 3);
+}
+
+/** The classes the viewport takes when the plan is ZOOMED in, or FITTED (100% or less), one per entry. */
+function planViewportClasses(state) {
+  const match = source.match(new RegExp(`const PLAN_VIEWPORT_${state} = '([^']*)';`));
+  assert.ok(match, `the viewport has classes for the ${state} plan`);
+  return match[1].split(' ').filter(Boolean);
+}
+
+test('the viewport only becomes a box of its own once the plan is zoomed in', () => {
+  assert.ok(
+    viewportTag().includes('${zoomLevel > 1 ? PLAN_VIEWPORT_ZOOMED : PLAN_VIEWPORT_FITTED}'),
+    'the zoom level picks the viewport classes'
+  );
+  assert.doesNotMatch(viewportTag(), /overscroll|overflow|max-h-/, 'no scrolling class is set whatever the zoom');
+});
+
+test('at 100% or less a finger on the plan scrolls the page', () => {
+  const fitted = planViewportClasses('FITTED');
+  assert.ok(fitted.length > 0);
+
+  // Confining the scroll is what swallowed the gesture, at any screen size.
+  assert.equal(fitted.some((name) => name.includes('overscroll')), false, 'the scroll is never confined to the plan');
+  // On a phone or a tablet (one column, below lg) the plan is shown whole and
+  // is no scrolling box at all; the two-column layout keeps its height cap.
+  for (const name of fitted) assert.match(name, /^lg:/, `${name} only applies to the two-column layout`);
+});
+
+test('zoomed in, a finger on the plan moves the plan and not the page', () => {
+  const zoomed = planViewportClasses('ZOOMED');
+
+  assert.ok(zoomed.includes('overflow-auto'), 'the zoomed plan scrolls in its box');
+  assert.ok(zoomed.includes('overscroll-contain'), 'reaching an edge of the plan does not drag the page along');
+  assert.ok(zoomed.includes('max-h-[70vh]'), 'the box stays within the screen');
 });
