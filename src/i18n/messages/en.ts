@@ -694,6 +694,16 @@ export const en: Catalog = {
       close: 'I saved my reference',
       historyTitle: 'My payment orders',
       status: { pending: 'Pending', granted: 'Credits added', refused: 'Refused' },
+      bank: {
+        title: 'Bank details for the transfer',
+        holder: 'Account holder',
+        rib: 'RIB (24 digits)',
+        iban: 'IBAN',
+        bic: 'BIC / SWIFT',
+        copy: 'Copy',
+        copied: 'Copied',
+        copyAria: 'Copy: {label}',
+      },
     },
     errors: {
       authRequired: 'Sign in to buy credits.',
