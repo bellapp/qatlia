@@ -58,6 +58,8 @@ Les noms ci-dessous sont exacts. Les valeurs ne doivent jamais être écrites da
 | `WHATSAPP_BOT_SCOPE` | `ads` (par défaut) : en coexistence, le bot ne répond qu'aux contacts venus de la publicité. `all` : il répond à tout le monde. Sans effet en mode `redirect`, où le bot répond toujours à tout le monde |
 | `WHATSAPP_BOT_MODEL` | Facultative. Modèle IA utilisé (défaut : `OPENROUTER_MODEL`, puis `google/gemini-3.7-flash`) |
 | `OPENROUTER_API_KEY` | Existe déjà (utilisée aussi par le scan) : rien à faire |
+| `YCLOUD_API_KEY` | Facultative. Clé API YCloud (YCloud → Developers → API Keys). Avec `WHATSAPP_FROM_NUMBER`, les réponses du bot partent par YCloud au lieu de l'API Meta : c'est obligatoire quand le numéro a été inscrit par YCloud |
+| `WHATSAPP_FROM_NUMBER` | Facultative. Numéro du bot au format international (`+212726263686`), utilisé comme expéditeur par YCloud |
 
 ## Mise en place
 

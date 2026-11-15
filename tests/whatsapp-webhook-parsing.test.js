@@ -236,3 +236,17 @@ test('getWhatsAppConfig resolves the model and OpenRouter key', () => {
   assert.equal(getWhatsAppConfig({ ...FULL_ENV, OPENROUTER_API_KEY: 'sk-or-real' }).openrouterKey, 'sk-or-real');
   assert.equal(getWhatsAppConfig({ ...FULL_ENV, OPENROUTER_API_KEY: 'your_key' }).openrouterKey, null);
 });
+
+test('getWhatsAppConfig sends through YCloud only when both the key and the sender number are set', () => {
+  const both = { ...FULL_ENV, YCLOUD_API_KEY: 'yc-key', WHATSAPP_FROM_NUMBER: '+212726263686' };
+  assert.equal(getWhatsAppConfig(FULL_ENV).ycloud, null);
+  assert.equal(getWhatsAppConfig({ ...FULL_ENV, YCLOUD_API_KEY: 'yc-key' }).ycloud, null);
+  assert.equal(getWhatsAppConfig({ ...FULL_ENV, WHATSAPP_FROM_NUMBER: '+212726263686' }).ycloud, null);
+  assert.deepEqual(getWhatsAppConfig(both).ycloud, { apiKey: 'yc-key', from: '+212726263686' });
+  // A number typed without the plus or with separators is normalised to E.164.
+  assert.equal(getWhatsAppConfig({ ...both, WHATSAPP_FROM_NUMBER: '212 726-263686' }).ycloud.from, '+212726263686');
+  assert.equal(getWhatsAppConfig({ ...both, YCLOUD_API_KEY: 'your_key' }).ycloud, null);
+  assert.equal(getWhatsAppConfig({ ...both, WHATSAPP_FROM_NUMBER: 'abc' }).ycloud, null);
+  // YCloud is optional: the Meta credentials alone still give a config.
+  assert.ok(getWhatsAppConfig(FULL_ENV));
+});
