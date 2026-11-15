@@ -97,7 +97,9 @@ test('the private bucket is created without a single storage policy', () => {
   assert.match(sql, /'scans'/);
   assert.match(sql, /'scans',\s*'scans',\s*false,\s*1048576,/, 'id, name, public = false, 1 MB limit');
   assert.match(sql, /array\['image\/jpeg',\s*'image\/png',\s*'image\/webp'\]/i);
-  assert.match(sql, /on conflict \(id\) do nothing/i);
+  // A bucket created earlier by hand is brought back to these settings, private first.
+  assert.doesNotMatch(sql, /do nothing/i);
+  assert.match(sql, /on conflict \(id\) do update set\s+public = false,\s*file_size_limit = excluded\.file_size_limit,\s*allowed_mime_types = excluded\.allowed_mime_types;/i);
   const code = sql.replace(/--.*$/gm, '');
   assert.doesNotMatch(code, /create\s+policy/i, 'only the service key reaches storage.objects');
   assert.doesNotMatch(code, /storage\.objects/i);
