@@ -284,11 +284,11 @@ export const fr = {
       nameDuplicate: 'Ce nom est déjà utilisé par un autre panneau.',
       presetColorLabel: 'Couleur / décor (optionnel)',
       presetColorPlaceholder: 'Ex : Blanc, Noyer',
-      panelPriceLabel: 'Prix du panneau (MAD)',
-      panelPricePlaceholder: 'Tarif catalogue : {price} MAD le panneau',
+      panelPriceLabel: 'Prix du panneau ({currency})',
+      panelPricePlaceholder: 'Tarif catalogue : {price} {currency} le panneau',
       presetPricePlaceholder: 'Prix',
-      presetPriceAria: 'Prix du panneau {name} (MAD)',
-      presetPriceTag: '{price} MAD',
+      presetPriceAria: 'Prix du panneau {name} ({currency})',
+      presetPriceTag: '{price} {currency}',
       presetPriceSaved: 'Prix de « {name} » enregistré.',
       presetDuplicate: 'Ce panneau (mêmes dimensions, matériau, couleur et ramage) est déjà sauvegardé sous « {name} ».',
       presetSaveFailed: 'La liste de panneaux n’a pas pu être mise à jour. Réessayez.',
@@ -332,8 +332,8 @@ export const fr = {
     },
     cost: {
       bannerLabel: 'Coût total estimé',
-      currency: 'MAD',
-      amount: '{value} MAD',
+      currency: '{currency}',
+      amount: '{value} {currency}',
       bannerMeta: '{meters} m linéaires de coupe · {sheets}',
       sheetsCount: { one: '{count} panneau', many: '{count} panneaux' },
       breakdownTitle: 'Estimation du coût',
@@ -347,9 +347,9 @@ export const fr = {
         edge: 'Chant',
         laborFixed: 'Main d’œuvre (forfait)',
         laborPerMeter: 'Main d’œuvre (au mètre de coupe)',
-        perPanel: '{count} × {price} MAD',
-        perM2: '{count} × {area} m² × {price} MAD/m²',
-        perMeter: '{length} m × {price} MAD/m',
+        perPanel: '{count} × {price} {currency}',
+        perM2: '{count} × {area} m² × {price} {currency}/m²',
+        perMeter: '{length} m × {price} {currency}/m',
       },
     },
     metrics: {
@@ -517,7 +517,7 @@ export const fr = {
       grey: 'Gris',
       black: 'Noir',
       walnut: 'Noyer',
-      price: ' ({price} MAD/m)',
+      price: ' ({price} {currency}/m)',
       selectAria: 'Couleur du chant',
     },
     quickAdd: {
@@ -586,17 +586,17 @@ export const fr = {
       tooltip: 'Empêche la rotation des pièces. À activer pour le bois massif ou le stratifié avec sens de veinage.',
     },
     pricing: {
-      tooltip: 'Tarifs utilisés pour le chiffrage. Par défaut : main d’œuvre à 0 MAD, panneau au tarif catalogue du matériau.',
+      tooltip: 'Tarifs utilisés pour le chiffrage. Par défaut : main d’œuvre à 0 {currency}, panneau au tarif catalogue du matériau.',
       title: 'Tarification',
       laborLabel: 'Main d’œuvre / découpe',
       laborModeAria: 'Mode de tarification de la main d’œuvre',
       laborValueAria: 'Montant de la main d’œuvre',
-      laborFixed: 'Forfait (MAD)',
-      laborPerMeter: 'Au mètre (MAD/m)',
-      stockPerM2: 'MAD / m²',
-      stockPerSheet: 'MAD / panneau',
-      edgeLabel: 'Prix du chant (MAD le mètre, toutes couleurs)',
-      edgePlaceholder: 'Tarif catalogue : {range} MAD/m selon la couleur',
+      laborFixed: 'Forfait ({currency})',
+      laborPerMeter: 'Au mètre ({currency}/m)',
+      stockPerM2: '{currency} / m²',
+      stockPerSheet: '{currency} / panneau',
+      edgeLabel: 'Prix du chant ({currency} le mètre, toutes couleurs)',
+      edgePlaceholder: 'Tarif catalogue : {range} {currency}/m selon la couleur',
       edgeSaveFailed: 'Ce prix n’a pas pu être enregistré dans votre compte. Réessayez.',
     },
   },
@@ -644,6 +644,10 @@ export const fr = {
     logout: 'Déconnexion',
   },
   /** Contact channels; the address and number themselves live in `@/lib/support`. */
+  currency: {
+    label: 'Devise',
+    names: { MAD: 'DH (dirham)', EUR: '€ (euro)', USD: '$ (dollar)' },
+  },
   support: {
     footerHeading: 'Contact',
     menuEntry: 'Contacter le support',
@@ -758,6 +762,8 @@ export const fr = {
     manualPaymentOnly: 'Paiement par virement bancaire ou en espèces (CashPlus / Wafacash), en dirhams ({currency})',
     securePaymentInternational:
       'Paiement sécurisé par {provider} — cartes bancaires internationales, Apple Pay et Google Pay, débitées en dollars ({currency})',
+    securePaymentInternationalEur:
+      'Paiement sécurisé par {provider} — cartes bancaires internationales, Apple Pay et Google Pay, débitées en euros ({currency})',
     // Shown under the card button: the amount the card payment really charges.
     cardPrice: 'Par carte : {price}',
     invoiceNote: 'Facture et reçu instantanés par email',
@@ -771,7 +777,29 @@ export const fr = {
       keepReference: 'Notez ou capturez ce numéro : il est votre preuve de paiement.',
       close: 'J’ai noté ma référence',
       historyTitle: 'Mes commandes de paiement',
-      status: { pending: 'En attente', granted: 'Crédits ajoutés', refused: 'Refusée' },
+      status: { pending: 'En attente', granted: 'Crédits ajoutés', refused: 'Refusée', expired: 'Annulée' },
+      existingTitle: 'Vous avez déjà une commande en attente',
+      existingNotice: 'Une seule commande à la fois : payez celle-ci avec son numéro, ou annulez-la (en bas) pour choisir un autre pack.',
+      cancel: 'Annuler cette commande',
+      cancelShort: 'Annuler',
+      cancelConfirm: 'Annulez seulement si vous n’avez pas encore payé cette commande. Si vous avez déjà payé, envoyez-nous plutôt la preuve.',
+      cancelYes: 'Oui, annuler',
+      cancelKeep: 'Garder la commande',
+      cancelFailed: 'L’annulation n’a pas abouti. Réessayez, ou écrivez-nous sur WhatsApp.',
+      sendProof: 'Envoyer la preuve de paiement sur WhatsApp',
+      sendProofHint: 'Après le paiement, envoyez une photo du reçu : le message avec votre numéro de commande est déjà rempli. Numéro :',
+      emailAlternative: 'Ou par email :',
+      proofMessage: 'Bonjour QatliA, voici la preuve de paiement de ma commande {orderNumber}.',
+      bank: {
+        title: 'Coordonnées pour le virement',
+        holder: 'Titulaire du compte',
+        rib: 'RIB (24 chiffres)',
+        iban: 'IBAN',
+        bic: 'BIC / SWIFT',
+        copy: 'Copier',
+        copied: 'Copié',
+        copyAria: 'Copier : {label}',
+      },
     },
     /**
      * One entry per machine-readable code returned by /api/credits/checkout. The
@@ -779,6 +807,7 @@ export const fr = {
      * their own language, and never the provider's own message.
      */
     errors: {
+      manualMadOnly: 'Le virement et le paiement en espèces se font en dirhams. Passez votre devise en DH pour les utiliser.',
       authRequired: 'Connectez-vous pour acheter des crédits.',
       invalidSelection: 'Ce pack n’est plus disponible. Choisissez-en un autre.',
       unavailable: 'Le paiement est momentanément indisponible. Réessayez plus tard.',
@@ -877,6 +906,8 @@ export const fr = {
     saving: 'Enregistrement…',
     submit: 'Mettre à jour le mot de passe',
     passwordUpdated: 'Mot de passe mis à jour.',
+    currencyTitle: 'Devise',
+    currencyHint: 'Vos packs, chiffrages, devis et PDF sont dans cette devise. Elle a été choisie selon votre pays ; vous pouvez la changer. Les prix que vous avez enregistrés ne sont pas convertis.',
     errors: {
       tooShort: '{min} caractères minimum.',
       mismatch: 'Les mots de passe ne correspondent pas.',
@@ -939,7 +970,7 @@ export const fr = {
     },
     delivery: {
       label: 'Livraison',
-      amount: 'Montant (MAD)',
+      amount: 'Montant ({currency})',
     },
     discount: {
       label: 'Remise',

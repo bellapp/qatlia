@@ -1,12 +1,16 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import { Sparkles, Check, Zap, ArrowLeft, ShieldCheck, CreditCard, Landmark } from 'lucide-react';
+import { Sparkles, Check, Zap, ArrowLeft, ShieldCheck, CreditCard, Landmark, MessageCircle, Mail } from 'lucide-react';
+import { SUPPORT_EMAIL, SUPPORT_WHATSAPP_DISPLAY, supportMailto, supportWhatsAppUrl } from '@/lib/support';
 import Link from 'next/link';
 import { createClient } from '@/lib/supabase/client';
-import { CREDIT_PACKS, PACK_IDS, formatMAD, formatUSD, BILLING_CURRENCY, CARD_CURRENCY } from '@/lib/billing/catalog';
+import { CREDIT_PACKS, PACK_IDS, formatPrice, packPrice, BILLING_CURRENCY } from '@/lib/billing/catalog';
+import { cardCurrencyFor, offersManualPayment, type AppCurrency } from '@/lib/currency';
+import { CurrencySwitcher, useCurrency } from '@/components/CurrencySwitcher';
 import { LocaleSwitcher, useLocale } from '@/components/LocaleProvider';
 import { SupportContact } from '@/components/SupportContact';
+import { BankTransferDetails, type BankTransferDetailsData } from '@/components/BankTransferDetails';
 import { checkoutErrorKey, creditPackLabelKeys } from '@/i18n/domain';
 import { LEGAL_DOCS, LEGAL_ROUTES } from '@/lib/legal';
 
@@ -15,7 +19,7 @@ const PAYMENT_PROVIDER_NAMES = { creem: 'Creem', stripe: 'Stripe' } as const;
 type CardProvider = keyof typeof PAYMENT_PROVIDER_NAMES;
 
 export default function CreditsPage() {
-  const { t, tn, n } = useLocale();
+  const { t, tn, n, locale } = useLocale();
   const [loadingPack, setLoadingPack] = useState<string | null>(null);
   const [checkoutError, setCheckoutError] = useState<string | null>(null);
   // null until the real balance is known — never a hardcoded placeholder.
@@ -23,6 +27,10 @@ export default function CreditsPage() {
   // Creem charges the USD price, Stripe the MAD one: the card price is only
   // shown once the server has said which provider will take the payment.
   const [cardProvider, setCardProvider] = useState<CardProvider | null>(null);
+  // Creem charges a euro account in euros only once the euro products exist.
+  const [euroCard, setEuroCard] = useState(false);
+  const [providerKnown, setProviderKnown] = useState(false);
+  const { currency } = useCurrency();
 
   const packs = PACK_IDS.map((id) => CREDIT_PACKS[id]);
 
@@ -34,7 +42,10 @@ export default function CreditsPage() {
         if (!res.ok) return;
         const data = await res.json();
         if (!cancelled && (data?.provider === 'creem' || data?.provider === 'stripe')) setCardProvider(data.provider);
-      } catch { /* the cards keep their MAD price */ }
+        if (!cancelled) setEuroCard(data?.euroCard === true);
+      } catch { /* the cards keep their account-currency price */ } finally {
+        if (!cancelled) setProviderKnown(true);
+      }
     })();
     return () => { cancelled = true; };
   }, []);
@@ -66,7 +77,9 @@ export default function CreditsPage() {
       const res = await fetch('/api/credits/checkout', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ packId }),
+        // The card checkout opens in the language chosen here (Creem has no
+        // Arabic: the server maps it to French).
+        body: JSON.stringify({ packId, locale }),
       });
       const data = await res.json();
       if (res.ok && data.url) {
@@ -98,6 +111,40 @@ export default function CreditsPage() {
   const [myManualOrders, setMyManualOrders] = useState<Array<{
     order_number: string; status: string; amount_mad: number; credits: number; created_at: string;
   }>>([]);
+  // The account to pay into, sent by the server only to the signed-in buyer of
+  // an order still to be paid (null when not configured).
+  const [bankDetails, setBankDetails] = useState<BankTransferDetailsData | null>(null);
+  // The server answered with the order the customer already had pending: one
+  // order to pay at a time, cancelled explicitly to switch packs.
+  const [isExistingOrder, setIsExistingOrder] = useState(false);
+  // Which pending order is asking "are you sure?" before being cancelled.
+  const [confirmCancel, setConfirmCancel] = useState<string | null>(null);
+  const [cancelling, setCancelling] = useState(false);
+  const [ordersVersion, setOrdersVersion] = useState(0);
+
+  const cancelManualOrder = async (orderNumber: string) => {
+    setCancelling(true);
+    setCheckoutError(null);
+    try {
+      const res = await fetch('/api/credits/manual', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ orderNumber }),
+      });
+      if (!res.ok) {
+        setCheckoutError(t('creditsPage.manual.cancelFailed'));
+        return;
+      }
+      setConfirmCancel(null);
+      setIsExistingOrder(false);
+      setManualOrder(null);
+      setOrdersVersion((v) => v + 1);
+    } catch {
+      setCheckoutError(t('creditsPage.manual.cancelFailed'));
+    } finally {
+      setCancelling(false);
+    }
+  };
 
   useEffect(() => {
     let cancelled = false;
@@ -106,11 +153,14 @@ export default function CreditsPage() {
         const res = await fetch('/api/credits/manual');
         if (!res.ok) return;
         const data = await res.json();
-        if (!cancelled && data.success) setMyManualOrders(data.orders || []);
+        if (!cancelled && data.success) {
+          setMyManualOrders(data.orders || []);
+          setBankDetails(data.bank ?? null);
+        }
       } catch { /* tracking is best-effort */ }
     })();
     return () => { cancelled = true; };
-  }, [manualOrder]);
+  }, [manualOrder, ordersVersion]);
 
   const handleManualOrder = async (packId: string) => {
     setLoadingPack(`manual-${packId}`);
@@ -124,6 +174,9 @@ export default function CreditsPage() {
       const data = await res.json();
       if (res.ok && data.success && data.order) {
         setManualOrder(data.order);
+        setBankDetails(data.bank ?? null);
+        setIsExistingOrder(data.existing === true);
+        setConfirmCancel(null);
       } else {
         setCheckoutError(t(checkoutErrorKey(data?.error)) || t('creditsPage.errors.network'));
       }
@@ -134,6 +187,19 @@ export default function CreditsPage() {
     }
   };
 
+  // The currency the packs are priced in: the account's, except a euro
+  // account before the euro products exist, which is charged (so shown) in
+  // dollars. Null until both answers are in, so no price flips on screen.
+  const shownCurrency: AppCurrency | null =
+    currency === null || !providerKnown ? null : currency === 'EUR' && !euroCard ? 'USD' : currency;
+  // A dirham account pays by card through Creem in dollars: that price is
+  // shown under the button. Other accounts are charged the price on the card.
+  const cardCurrency = shownCurrency ? cardCurrencyFor(shownCurrency, euroCard) : 'USD';
+  const showCardPrice = cardProvider === 'creem' && shownCurrency === 'MAD';
+  const manualOffered = shownCurrency !== null && offersManualPayment(shownCurrency);
+  const priceOf = (pack: (typeof packs)[number]) =>
+    shownCurrency ? formatPrice(packPrice(pack, shownCurrency), shownCurrency) : '…';
+
   // Rendered around the placeholders so the figure and the provider stay bold.
   const [headlineBefore, headlineAfter = ''] = t('creditsPage.headline', {
     count: CREDIT_PACKS.starter.credits,
@@ -142,7 +208,7 @@ export default function CreditsPage() {
   // only cash and bank transfer are offered, so no card brand may be named.
   const [secureBefore, secureAfter = ''] = cardProvider
     ? (cardProvider === 'creem'
-        ? t('creditsPage.securePaymentInternational', { currency: CARD_CURRENCY })
+        ? t(cardCurrency === 'EUR' ? 'creditsPage.securePaymentInternationalEur' : 'creditsPage.securePaymentInternational', { currency: cardCurrency })
         : t('creditsPage.securePayment', { currency: BILLING_CURRENCY })
       ).split('{provider}')
     : [];
@@ -160,6 +226,7 @@ export default function CreditsPage() {
             {t('creditsPage.back')}
           </Link>
           <div className="flex items-center gap-2">
+            <CurrencySwitcher />
             <LocaleSwitcher />
             {/* The balance arrives after the profile is read, so it is a live
                 region: the artisan hears the real figure, never the placeholder. */}
@@ -183,7 +250,7 @@ export default function CreditsPage() {
           </span>
           <h1 className="text-3xl md:text-4xl font-black text-slate-900 dark:text-white">
             {headlineBefore}
-            <span dir="ltr" translate="no">{formatMAD(CREDIT_PACKS.starter.priceMAD)}</span>
+            <span dir="ltr" translate="no">{priceOf(CREDIT_PACKS.starter)}</span>
             {headlineAfter}
           </h1>
           <p className="text-sm text-slate-600 dark:text-slate-400 max-w-xl mx-auto">{t('creditsPage.policy')}</p>
@@ -200,8 +267,15 @@ export default function CreditsPage() {
           <div role="dialog" aria-label={t('creditsPage.manual.dialogTitle')} className="rounded-2xl border-2 border-[#F5A623] bg-gradient-to-b from-[#1E3A5F] to-[#0F172A] p-6 space-y-4">
             <div className="flex items-center gap-2">
               <Landmark className="w-5 h-5 text-[#F5A623]" aria-hidden="true" />
-              <h2 className="text-base font-black text-white">{t('creditsPage.manual.dialogTitle')}</h2>
+              <h2 className="text-base font-black text-white">
+                {t(isExistingOrder ? 'creditsPage.manual.existingTitle' : 'creditsPage.manual.dialogTitle')}
+              </h2>
             </div>
+            {isExistingOrder && (
+              <p data-testid="existing-order-notice" className="text-xs text-amber-200 bg-amber-500/10 border border-amber-500/30 rounded-lg px-3 py-2 leading-relaxed">
+                {t('creditsPage.manual.existingNotice')}
+              </p>
+            )}
             <div className="text-center py-3 rounded-xl bg-black/30 border border-white/10">
               <p className="text-[10px] uppercase tracking-widest text-slate-400 font-bold mb-1">{t('creditsPage.manual.orderNumberLabel')}</p>
               <p dir="ltr" className="text-2xl font-mono font-black text-[#F5A623] tracking-widest">{manualOrder.order_number}</p>
@@ -211,20 +285,77 @@ export default function CreditsPage() {
               <li>{t('creditsPage.manual.step2')}</li>
               <li>{t('creditsPage.manual.step3')}</li>
             </ol>
+            {bankDetails && <BankTransferDetails bank={bankDetails} />}
             <p className="text-[11px] text-amber-300/90 bg-amber-500/10 border border-amber-500/30 rounded-lg px-3 py-2">
               {t('creditsPage.manual.keepReference')}
             </p>
-            <SupportContact
-              label={t('support.paymentHelp')}
-              message={t('support.prefillOrder', { orderNumber: manualOrder.order_number })}
-              className="text-slate-300"
-            />
+            {/* One obvious next step after paying: send the proof on WhatsApp,
+                the message already carrying the order number. */}
+            <div className="space-y-1.5">
+              <a
+                href={supportWhatsAppUrl(t('creditsPage.manual.proofMessage', { orderNumber: manualOrder.order_number }))}
+                target="_blank"
+                rel="noopener noreferrer"
+                data-testid="send-proof-whatsapp"
+                className="w-full py-3 px-4 rounded-xl bg-[#25D366] hover:bg-[#1FBF5B] text-[#0B2E13] text-sm font-black transition-colors flex items-center justify-center gap-2"
+              >
+                <MessageCircle className="w-5 h-5 shrink-0" aria-hidden="true" />
+                <span>{t('creditsPage.manual.sendProof')}</span>
+              </a>
+              <p className="text-center text-[11px] text-slate-300 leading-relaxed">
+                {t('creditsPage.manual.sendProofHint')}{' '}
+                <span dir="ltr" translate="no" className="font-mono font-bold text-white whitespace-nowrap">{SUPPORT_WHATSAPP_DISPLAY}</span>
+              </p>
+              <p className="text-center text-[11px] text-slate-400">
+                {t('creditsPage.manual.emailAlternative')}{' '}
+                <a
+                  href={supportMailto(t('creditsPage.manual.proofMessage', { orderNumber: manualOrder.order_number }))}
+                  dir="ltr"
+                  className="inline-flex items-center gap-1 font-bold text-slate-200 underline underline-offset-2"
+                >
+                  <Mail className="w-3.5 h-3.5" aria-hidden="true" />
+                  {SUPPORT_EMAIL}
+                </a>
+              </p>
+            </div>
             <button
-              onClick={() => setManualOrder(null)}
+              onClick={() => { setManualOrder(null); setIsExistingOrder(false); setConfirmCancel(null); }}
               className="w-full py-2.5 rounded-xl bg-white/10 hover:bg-white/20 text-white text-xs font-bold transition-colors"
             >
               {t('creditsPage.manual.close')}
             </button>
+            {confirmCancel === manualOrder.order_number ? (
+              <div className="rounded-xl border border-rose-500/40 bg-rose-500/10 p-3 space-y-2">
+                <p className="text-[11px] text-rose-200 leading-relaxed">{t('creditsPage.manual.cancelConfirm')}</p>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    data-testid="confirm-cancel-order"
+                    onClick={() => void cancelManualOrder(manualOrder.order_number)}
+                    disabled={cancelling}
+                    className="flex-1 py-2 rounded-lg bg-rose-500/80 hover:bg-rose-500 text-white text-[11px] font-bold disabled:opacity-50 transition-colors"
+                  >
+                    {t('creditsPage.manual.cancelYes')}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setConfirmCancel(null)}
+                    className="flex-1 py-2 rounded-lg bg-white/10 hover:bg-white/20 text-white text-[11px] font-bold transition-colors"
+                  >
+                    {t('creditsPage.manual.cancelKeep')}
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <button
+                type="button"
+                data-testid="cancel-order"
+                onClick={() => setConfirmCancel(manualOrder.order_number)}
+                className="w-full text-center text-[11px] font-bold text-slate-400 hover:text-rose-300 underline underline-offset-2 transition-colors"
+              >
+                {t('creditsPage.manual.cancel')}
+              </button>
+            )}
           </div>
         )}
 
@@ -236,15 +367,38 @@ export default function CreditsPage() {
               <div key={o.order_number} className="flex items-center justify-between text-xs py-1.5 border-b border-studio-border/40 last:border-0">
                 <span dir="ltr" className="font-mono font-bold text-slate-700 dark:text-slate-200">{o.order_number}</span>
                 <span dir="ltr" translate="no" className="font-mono text-slate-500">{n(o.amount_mad)} {t('creditsPage.currency')} · {o.credits} cr</span>
-                <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
-                  o.status === 'granted' ? 'bg-emerald-500/15 text-emerald-400' :
-                  o.status === 'refused' ? 'bg-rose-500/15 text-rose-400' :
-                  'bg-amber-500/15 text-amber-400'
-                }`}>
-                  {t(`creditsPage.manual.status.${o.status === 'granted' ? 'granted' : o.status === 'refused' ? 'refused' : 'pending'}`)}
+                <span className="flex items-center gap-2">
+                  {o.status === 'pending' && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setManualOrder({ order_number: o.order_number, amount_mad: o.amount_mad, credits: o.credits, pack_id: '' });
+                        setIsExistingOrder(false);
+                        setConfirmCancel(o.order_number);
+                      }}
+                      className="text-[10px] font-bold text-slate-500 hover:text-rose-400 underline underline-offset-2 transition-colors"
+                    >
+                      {t('creditsPage.manual.cancelShort')}
+                    </button>
+                  )}
+                  <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                    o.status === 'granted' ? 'bg-emerald-500/15 text-emerald-400' :
+                    o.status === 'refused' ? 'bg-rose-500/15 text-rose-400' :
+                    o.status === 'expired' ? 'bg-slate-500/15 text-slate-400' :
+                    'bg-amber-500/15 text-amber-400'
+                  }`}>
+                    {t(`creditsPage.manual.status.${
+                      o.status === 'granted' ? 'granted' : o.status === 'refused' ? 'refused' : o.status === 'expired' ? 'expired' : 'pending'
+                    }`)}
+                  </span>
                 </span>
               </div>
             ))}
+            {bankDetails && myManualOrders.some((o) => o.status === 'pending') && (
+              <div className="rounded-2xl bg-gradient-to-b from-[#1E3A5F] to-[#0F172A] p-3">
+                <BankTransferDetails bank={bankDetails} />
+              </div>
+            )}
             <SupportContact
               label={t('support.paymentHelp')}
               message={t('support.prefill')}
@@ -286,11 +440,8 @@ export default function CreditsPage() {
                     <h3 className={`text-base font-bold ${tone.strong}`}>{packName}</h3>
                   </div>
                   <div className="flex items-baseline gap-1 my-3" translate="no">
-                    <span dir="ltr" className={`text-3xl font-black ${tone.strong}`}>
-                      {n(p.priceMAD)}
-                    </span>
-                    <span className={`text-sm font-bold ${tone.muted}`}>
-                      {t('creditsPage.currency')}
+                    <span dir="ltr" data-testid="pack-price" className={`text-3xl font-black ${tone.strong}`}>
+                      {priceOf(p)}
                     </span>
                   </div>
                   <p className={`text-xs leading-relaxed mb-6 ${tone.muted}`}>
@@ -340,11 +491,13 @@ export default function CreditsPage() {
                     </>
                   )}
                 </button>
-                {cardProvider === 'creem' && (
+                {showCardPrice && (
                   <p className={`mt-1.5 text-center text-[11px] font-semibold ${tone.muted}`}>
-                    <span dir="ltr" translate="no">{t('creditsPage.cardPrice',{ price: formatUSD(p.priceUSD) })}</span>
+                    <span dir="ltr" translate="no">{t('creditsPage.cardPrice', { price: formatPrice(packPrice(p, cardCurrency), cardCurrency) })}</span>
                   </p>
                 )}
+                {/* Transfer and cash go to a Moroccan account, in dirhams. */}
+                {manualOffered && (
                 <button
                   onClick={() => handleManualOrder(p.id)}
                   disabled={loadingPack === `manual-${p.id}`}
@@ -356,6 +509,7 @@ export default function CreditsPage() {
                   <Landmark className="w-3.5 h-3.5" aria-hidden="true" />
                   {t('creditsPage.manual.button')}
                 </button>
+                )}
               </div>
             );
           })}

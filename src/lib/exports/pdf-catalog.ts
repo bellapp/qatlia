@@ -1,4 +1,6 @@
 import type { Locale } from '@/i18n';
+import type { AppCurrency } from '@/lib/currency';
+import { withCurrencyCode } from './currency-labels';
 
 /**
  * Dedicated label catalog for the `/api/export-pdf` report.
@@ -251,6 +253,7 @@ const ar: PdfCatalog = {
 
 export const pdfCatalogs: Record<Locale, PdfCatalog> = { fr, en, ar };
 
-export function pdfCatalogFor(locale: Locale): PdfCatalog {
-  return pdfCatalogs[locale] ?? pdfCatalogs.fr;
+/** The catalog for a locale, its money labels in the account currency (default MAD). */
+export function pdfCatalogFor(locale: Locale, currency: AppCurrency = 'MAD'): PdfCatalog {
+  return withCurrencyCode(pdfCatalogs[locale] ?? pdfCatalogs.fr, currency);
 }

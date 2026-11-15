@@ -53,11 +53,35 @@ const CREEM_PRODUCT_ENV: Record<PackId, string> = {
   atelier_max: 'CREEM_PRODUCT_ATELIER_MAX',
 };
 
+/** The same packs priced in euros (Creem products are in one currency each). */
+const CREEM_PRODUCT_EUR_ENV: Record<PackId, string> = {
+  starter: 'CREEM_PRODUCT_STARTER_EUR',
+  standard: 'CREEM_PRODUCT_STANDARD_EUR',
+  pro: 'CREEM_PRODUCT_PRO_EUR',
+  atelier_max: 'CREEM_PRODUCT_ATELIER_MAX_EUR',
+};
+
 export interface CreemConfig {
   apiKey: string;
   /** Chosen from the key prefix, so a test key can never reach the live API. */
   apiBase: string;
+  /** The dollar products: every card payment that is not in euros. */
   products: Record<PackId, string>;
+  /**
+   * The euro products, or null until all four are configured: a euro account
+   * then pays the dollar price, never a euro price for some packs only.
+   */
+  productsEUR: Record<PackId, string> | null;
+}
+
+function readCreemProducts(env: Env, names: Record<PackId, string>): Record<PackId, string> | null {
+  const products = {} as Record<PackId, string>;
+  for (const packId of PACK_IDS) {
+    const productId = env[names[packId]];
+    if (isPlaceholder(productId) || !/^prod_/.test((productId as string).trim())) return null;
+    products[packId] = (productId as string).trim();
+  }
+  return products;
 }
 
 /**
@@ -69,21 +93,37 @@ export function getCreemConfig(env: Env = process.env): CreemConfig | null {
   const key = env.CREEM_API_KEY;
   if (isPlaceholder(key)) return null;
   const apiKey = (key as string).trim();
-  const mode = /^creem_(test|live)_/.exec(apiKey)?.[1];
-  if (!mode) return null;
+  // Test keys are `creem_test_…`; production keys are plain `creem_…` (Creem
+  // docs: "Production keys start with creem_ - not creem_test_").
+  if (!/^creem_[A-Za-z0-9_]{6,}$/.test(apiKey)) return null;
+  const mode = apiKey.startsWith('creem_test_') ? 'test' : 'live';
 
-  const products = {} as Record<PackId, string>;
-  for (const packId of PACK_IDS) {
-    const productId = env[CREEM_PRODUCT_ENV[packId]];
-    if (isPlaceholder(productId) || !/^prod_/.test((productId as string).trim())) return null;
-    products[packId] = (productId as string).trim();
-  }
+  const products = readCreemProducts(env, CREEM_PRODUCT_ENV);
+  if (!products) return null;
 
   return {
     apiKey,
     apiBase: mode === 'test' ? 'https://test-api.creem.io' : 'https://api.creem.io',
     products,
+    productsEUR: readCreemProducts(env, CREEM_PRODUCT_EUR_ENV),
   };
+}
+
+/** The products to sell a card payment in that currency from. */
+export function creemProductsFor(config: CreemConfig, cardCurrency: 'USD' | 'EUR'): Record<PackId, string> {
+  return cardCurrency === 'EUR' && config.productsEUR ? config.productsEUR : config.products;
+}
+
+/**
+ * Every product id that pays for each pack, in any currency: what a signed
+ * webhook may name.
+ */
+export function creemProductIdsByPack(config: CreemConfig): Record<PackId, string[]> {
+  const ids = {} as Record<PackId, string[]>;
+  for (const packId of PACK_IDS) {
+    ids[packId] = [config.products[packId], ...(config.productsEUR ? [config.productsEUR[packId]] : [])];
+  }
+  return ids;
 }
 
 export function isCreemConfigured(env: Env = process.env): boolean {

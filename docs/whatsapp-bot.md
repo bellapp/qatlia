@@ -24,6 +24,24 @@ Le même numéro peut être utilisé de deux façons. La variable `WHATSAPP_HAND
 
 Le choix entre les deux se fait à l'étape 2 de la mise en place ci-dessous.
 
+## Numéro en production
+
+État au 14 novembre 2026 : le bot tourne en mode `redirect` sur un numéro dédié. Le 06 00 93 75 23 reste le numéro humain, dans l'app WhatsApp Business.
+
+| Élément | Valeur |
+| --- | --- |
+| Numéro du bot | +212 7 26 26 36 86 (SIM Inwi), nom affiché « QatliA » |
+| Compte WhatsApp (WABA) | QatliA, ID `1154142957108260`, dans le portefeuille business QatliA |
+| ID du numéro (`WHATSAPP_PHONE_NUMBER_ID`) | `1475318458992904` |
+| App Meta | Qatlia bot, ID `2912965159085885`, publiée (mode live) |
+| Utilisateur système | `qatlia-bot`, accès total à l'app et au compte WhatsApp QatliA |
+
+**Pourquoi YCloud.** Meta refusait d'ajouter un numéro directement au portefeuille QatliA (erreur #2494070 : entreprise non vérifiée et portefeuille récent). L'inscription est passée par YCloud (fournisseur officiel, plan gratuit), avec l'option « Create and connect a new WhatsApp Business Platform account » et le compte WhatsApp QatliA déjà existant. Le compte YCloud doit rester connecté : le supprimer pourrait déconnecter le numéro.
+
+**Code PIN de vérification en deux étapes.** Un code PIN à 6 chiffres a été défini le 14 novembre 2026 en enregistrant le numéro avec notre app. Meta le demande pour enregistrer de nouveau le numéro ou le déplacer vers un autre fournisseur. Sa valeur n'est **jamais** écrite dans ce dépôt : elle est rangée hors du dépôt, dans `C:\Users\zbook\qatlia-whatsapp-pin.txt`, à recopier dans un gestionnaire de mots de passe.
+
+**Envoi des réponses.** Notre app reçoit bien les messages du numéro, mais Meta lui refuse l'envoi (code 10, « Application does not have permission for this action ») : seul YCloud, par qui le numéro a été inscrit, peut envoyer. Les réponses du bot doivent donc passer par l'API de YCloud.
+
 ## Variables d'environnement
 
 Les noms ci-dessous sont exacts. Les valeurs ne doivent jamais être écrites dans ce dépôt ni dans une conversation : elles se saisissent uniquement dans Vercel.
@@ -40,6 +58,8 @@ Les noms ci-dessous sont exacts. Les valeurs ne doivent jamais être écrites da
 | `WHATSAPP_BOT_SCOPE` | `ads` (par défaut) : en coexistence, le bot ne répond qu'aux contacts venus de la publicité. `all` : il répond à tout le monde. Sans effet en mode `redirect`, où le bot répond toujours à tout le monde |
 | `WHATSAPP_BOT_MODEL` | Facultative. Modèle IA utilisé (défaut : `OPENROUTER_MODEL`, puis `google/gemini-3.7-flash`) |
 | `OPENROUTER_API_KEY` | Existe déjà (utilisée aussi par le scan) : rien à faire |
+| `YCLOUD_API_KEY` | Facultative. Clé API YCloud (YCloud → Developers → API Keys). Avec `WHATSAPP_FROM_NUMBER`, les réponses du bot partent par YCloud au lieu de l'API Meta : c'est obligatoire quand le numéro a été inscrit par YCloud |
+| `WHATSAPP_FROM_NUMBER` | Facultative. Numéro du bot au format international (`+212726263686`), utilisé comme expéditeur par YCloud |
 
 ## Mise en place
 

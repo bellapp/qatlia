@@ -4,6 +4,8 @@ import React, { useEffect, useId, useRef, useState } from 'react';
 import { X, FileText, RefreshCw, Upload, Trash2 } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { useLocale } from '@/components/LocaleProvider';
+import { useCurrency } from '@/components/currency-store';
+import { DEFAULT_CURRENCY } from '@/lib/currency';
 import { SupportContact } from '@/components/SupportContact';
 import { quotationErrorKey } from '@/i18n/domain';
 import type { TranslationKey } from '@/i18n';
@@ -92,6 +94,8 @@ export const QuotationDialog: React.FC<QuotationDialogProps> = ({
   projectId,
 }) => {
   const { t, locale } = useLocale();
+  // The quote is in the account currency, the one the plan was priced in.
+  const currency = useCurrency().currency ?? DEFAULT_CURRENCY;
   const headingId = useId();
   const dialogRef = useRef<HTMLDivElement>(null);
   const logoInputRef = useRef<HTMLInputElement>(null);
@@ -303,6 +307,7 @@ export const QuotationDialog: React.FC<QuotationDialogProps> = ({
         notes: notes.trim() ? notes.trim() : undefined,
         locale: outputLocale,
         includeAmountInWords,
+        currency,
         logoDataUrl,
         panels,
         pieces,

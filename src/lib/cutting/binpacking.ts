@@ -9,6 +9,7 @@ import {
   type SheetCostLine,
   type EdgeSegmentCostLine,
 } from '@/lib/costing';
+import { catalogPriceIn, type AppCurrency } from '@/lib/currency';
 
 // Single source of truth for supported material types, shared by the API
 // schema (enum validation) and the material library below, so neither can
@@ -56,14 +57,15 @@ function isPrice(value: unknown): value is number {
 }
 
 /**
- * MAD per metre for an edge-banding colour. The artisan sets one price for
- * every colour (user request, 2026-11-13: a price per colour was too much
- * detail); without it each colour keeps its catalog price.
+ * Price per metre for an edge-banding colour, in the account currency. The
+ * artisan sets one price for every colour (user request, 2026-11-13: a price
+ * per colour was too much detail); without it each colour keeps its catalog
+ * price — a dirham figure, converted for a euro or dollar account.
  */
-export function edgePricePerM(edgeId: string, ownPricePerM?: number): number {
+export function edgePricePerM(edgeId: string, ownPricePerM?: number, currency?: AppCurrency): number {
   const preset = EDGEBANDING_PRESETS.find((e) => e.id === edgeId) || EDGEBANDING_PRESETS[0];
   if (preset.id === 'none') return 0;
-  return isPrice(ownPricePerM) ? ownPricePerM : preset.pricePerM;
+  return isPrice(ownPricePerM) ? ownPricePerM : catalogPriceIn(preset.pricePerM, currency);
 }
 
 /**
@@ -71,8 +73,14 @@ export function edgePricePerM(edgeId: string, ownPricePerM?: number): number {
  * its area, to the cent. Artisans buy and price panels by the panel, so the
  * catalog default is a price per panel too (user request, 2026-11-13).
  */
-export function catalogPanelPrice(material: MaterialType | null | undefined, widthCm: number, heightCm: number): number {
-  return roundCurrency(getMaterialDef((material || 'mdf') as MaterialType).pricePerM2 * ((widthCm * heightCm) / 10000));
+export function catalogPanelPrice(
+  material: MaterialType | null | undefined,
+  widthCm: number,
+  heightCm: number,
+  currency?: AppCurrency
+): number {
+  const priceMad = roundCurrency(getMaterialDef((material || 'mdf') as MaterialType).pricePerM2 * ((widthCm * heightCm) / 10000));
+  return catalogPriceIn(priceMad, currency);
 }
 
 /**
@@ -83,11 +91,12 @@ export function catalogPanelPrice(material: MaterialType | null | undefined, wid
  */
 export function sheetPricing(
   sheet: { material?: MaterialType | null; pricePerSheet?: number; width: number; height: number },
-  overrides?: Partial<Record<MaterialType, StockPricing>>
+  overrides?: Partial<Record<MaterialType, StockPricing>>,
+  currency?: AppCurrency
 ): StockPricing {
   if (isPrice(sheet.pricePerSheet)) return { mode: 'per_sheet', value: sheet.pricePerSheet };
   const material = (sheet.material || 'mdf') as MaterialType;
-  return overrides?.[material] ?? { mode: 'per_sheet', value: catalogPanelPrice(material, sheet.width, sheet.height) };
+  return overrides?.[material] ?? { mode: 'per_sheet', value: catalogPanelPrice(material, sheet.width, sheet.height, currency) };
 }
 
 /**
@@ -158,6 +167,11 @@ export interface OptimizationOptions {
   laborPricing?: LaborPricing;
   /** The artisan's price per metre of edge banding, every colour (see `edgePricePerM`). */
   edgeBandPricePerM?: number;
+  /**
+   * The account currency the plan is priced in: the catalog prices (dirham
+   * figures) are converted to it. Absent: dirhams, as before.
+   */
+  currency?: AppCurrency;
   /**
    * Per-material stock price override fed into the shared cost calculator.
    * A material absent from this map keeps using the material library's
@@ -290,6 +304,8 @@ export function repriceCostingInput(
   prices: {
     edgeBandPricePerM?: number;
     sheet?: Pick<Sheet, 'material' | 'width' | 'height' | 'color' | 'pricePerSheet'>;
+    /** The account currency, for the catalog prices (see `catalogPriceIn`). */
+    currency?: AppCurrency;
   }
 ): CostBreakdownInput {
   const { sheet } = prices;
@@ -307,13 +323,13 @@ export function repriceCostingInput(
         const { color: _previousColor, ...rest } = line;
         void _previousColor;
         const color = sheet.color?.trim().slice(0, 60);
-        return { ...rest, pricing: sheetPricing(sheet), ...(color ? { color } : {}) };
+        return { ...rest, pricing: sheetPricing(sheet, undefined, prices.currency), ...(color ? { color } : {}) };
       }),
     },
     edge: {
       ...input.edge,
       segments: input.edge.segments.map((segment) =>
-        segment.edgeId ? { ...segment, pricePerMeter: edgePricePerM(segment.edgeId, prices.edgeBandPricePerM) } : segment
+        segment.edgeId ? { ...segment, pricePerMeter: edgePricePerM(segment.edgeId, prices.edgeBandPricePerM, prices.currency) } : segment
       ),
     },
   };
@@ -485,8 +501,11 @@ interface PackingStrategy {
    *   which first groups pieces that share a common dimension and cuts each
    *   group from one full-width band, so pieces of the same width come off the
    *   SAME rip instead of being scattered across leftover rectangles.
+   * - 'filled_band' — the filled band packer (`packSheetWithFilledBands`),
+   *   whose bands run along `axis` and each take the combination of pieces
+   *   that fills their length best.
    */
-  mode?: 'free_rect' | 'band';
+  mode?: 'free_rect' | 'band' | 'filled_band';
 }
 
 interface PlacementCandidate {
@@ -540,6 +559,18 @@ const PACKING_STRATEGIES: PackingStrategy[] = [
   // one long rip frees the band, then crosscuts inside it. See
   // `packSheetWithSharedWidthBands`.
   { id: 'band-width-shared', axis: 'rows', order: 'long_side_desc', levelSelection: 'tight_primary', mode: 'band' },
+];
+
+// Bands filled at their best, across the panel and along its height (see
+// `packSheetWithFilledBands`). They are kept out of the table above on
+// purpose: a plan search keeps only a handful of partial plans per panel, so
+// two more strategies in the same search change which ones survive, and with
+// them plans customers have already checked at the saw. These run in a search
+// of their own, whose plan is taken only when it saves a panel or places more
+// pieces (see `runStrategySearch`).
+const FILLED_BAND_STRATEGIES: PackingStrategy[] = [
+  { id: 'band-filled-rows', axis: 'rows', order: 'long_side_desc', levelSelection: 'tight_primary', mode: 'filled_band' },
+  { id: 'band-filled-columns', axis: 'columns', order: 'long_side_desc', levelSelection: 'tight_primary', mode: 'filled_band' },
 ];
 
 function compareNumbersDesc(a: number, b: number): number {
@@ -1006,6 +1037,264 @@ function packSheetWithSharedWidthBands(
   };
 }
 
+// ─── Filled band packing ──────────────────────────────────────────
+//
+// The shared-width packer above lays its bands across the panel only, gives
+// every piece to one band dimension up front and fills a band longest piece
+// first. That misses plans a carpenter finds by hand (customer report,
+// 2026-11-15: 19 pieces sharing the dimensions 70 and 33 came out on two
+// 206 × 279 panels; as four bands running the panel's height, 70 + 70 + 33 +
+// 33, they fill one). This packer differs on the three points:
+//
+// - bands run either way: across the panel ('rows') or along its height
+//   ('columns'), one strategy each;
+// - each band takes the combination of pieces that fills its length best,
+//   found exactly rather than longest first;
+// - a piece is not tied to one dimension: a 70 × 33 piece lies in a 70 band or
+//   a 33 band, whichever band is being filled when it is taken.
+//
+// Kerf, margins and saw passes are counted exactly as in the shared-width
+// packer, so the plans of both compare on the same `totalLinearCutMeters`.
+
+// Band lengths are filled in whole millimetres, the precision pieces are
+// entered at. A length that is not a whole millimetre counts as the next one
+// up, so a band is never overfilled.
+const BAND_FILL_UNITS_PER_CM = 10;
+
+interface BandFillMember { item: ExpandedPiece; length: number; rotated: boolean; }
+interface FilledBand { size: number; members: BandFillMember[]; filled: number; }
+
+// Which band to lay next among the candidates, each already filled at its
+// best: the one filled closest to its full length, or the one that places the
+// most area. Neither is always right, so a panel is banded under each rule and
+// the banding that places more area is kept.
+type BandChoiceRule = 'fullest' | 'largest';
+const BAND_CHOICE_RULES: BandChoiceRule[] = ['fullest', 'largest'];
+
+/** The ways a piece can lie in a band along `axis`: `size` across the band, `length` along it. */
+function getBandFillOrientations(item: ExpandedPiece, axis: StripAxis): { size: number; length: number; rotated: boolean }[] {
+  return getBandOrientations(item).map((orientation) => (axis === 'rows'
+    ? { size: orientation.bandHeight, length: orientation.length, rotated: orientation.rotated }
+    : { size: orientation.length, length: orientation.bandHeight, rotated: orientation.rotated }));
+}
+
+// The best fill of a run depends only on the run, the kerf and the lengths on
+// offer, and one job asks for the same ones over and over: every plan the
+// search tries bands the pieces it has left, and most dimensions are untouched
+// from one try to the next. Answers are kept by those three, as positions in
+// the list of lengths, so they hold for any job. The limit only bounds memory.
+const BAND_FILL_MEMO_LIMIT = 20_000;
+const bandFillMemo = new Map<string, number[]>();
+
+// The members whose lengths, a kerf apart, fill the most of `run`: a subset
+// sum over lengths in whole millimetres. `members` come longest first, and
+// among equal fills the one found first is kept, which favours long pieces and
+// so fewer crosscuts.
+function fillBandRun(members: BandFillMember[], run: number, kerf: number): BandFillMember[] {
+  // Each piece takes its length and one kerf; the last needs no kerf after
+  // it, which is the same as a run one kerf longer.
+  const spanOf = (chosen: BandFillMember[]) => chosen.reduce((sum, member) => sum + member.length + kerf, 0) - kerf;
+  if (spanOf(members) <= run + 1e-9) return members;
+
+  const memoKey = `${run}|${kerf}|${members.map((member) => member.length).join(',')}`;
+  const remembered = bandFillMemo.get(memoKey);
+  if (remembered) return remembered.map((index) => members[index]);
+
+  const capacity = Math.floor(((run + kerf) * BAND_FILL_UNITS_PER_CM) + 1e-6);
+  const weights = members.map((member) => Math.max(1, Math.ceil(((member.length + kerf) * BAND_FILL_UNITS_PER_CM) - 1e-6)));
+  // takenBy[s] is the member that first brought the total to s, -1 while s is
+  // out of reach. Members are offered one at a time and totals walked
+  // downwards, so a member is never counted twice in one total.
+  const takenBy = new Int32Array(capacity + 1).fill(-1);
+  let reach = 0;
+  for (let index = 0; index < members.length && reach < capacity; index += 1) {
+    const weight = weights[index];
+    for (let total = Math.min(capacity, reach + weight); total >= weight; total -= 1) {
+      if (takenBy[total] !== -1) continue;
+      if (total === weight || takenBy[total - weight] !== -1) {
+        takenBy[total] = index;
+        if (total > reach) reach = total;
+      }
+    }
+  }
+
+  const picked: number[] = [];
+  for (let total = reach; total > 0; total -= weights[takenBy[total]]) picked.push(takenBy[total]);
+  picked.reverse();
+  // Whole millimetres round a length to within a millionth; the real lengths
+  // decide, and the shortest piece goes if they run over.
+  while (picked.length > 0 && spanOf(picked.map((index) => members[index])) > run + 1e-9) picked.pop();
+
+  if (bandFillMemo.size >= BAND_FILL_MEMO_LIMIT) bandFillMemo.clear();
+  bandFillMemo.set(memoKey, picked);
+  return picked.map((index) => members[index]);
+}
+
+// Bands for one panel, chosen one at a time: every dimension still present
+// among the unplaced pieces is filled at its best, `rule` picks one, its
+// pieces leave the list, and so on until no band fits what is left of the
+// panel.
+function chooseFilledBands(
+  items: ExpandedPiece[],
+  axis: StripAxis,
+  run: number,
+  stack: number,
+  kerf: number,
+  rule: BandChoiceRule
+): FilledBand[] {
+  const bands: FilledBand[] = [];
+  let unplaced = items;
+  let stackLeft = stack;
+
+  while (unplaced.length > 0) {
+    const bySize = new Map<string, { size: number; members: BandFillMember[] }>();
+    for (const item of unplaced) {
+      for (const orientation of getBandFillOrientations(item, axis)) {
+        if (orientation.size > stackLeft + 1e-9 || orientation.length > run + 1e-9) continue;
+        const key = bandDimensionKey(orientation.size);
+        const member: BandFillMember = { item, length: orientation.length, rotated: orientation.rotated };
+        const group = bySize.get(key);
+        if (group) group.members.push(member);
+        else bySize.set(key, { size: orientation.size, members: [member] });
+      }
+    }
+
+    let best: FilledBand | null = null;
+    let bestScore: number[] = [];
+    for (const group of Array.from(bySize.values())) {
+      group.members.sort((a, b) => (b.length - a.length) || String(a.item.id || '').localeCompare(String(b.item.id || '')));
+      const members = fillBandRun(group.members, run, kerf);
+      if (members.length === 0) continue;
+
+      const filled = members.reduce((sum, member) => sum + member.length, 0);
+      const score = rule === 'fullest' ? [filled / run, group.size] : [filled * group.size, filled / run];
+      if (!best || compareTuples(score, bestScore) > 0) {
+        best = { size: group.size, members, filled };
+        bestScore = score;
+      }
+    }
+
+    if (!best) break;
+    bands.push(best);
+    const taken = new Set(best.members.map((member) => member.item));
+    unplaced = unplaced.filter((item) => !taken.has(item));
+    stackLeft -= best.size + kerf;
+  }
+
+  return bands;
+}
+
+function packSheetWithFilledBands(
+  items: ExpandedPiece[],
+  sheet: Sheet,
+  axis: StripAxis,
+  sheetIndex: number,
+  nextPieceNumber: number
+): SheetPackingCandidate {
+  const { margin, kerf, width: usableWidth, height: usableHeight } = usableSpan(sheet);
+  const pieces: PlacedPiece[] = [];
+  const cuts: CutInstruction[] = [];
+  const freeRects: FreeRect[] = [];
+  let usedArea = 0;
+
+  if (usableWidth <= 0 || usableHeight <= 0) {
+    return { pieces, remaining: [...items], usedArea, freeRects, cuts };
+  }
+
+  const alongWidth = axis === 'rows';
+  const run = alongWidth ? usableWidth : usableHeight;
+  const stack = alongWidth ? usableHeight : usableWidth;
+  // The same pieces always band the same way, whatever order they come in.
+  const ordered = [...items].sort((a, b) => String(a.id || '').localeCompare(String(b.id || '')));
+
+  let bands: FilledBand[] = [];
+  let bandedArea = -1;
+  for (const rule of BAND_CHOICE_RULES) {
+    const candidate = chooseFilledBands(ordered, axis, run, stack, kerf, rule);
+    const area = candidate.reduce((sum, band) => sum + (band.filled * band.size), 0);
+    if (area > bandedArea + 1e-9) {
+      bands = candidate;
+      bandedArea = area;
+    }
+  }
+
+  // Widest band first, bands of one size side by side: the fence is set once
+  // per size. Which band sits where changes neither the fit nor the cuts.
+  bands = [...bands].sort((a, b) => (b.size - a.size) || (b.filled - a.filled));
+
+  const runEnd = margin + run;
+  const stackEnd = margin + stack;
+  const placedItems = new Set<ExpandedPiece>();
+  let stackCursor = margin;
+
+  for (const band of bands) {
+    let runCursor = margin;
+
+    for (const member of band.members) {
+      pieces.push({
+        pieceId: member.item.id,
+        pieceNumber: nextPieceNumber + pieces.length,
+        name: member.item.name,
+        baseName: member.item.baseName,
+        isUnnamed: member.item.isUnnamed,
+        originalHeight: member.item.originalHeight,
+        originalWidth: member.item.originalWidth,
+        height: alongWidth ? band.size : member.length,
+        width: alongWidth ? member.length : band.size,
+        x: alongWidth ? runCursor : stackCursor,
+        y: alongWidth ? stackCursor : runCursor,
+        rotated: member.rotated,
+        sheetIndex,
+        material: member.item.material,
+        color: member.item.color,
+        originalIndex: member.item.originalIndex,
+        edges: member.item.edges,
+        // Rotation is blocked at expandPieces for any grain-constrained
+        // piece, so a placed unit's grain axis always equals its source axis.
+        grain: member.item.grain,
+      });
+      placedItems.add(member.item);
+      usedArea += member.length * band.size;
+
+      const runLeft = runEnd - (runCursor + member.length) - kerf;
+      if (runLeft > 1e-9) {
+        // Crosscut releasing this piece from the rest of its band.
+        cuts.push({ id: `sheet${sheetIndex}_cut_${cuts.length}`, sheetIndex, axis: alongWidth ? 'vertical' : 'horizontal', lengthCm: band.size });
+      }
+      runCursor += member.length + kerf;
+    }
+
+    const bandLeftover = runEnd - runCursor;
+    if (bandLeftover > 1e-9) {
+      freeRects.push(alongWidth
+        ? { x: runCursor, y: stackCursor, width: bandLeftover, height: band.size }
+        : { x: stackCursor, y: runCursor, width: band.size, height: bandLeftover });
+    }
+
+    const stackLeft = stackEnd - (stackCursor + band.size) - kerf;
+    if (stackLeft > 1e-9) {
+      // The long rip separating this band from the rest of the panel.
+      cuts.push({ id: `sheet${sheetIndex}_cut_${cuts.length}`, sheetIndex, axis: alongWidth ? 'horizontal' : 'vertical', lengthCm: run });
+    }
+    stackCursor += band.size + kerf;
+  }
+
+  const tail = stackEnd - stackCursor;
+  if (tail > 1e-9) {
+    freeRects.push(alongWidth
+      ? { x: margin, y: stackCursor, width: run, height: tail }
+      : { x: stackCursor, y: margin, width: tail, height: run });
+  }
+
+  return {
+    pieces,
+    remaining: items.filter((item) => !placedItems.has(item)),
+    usedArea,
+    freeRects: sortFreeRects(pruneFreeRects(freeRects), axis),
+    cuts,
+  };
+}
+
 function packSheetWithStrategy(
   items: ExpandedPiece[],
   sheet: Sheet,
@@ -1015,6 +1304,9 @@ function packSheetWithStrategy(
 ): SheetPackingCandidate {
   if (strategy.mode === 'band') {
     return packSheetWithSharedWidthBands(items, sheet, sheetIndex, nextPieceNumber);
+  }
+  if (strategy.mode === 'filled_band') {
+    return packSheetWithFilledBands(items, sheet, strategy.axis, sheetIndex, nextPieceNumber);
   }
   return packSheetWithFreeRects(items, sheet, strategy, sheetIndex, nextPieceNumber);
 }
@@ -1152,6 +1444,8 @@ interface PlanSearchControls {
   checkpoints?: PlanSearchCheckpoint[];
   /** Counts the packing work done, one unit per piece offered to a panel. */
   meter?: { work: number };
+  /** The strategies tried on every panel; `PACKING_STRATEGIES` unless given. */
+  strategies?: PackingStrategy[];
 }
 
 function simulatePlanForStrategy(
@@ -1162,11 +1456,11 @@ function simulatePlanForStrategy(
   defaultMaterial: MaterialType,
   search: PlanSearchControls = {}
 ): PlanCandidate {
-  const { strip, checkpoints, meter } = search;
+  const { strip, checkpoints, meter, strategies = PACKING_STRATEGIES } = search;
   const stockSequence = getStockSequence(sheets);
   const candidateStrategies = [
     strategy,
-    ...PACKING_STRATEGIES.filter((candidate) => candidate.id !== strategy.id),
+    ...strategies.filter((candidate) => candidate.id !== strategy.id),
   ];
   // A strip search already knows how many panels the job takes: a plan that
   // needs one more is of no use to it, so it stops there instead of opening
@@ -1424,10 +1718,27 @@ function buildActiveConstraints(options: OptimizationOptions, sheetsUsed: number
 
 interface StrategySearchOutcome { plan: PlanCandidate; candidatesEvaluated: number; }
 
+/** True when `plan` places every piece on as few panels as the pieces' area allows: no other plan can save a panel on it. */
+function usesFewestPanelsPossible(plan: PlanCandidate, items: ExpandedPiece[], sheets: Sheet[]): boolean {
+  if (plan.unplacedPieces.length > 0) return false;
+  const pieceArea = items.reduce((sum, item) => sum + (item.width * item.height), 0);
+  const largestUsableArea = sheets.reduce((max, sheet) => {
+    const usable = usableSpan(sheet);
+    return Math.max(max, usable.width * usable.height);
+  }, 0);
+  if (largestUsableArea <= 0) return true;
+  return plan.sheets.length <= Math.ceil((pieceArea - 1e-9) / largestUsableArea);
+}
+
 // Runs every packing strategy against one homogeneous set of items/stock and
 // keeps the best plan per the active `optimizationPriority` scoring policy,
 // then gives that plan a second pass to keep its largest offcut whole (see
 // `keepLargestRemnantWhole`).
+//
+// The filled bands get a search of their own (see `FILLED_BAND_STRATEGIES`),
+// and its plan replaces the first one only when it places more pieces or
+// takes fewer panels. A job they do not improve that way keeps exactly the
+// plan it had before they existed.
 function runStrategySearch(
   items: ExpandedPiece[],
   candidateSheets: Sheet[],
@@ -1437,23 +1748,53 @@ function runStrategySearch(
   let bestPlan: PlanCandidate | null = null;
   // Left by the first strategy's search for the second pass, which runs that
   // same strategy again with a strip on one panel.
-  const checkpoints: PlanSearchCheckpoint[] = [];
+  let checkpoints: PlanSearchCheckpoint[] = [];
+  let strategies = PACKING_STRATEGIES;
+  let leadStrategy = PACKING_STRATEGIES[0];
+  let candidatesEvaluated = PACKING_STRATEGIES.length;
 
   for (const strategy of PACKING_STRATEGIES) {
-    const candidate = simulatePlanForStrategy(items, candidateSheets, strategy, mergedOptions, defaultMaterial, strategy === PACKING_STRATEGIES[0] ? { checkpoints } : {});
+    const candidate = simulatePlanForStrategy(items, candidateSheets, strategy, mergedOptions, defaultMaterial, strategy === leadStrategy ? { checkpoints } : {});
     bestPlan = chooseBetterPlan(bestPlan, candidate, mergedOptions.optimizationPriority);
+  }
+
+  if (!bestPlan || !usesFewestPanelsPossible(bestPlan, items, candidateSheets)) {
+    const withFilledBands = [...PACKING_STRATEGIES, ...FILLED_BAND_STRATEGIES];
+    const filledLead = FILLED_BAND_STRATEGIES[0];
+    const filledCheckpoints: PlanSearchCheckpoint[] = [];
+    let filledPlan: PlanCandidate | null = null;
+
+    for (const strategy of FILLED_BAND_STRATEGIES) {
+      const candidate = simulatePlanForStrategy(items, candidateSheets, strategy, mergedOptions, defaultMaterial, {
+        strategies: withFilledBands,
+        ...(strategy === filledLead ? { checkpoints: filledCheckpoints } : {}),
+      });
+      filledPlan = chooseBetterPlan(filledPlan, candidate, mergedOptions.optimizationPriority);
+    }
+    candidatesEvaluated += FILLED_BAND_STRATEGIES.length;
+
+    const placesMoreOnFewerPanels = filledPlan && (!bestPlan || compareTuples(
+      [filledPlan.unplacedPieces.length, filledPlan.sheets.length],
+      [bestPlan.unplacedPieces.length, bestPlan.sheets.length]
+    ) < 0);
+    if (filledPlan && placesMoreOnFewerPanels) {
+      bestPlan = filledPlan;
+      checkpoints = filledCheckpoints;
+      strategies = withFilledBands;
+      leadStrategy = filledLead;
+    }
   }
 
   if (!bestPlan) {
     return {
       plan: { sheets: [], placedPieces: [], unplacedPieces: items, totalAreaUsed: 0, totalAreaAvailable: 0 },
-      candidatesEvaluated: PACKING_STRATEGIES.length,
+      candidatesEvaluated,
     };
   }
 
-  if (!remnantPassEnabled) return { plan: bestPlan, candidatesEvaluated: PACKING_STRATEGIES.length };
-  const second = keepLargestRemnantWhole(items, candidateSheets, bestPlan, checkpoints, mergedOptions, defaultMaterial);
-  return { plan: second.plan, candidatesEvaluated: PACKING_STRATEGIES.length + second.candidatesEvaluated };
+  if (!remnantPassEnabled) return { plan: bestPlan, candidatesEvaluated };
+  const second = keepLargestRemnantWhole(items, candidateSheets, bestPlan, checkpoints, mergedOptions, defaultMaterial, leadStrategy, strategies);
+  return { plan: second.plan, candidatesEvaluated: candidatesEvaluated + second.candidatesEvaluated };
 }
 
 // ─── Second pass: the largest offcut, in one piece ────────────────
@@ -1569,10 +1910,12 @@ function keepLargestRemnantWhole(
   basePlan: PlanCandidate,
   checkpoints: PlanSearchCheckpoint[],
   mergedOptions: OptimizationOptions,
-  defaultMaterial: MaterialType
+  defaultMaterial: MaterialType,
+  // The strategy whose search left `checkpoints`, and the table it ran with.
+  strategy: PackingStrategy | undefined,
+  strategies: PackingStrategy[]
 ): StrategySearchOutcome {
   const sheetCount = basePlan.sheets.length;
-  const strategy = PACKING_STRATEGIES[0];
   if (sheetCount === 0 || !strategy) return { plan: basePlan, candidatesEvaluated: 0 };
 
   const stockSequence = getStockSequence(sheets);
@@ -1585,7 +1928,7 @@ function keepLargestRemnantWhole(
 
   const probe = (strip: StripLimit): PlanCandidate | null => {
     probes += 1;
-    const candidate = simulatePlanForStrategy(items, sheets, strategy, mergedOptions, defaultMaterial, { strip, checkpoints, meter });
+    const candidate = simulatePlanForStrategy(items, sheets, strategy, mergedOptions, defaultMaterial, { strip, checkpoints, meter, strategies });
     const keepsThePlan = candidate.unplacedPieces.length <= basePlan.unplacedPieces.length
       && candidate.sheets.length <= sheetCount
       && candidate.totalAreaUsed >= basePlan.totalAreaUsed - 1e-6;
@@ -1889,7 +2232,7 @@ export function optimizeCutting2D(
   const sheetCostLines: SheetCostLine[] = finalPlan.sheets.map((sheet) => ({
     areaM2: (sheet.width * sheet.height) / 10000,
     quantity: 1,
-    pricing: sheetPricing(sheet, mergedOptions.stockPricingOverrides),
+    pricing: sheetPricing(sheet, mergedOptions.stockPricingOverrides, mergedOptions.currency),
     // Which panel this is, for the price detail (src/lib/cost-detail.ts) only.
     material: sheet.material,
     ...(sheet.label ? { label: sheet.label.slice(0, 80) } : {}),
@@ -1912,7 +2255,7 @@ export function optimizeCutting2D(
     const pricePerMeter = resolveEdgeRatePerMeter(
       placed.edges.pricePerM !== undefined
         ? { kind: 'explicit', pricePerMeter: placed.edges.pricePerM }
-        : { kind: 'preset', preset: { id: preset.id, pricePerMeter: edgePricePerM(preset.id, mergedOptions.edgeBandPricePerM) } }
+        : { kind: 'preset', preset: { id: preset.id, pricePerMeter: edgePricePerM(preset.id, mergedOptions.edgeBandPricePerM, mergedOptions.currency) } }
     );
     if (pricePerMeter <= 0) continue;
     // Edge flags (top/bottom/left/right) refer to the piece's own labeled
@@ -1964,6 +2307,7 @@ export function optimizeCutting(pieces: Piece[], sheet: Sheet, options?: Partial
 
 export const GuillotinePacker = {
   strategies: PACKING_STRATEGIES,
+  filledBandStrategies: FILLED_BAND_STRATEGIES,
   pruneFreeRects,
   chooseBetterPlan,
   withoutRemnantPass,

@@ -13,6 +13,9 @@ export const SUPPORT_EMAIL = 'contact@qatlia.ma';
 /** International format without the "+", as wa.me expects (06 00 93 75 23). */
 export const SUPPORT_WHATSAPP = '212600937523';
 
+/** How a Moroccan customer reads and dials the number. */
+export const SUPPORT_WHATSAPP_DISPLAY = `0${SUPPORT_WHATSAPP.slice(3)}`.replace(/(\d{2})(?=\d)/g, '$1 ');
+
 /** E.164, for structured data and `tel:` links. */
 export const SUPPORT_PHONE_E164 = `+${SUPPORT_WHATSAPP}`;
 

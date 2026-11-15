@@ -74,17 +74,25 @@ test('toStripeMinorUnits refuses non-finite or non-positive prices instead of se
   assert.throws(() => toStripeMinorUnits(Number.POSITIVE_INFINITY));
 });
 
-test('the catalog carries no EUR price and no unused Stripe price IDs', () => {
+test('the catalog carries no unused Stripe price IDs', () => {
   const { CREDIT_PACKS, PACK_IDS } = loadTsModule('src/lib/billing/catalog.ts');
 
   for (const id of PACK_IDS) {
     const keys = Object.keys(CREDIT_PACKS[id]);
-    assert.ok(!keys.includes('priceEUR'), `${id} must not expose priceEUR`);
     assert.ok(!keys.includes('stripePriceId'), `${id} must not expose an unused Stripe price ID`);
   }
   const source = read('src/lib/billing/catalog.ts');
-  assert.ok(!/priceEUR/.test(source), 'catalog source must not mention priceEUR');
   assert.ok(!/STRIPE_PRICE_/.test(source), 'catalog source must not read unused STRIPE_PRICE_* env vars');
+});
+
+// Euro accounts (user decision 2026-11-15) pay the dollar figures in euros,
+// through Creem euro products priced exactly so.
+test('a euro pack costs the dollar figure, in euros', () => {
+  const { CREDIT_PACKS, PACK_IDS } = loadTsModule('src/lib/billing/catalog.ts');
+  for (const id of PACK_IDS) {
+    assert.equal(CREDIT_PACKS[id].priceEUR, CREDIT_PACKS[id].priceUSD, id);
+  }
+  assert.deepEqual(PACK_IDS.map((id) => CREDIT_PACKS[id].priceEUR), [4.99, 9.99, 19.99, 29.99]);
 });
 
 // ---------------------------------------------------------------------------

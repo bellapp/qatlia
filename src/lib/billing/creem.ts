@@ -117,9 +117,18 @@ function firstMetadata(...candidates: unknown[]): Metadata {
   return {};
 }
 
-function packForProduct(productId: string | null, products: Record<PackId, string>): PackId | null {
+/**
+ * The product id(s) that pay for each pack: one per currency sold (dollar
+ * and euro products, see `creemProductIdsByPack`).
+ */
+export type CreemProductMap = Record<PackId, string | readonly string[]>;
+
+function packForProduct(productId: string | null, products: CreemProductMap): PackId | null {
   if (!productId) return null;
-  const match = (Object.keys(products) as PackId[]).find((packId) => products[packId] === productId);
+  const match = (Object.keys(products) as PackId[]).find((packId) => {
+    const ids = products[packId];
+    return typeof ids === 'string' ? ids === productId : ids.includes(productId);
+  });
   return match ?? null;
 }
 
@@ -127,7 +136,7 @@ function buildGrant(
   metadata: Metadata,
   productId: string | null,
   transactionId: string | null,
-  products: Record<PackId, string>,
+  products: CreemProductMap,
   source: 'creem_checkout',
   charged: { amountPaid: number | null; currency: string | null }
 ): GrantResolution {
@@ -165,7 +174,7 @@ function buildGrant(
   };
 }
 
-export function resolveCreemGrant(event: CreemEventLike, products: Record<PackId, string>): GrantResolution {
+export function resolveCreemGrant(event: CreemEventLike, products: CreemProductMap): GrantResolution {
   const object = asRecord(event?.object) || {};
 
   if (event?.eventType === 'checkout.completed') {
@@ -191,4 +200,36 @@ export function resolveCreemGrant(event: CreemEventLike, products: Record<PackId
   }
 
   return { ok: false, reason: `UNHANDLED_EVENT:${String(event?.eventType)}`, retryable: false };
+}
+
+/** The interface languages QatliA offers (kept literal: no catalog import here). */
+type InterfaceLocale = 'fr' | 'en' | 'ar';
+
+/**
+ * The language the Creem checkout should open in for a QatliA interface
+ * language. Creem has French and English but no Arabic (an unknown locale
+ * falls back to English), so Arabic maps to French, the language a Moroccan
+ * customer is likelier to read than English.
+ */
+export function creemCheckoutLocale(locale: InterfaceLocale | string | null | undefined): 'fr' | 'en' {
+  return locale === 'en' ? 'en' : 'fr';
+}
+
+const CREEM_CHECKOUT_HOST = /(^|\.)creem\.io$/;
+
+/**
+ * Adds `?locale=` to a Creem hosted-checkout URL, which otherwise follows the
+ * browser's language rather than the one chosen on QatliA. Only a Creem https
+ * URL is changed; anything else is returned as is.
+ */
+export function withCreemCheckoutLocale(checkoutUrl: string, locale: InterfaceLocale | string | null | undefined): string {
+  let url: URL;
+  try {
+    url = new URL(checkoutUrl);
+  } catch {
+    return checkoutUrl;
+  }
+  if (url.protocol !== 'https:' || !CREEM_CHECKOUT_HOST.test(url.hostname)) return checkoutUrl;
+  url.searchParams.set('locale', creemCheckoutLocale(locale));
+  return url.toString();
 }

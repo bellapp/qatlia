@@ -7,7 +7,9 @@ import { QatlIALogo } from '@/components/QatlIALogo';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { LocaleSwitcher, useLocale } from '@/components/LocaleProvider';
 import { SELECTABLE_LOCALES } from '@/i18n';
-import { BILLING_CURRENCY, CREDIT_PACKS, PACK_IDS } from '@/lib/billing/catalog';
+import { CREDIT_PACKS, PACK_IDS, formatPrice, packPrice } from '@/lib/billing/catalog';
+import { DEFAULT_CURRENCY } from '@/lib/currency';
+import { useCurrency } from '@/components/CurrencySwitcher';
 import { creditPackLabelKeys } from '@/i18n/domain';
 import { SIGNUP_FREE_CREDITS } from '@/lib/billing/policy';
 import { SUPPORT_EMAIL, supportMailto, supportWhatsAppUrl } from '@/lib/support';
@@ -27,7 +29,8 @@ const STATS = ['waste', 'surface', 'time', 'credits'] as const;
 /** The navy band's four figures — value from code, label from the catalog. */
 const HERO_STATS = [
   { key: 'credits', value: String(FREE_VISION_CREDITS) },
-  { key: 'free', value: `0 ${BILLING_CURRENCY}` },
+  // The free plan's figure, in the visitor's currency (see `freeValue`).
+  { key: 'free', value: null },
   { key: 'max', value: MAX_PACK.displayCredits },
   { key: 'langs', value: String(SELECTABLE_LOCALES.length) },
 ] as const;
@@ -80,6 +83,10 @@ function PlanLine({ children, included = true }: { children: React.ReactNode; in
 /** `homeHref`: where the logo leads — the Arabic page links back to itself, not to /. */
 export default function LandingPage({ homeHref = '/' }: { homeHref?: string }) {
   const { t } = useLocale();
+  // Prices in the visitor's currency (from their country, or their choice);
+  // dirhams in the server render, the home market's.
+  const currency = useCurrency().currency ?? DEFAULT_CURRENCY;
+  const freeValue = currency === 'EUR' ? '0 €' : currency === 'USD' ? '$0' : '0 MAD';
 
   return (
     <div className="min-h-screen bg-studio-canvas text-slate-900 dark:text-slate-100 font-body antialiased overflow-x-hidden">
@@ -224,7 +231,7 @@ export default function LandingPage({ homeHref = '/' }: { homeHref?: string }) {
           {HERO_STATS.map((stat) => (
             <div key={stat.key} className="text-center px-4">
               <p className="font-mono text-[28px] sm:text-[32px] leading-none font-bold text-brand-400" dir="ltr">
-                {stat.value}
+                {stat.value ?? freeValue}
               </p>
               <p className="mt-2 font-mono text-[10px] uppercase tracking-[0.15em] text-slate-400 leading-tight">
                 {t(`hero.stats.${stat.key}`)}
@@ -306,7 +313,7 @@ export default function LandingPage({ homeHref = '/' }: { homeHref?: string }) {
               <h3 className="text-2xl font-black tracking-[-0.01em] text-slate-900 dark:text-white">{t('pricing.freeName')}</h3>
               <p className="mt-1.5 text-sm text-slate-600 dark:text-slate-400">{t('pricing.freeDesc', { count: FREE_VISION_CREDITS })}</p>
               <p className="mt-4 font-mono text-[32px] leading-none font-bold text-slate-900 dark:text-white" dir="ltr" translate="no">
-                0 <span className="text-lg text-slate-500 dark:text-slate-400">{BILLING_CURRENCY}</span>
+                {freeValue}
               </p>
             </div>
             <ul className="flex-grow grid sm:grid-cols-2 gap-x-6 gap-y-3 text-sm">
@@ -349,7 +356,7 @@ export default function LandingPage({ homeHref = '/' }: { homeHref?: string }) {
                   <h3 className="text-lg font-black tracking-[-0.01em] text-slate-900 dark:text-white">{t(labels.name)}</h3>
                   <p className="mt-1.5 text-sm text-slate-600 dark:text-slate-400">{t(labels.description, { count: pack.credits })}</p>
                   <p className="mt-6 font-mono text-[36px] leading-none font-bold text-slate-900 dark:text-white" dir="ltr" translate="no">
-                    {pack.priceMAD} <span className="text-lg text-slate-500 dark:text-slate-400">{BILLING_CURRENCY}</span>
+                    {formatPrice(packPrice(pack, currency), currency)}
                   </p>
                   <p className="mt-2 text-sm text-slate-600 dark:text-slate-400">
                     {t('pricing.packSuffix', { count: pack.displayCredits })}

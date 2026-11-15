@@ -19,6 +19,8 @@ import {
   type TranslationKey,
   type TranslationVars,
 } from '@/i18n';
+import { DEFAULT_CURRENCY } from '@/lib/currency';
+import { useCurrency } from '@/components/currency-store';
 
 const COOKIE_MAX_AGE_SECONDS = 60 * 60 * 24 * 365;
 
@@ -36,8 +38,8 @@ interface LocaleContextValue {
 const LocaleContext = createContext<LocaleContextValue>({
   locale: DEFAULT_LOCALE,
   setLocale: () => {},
-  t: (key, vars) => translate(DEFAULT_LOCALE, key, vars),
-  tn: (key, count, vars) => translatePlural(DEFAULT_LOCALE, key, count, vars),
+  t: (key, vars) => translate(DEFAULT_LOCALE, key, { currency: DEFAULT_CURRENCY, ...vars }),
+  tn: (key, count, vars) => translatePlural(DEFAULT_LOCALE, key, count, { currency: DEFAULT_CURRENCY, ...vars }),
   n: (value, options) => formatNumber(DEFAULT_LOCALE, value, options),
   dir: dirFor(DEFAULT_LOCALE),
 });
@@ -116,17 +118,21 @@ export function LocaleProvider({
     applyDocumentLocale(next);
   }, [pinnedLocale]);
 
+  // The account currency (ISO code) fills every `{currency}` a string carries
+  // unless the caller passes its own: one currency for the whole account.
+  const currency = useCurrency().currency ?? DEFAULT_CURRENCY;
+
   const value = useMemo<LocaleContextValue>(
     () => ({
       locale,
       setLocale,
-      t: (key: TranslationKey, vars?: TranslationVars) => translate(locale, key, vars),
+      t: (key: TranslationKey, vars?: TranslationVars) => translate(locale, key, { currency, ...vars }),
       tn: (key: PluralTranslationKey, count: number, vars?: TranslationVars) =>
-        translatePlural(locale, key, count, vars),
+        translatePlural(locale, key, count, { currency, ...vars }),
       n: (value: number, options?: Intl.NumberFormatOptions) => formatNumber(locale, value, options),
       dir: dirFor(locale),
     }),
-    [locale, setLocale]
+    [locale, setLocale, currency]
   );
 
   // The provider is always mounted: no subtree ever renders outside the context.

@@ -134,6 +134,7 @@ export const CHECKOUT_ERROR_KEYS: Record<string, TranslationKey> = {
   PAYMENT_UNAVAILABLE: 'creditsPage.errors.unavailable',
   PAYMENT_CONFIGURATION_ERROR: 'creditsPage.errors.unavailable',
   CHECKOUT_FAILED: 'creditsPage.errors.generic',
+  MANUAL_PAYMENT_MAD_ONLY: 'creditsPage.errors.manualMadOnly',
 };
 
 export function checkoutErrorKey(code: unknown): TranslationKey {

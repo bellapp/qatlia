@@ -4,24 +4,33 @@ import { z } from 'zod';
 import { createClient } from '@/lib/supabase/server';
 import { CREDIT_PACKS, PackId } from '@/lib/billing/catalog';
 import { buildCheckoutParams, resolveCheckoutOrigin } from '@/lib/billing/checkout-params';
-import { allowDemoCheckout, getCardProvider, getCreemConfig, isStripeConfigured } from '@/lib/billing/config';
-import { buildCreemCheckoutBody } from '@/lib/billing/creem';
+import { allowDemoCheckout, creemProductsFor, getCardProvider, getCreemConfig, isStripeConfigured } from '@/lib/billing/config';
+import { cardCurrencyFor } from '@/lib/currency';
+import { resolveRequestCurrency } from '@/lib/currency-server';
+import { buildCreemCheckoutBody, withCreemCheckoutLocale } from '@/lib/billing/creem';
 import { getStripe } from '@/lib/billing/stripe-client';
 
 export const dynamic = 'force-dynamic';
 
 /**
  * Which card provider is live, so the credits page can show the price that
- * provider will actually charge (USD through Creem, MAD through Stripe).
+ * provider will actually charge (USD or EUR through Creem, MAD through Stripe).
  */
 export async function GET() {
-  return NextResponse.json({ provider: getCardProvider() });
+  const provider = getCardProvider();
+  // Whether a euro account pays in euros (all four euro products configured)
+  // or the dollar price: the card line must show what will be charged.
+  const euroCard = provider === 'creem' && getCreemConfig()?.productsEUR != null;
+  return NextResponse.json({ provider, euroCard });
 }
 
 // The buyer is resolved from the Supabase session, never from the request body:
 // a client-supplied user id would let anyone credit an arbitrary account.
 const CheckoutSchema = z.object({
   packId: z.enum(['starter', 'standard', 'pro', 'atelier_max']),
+  // The QatliA interface language, so the Creem checkout opens in it too.
+  // Optional: an older page without it still gets a checkout (in French).
+  locale: z.enum(['fr', 'en', 'ar']).optional(),
 });
 
 export async function POST(req: Request) {
@@ -58,9 +67,14 @@ export async function POST(req: Request) {
         return NextResponse.json({ error: 'PAYMENT_CONFIGURATION_ERROR' }, { status: 503 });
       }
 
+      // The account currency is read here, never taken from the request: a
+      // euro account gets the euro product, everyone else the dollar one.
+      const currency = await resolveRequestCurrency(req, user.id);
+      const products = creemProductsFor(creem, cardCurrencyFor(currency, creem.productsEUR !== null));
+
       const body = buildCreemCheckoutBody({
         pack,
-        productId: creem.products[pack.id],
+        productId: products[pack.id],
         userId: user.id,
         userEmail: user.email,
         origin,
@@ -81,7 +95,7 @@ export async function POST(req: Request) {
         );
       }
 
-      return NextResponse.json({ success: true, url: checkout.checkout_url });
+      return NextResponse.json({ success: true, url: withCreemCheckoutLocale(checkout.checkout_url, parsed.data.locale) });
     }
 
     if (!isStripeConfigured()) {
