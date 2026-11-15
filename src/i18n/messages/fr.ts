@@ -812,10 +812,12 @@ export const fr = {
     back: 'Retourner au Débit de Panneaux',
   },
   historyPage: {
-      scanThumbAlt: 'Photo de la fiche de débit scannée pour {name}',
       pdfAria: 'Télécharger le PDF du projet {name}',
       pdfLabel: 'PDF',
       renameAria: 'Renommer le projet {name}',
+      renameSave: 'Enregistrer le nom',
+      renameCancel: 'Annuler',
+      renameFailed: 'Nom non enregistré. Réessayez.',
     backToAtelier: 'Atelier',
     eyebrow: 'Atelier',
     heading: 'Vos débits',
@@ -831,13 +833,30 @@ export const fr = {
       panel: 'Panneau',
       pieces: 'Pièces',
       waste: 'Chute',
+      sheets: 'Feuilles',
     },
+    /** Table headers the stats above do not already name. */
+    columns: {
+      preview: 'Aperçu',
+      name: 'Nom',
+      date: 'Enregistré le',
+      material: 'Matériau',
+      actions: 'Actions sur le débit',
+    },
+    /** The two ways of showing the list. */
+    view: {
+      label: 'Affichage',
+      cards: 'Cartes',
+      table: 'Tableau',
+    },
+    scanViewAria: 'Voir la fiche scannée de {name}',
+    pdfFailed: 'Le PDF n’a pas pu être créé. Réessayez.',
     // Canonical panel size. `{unit}` is the SI symbol, not prose.
     sheetSize: '{height} × {width} {unit}',
     piecesValue: '{count} pcs',
     sheetsUsed: { one: '{count} feuille', many: '{count} feuilles' },
     open: 'Ouvrir',
-    openAria: 'Ouvrir le débit {name}',
+    openAria: 'Ouvrir {name}',
     /** What the artisan is told when the cloud history is not the source shown. */
     sync: {
       localOnly: 'Plans enregistrés sur cet appareil. La sync cloud se fera dès que la base atelier sera prête.',

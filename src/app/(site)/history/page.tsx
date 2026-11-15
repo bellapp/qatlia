@@ -1,26 +1,26 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
 import { createClient } from '@/lib/supabase/client';
 import {
-  Calendar,
-  ArrowRight,
   Zap,
   ArrowLeft,
   RefreshCw,
   CloudOff,
   Search,
-  Pencil,
-  FileDown,
 } from 'lucide-react';
 import { readLocalHistory, renameLocalHistoryItem, type LocalHistoryItem } from '@/lib/history';
 import { AccountMenu } from '@/components/AccountMenu';
 import { QatlIALogo } from '@/components/QatlIALogo';
 import { EmptyState } from '@/components/EmptyState';
 import { LocaleSwitcher, useLocale } from '@/components/LocaleProvider';
-import { materialBadgeKey, materialLabelKey } from '@/i18n/domain';
-import { formatDateTime, type TranslationKey } from '@/i18n';
+import { HistoryCards } from '@/components/history/HistoryCards';
+import { HistoryTable } from '@/components/history/HistoryTable';
+import { HistoryViewToggle } from '@/components/history/HistoryViewToggle';
+import { materialLabelKey } from '@/i18n/domain';
+import { type TranslationKey } from '@/i18n';
+import { readHistoryView, restoreSeedFromRow, toHistoryRow, writeHistoryView, type HistoryView } from '@/lib/projects/history-row';
 import type { DisplayUnit } from '@/lib/units';
 
 interface ProjectHistoryItem {
@@ -49,15 +49,6 @@ interface ProjectHistoryItem {
 }
 
 /**
- * The stored panel dimensions are canonical domain values (see src/lib/units.ts),
- * so the card states them in the canonical unit whatever display unit the
- * artisan was working in when the plan was saved. Being geometry, they are not
- * routed through the locale number formatter either: a panel reads the same in
- * every language.
- */
-const CANONICAL_UNIT: DisplayUnit = 'cm';
-
-/**
  * A local-only history entry's `id` (see src/lib/history.ts's
  * `writeLocalHistoryItem`, e.g. `optimize_1699999999999`) is never a real
  * server project id — only a cloud-synced entry's id (a genuine Supabase
@@ -69,26 +60,14 @@ const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{
 /** Materials an artisan can filter the list by, in the order they are offered. */
 const FILTERABLE_MATERIALS = ['mdf', 'aluminium', 'verre'] as const;
 
-/**
- * Card badge tone per material. Only the three materials that have ever had
- * their own colour are listed; everything else keeps the default tone, and the
- * label itself comes from `materialBadgeKey`.
- */
-const MATERIAL_BADGE_TONES: Record<string, string> = {
-  aluminium: 'bg-slate-500/20 text-slate-700 dark:text-slate-300 border-slate-500/30',
-  verre: 'bg-sky-500/20 text-sky-300 border-sky-500/30',
-  contreplaques: 'bg-brand-600/10 text-brand-400 border-brand-500/20',
-};
-
-const DEFAULT_BADGE_TONE = 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30';
-
-const CARD_DATE_OPTIONS: Intl.DateTimeFormatOptions = {
-  day: 'numeric',
-  month: 'short',
-  year: 'numeric',
-  hour: '2-digit',
-  minute: '2-digit',
-};
+/** The browser's localStorage, or null where reaching it throws (blocked storage). */
+function browserStorage(): Storage | null {
+  try {
+    return window.localStorage;
+  } catch {
+    return null;
+  }
+}
 
 function mergeHistory(cloud: ProjectHistoryItem[], local: LocalHistoryItem[]): ProjectHistoryItem[] {
   const mappedLocal: ProjectHistoryItem[] = local.map((p) => ({
@@ -144,20 +123,30 @@ export default function HistoryPage() {
   const [syncNote, setSyncNote] = useState<TranslationKey | null>(null);
   const [filterText, setFilterText] = useState('');
   const [materialFilter, setMaterialFilter] = useState('');
+  // Cards until the remembered choice is read after mounting (the server has
+  // no localStorage, and the first render has to match it).
+  const [view, setView] = useState<HistoryView>('cards');
+  // Rows whose PDF is being built (their button is busy), and whether the
+  // last attempt failed (a line above the list says so).
+  const [pdfPendingIds, setPdfPendingIds] = useState<ReadonlySet<string>>(() => new Set());
+  const [pdfFailed, setPdfFailed] = useState(false);
 
-  // Inline rename state: which card is being edited + its draft value.
-  const [renamingId, setRenamingId] = useState<string | null>(null);
-  const [renameDraft, setRenameDraft] = useState('');
+  useEffect(() => { setView(readHistoryView(browserStorage())); }, []);
 
-  /** Commits a rename: cloud rows go through PATCH /api/projects/[id]
-   *  (ownership-checked); local-only rows update localStorage directly. */
-  const commitRename = async (proj: ProjectHistoryItem) => {
-    const name = renameDraft.trim();
-    setRenamingId(null);
-    if (!name || name === proj.name) return;
-    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(proj.id);
+  const changeView = (next: HistoryView) => {
+    setView(next);
+    writeHistoryView(browserStorage(), next);
+  };
+
+  /** Renames a project: cloud rows go through PATCH /api/projects/[id]
+   *  (ownership-checked); local-only rows update localStorage directly.
+   *  Resolves true only once the new name is saved, false on any failure. */
+  const commitRename = async (id: string, nextName: string): Promise<boolean> => {
+    const proj = projects.find((p) => p.id === id);
+    const name = nextName.trim();
+    if (!proj || !name) return false;
     let ok = false;
-    if (isUuid) {
+    if (UUID_PATTERN.test(proj.id)) {
       try {
         const res = await fetch(`/api/projects/${proj.id}`, {
           method: 'PATCH',
@@ -178,11 +167,13 @@ export default function HistoryPage() {
         p.id === proj.id ? { ...p, name, options_json: { ...p.options_json, projectName: name } } : p
       )));
     }
+    return ok;
   };
 
   /** Rebuilds and downloads the cutting-plan PDF from the stored project
-   *  data — the PDF itself is never persisted, only regenerated on demand. */
-  const downloadPdf = async (proj: ProjectHistoryItem) => {
+   *  data — the PDF itself is never persisted, only regenerated on demand.
+   *  Resolves true once the file is handed to the browser, false otherwise. */
+  const downloadPdf = async (proj: ProjectHistoryItem): Promise<boolean> => {
     try {
       const optJson = (proj.options_json || {}) as {
         sheet?: unknown; sheets?: unknown; pieces?: unknown; options?: unknown; result?: unknown;
@@ -202,7 +193,7 @@ export default function HistoryPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
       });
-      if (!res.ok) return;
+      if (!res.ok) return false;
       const blob = await res.blob();
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
@@ -212,8 +203,9 @@ export default function HistoryPage() {
       a.click();
       a.remove();
       window.URL.revokeObjectURL(url);
+      return true;
     } catch {
-      /* download failed silently — the card stays usable */
+      return false;
     }
   };
 
@@ -274,13 +266,18 @@ export default function HistoryPage() {
     setFiltered(list);
   }, [projects, filterText, materialFilter]);
 
-  const handleLoadProject = (project: ProjectHistoryItem) => {
-    if (project.options_json) {
+  const rows = useMemo(() => filtered.map(toHistoryRow), [filtered]);
+
+  const handleLoadProject = (id: string) => {
+    const project = projects.find((p) => p.id === id);
+    // An old project that kept no saved data still opens: the atelier skips
+    // every missing field and starts without a plan, linked to this entry.
+    if (project) {
       // A project renamed from the history before the name was also kept in its
       // saved data still carries the old name there: the name on the card wins,
       // but only over a name that is stored (an automatic name is never typed
       // into the atelier's field).
-      const storedName = project.options_json.projectName;
+      const storedName = project.options_json?.projectName;
       const restoredOptions =
         UUID_PATTERN.test(project.id)
         && project.name.trim()
@@ -288,7 +285,7 @@ export default function HistoryPage() {
         && storedName.trim()
         && storedName.trim() !== project.name.trim()
           ? { ...project.options_json, projectName: project.name.trim() }
-          : project.options_json;
+          : project.options_json ?? restoreSeedFromRow(project);
       sessionStorage.setItem('qatlia_saved_project', JSON.stringify(restoredOptions));
       // Read back by atelier/page.tsx's restore effect so QuotationDialog's
       // `projectId` targets the project the artisan actually opened here,
@@ -309,41 +306,82 @@ export default function HistoryPage() {
     }
   };
 
-  const getMaterialBadge = (mat?: string) => {
-    const material = mat?.toLowerCase();
-    const tone = (material && MATERIAL_BADGE_TONES[material]) || DEFAULT_BADGE_TONE;
-    return (
-      <span className={`text-[10px] font-bold px-2 py-0.5 rounded border ${tone}`}>
-        {t(materialBadgeKey(material))}
-      </span>
-    );
+  const handleDownloadPdf = async (id: string) => {
+    const project = projects.find((p) => p.id === id);
+    if (!project || pdfPendingIds.has(id)) return;
+    setPdfPendingIds((prev) => new Set(prev).add(id));
+    setPdfFailed(false);
+    const ok = await downloadPdf(project);
+    setPdfPendingIds((prev) => {
+      const next = new Set(prev);
+      next.delete(id);
+      return next;
+    });
+    if (!ok) setPdfFailed(true);
+  };
+
+  /**
+   * Shows the scan thumbnail in a new tab until the scan viewer exists. A
+   * browser refuses to open a `data:` URL as a page, so the tab is opened
+   * blank and the image written into it; the thumbnail passed the
+   * `sanitizeScanThumb` check (a `data:image/...;base64` URL) in `toHistoryRow`.
+   */
+  const openScan = (id: string) => {
+    const row = rows.find((candidate) => candidate.id === id);
+    if (!row?.scanThumb) return;
+    const tab = window.open('', '_blank');
+    if (!tab) return;
+    tab.opener = null;
+    const img = tab.document.createElement('img');
+    img.src = row.scanThumb;
+    img.alt = row.name;
+    img.style.maxWidth = '100vw';
+    img.style.height = 'auto';
+    tab.document.body.style.margin = '0';
+    tab.document.body.appendChild(img);
+  };
+
+  const listProps = {
+    rows,
+    onOpen: handleLoadProject,
+    onRename: commitRename,
+    onDownloadPdf: (id: string) => { void handleDownloadPdf(id); },
+    pdfPendingIds,
+    onViewScan: openScan,
   };
 
   return (
     <div className="min-h-screen bg-studio-canvas text-slate-900 dark:text-slate-100 font-sans antialiased selection:bg-brand-400 selection:text-black pb-16">
       <header className="sticky top-0 z-40 border-b border-studio-border/70 bg-studio-canvas/70 backdrop-blur-2xl backdrop-saturate-150">
-        <div className="max-w-6xl mx-auto flex items-center justify-between px-4 sm:px-8 h-16">
-          <div className="flex items-center gap-3">
-            <Link href="/atelier" className="flex items-center gap-2 px-3 py-2 rounded-xl bg-studio-panel hover:bg-studio-field text-slate-700 dark:text-slate-300 text-xs font-semibold border border-studio-border transition-all">
-              <ArrowLeft className="w-4 h-4 rtl:-scale-x-100" aria-hidden="true" /><span>{t('historyPage.backToAtelier')}</span>
+        <div className="max-w-6xl mx-auto flex items-center justify-between gap-2 px-4 sm:px-8 h-16">
+          <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+            <Link
+              href="/atelier"
+              aria-label={t('historyPage.backToAtelier')}
+              className="shrink-0 flex items-center justify-center gap-2 min-w-10 min-h-10 px-2.5 sm:px-3 py-2 rounded-xl bg-studio-panel hover:bg-studio-field text-slate-700 dark:text-slate-300 text-xs font-semibold border border-studio-border transition-all"
+            >
+              <ArrowLeft className="w-4 h-4 rtl:-scale-x-100" aria-hidden="true" /><span className="hidden sm:inline">{t('historyPage.backToAtelier')}</span>
             </Link>
-            <div className="flex items-center gap-2">
-              <div className="text-brand-400"><QatlIALogo size="sm" /></div>
-              <h1 className="font-display font-extrabold text-base text-slate-900 dark:text-white tracking-tight">{t('atelier.header.history')}</h1>
+            <div className="flex items-center gap-2 min-w-0">
+              <div className="hidden sm:block text-brand-400"><QatlIALogo size="sm" /></div>
+              {/* On a phone the language, credits and account controls fill the
+                  bar; the title stays for screen readers (the page heading
+                  below names the page too). */}
+              <h1 className="sr-only sm:not-sr-only font-display font-extrabold text-base text-slate-900 dark:text-white tracking-tight truncate">{t('atelier.header.history')}</h1>
             </div>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
             <LocaleSwitcher />
             <Link
               href="/credits"
               aria-label={`${t('atelier.header.creditsAria')}: ${userCredits === null ? '—' : n(userCredits)}`}
-              className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-brand-400/10 border border-brand-500/25 text-brand-400 hover:bg-brand-500/15 text-xs font-semibold transition-all"
+              className="flex items-center gap-1.5 px-2.5 sm:px-3.5 py-2 rounded-xl bg-brand-400/10 border border-brand-500/25 text-brand-400 hover:bg-brand-500/15 text-xs font-semibold transition-all"
             >
               <Zap className="w-3.5 h-3.5 fill-brand-400 text-brand-400" aria-hidden="true" />
               <span dir="ltr" className="font-mono font-bold">{userCredits === null ? '—' : n(userCredits)}</span>
             </Link>
             {userEmail ? (<AccountMenu email={userEmail} />) : (
-              <Link href="/auth/login?redirect=/history" className="px-4 py-2 rounded-xl bg-white dark:bg-studio-field text-slate-950 font-bold text-xs hover:bg-slate-100 transition-all">{t('nav.login')}</Link>
+              <Link href="/auth/login?redirect=/history" className="px-3 sm:px-4 py-2 rounded-xl bg-white dark:bg-studio-field text-slate-950 font-bold text-xs hover:bg-slate-100 transition-all">{t('nav.login')}</Link>
             )}
           </div>
         </div>
@@ -367,26 +405,33 @@ export default function HistoryPage() {
           </div>
         )}
 
-        {/* Filters */}
+        {/* Filters, then the view toggle at the end. On a phone the search takes
+            the first line and the rest wraps onto a second one. */}
         {projects.length > 0 && (
-          <div className="flex items-center gap-2">
-            <div className="relative flex-1 max-w-xs">
-              <Search className="w-3.5 h-3.5 text-slate-500 dark:text-slate-400 absolute start-2.5 top-2.5" aria-hidden="true" />
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="relative w-full sm:w-auto sm:flex-1 sm:max-w-xs">
+              <Search className="w-3.5 h-3.5 text-slate-500 dark:text-slate-400 absolute start-2.5 top-1/2 -translate-y-1/2" aria-hidden="true" />
               <input type="text" placeholder={t('historyPage.filterPlaceholder')} aria-label={t('historyPage.filterAria')} value={filterText}
                 onChange={e => setFilterText(e.target.value)}
-                className="w-full ps-7 pe-2 py-1.5 rounded-lg bg-studio-field/60 border border-studio-border/80 text-slate-800 dark:text-slate-200 text-xs outline-none focus:border-brand-500/50" />
+                className="w-full ps-7 pe-2 py-2.5 rounded-lg bg-studio-field/60 border border-studio-border/80 text-slate-800 dark:text-slate-200 text-xs outline-none focus:border-brand-500/50" />
             </div>
             <select value={materialFilter} onChange={e => setMaterialFilter(e.target.value)}
               aria-label={t('historyPage.materialFilterAria')}
-              className="px-2.5 py-1.5 rounded-lg bg-studio-field/60 border border-studio-border/80 text-slate-700 dark:text-slate-300 text-xs outline-none focus:border-brand-500/50 [&>option]:bg-white [&>option]:text-slate-900 dark:[&>option]:bg-slate-900 dark:[&>option]:text-slate-100">
+              className="min-w-0 px-2.5 py-2.5 rounded-lg bg-studio-field/60 border border-studio-border/80 text-slate-700 dark:text-slate-300 text-xs outline-none focus:border-brand-500/50 [&>option]:bg-white [&>option]:text-slate-900 dark:[&>option]:bg-slate-900 dark:[&>option]:text-slate-100">
               <option value="">{t('historyPage.allMaterials')}</option>
               {FILTERABLE_MATERIALS.map((material) => (
                 <option key={material} value={material}>{t(materialLabelKey(material))}</option>
               ))}
             </select>
             <span className="text-[10px] font-mono text-slate-500 dark:text-slate-400 ms-auto">{tn('historyPage.resultCount', filtered.length)}</span>
+            <HistoryViewToggle view={view} onChange={changeView} />
           </div>
         )}
+
+        {/* Always in the page, so a screen reader hears the failure when it appears. */}
+        <p role="status" aria-live="polite" data-testid="history-pdf-failed" className={pdfFailed ? 'text-xs font-semibold text-red-600 dark:text-red-400' : 'sr-only'}>
+          {pdfFailed ? t('historyPage.pdfFailed') : ''}
+        </p>
 
         {loading ? (
           <div role="status" aria-label={t('historyPage.loadingAria')} className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -396,93 +441,12 @@ export default function HistoryPage() {
           <EmptyState type="ready" />
         ) : filtered.length === 0 ? (
           <EmptyState type="no-results" />
+        ) : view === 'table' ? (
+          <HistoryTable {...listProps} />
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {filtered.map((proj) => {
-              const optJson = (proj.options_json || {}) as ProjectHistoryItem['options_json'] & {
-                scanThumb?: string; pdfGeneratedAt?: string;
-              };
-              const res = optJson.result;
-              const pieceCount = optJson.pieces?.reduce((s, p) => s + (p.quantity || 1), 0) || 0;
-              const wasteRate = res?.wastePercentage ?? 0;
-              const sheetsUsed = res?.sheetsUsed ?? 1;
-              return (
-                <div key={proj.id} className="p-5 rounded-2xl bg-studio-panel/70 border border-studio-border hover:border-brand-400/40 transition-all flex flex-col justify-between gap-4 group">
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between gap-2">
-                      <span className="text-[11px] font-mono text-slate-600 dark:text-slate-400 flex items-center gap-1">
-                        <Calendar className="w-3.5 h-3.5" aria-hidden="true" />
-                        {formatDateTime(locale, proj.created_at, CARD_DATE_OPTIONS)}
-                      </span>
-                      {getMaterialBadge(proj.material)}
-                    </div>
-                    {renamingId === proj.id ? (
-                      <input
-                        autoFocus
-                        value={renameDraft}
-                        onChange={(e) => setRenameDraft(e.target.value)}
-                        onBlur={() => void commitRename(proj)}
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter') e.currentTarget.blur();
-                          if (e.key === 'Escape') setRenamingId(null);
-                        }}
-                        aria-label={t('historyPage.renameAria')}
-                        data-testid="history-rename-input"
-                        className="w-full bg-transparent text-base font-black text-slate-900 dark:text-white outline-none border-b border-brand-500/50 pb-0.5"
-                      />
-                    ) : (
-                      <h3 className="text-base font-black text-slate-900 dark:text-white truncate flex items-center gap-1.5">
-                        <span className="truncate">{proj.name}</span>
-                        <button
-                          onClick={() => { setRenamingId(proj.id); setRenameDraft(proj.name); }}
-                          aria-label={t('historyPage.renameAria', { name: proj.name })}
-                          data-testid="history-rename-btn"
-                          className="shrink-0 w-6 h-6 rounded-lg text-slate-400 hover:text-brand-500 dark:hover:text-brand-400 hover:bg-studio-field opacity-0 group-hover:opacity-100 focus:opacity-100 transition-all flex items-center justify-center"
-                        >
-                          <Pencil className="w-3.5 h-3.5" aria-hidden="true" />
-                        </button>
-                      </h3>
-                    )}
-                    {/* Scan thumbnail + PDF indicator (persisted with the project) */}
-                  {(optJson.scanThumb || optJson.pdfGeneratedAt) && (
-                    <div className="flex items-center gap-2.5">
-                      {optJson.scanThumb && (
-                        <img
-                          src={optJson.scanThumb}
-                          alt={t('historyPage.scanThumbAlt', { name: proj.name })}
-                          className="w-14 h-14 object-cover rounded-lg border border-studio-border shadow-sm"
-                          loading="lazy"
-                        />
-                      )}
-                      {optJson.pdfGeneratedAt && (
-                        <button
-                          onClick={() => void downloadPdf(proj)}
-                          aria-label={t('historyPage.pdfAria', { name: proj.name })}
-                          className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-studio-field hover:bg-studio-border text-[11px] font-bold text-slate-600 dark:text-slate-300 hover:text-brand-500 dark:hover:text-brand-400 transition-colors"
-                        >
-                          <FileDown className="w-3.5 h-3.5" aria-hidden="true" />
-                          {t('historyPage.pdfLabel')}
-                        </button>
-                      )}
-                    </div>
-                  )}
-                  <div className="grid grid-cols-3 gap-2 pt-2 border-t border-studio-border text-xs font-mono">
-                      <div className="p-2 rounded-lg bg-studio-canvas"><span className="text-[10px] text-slate-500 dark:text-slate-400 block">{t('historyPage.stats.panel')}</span><span dir="ltr" className="font-bold text-slate-900 dark:text-white">{t('historyPage.sheetSize', { height: proj.sheet_height, width: proj.sheet_width, unit: CANONICAL_UNIT })}</span></div>
-                      <div className="p-2 rounded-lg bg-studio-canvas"><span className="text-[10px] text-slate-500 dark:text-slate-400 block">{t('historyPage.stats.pieces')}</span><span className="font-bold text-brand-400">{t('historyPage.piecesValue', { count: n(pieceCount) })}</span></div>
-                      <div className="p-2 rounded-lg bg-studio-canvas"><span className="text-[10px] text-slate-500 dark:text-slate-400 block">{t('historyPage.stats.waste')}</span><span dir="ltr" className="font-bold text-emerald-400">{wasteRate > 0 ? `${wasteRate}%` : '—'}</span></div>
-                    </div>
-                  </div>
-                  <div className="flex items-center justify-between gap-2 pt-1">
-                    <span className="text-[11px] font-mono font-bold text-slate-600 dark:text-slate-400">{tn('historyPage.sheetsUsed', sheetsUsed)}</span>
-                    <button onClick={() => handleLoadProject(proj)} aria-label={t('historyPage.openAria', { name: proj.name })} className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-brand-400 hover:bg-brand-500 text-slate-950 font-black text-xs transition-all group-hover:shadow-lg group-hover:shadow-brand-500/20">{t('historyPage.open')}<ArrowRight className="w-3.5 h-3.5 rtl:-scale-x-100" aria-hidden="true" /></button>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
+          <HistoryCards {...listProps} />
         )}
       </main>
     </div>
   );
 }
-
