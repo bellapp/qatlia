@@ -180,6 +180,7 @@ export const en: Catalog = {
       navMaterials: 'Materials',
       navQuotation: 'Costing & Quotes',
       navCutSettings: 'Cutting settings',
+      navHistory: 'Cut list history',
     },
     project: {
       nameBars: 'Bars {material} — {count} pcs',

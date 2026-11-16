@@ -215,6 +215,7 @@ export const fr = {
       navMaterials: 'Matériaux',
       navQuotation: 'Chiffrage & Devis',
       navCutSettings: 'Réglages de coupe',
+      navHistory: 'Historique des débits',
     },
     /**
      * Name given to the project saved after an optimization. `{material}` is the
