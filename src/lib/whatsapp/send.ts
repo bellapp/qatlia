@@ -1,5 +1,6 @@
 /**
- * Sends a text message, through the Meta Graph API or through YCloud.
+ * Sends a text message, or a text with reply buttons, through the Meta Graph
+ * API or through YCloud.
  *
  * YCloud is used when it is configured: the bot number was onboarded with it,
  * and Meta only lets YCloud send from that number. Inbound messages still
@@ -11,9 +12,27 @@
  */
 
 import type { WhatsAppConfig, YCloudConfig } from '@/lib/whatsapp/config';
+import type { MenuButton } from '@/lib/whatsapp/copy';
 
 const SEND_TIMEOUT_MS = 10000;
 const YCLOUD_SEND_URL = 'https://api.ycloud.com/v2/whatsapp/messages/sendDirectly';
+
+type Message = { body: string; buttons?: readonly MenuButton[] };
+
+/** The type-specific part of a send request. Both APIs share the interactive shape; only the link preview flag differs. */
+function content(message: Message, previewKey: 'preview_url' | 'previewUrl'): Record<string, unknown> {
+  if (!message.buttons) return { type: 'text', text: { body: message.body, [previewKey]: true } };
+  return {
+    type: 'interactive',
+    interactive: {
+      type: 'button',
+      body: { text: message.body },
+      action: {
+        buttons: message.buttons.map((button) => ({ type: 'reply', reply: { id: button.id, title: button.title } })),
+      },
+    },
+  };
+}
 
 function logFailure(error: unknown): null {
   const reason = error instanceof Error ? error.name : 'unknown error';
@@ -24,7 +43,7 @@ function logFailure(error: unknown): null {
 async function sendViaMeta(
   config: WhatsAppConfig,
   to: string,
-  body: string,
+  message: Message,
   fetchImpl: typeof fetch,
 ): Promise<string | null> {
   const url = `https://graph.facebook.com/${config.graphVersion}/${config.phoneNumberId}/messages`;
@@ -39,8 +58,7 @@ async function sendViaMeta(
         messaging_product: 'whatsapp',
         recipient_type: 'individual',
         to,
-        type: 'text',
-        text: { body, preview_url: true },
+        ...content(message, 'preview_url'),
       }),
       signal: AbortSignal.timeout(SEND_TIMEOUT_MS),
     });
@@ -65,7 +83,7 @@ async function sendViaMeta(
 async function sendViaYCloud(
   ycloud: YCloudConfig,
   to: string,
-  body: string,
+  message: Message,
   fetchImpl: typeof fetch,
 ): Promise<string | null> {
   try {
@@ -78,8 +96,7 @@ async function sendViaYCloud(
       body: JSON.stringify({
         from: ycloud.from,
         to: to.startsWith('+') ? to : `+${to}`,
-        type: 'text',
-        text: { body, previewUrl: true },
+        ...content(message, 'previewUrl'),
       }),
       signal: AbortSignal.timeout(SEND_TIMEOUT_MS),
     });
@@ -106,6 +123,12 @@ async function sendViaYCloud(
   }
 }
 
+function send(config: WhatsAppConfig, to: string, message: Message, fetchImpl: typeof fetch): Promise<string | null> {
+  return config.ycloud
+    ? sendViaYCloud(config.ycloud, to, message, fetchImpl)
+    : sendViaMeta(config, to, message, fetchImpl);
+}
+
 /** Returns the id of the sent message, or `null` on any failure. */
 export async function sendText(
   config: WhatsAppConfig,
@@ -113,7 +136,16 @@ export async function sendText(
   body: string,
   fetchImpl: typeof fetch = fetch,
 ): Promise<string | null> {
-  return config.ycloud
-    ? sendViaYCloud(config.ycloud, to, body, fetchImpl)
-    : sendViaMeta(config, to, body, fetchImpl);
+  return send(config, to, { body }, fetchImpl);
+}
+
+/** Sends `body` with up to 3 reply buttons under it. Returns the message id, or `null` on any failure. */
+export async function sendButtons(
+  config: WhatsAppConfig,
+  to: string,
+  body: string,
+  buttons: readonly MenuButton[],
+  fetchImpl: typeof fetch = fetch,
+): Promise<string | null> {
+  return send(config, to, { body, buttons }, fetchImpl);
 }

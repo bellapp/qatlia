@@ -55,6 +55,12 @@ const messageSchema = z.object({
   type: z.string().optional(),
   text: z.object({ body: z.string() }).partial().optional(),
   image: z.object({ caption: z.string() }).partial().optional(),
+  interactive: z
+    .object({ type: z.string(), button_reply: z.object({ id: z.string() }).partial() })
+    .partial()
+    .optional()
+    .catch(undefined),
+  button: z.object({ payload: z.string(), text: z.string() }).partial().optional().catch(undefined),
   referral: z.record(z.string(), z.unknown()).optional().catch(undefined),
 });
 
@@ -85,6 +91,19 @@ const envelopeSchema = z.object({
   ),
 });
 
+/**
+ * A tap on a reply button, as the text it stands for: the button id (the bot's
+ * own buttons use the menu digit as id). Meta sends `interactive.button_reply`;
+ * a reply to a message delivered as a template comes as `button.payload`.
+ */
+function buttonText(message: z.infer<typeof messageSchema>): string | null {
+  if (message.type === 'interactive' && message.interactive?.type === 'button_reply') {
+    return message.interactive.button_reply?.id || null;
+  }
+  if (message.type === 'button') return message.button?.payload || message.button?.text || null;
+  return null;
+}
+
 function parseInbound(
   raw: unknown,
   profileNames: Map<string, string>,
@@ -93,10 +112,13 @@ function parseInbound(
   if (!parsed.success) return null;
   const message = parsed.data;
   const type = message.type ?? '';
-  const kind: InboundKind = KNOWN_KINDS.has(type) ? (type as InboundKind) : 'other';
+  const tapped = buttonText(message);
+  let kind: InboundKind = KNOWN_KINDS.has(type) ? (type as InboundKind) : 'other';
+  if (tapped !== null) kind = 'text';
 
   let text: string | null = null;
-  if (kind === 'text') text = message.text?.body ?? null;
+  if (tapped !== null) text = tapped;
+  else if (kind === 'text') text = message.text?.body ?? null;
   else if (kind === 'image') text = message.image?.caption ?? null;
 
   return {

@@ -115,6 +115,10 @@ stubModule('@/lib/whatsapp/send', {
     state.sent.push({ to, body, config });
     return state.sendResult(state.sent.length);
   },
+  sendButtons: async (config, to, body, buttons) => {
+    state.sent.push({ to, body, config, buttons });
+    return state.sendResult(state.sent.length);
+  },
 });
 stubModule('@/lib/whatsapp/assistant', {
   HISTORY_MESSAGES: 10,
@@ -124,7 +128,7 @@ stubModule('@/lib/whatsapp/assistant', {
   },
 });
 
-const { COPY } = loadTsModule('src/lib/whatsapp/copy.ts');
+const { COPY, MENU_BUTTONS } = loadTsModule('src/lib/whatsapp/copy.ts');
 const { GET, POST, dynamic, maxDuration } = loadTsModule('src/app/api/whatsapp/webhook/route.ts');
 
 const ENV_KEYS = [
@@ -502,7 +506,11 @@ test('a failed send records nothing and leaves the contact un-greeted', async ()
   await withEnv(CONFIGURED, async () => {
     const res = await POST(signedPost(messagesPayload([textMessage('wamid.8', WA_ID, 'salam')])));
     assert.equal(res.status, 200);
-    assert.equal(state.sent.length, 1);
+    // The button greeting, then its plain-text fallback: both fail.
+    assert.deepEqual(
+      state.sent.map((m) => m.body),
+      [COPY.greeting, COPY.greetingPlain],
+    );
     assert.equal(state.outbound.length, 0);
     assert.equal(state.updates.filter((u) => u.patch.greetedAt !== undefined).length, 0);
   });
@@ -775,4 +783,66 @@ test('the route tells the assistant which handoff mode is active', async () => {
       assert.equal(state.assistantCalls[0].handoffMode, mode ?? 'coexistence');
     });
   }
+});
+
+// --- reply buttons -----------------------------------------------------------
+
+const buttonTap = (id, from, buttonId) => ({
+  from,
+  id,
+  type: 'interactive',
+  interactive: { type: 'button_reply', button_reply: { id: buttonId, title: 'x' } },
+});
+
+test('the greeting is sent with the menu buttons; later replies are plain text', async () => {
+  resetState();
+  await withEnv(CONFIGURED, async () => {
+    await POST(signedPost(messagesPayload([textMessage('wamid.btn1', WA_ID, 'Bonjour')])));
+    assert.equal(state.sent.length, 1);
+    assert.equal(state.sent[0].body, COPY.greeting);
+    assert.deepEqual(state.sent[0].buttons, MENU_BUTTONS);
+    assert.deepEqual(state.outbound, [
+      { waId: WA_ID, wamid: 'wamid.OUT', direction: 'bot', kind: 'fixed', body: COPY.greeting },
+    ]);
+
+    await POST(signedPost(messagesPayload([textMessage('wamid.btn2', WA_ID, '2')])));
+    assert.equal(state.sent.length, 2);
+    assert.equal(state.sent[1].body, COPY.pricing.fr);
+    assert.equal(state.sent[1].buttons, undefined);
+  });
+});
+
+test('when the button greeting cannot be sent, the plain-text greeting goes instead and the claim is kept', async () => {
+  resetState();
+  state.sendResult = (n) => (n === 1 ? null : 'wamid.PLAIN');
+  await withEnv(CONFIGURED, async () => {
+    await POST(signedPost(messagesPayload([textMessage('wamid.btn3', WA_ID, 'Bonjour')])));
+    assert.deepEqual(
+      state.sent.map((m) => [m.body, m.buttons]),
+      [
+        [COPY.greeting, MENU_BUTTONS],
+        [COPY.greetingPlain, undefined],
+      ],
+    );
+    assert.deepEqual(state.outbound, [
+      { waId: WA_ID, wamid: 'wamid.PLAIN', direction: 'bot', kind: 'fixed', body: COPY.greetingPlain },
+    ]);
+    assert.equal(state.greetReleases.length, 0);
+    assert.ok(state.contacts.get(WA_ID).greetedAt instanceof Date);
+  });
+});
+
+test('tapping a menu button answers like the typed digit, in the contact language', async () => {
+  resetState();
+  state.contacts.set(WA_ID, { waId: WA_ID, lang: 'ar', greetedAt: new Date(), handoffUntil: null });
+  await withEnv(CONFIGURED, async () => {
+    await POST(signedPost(messagesPayload([buttonTap('wamid.btn4', WA_ID, '1')])));
+    assert.deepEqual(
+      state.sent.map((m) => m.body),
+      [COPY.howItWorks.ar],
+    );
+    assert.equal(state.claims[0].kind, 'text');
+    assert.equal(state.claims[0].body, '1');
+    assert.equal(state.assistantCalls.length, 0);
+  });
 });

@@ -15,10 +15,10 @@ import { getSupabaseAdminConfig } from '@/lib/billing/config';
 import { getWhatsAppConfig, type WhatsAppConfig } from '@/lib/whatsapp/config';
 import { verifySignature } from '@/lib/whatsapp/signature';
 import { parseWebhook, type EchoEvent, type InboundEvent } from '@/lib/whatsapp/payload';
-import { COPY } from '@/lib/whatsapp/copy';
+import { COPY, type MenuButton } from '@/lib/whatsapp/copy';
 import { HANDOFF_HOURS, decide, detectLang, type Decision } from '@/lib/whatsapp/router';
 import { HISTORY_MESSAGES, askAssistant } from '@/lib/whatsapp/assistant';
-import { sendText } from '@/lib/whatsapp/send';
+import { sendButtons, sendText } from '@/lib/whatsapp/send';
 import {
   WhatsAppTablesMissingError,
   claimGreeting,
@@ -50,15 +50,16 @@ function handoffDeadline(now: Date): Date {
   return new Date(now.getTime() + HANDOFF_HOURS * HOUR_MS);
 }
 
-/** Sends one text and logs it. Returns false (and records nothing) when the send failed. */
+/** Sends one text (with reply buttons when given) and logs it. Returns false (and records nothing) when the send failed. */
 async function deliver(
   db: SupabaseClient,
   config: WhatsAppConfig,
   waId: string,
   body: string,
   kind: 'fixed' | 'assistant' | 'image_hint',
+  buttons?: readonly MenuButton[],
 ): Promise<boolean> {
-  const wamid = await sendText(config, waId, body);
+  const wamid = buttons ? await sendButtons(config, waId, body, buttons) : await sendText(config, waId, body);
   if (wamid === null) return false;
   await recordOutbound(db, { waId, wamid, direction: 'bot', kind, body });
   return true;
@@ -126,7 +127,13 @@ async function handleInbound(db: SupabaseClient, config: WhatsAppConfig, event: 
       const since = new Date(now.getTime() - IMAGE_HINT_COOLDOWN_MINUTES * 60 * 1000);
       if ((await countBotMessages(db, waId, 'image_hint', since)) > 0) return;
     }
-    if (!(await deliver(db, config, waId, decision.text, isImageHint ? 'image_hint' : 'fixed'))) {
+    const kind = isImageHint ? 'image_hint' : 'fixed';
+    // A message with buttons that cannot be sent falls back to its plain-text version, so the contact still gets an answer.
+    const sent = decision.menu
+      ? (await deliver(db, config, waId, decision.text, kind, decision.menu.buttons)) ||
+        (await deliver(db, config, waId, decision.menu.fallbackText, kind))
+      : await deliver(db, config, waId, decision.text, kind);
+    if (!sent) {
       if (greetingClaimed) await releaseGreeting(db, waId, now);
       return;
     }

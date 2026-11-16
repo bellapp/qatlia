@@ -6,7 +6,7 @@ const { loadTsModule } = require('./helpers/load-ts-module');
 const PROJECT_ROOT = path.resolve(__dirname, '..');
 const load = (rel) => loadTsModule(path.join(PROJECT_ROOT, rel));
 
-const { COPY, DEMO_VIDEO_URL } = load('src/lib/whatsapp/copy.ts');
+const { COPY, DEMO_VIDEO_URL, MENU_BUTTONS, MENU_BUTTON_TITLE_MAX } = load('src/lib/whatsapp/copy.ts');
 const { detectLang, menuChoice, decide, HANDOFF_HOURS, MAX_ASSISTANT_REPLIES_PER_DAY } = load(
   'src/lib/whatsapp/router.ts',
 );
@@ -53,7 +53,13 @@ test('new contact gets the greeting and is marked greeted', () => {
     event: { text: 'Bonjour ! Puis-je en savoir plus à ce sujet ?' },
     contact: { greetedAt: null },
   });
-  assert.deepEqual(d, { action: 'send', text: COPY.greeting, markGreeted: true, handoff: false });
+  assert.deepEqual(d, {
+    action: 'send',
+    text: COPY.greeting,
+    markGreeted: true,
+    handoff: false,
+    menu: { buttons: MENU_BUTTONS, fallbackText: COPY.greetingPlain },
+  });
 });
 
 test('new contact choosing 1 gets howItWorks, not the greeting', () => {
@@ -94,7 +100,7 @@ test('spelled menu choices route to the right fixed reply', () => {
 });
 
 test('the demo video link comes before the site link', () => {
-  for (const text of [COPY.howItWorks.fr, COPY.howItWorks.ar, COPY.greeting]) {
+  for (const text of [COPY.howItWorks.fr, COPY.howItWorks.ar, COPY.greeting, COPY.greetingPlain]) {
     assert.ok(text.indexOf(DEMO_VIDEO_URL) !== -1);
     assert.ok(text.indexOf(DEMO_VIDEO_URL) < text.indexOf('https://qatlia.ma'));
   }
@@ -218,6 +224,7 @@ test('detectLang', () => {
 
 test('every fixed reply exists in both languages and is non-empty', () => {
   assert.ok(COPY.greeting.length > 0);
+  assert.ok(COPY.greetingPlain.length > 0);
   for (const key of ['howItWorks', 'pricing', 'advisor', 'redirect', 'imageHint', 'mediaHandoff', 'fallback']) {
     for (const lang of ['fr', 'ar']) {
       assert.ok(typeof COPY[key][lang] === 'string' && COPY[key][lang].length > 0, `${key}.${lang}`);
@@ -227,7 +234,7 @@ test('every fixed reply exists in both languages and is non-empty', () => {
 
 test('no fixed reply mentions a bank card', () => {
   const keys = ['howItWorks', 'pricing', 'advisor', 'redirect', 'imageHint', 'mediaHandoff', 'fallback'];
-  const texts = [COPY.greeting, ...keys.flatMap((key) => [COPY[key].fr, COPY[key].ar])];
+  const texts = [COPY.greeting, COPY.greetingPlain, ...keys.flatMap((key) => [COPY[key].fr, COPY[key].ar])];
   for (const text of texts) {
     assert.ok(!/carte|بطاقة|كارت/i.test(text), text.slice(0, 60));
   }
@@ -244,4 +251,41 @@ test('the pricing reply lists every pack, the signup gift and the cost of an ana
   assert.ok(COPY.pricing.ar.includes(`${SIGNUP_FREE_CREDITS} كريدي مجانا`));
   assert.ok(COPY.pricing.fr.includes(`${VISION_CREDIT_COST} crédit = 1 analyse complète`));
   assert.ok(COPY.pricing.ar.includes(`${VISION_CREDIT_COST} كريدي = تحليل كامل`));
+});
+
+test('the menu buttons are the three menu choices, with titles WhatsApp accepts', () => {
+  assert.deepEqual(
+    MENU_BUTTONS.map((b) => b.id),
+    ['1', '2', '3'],
+  );
+  assert.equal(MENU_BUTTON_TITLE_MAX, 20);
+  for (const button of MENU_BUTTONS) {
+    assert.ok(button.title.trim().length > 0, button.id);
+    assert.ok([...button.title].length <= MENU_BUTTON_TITLE_MAX, button.title);
+    assert.equal(menuChoice(button.id), Number(button.id));
+  }
+  assert.equal(new Set(MENU_BUTTONS.map((b) => b.title)).size, 3);
+});
+
+test('tapping a menu button gets the same reply as typing its digit', () => {
+  const [howItWorks, pricing, advisor] = MENU_BUTTONS;
+  assert.equal(run({ event: { text: howItWorks.id } }).text, COPY.howItWorks.fr);
+  assert.equal(run({ event: { text: pricing.id }, contact: { lang: 'ar' } }).text, COPY.pricing.ar);
+  assert.equal(run({ event: { text: advisor.id }, handoffMode: 'redirect' }).text, `${COPY.advisor.fr}\n\n${COPY.redirect.fr}`);
+});
+
+test('the button greeting points at the buttons; its plain fallback keeps the typed 1/2/3 menu', () => {
+  assert.ok(COPY.greeting.includes('👇'));
+  assert.ok(!COPY.greeting.includes('1️⃣'));
+  assert.ok(!COPY.greeting.includes('1 / 2 / 3'));
+  assert.ok(COPY.greetingPlain.includes('1️⃣ Comment ça marche'));
+  assert.ok(COPY.greetingPlain.includes('جاوب بـ 1 / 2 / 3'));
+  // WhatsApp caps an interactive message body at 1024 characters.
+  assert.ok([...COPY.greeting].length <= 1024);
+});
+
+test('only the first-contact greeting carries buttons', () => {
+  assert.equal(run({ event: { text: '2' } }).menu, undefined);
+  assert.equal(run({ event: { kind: 'image', text: null } }).menu, undefined);
+  assert.ok(run({ event: { kind: 'image', text: null }, contact: { greetedAt: null } }).menu);
 });

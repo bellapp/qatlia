@@ -19,7 +19,7 @@ const {
   claimGreeting,
   releaseGreeting,
 } = load('src/lib/whatsapp/store.ts');
-const { sendText } = load('src/lib/whatsapp/send.ts');
+const { sendText, sendButtons } = load('src/lib/whatsapp/send.ts');
 
 // Failure paths log with the [whatsapp] prefix; capture them to assert on
 // what is (not) logged and keep the test output quiet.
@@ -516,4 +516,48 @@ test('with YCloud, a recipient already in E.164 is not given a second plus', asy
   const fetchImpl = fakeFetch(() => new Response(JSON.stringify({ id: 'yc1', wamid: 'w' }), { status: 200 }));
   await sendText(YCLOUD_CONFIG, '+212600000000', 'hi', fetchImpl);
   assert.equal(fetchImpl.calls[0].body.to, '+212600000000');
+});
+
+// --- sendButtons -------------------------------------------------------------
+
+const BUTTONS = [
+  { id: '1', title: 'Démo' },
+  { id: '2', title: 'Tarifs' },
+];
+const INTERACTIVE = {
+  type: 'interactive',
+  interactive: {
+    type: 'button',
+    body: { text: 'Bonjour' },
+    action: {
+      buttons: [
+        { type: 'reply', reply: { id: '1', title: 'Démo' } },
+        { type: 'reply', reply: { id: '2', title: 'Tarifs' } },
+      ],
+    },
+  },
+};
+
+test('sendButtons posts an interactive reply-button message to the Graph API', async () => {
+  const fetchImpl = fakeFetch(() => new Response(JSON.stringify({ messages: [{ id: 'wamid.B' }] }), { status: 200 }));
+  assert.equal(await sendButtons(CONFIG, '212600000000', 'Bonjour', BUTTONS, fetchImpl), 'wamid.B');
+  assert.deepEqual(fetchImpl.calls[0].body, {
+    messaging_product: 'whatsapp',
+    recipient_type: 'individual',
+    to: '212600000000',
+    ...INTERACTIVE,
+  });
+});
+
+test('with YCloud, sendButtons posts the interactive message to YCloud', async () => {
+  const fetchImpl = fakeFetch(() => new Response(JSON.stringify({ id: 'yc2', wamid: 'wamid.YB' }), { status: 200 }));
+  assert.equal(await sendButtons(YCLOUD_CONFIG, '212600000000', 'Bonjour', BUTTONS, fetchImpl), 'wamid.YB');
+  const call = fetchImpl.calls[0];
+  assert.equal(call.url, 'https://api.ycloud.com/v2/whatsapp/messages/sendDirectly');
+  assert.deepEqual(call.body, { from: '+212726263686', to: '+212600000000', ...INTERACTIVE });
+});
+
+test('sendButtons returns null when the provider refuses the message', async () => {
+  const fetchImpl = fakeFetch(() => new Response('{}', { status: 400 }));
+  assert.equal(await sendButtons(YCLOUD_CONFIG, '1', 'Bonjour', BUTTONS, fetchImpl), null);
 });
