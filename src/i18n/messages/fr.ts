@@ -231,6 +231,8 @@ export const fr = {
       nameFailed: 'Nom non enregistré. Réessayez.',
       optimized: 'Optimisation réussie',
       rerun: 'Relancer l’optimisation',
+      newJob: 'Nouveau débit',
+      newJobConfirm: 'Effacer les pièces non enregistrées ?',
     },
     restored: {
       notice: 'Plan enregistré le {date}. Rouvert tel quel, sans nouvelle optimisation.',

@@ -110,7 +110,7 @@ test('a save of the whole project reads the name committed now and the line foll
   assert.doesNotMatch(persist, /projectName\.trim\(\)/);
   assert.match(persist, /lastPersistedNameRef\.current = committedName;/);
   // The reference follows every place the committed name is set.
-  assert.equal(page.match(/commitName\(/g).length, 3);
+  assert.equal(page.match(/commitName\(/g).length, 4);
   assert.equal(page.match(/setProjectName\(/g).length, 1);
 });
 
@@ -170,7 +170,7 @@ test('a name commit only records the name it saved when no newer save owns the l
 });
 
 test('the "optimized" chip is not shown on a plan reopened as saved', () => {
-  assert.match(atelierSource(), /\{result && !restoredAt && \(\s*<span className="ms-auto inline-flex/);
+  assert.match(atelierSource(), /\{result && !restoredAt && \(\s*<span className="inline-flex/);
 });
 
 test('a project renamed before the name was kept in its data reopens under the card name', () => {
