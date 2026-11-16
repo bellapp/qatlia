@@ -192,6 +192,8 @@ export const ar: Catalog = {
       nameFailed: 'لم يُحفظ الاسم. حاول مجدداً.',
       optimized: 'تم التحسين بنجاح',
       rerun: 'إعادة التحسين',
+      newJob: 'قائمة قطع جديدة',
+      newJobConfirm: 'مسح القطع غير المحفوظة؟',
     },
     restored: {
       notice: 'مخطط محفوظ بتاريخ {date}. فُتح كما هو، دون تحسين جديد.',

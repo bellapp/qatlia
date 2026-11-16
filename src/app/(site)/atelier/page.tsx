@@ -28,6 +28,7 @@ import {
   LayoutGrid,
   Settings2,
   ClipboardList,
+  FilePlus2,
   CheckCircle2,
 } from 'lucide-react';
 import {
@@ -103,6 +104,7 @@ import { pickRestorableResult, readRestoredProjectDate } from '@/lib/projects/re
 import { downscaleDataUrl } from '@/lib/image-downscale';
 import { createScanKeeper, saveProjectToCloud, settledWithin } from '@/lib/projects/scan-upload';
 import { readAnalysisPass, storeAnalysisPass } from '@/lib/billing/analysis-pass-store';
+import { piecesOnlyOnScreen } from '@/lib/new-job';
 import {
   type DisplayUnit,
   DEFAULT_DISPLAY_UNIT,
@@ -141,6 +143,9 @@ const PLAN_VIEWPORT_ZOOMED = 'max-h-[70vh] overflow-auto overscroll-contain';
  *  scroll here is what the 2026-11-15 report was about: the plan fits the box
  *  at 100%, so there was nothing to scroll and the gesture went nowhere. */
 const PLAN_VIEWPORT_FITTED = 'lg:max-h-[70vh] lg:overflow-auto';
+
+/** How long the new-job button keeps asking before it goes back to its name. */
+const NEW_JOB_CONFIRM_MS = 6000;
 
 /**
  * The French name the default panel used to carry. It described the 278×208
@@ -254,6 +259,18 @@ export default function Dashboard() {
   // When the plan on screen was saved, set only while it is a plan reopened
   // from history as saved. A new run replaces that plan, so it clears it.
   const [restoredAt, setRestoredAt] = useState<string | null>(null);
+  // The pieces the plan on screen was made from, saved with it: the list a
+  // new job can drop without asking (see src/lib/new-job.ts).
+  const plannedPiecesRef = useRef<Piece[] | null>(null);
+  // The new-job button asks once before dropping pieces that are only on screen.
+  const [confirmingNewJob, setConfirmingNewJob] = useState(false);
+  // A tap gives a button no focus on iOS, so leaving it cannot be all that
+  // takes the question back: left armed, a later tap would empty the list.
+  useEffect(() => {
+    if (!confirmingNewJob) return;
+    const timer = window.setTimeout(() => setConfirmingNewJob(false), NEW_JOB_CONFIRM_MS);
+    return () => window.clearTimeout(timer);
+  }, [confirmingNewJob]);
   const [isAuthModalOpen, setIsAuthModalOpen] = useState<boolean>(false);
   // Which action opened the (shared) auth modal, so its onSuccess handler
   // resumes the right one instead of always re-triggering the PDF export.
@@ -577,6 +594,58 @@ const commitPanelName = () => {
   // the catalog prices (dirham figures) converted to it.
   const currency = useCurrency().currency ?? DEFAULT_CURRENCY;
 
+  // Something a new job would clear: without it the button has nothing to do.
+  const hasJobOnScreen = pieces.length > 0 || !!result || !!previewImage || projectNameDraft.trim() !== '';
+
+  /**
+   * The new-job button. The plan on screen is already in history with its
+   * pieces, so it is left without a question; pieces changed since, or never
+   * optimized, exist only here, and the first click asks before dropping them.
+   */
+  const handleNewJob = () => {
+    const kept = result ? plannedPiecesRef.current : INITIAL_PIECES;
+    if (!confirmingNewJob && piecesOnlyOnScreen(pieces, kept)) {
+      setConfirmingNewJob(true);
+      return;
+    }
+    startNewJob();
+  };
+
+  /**
+   * Empties the atelier for another job: pieces, name, scan and plan. The
+   * panel, the cut settings and the unit stay, an artisan cuts job after job
+   * in the same panel with the same blade.
+   */
+  const startNewJob = () => {
+    setConfirmingNewJob(false);
+    setPieces([]);
+    setResult(null);
+    plannedPiecesRef.current = null;
+    setRestoredAt(null);
+    setActiveSheetIndex(0);
+    setZoomLevel(1);
+    setOptimizeError(null);
+    setVisionError(null);
+    setPreviewImage(null);
+    setScanThumb(null);
+    scanKeeper.restore(null);
+    scanAttachRef.current = Promise.resolve(false);
+    setPdfGeneratedAt(null);
+    // The job on screen is no longer the saved project: the name field writes
+    // to that project, and would rename the old one in history.
+    setLastSavedProjectId(null);
+    setLocalProjectId(null);
+    commitName('');
+    setProjectNameDraft('');
+    lastPersistedNameRef.current = '';
+    // An answer still on its way for the old name no longer owns the line.
+    nameSaveAttemptRef.current += 1;
+    setNameSaveState('idle');
+    // A new job is a new record: it owes no rewrite of an old one's units.
+    setPendingUnitMigration(false);
+    setMigratedFromLegacyUnit(false);
+  };
+
   /** Commits the typed project name (no uniqueness constraint — several
    *  projects may share a name). Empty reverts to the auto-name fallback.
    *  Leaving the field also writes the name to the saved project, if there is
@@ -699,7 +768,8 @@ const commitPanelName = () => {
         const restoreSheet = (sheet: Sheet) => withLegacyStockPrice(withoutLegacyPanelLabel(sheet), legacyStockPrices);
         if (parsed.sheet) setSheets([restoreSheet(parsed.sheet)]);
         if (Array.isArray(parsed.sheets)) setSheets(parsed.sheets.map(restoreSheet));
-        if (Array.isArray(parsed.pieces)) setPieces(normalizePiecesWithColors(parsed.pieces));
+        const restoredPieces = Array.isArray(parsed.pieces) ? normalizePiecesWithColors(parsed.pieces) : null;
+        if (restoredPieces) setPieces(restoredPieces);
         if (typeof parsed.projectName === 'string' && parsed.projectName.trim()) {
           commitName(parsed.projectName.trim());
           setProjectNameDraft(parsed.projectName.trim());
@@ -720,6 +790,7 @@ const commitPanelName = () => {
         if (restoredResult) {
           setResult(restoredResult);
           setActiveSheetIndex(0);
+          plannedPiecesRef.current = restoredPieces;
           // A bar plan reopens in bar mode: the header, the stock card, the
           // project name and a re-run all follow the mode, not only the viewer.
           if (restoredResult.cutMode === '1d' || restoredResult.cutMode === '2d') setCutMode(restoredResult.cutMode);
@@ -1028,6 +1099,7 @@ const commitPanelName = () => {
       const optResult = data.result as OptimizationResult;
       setResult(optResult);
       setRestoredAt(null);
+      plannedPiecesRef.current = pieces;
       setActiveSheetIndex(0);
       if (typeof data.creditsRemaining === 'number') setUserCredits(data.creditsRemaining);
       void persistProject(optResult, 'optimize');
@@ -1651,11 +1723,26 @@ const commitPanelName = () => {
                   })}
                 </p>
               </div>
-              {result && !restoredAt && (
-                <span className="ms-auto inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-600 dark:text-emerald-400 text-[10px] font-bold">
-                  <CheckCircle2 className="w-3 h-3" /> {t('atelier.project.optimized')}
-                </span>
-              )}
+              <div className="ms-auto flex flex-wrap items-center justify-end gap-2">
+                {result && !restoredAt && (
+                  <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-600 dark:text-emerald-400 text-[10px] font-bold">
+                    <CheckCircle2 className="w-3 h-3" /> {t('atelier.project.optimized')}
+                  </span>
+                )}
+                {/* Starts another job from a plan on screen, reopened or just
+                    made. Leaving the button drops a pending confirmation. */}
+                <button
+                  type="button"
+                  data-testid="new-job-button"
+                  onClick={handleNewJob}
+                  onBlur={() => setConfirmingNewJob(false)}
+                  disabled={isOptimizing || isProcessingVision || !hasJobOnScreen}
+                  className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-lg border text-xs font-bold transition-colors disabled:opacity-40 disabled:cursor-not-allowed ${confirmingNewJob ? 'bg-rose-600 hover:bg-rose-500 border-rose-600 text-white' : 'bg-studio-field border-studio-border text-slate-700 dark:text-slate-200 hover:border-brand-500/50 hover:text-slate-900 dark:hover:text-white'}`}
+                >
+                  <FilePlus2 className="w-4 h-4" aria-hidden="true" />
+                  <span aria-live="polite">{t(confirmingNewJob ? 'atelier.project.newJobConfirm' : 'atelier.project.newJob')}</span>
+                </button>
+              </div>
             </div>
 
             <div id="plan-top" className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">

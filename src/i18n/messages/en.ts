@@ -191,6 +191,8 @@ export const en: Catalog = {
       nameFailed: 'Name not saved. Try again.',
       optimized: 'Optimization complete',
       rerun: 'Re-run optimization',
+      newJob: 'New cut list',
+      newJobConfirm: 'Clear the unsaved pieces?',
     },
     restored: {
       notice: 'Plan saved on {date}. Reopened as saved, with no new run.',
