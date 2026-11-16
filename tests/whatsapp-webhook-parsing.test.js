@@ -250,3 +250,40 @@ test('getWhatsAppConfig sends through YCloud only when both the key and the send
   // YCloud is optional: the Meta credentials alone still give a config.
   assert.ok(getWhatsAppConfig(FULL_ENV));
 });
+
+test('parseWebhook reads a reply-button tap as a text event carrying the button id', () => {
+  const [event] = parseWebhook(
+    messagesPayload({
+      type: 'interactive',
+      interactive: { type: 'button_reply', button_reply: { id: '2', title: 'Tarifs · الأثمنة' } },
+      context: { from: '212726263686', id: 'wamid.GREETING' },
+    }),
+    PHONE_ID,
+  );
+  assert.equal(event.kind, 'text');
+  assert.equal(event.text, '2');
+  assert.equal(event.wamid, 'wamid.1');
+  assert.equal(event.waId, CUSTOMER);
+});
+
+test('parseWebhook reads a template quick-reply tap from its payload, else its text', () => {
+  const [withPayload] = parseWebhook(messagesPayload({ type: 'button', button: { payload: '3', text: 'Conseiller' } }), PHONE_ID);
+  assert.equal(withPayload.kind, 'text');
+  assert.equal(withPayload.text, '3');
+  const [textOnly] = parseWebhook(messagesPayload({ type: 'button', button: { text: 'Oui' } }), PHONE_ID);
+  assert.equal(textOnly.kind, 'text');
+  assert.equal(textOnly.text, 'Oui');
+});
+
+test('parseWebhook keeps other interactive replies and malformed taps as other, without text', () => {
+  for (const message of [
+    { type: 'interactive', interactive: { type: 'list_reply', list_reply: { id: 'x', title: 'X' } } },
+    { type: 'interactive', interactive: { type: 'button_reply' } },
+    { type: 'interactive', interactive: 'garbage' },
+    { type: 'button', button: 42 },
+  ]) {
+    const [event] = parseWebhook(messagesPayload(message), PHONE_ID);
+    assert.equal(event.kind, 'other', JSON.stringify(message));
+    assert.equal(event.text, null);
+  }
+});

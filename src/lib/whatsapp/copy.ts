@@ -24,8 +24,34 @@ const PACK_LINES_AR = Object.values(CREDIT_PACKS)
   .map((pack) => `• ${pack.credits} كريدي بـ ${pack.priceMAD} درهم`)
   .join('\n');
 
+/** A tappable reply button. Its id is the menu digit, so a tap is routed exactly like typing it. */
+export interface MenuButton {
+  id: '1' | '2' | '3';
+  title: string;
+}
+
+/** WhatsApp caps a reply button title at 20 characters; the greeting is bilingual, so are the titles. */
+export const MENU_BUTTON_TITLE_MAX = 20;
+
+export const MENU_BUTTONS: readonly MenuButton[] = [
+  { id: '1', title: 'Démo · كيفاش كيخدم' },
+  { id: '2', title: 'Tarifs · الأثمنة' },
+  { id: '3', title: 'Conseiller · مستشار' },
+];
+
+const GREETING_INTRO_FR = `Bonjour 👋 Merci pour votre intérêt !
+QatliA optimise la découpe de vos panneaux : prenez en photo votre fiche de mesure et recevez le plan de coupe en PDF en quelques secondes.
+🎥 Démo en 1 min : ${DEMO_VIDEO_URL}
+👉 Essai gratuit : https://qatlia.ma`;
+
+const GREETING_INTRO_AR = `مرحبا 👋 QatliA كيعطيك مخطط تقطيع الألواح من صورة ورقة القياسات فثواني.
+👉 جرّب مجانا: https://qatlia.ma`;
+
 export const COPY: {
+  /** First-contact message, sent with the MENU_BUTTONS under it. */
   greeting: string;
+  /** The same greeting as plain text with a typed 1/2/3 menu, used when the button message cannot be sent. */
+  greetingPlain: string;
   howItWorks: Record<Lang, string>;
   pricing: Record<Lang, string>;
   advisor: Record<Lang, string>;
@@ -34,18 +60,20 @@ export const COPY: {
   mediaHandoff: Record<Lang, string>;
   fallback: Record<Lang, string>;
 } = {
-  greeting: `Bonjour 👋 Merci pour votre intérêt !
-QatliA optimise la découpe de vos panneaux : prenez en photo votre fiche de mesure et recevez le plan de coupe en PDF en quelques secondes.
-🎥 Démo en 1 min : ${DEMO_VIDEO_URL}
-👉 Essai gratuit : https://qatlia.ma
+  greeting: `${GREETING_INTRO_FR}
+Choisissez ci-dessous 👇 ou posez directement votre question ✍️
+
+${GREETING_INTRO_AR}
+ختار من التحت 👇 ولا سول سؤالك مباشرة`,
+
+  greetingPlain: `${GREETING_INTRO_FR}
 Répondez :
 1️⃣ Comment ça marche
 2️⃣ Tarifs
 3️⃣ Parler à un conseiller
 Ou posez directement votre question ✍️
 
-مرحبا 👋 QatliA كيعطيك مخطط تقطيع الألواح من صورة ورقة القياسات فثواني.
-👉 جرّب مجانا: https://qatlia.ma
+${GREETING_INTRO_AR}
 جاوب بـ 1 / 2 / 3 ولا سول سؤالك مباشرة`,
 
   howItWorks: {

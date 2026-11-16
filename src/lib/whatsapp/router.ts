@@ -7,7 +7,7 @@
  */
 
 import type { HandoffMode } from '@/lib/whatsapp/config';
-import { COPY, type Lang } from '@/lib/whatsapp/copy';
+import { COPY, MENU_BUTTONS, type Lang, type MenuButton } from '@/lib/whatsapp/copy';
 import type { InboundEvent } from '@/lib/whatsapp/payload';
 
 export const HANDOFF_HOURS = 24;
@@ -20,9 +20,15 @@ export interface ContactState {
   handoffUntil: Date | null;
 }
 
+/** Reply buttons sent under the text, and the plain text to send instead if the button message fails. */
+export interface Menu {
+  buttons: readonly MenuButton[];
+  fallbackText: string;
+}
+
 export type Decision =
   | { action: 'silent' }
-  | { action: 'send'; text: string; markGreeted: boolean; handoff: boolean }
+  | { action: 'send'; text: string; markGreeted: boolean; handoff: boolean; menu?: Menu }
   | { action: 'assistant' };
 
 const ARABIC_LETTER = /[؀-ۿ]/;
@@ -92,8 +98,16 @@ export function decide(input: {
   if (choice === 2) return reply(COPY.pricing[lang], true);
   if (choice === 3) return toAdvisor(COPY.advisor[lang], true);
 
-  // 4. First contact.
-  if (contact.greetedAt === null) return reply(COPY.greeting, true);
+  // 4. First contact: the menu comes as buttons, so one tap is enough to answer.
+  if (contact.greetedAt === null) {
+    return {
+      action: 'send',
+      text: COPY.greeting,
+      markGreeted: true,
+      handoff: false,
+      menu: { buttons: MENU_BUTTONS, fallbackText: COPY.greetingPlain },
+    };
+  }
 
   // 5. Photos are read in the workshop, not by the bot.
   if (event.kind === 'image') return reply(COPY.imageHint[lang], false);
