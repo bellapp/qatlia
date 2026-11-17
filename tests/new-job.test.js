@@ -71,7 +71,6 @@ test('a new job empties the pieces, the name, the scan and the plan', () => {
     'setRestoredAt(null)',
     'setScanSheets([])',
     'scanGroupRef.current = null',
-    'scanKeeper.restore(null)',
     'setPdfGeneratedAt(null)',
   ]) {
     assert.ok(body.includes(call), `${call} is part of a new job`);

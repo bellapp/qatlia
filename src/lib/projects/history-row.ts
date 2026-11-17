@@ -30,6 +30,8 @@ export interface HistoryRow {
   hasFullScan: boolean;
   /** Cut-list sheets the project was read from (0 for a list typed by hand). */
   scanCount: number;
+  /** Each sheet's thumbnail and whether its full image was kept, in order. */
+  scanSheets: { thumb: string | null; hasFullScan: boolean }[];
   pdfGeneratedAt: string | null;
   hasPlan: boolean;
   isCloud: boolean;
@@ -90,6 +92,7 @@ export function toHistoryRow(project: HistoryProject): HistoryRow {
     scanThumb: scans[0]?.thumb ?? null,
     hasFullScan: !!scans[0]?.path,
     scanCount: scans.length,
+    scanSheets: scans.map((sheet) => ({ thumb: sheet.thumb ?? null, hasFullScan: !!sheet.path })),
     pdfGeneratedAt: sanitizePdfGeneratedAt(options.pdfGeneratedAt) ?? null,
     hasPlan: pickRestorableResult(options.result) !== null,
     isCloud: UUID_PATTERN.test(project.id),

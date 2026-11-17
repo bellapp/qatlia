@@ -798,6 +798,7 @@ export const ar: Catalog = {
     sheetSize: '{height} × {width} {unit}',
     piecesValue: '{count} قطعة',
     sheetsUsed: { one: '{count} لوح', many: '{count} ألواح' },
+    scanSheetsBadge: { one: 'ورقة {count}', many: '{count} أوراق' },
     open: 'فتح',
     openAria: 'فتح {name}',
     sync: {
@@ -815,6 +816,9 @@ export const ar: Catalog = {
     linkFailedNote: 'تعذّر تحميل الصورة الكاملة. تُعرض معاينة مصغّرة.',
     close: 'إغلاق',
     openImage: 'فتح الصورة',
+    sheetTitle: 'الورقة {index} من {count}',
+    previousSheet: 'الورقة السابقة',
+    nextSheet: 'الورقة التالية',
   },
   accountPage: {
     eyebrow: 'الحساب',

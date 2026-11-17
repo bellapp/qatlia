@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useId, useRef, useState, type MouseEvent } from 'react';
-import { ExternalLink, X } from 'lucide-react';
+import { ChevronLeft, ChevronRight, ExternalLink, X } from 'lucide-react';
 import { useLocale } from '@/components/LocaleProvider';
 import { createScanLinkCache, resolveScanView, scanViewNeedsFetch, type ScanReducedReason, type ScanViewInput } from '@/lib/projects/scan-upload';
 
@@ -15,6 +15,10 @@ export interface ScanViewerProps {
   /** Shown while the full image loads, and in its place if it fails to. */
   thumb?: string | null;
   alt: string;
+  /** Which sheet of the project is shown, when it has several (index from 1). */
+  position?: { index: number; count: number };
+  /** Shows the previous (-1) or next (+1) sheet. */
+  onStep?: (delta: -1 | 1) => void;
   onClose: () => void;
 }
 
@@ -48,7 +52,7 @@ const FOCUSABLE_SELECTOR = 'a[href], button:not([disabled])';
  * it. A full image reached by a link can also be opened in a new tab; an image
  * held in memory (a `data:` URL) cannot be opened as a page.
  */
-export function ScanViewer({ src, reduced, reducedReason, thumb, alt, onClose }: ScanViewerProps) {
+export function ScanViewer({ src, reduced, reducedReason, thumb, alt, position, onStep, onClose }: ScanViewerProps) {
   const { t } = useLocale();
   const titleId = useId();
   const dialogRef = useRef<HTMLDivElement>(null);
@@ -116,7 +120,35 @@ export function ScanViewer({ src, reduced, reducedReason, thumb, alt, onClose }:
       className="fixed inset-0 z-[60] flex flex-col bg-slate-950 text-white outline-none"
     >
       <div onClick={closeOnBackdrop} className="shrink-0 flex items-center gap-2 px-3 sm:px-4 py-2 border-b border-white/10">
-        <h2 id={titleId} className="flex-1 min-w-0 truncate text-sm font-bold">{t('scanViewer.title')}</h2>
+        <h2 id={titleId} className="flex-1 min-w-0 truncate text-sm font-bold">
+          {position && position.count > 1 ? t('scanViewer.sheetTitle', { index: position.index, count: position.count }) : t('scanViewer.title')}
+        </h2>
+        {position && position.count > 1 && onStep && (
+          // The arrows follow the reading direction: "previous" points to
+          // where the reading came from (left in French, right in Arabic).
+          <div className="shrink-0 flex items-center gap-1">
+            <button
+              type="button"
+              onClick={() => onStep(-1)}
+              disabled={position.index <= 1}
+              aria-label={t('scanViewer.previousSheet')}
+              data-testid="scan-viewer-previous"
+              className="w-10 h-10 inline-flex items-center justify-center rounded-xl bg-white/10 hover:bg-white/20 disabled:opacity-30 focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand-400 transition-colors"
+            >
+              <ChevronLeft className="w-5 h-5 rtl:rotate-180" aria-hidden="true" />
+            </button>
+            <button
+              type="button"
+              onClick={() => onStep(1)}
+              disabled={position.index >= position.count}
+              aria-label={t('scanViewer.nextSheet')}
+              data-testid="scan-viewer-next"
+              className="w-10 h-10 inline-flex items-center justify-center rounded-xl bg-white/10 hover:bg-white/20 disabled:opacity-30 focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand-400 transition-colors"
+            >
+              <ChevronRight className="w-5 h-5 rtl:rotate-180" aria-hidden="true" />
+            </button>
+          </div>
+        )}
         {content.openable && src && (
           <a
             href={src}
@@ -186,14 +218,19 @@ export function useScanViewer() {
   // Signed links reused while fresh, so reopening does not download again.
   const [linkCache] = useState(() => createScanLinkCache());
 
-  const show = async (key: string, input: ScanViewInput, alt: string) => {
+  const show = async (
+    key: string,
+    input: ScanViewInput,
+    alt: string,
+    nav?: { position: { index: number; count: number }; onStep: (delta: -1 | 1) => void }
+  ) => {
     if (busyRef.current) return;
     busyRef.current = true;
     const needsFetch = scanViewNeedsFetch(input, linkCache);
     if (needsFetch) setPendingKey(key);
     try {
       const source = await resolveScanView(input, (url, init) => fetch(url, init), linkCache);
-      if (source) setView({ ...source, thumb: input.thumb ?? null, alt });
+      if (source) setView({ ...source, thumb: input.thumb ?? null, alt, ...(nav ?? {}) });
     } finally {
       busyRef.current = false;
       if (needsFetch) setPendingKey(null);

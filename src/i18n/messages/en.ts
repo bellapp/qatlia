@@ -798,6 +798,7 @@ export const en: Catalog = {
     sheetSize: '{height} × {width} {unit}',
     piecesValue: '{count} pcs',
     sheetsUsed: { one: '{count} sheet', many: '{count} sheets' },
+    scanSheetsBadge: { one: '{count} page', many: '{count} pages' },
     open: 'Open',
     openAria: 'Open {name}',
     sync: {
@@ -815,6 +816,9 @@ export const en: Catalog = {
     linkFailedNote: 'The full image could not be loaded. Showing a reduced preview.',
     close: 'Close',
     openImage: 'Open the image',
+    sheetTitle: 'Page {index} of {count}',
+    previousSheet: 'Previous page',
+    nextSheet: 'Next page',
   },
   accountPage: {
     eyebrow: 'Account',

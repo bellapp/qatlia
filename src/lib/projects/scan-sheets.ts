@@ -141,3 +141,24 @@ export function withFirstScanPath(existing: Record<string, unknown>, path: strin
   }
   return { ...existing, scanPath: path };
 }
+
+/**
+ * A project's saved data with the kept images attached by position (`null`
+ * leaves a sheet as it is). An old project's single scan becomes a list.
+ * The paths are the caller's to vouch for (the PATCH route checks the owner).
+ */
+export function withScanPaths(existing: Record<string, unknown>, paths: readonly (string | null)[]): Record<string, unknown> {
+  const hasList = Array.isArray(existing.scans);
+  const base: Record<string, unknown>[] = hasList
+    ? (existing.scans as unknown[]).map((entry) => (isRecord(entry) ? { ...entry } : {}))
+    : readScanSheets(existing).map((sheet) => ({ ...sheet }));
+  const scans = paths.reduce<Record<string, unknown>[]>((list, path, index) => {
+    while (list.length <= index) list.push({});
+    if (path) list[index] = { ...list[index], path };
+    return list;
+  }, base);
+  const { scanThumb: _thumb, scanPath: _path, ...rest } = existing;
+  void _thumb;
+  void _path;
+  return { ...(hasList ? existing : rest), scans };
+}

@@ -100,7 +100,7 @@ import { buildPdfPayload } from '@/lib/pdf-payload';
 import { buildPersistedProjectPayload } from '@/lib/projects/persistence-payload';
 import { pickRestorableResult, readRestoredProjectDate } from '@/lib/projects/restore';
 import { downscaleDataUrl } from '@/lib/image-downscale';
-import { createScanKeeper, saveProjectToCloud, settledWithin } from '@/lib/projects/scan-upload';
+import { createScanKeeper, saveProjectToCloud, settledWithin, type ScanKeeper } from '@/lib/projects/scan-upload';
 import { MAX_SCAN_SHEETS, appendSheetPieces, fitThumb, readScanSheets, removeScanSheet, thumbBudgetFor, type ScanSheet } from '@/lib/projects/scan-sheets';
 import { isUuid } from '@/lib/billing/grant';
 import { ScanSheets } from '@/components/ScanSheets';
@@ -220,9 +220,11 @@ function normalizePiecesWithColors(sourcePieces: Piece[]): Piece[] {
 
 /**
  * A cut-list sheet of the project on screen: the image read on this page (in
- * memory), its thumbnail, and the kept image's path of a reopened project.
+ * memory), its thumbnail, the kept image's path of a reopened project, and the
+ * keeper of its full image (the path it is stored under, or the fresh image
+ * still to send; src/lib/projects/scan-upload.ts).
  */
-type ScreenSheet = { image?: string; thumb?: string; path?: string };
+type ScreenSheet = { image?: string; thumb?: string; path?: string; keeper: ScanKeeper };
 
 /** A picked photo as a data URL. */
 function readFileAsDataUrl(file: File): Promise<string> {
@@ -275,10 +277,9 @@ export default function Dashboard() {
   // It belongs to the project on screen: a new job or a reopened project
   // replaces it.
   const scanGroupRef = useRef<string | null>(null);
-  // The scan image kept in full with a saved project: the path it is stored
-  // under, and the fresh scan still to send (src/lib/projects/scan-upload.ts).
-  // Held outside React state so two saves in a row never send it twice.
-  const [scanKeeper] = useState(() => createScanKeeper({ fetch: (url, init) => fetch(url, init), downscale: downscaleDataUrl }));
+  // Each sheet keeps its full image through its own keeper, held outside
+  // React state so two saves in a row never send an image twice.
+  const newKeeper = () => createScanKeeper({ fetch: (url, init) => fetch(url, init), downscale: downscaleDataUrl });
   const scanViewer = useScanViewer();
   // The last save's scan attach (a PATCH that rewrites the project's saved
   // data); a PDF marker or a rename on the same project waits for it first.
@@ -652,7 +653,6 @@ const commitPanelName = () => {
     setVisionError(null);
     setScanSheets([]);
     scanGroupRef.current = null;
-    scanKeeper.restore(null);
     scanAttachRef.current = Promise.resolve(false);
     setPdfGeneratedAt(null);
     // The job on screen is no longer the saved project: the name field writes
@@ -802,10 +802,15 @@ const commitPanelName = () => {
         // The sheets come back with the plan (an old project's single scan
         // reads as one), and the next save carries them on.
         const restoredSheets = readScanSheets(parsed);
-        setScanSheets(restoredSheets.map((sheet) => ({ ...sheet })));
-        // Sheet 1's full image, when the project kept one, is reached by its
-        // path; the thumbnail on screen is never sent as if it were the image.
-        scanKeeper.restore(restoredSheets[0]?.path);
+        // Each sheet's full image, when the project kept it, is reached by its
+        // path; a thumbnail on screen is never sent as if it were the image.
+        setScanSheets(
+          restoredSheets.map((sheet) => {
+            const keeper = newKeeper();
+            keeper.restore(sheet.path);
+            return { ...sheet, keeper };
+          })
+        );
         // A photo added to it rides on its own group, never on another project's.
         scanGroupRef.current = isUuid(parsed.scanGroup) ? (parsed.scanGroup as string) : null;
         // The saved plan is put back as it was saved, with no new run and no
@@ -882,17 +887,17 @@ const commitPanelName = () => {
 
   /**
    * The sheets as saved: each thumbnail fitted to its share of the project's
-   * budget (a single sheet keeps the 600 px one it always had), sheet 1's
-   * kept-image path from the keeper, a reopened sheet's own path otherwise.
+   * budget (a single sheet keeps the 600 px one it always had), and the path
+   * of its kept image when its keeper knows it already.
    */
   const scansForSave = async (): Promise<ScanSheet[]> => {
     const sheets = scanSheetsRef.current;
     const budget = thumbBudgetFor(sheets.length);
     return Promise.all(
-      sheets.map(async (sheet, index) => {
+      sheets.map(async (sheet) => {
         const source = sheet.thumb && sheet.thumb.length <= budget ? sheet.thumb : sheet.image ?? sheet.thumb;
         const thumb = await fitThumb(source, budget, downscaleDataUrl);
-        const path = index === 0 ? scanKeeper.knownPath() ?? undefined : sheet.path;
+        const path = sheet.keeper.knownPath() ?? undefined;
         return { ...(thumb ? { thumb } : {}), ...(path ? { path } : {}) };
       })
     );
@@ -920,9 +925,9 @@ const commitPanelName = () => {
       // Custom project name (when the artisan named it) > panel label > auto.
       name: committedName || automaticProjectName,
       projectName: committedName || undefined,
-      // One entry per sheet, thumbnails within the project's budget. Sheet 1
-      // carries the path already known (a reopened project, an earlier save of
-      // this scan); a new scan's image follows this save (saveProjectToCloud).
+      // One entry per sheet, thumbnails within the project's budget, with the
+      // paths already known (a reopened project, an earlier save); the images
+      // of new sheets follow this save (see saveProjectToCloud).
       scans: await scansForSave(),
       scanGroup: scanGroupRef.current,
       pdfGeneratedAt: overrides.pdfGeneratedAt || pdfGeneratedAt || undefined,
@@ -960,7 +965,7 @@ const commitPanelName = () => {
         data: { user },
       } = await supabase.auth.getUser();
       if (user) {
-        const saved = await saveProjectToCloud(payload, scanKeeper, (url, init) => fetch(url, init));
+        const saved = await saveProjectToCloud(payload, scanSheetsRef.current.map((sheet) => sheet.keeper), (url, init) => fetch(url, init));
         // The project is saved without waiting for the scan image: a new scan's
         // image is sent afterwards and attached to it (`saved.scanAttached`,
         // never rejected); a refusal leaves the thumbnail only.
@@ -1160,17 +1165,25 @@ const commitPanelName = () => {
    * marked as reduced. Seeing it spends no credit.
    */
   const openScanViewer = (index: number) => {
-    const sheet = scanSheetsRef.current[index];
+    const sheets = scanSheetsRef.current;
+    const sheet = sheets[index];
     if (!sheet) return;
-    // Sheet 1's full image is the keeper's; another sheet shows the image read
-    // on this page, else its thumbnail.
-    const first = index === 0;
-    void scanViewer.show(`atelier-${index}`, {
-      localImage: first ? scanKeeper.freshImage() : sheet.image ?? null,
-      projectId: first ? lastSavedProjectId : null,
-      hasFullScan: first ? scanKeeper.knownPath() !== null : false,
-      thumb: sheet.thumb ?? sheet.image ?? null,
-    }, t('atelier.scan.previewAlt'));
+    // The image read on this page, else the sheet's kept image through a
+    // short signed link, else its thumbnail; arrows step through the sheets.
+    void scanViewer.show(
+      `atelier-${index}`,
+      {
+        localImage: sheet.keeper.freshImage(),
+        projectId: lastSavedProjectId,
+        hasFullScan: sheet.keeper.knownPath() !== null,
+        thumb: sheet.thumb ?? sheet.image ?? null,
+        sheet: index + 1,
+      },
+      t('atelier.scan.previewAlt'),
+      sheets.length > 1
+        ? { position: { index: index + 1, count: sheets.length }, onStep: (delta) => openScanViewer(index + delta) }
+        : undefined
+    );
   };
 
   /**
@@ -1181,14 +1194,7 @@ const commitPanelName = () => {
     const current = scanSheetsRef.current;
     if (!current[index]) return;
     setPieces((prev) => removeScanSheet(prev, index + 1));
-    const next = current.filter((_, i) => i !== index);
-    setScanSheets(next);
-    if (index === 0) {
-      // The next sheet becomes sheet 1: the keeper follows it.
-      const first = next[0];
-      if (first?.image) scanKeeper.newScan(first.image);
-      else scanKeeper.restore(first?.path ?? null);
-    }
+    setScanSheets(current.filter((_, i) => i !== index));
   };
 
   /**
@@ -1281,9 +1287,9 @@ const commitPanelName = () => {
         // later sheet, adds to it.
         const replace = sheetIndex === 0 && scanGroupRef.current === null;
         scanGroupRef.current = typeof data.scanGroup === 'string' ? data.scanGroup : null;
-        const sheet: ScreenSheet = { image: scanImage };
+        const sheet: ScreenSheet = { image: scanImage, keeper: newKeeper() };
+        sheet.keeper.newScan(scanImage);
         setScanSheets([...scanSheetsRef.current, sheet]);
-        if (sheetIndex === 0) scanKeeper.newScan(scanImage);
         // The thumbnail shown here, and saved with the project: 600px keeps
         // the cut list readable; a project of several sheets shrinks them at
         // save time to share one thumbnail's budget (see scansForSave).

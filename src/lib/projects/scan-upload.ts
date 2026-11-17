@@ -125,6 +125,27 @@ export function createScanKeeper(deps: { fetch: FetchLike; downscale: Downscale 
  * Resolves true once the server took it; a refusal or a failure is only
  * logged, and the project keeps its thumbnail.
  */
+/**
+ * Attaches the kept images of several sheets to a project already saved, by
+ * position, in one `PATCH { scanPaths }` (null leaves a sheet as it is): each
+ * PATCH rewrites the project's saved data, so several would lose each other's
+ * paths. Resolves true once the server took them.
+ */
+export async function attachScanPaths(projectId: string, scanPaths: (string | null)[], fetchImpl: FetchLike): Promise<boolean> {
+  try {
+    const res = await fetchImpl(`/api/projects/${encodeURIComponent(projectId)}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ scanPaths }),
+    });
+    if (!res.ok) console.warn('Images des fiches non rattachées au projet:', res.status);
+    return res.ok;
+  } catch (err) {
+    console.warn('Images des fiches non rattachées au projet:', err);
+    return false;
+  }
+}
+
 export async function attachScanPath(projectId: string, scanPath: string, fetchImpl: FetchLike): Promise<boolean> {
   try {
     const res = await fetchImpl(`/api/projects/${encodeURIComponent(projectId)}`, {
@@ -151,20 +172,23 @@ export interface CloudSave {
 
 /**
  * Saves a signed-in artisan's project to the cloud at once, never waiting for
- * the scan image. When the save carried no image path and a scan made on this
- * page is still to be kept, the image is sent afterwards (once, shared by
- * every save that needs it) and attached to the project this save created.
- * A scan replaced while the save was running is not attached to it.
+ * the scan images. Each sheet (one keeper per sheet, in order) whose path the
+ * save did not carry and whose scan made on this page is still to be kept has
+ * its image sent afterwards (once, shared by every save that needs it); all
+ * are then attached to the project this save created, in one PATCH. A sheet
+ * replaced while the save was running is not attached to it. A single keeper
+ * (not a list) attaches the old way, `{ scanPath }`.
  *
  * A network error of the save itself is thrown, as `fetch` would; the caller
  * falls back to the device then.
  */
 export async function saveProjectToCloud(
   payload: { scans?: { path?: string }[] },
-  keeper: ScanKeeper,
+  keepers: ScanKeeper | readonly ScanKeeper[],
   fetchImpl: FetchLike
 ): Promise<CloudSave> {
-  const scanAtSave = keeper.freshImage();
+  const list = Array.isArray(keepers) ? (keepers as readonly ScanKeeper[]) : [keepers as ScanKeeper];
+  const scansAtSave = list.map((keeper) => keeper.freshImage());
   const res = await fetchImpl('/api/projects', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -173,10 +197,19 @@ export async function saveProjectToCloud(
   if (!res.ok) return { ok: false, projectId: null, scanAttached: Promise.resolve(false) };
   const data = await res.json().catch(() => null);
   const projectId = data?.success && typeof data.projectId === 'string' ? data.projectId : null;
-  const needsImage = !!projectId && !payload.scans?.[0]?.path && !!scanAtSave && keeper.freshImage() === scanAtSave;
-  const scanAttached = needsImage
-    ? keeper.keep().then((path) => (path ? attachScanPath(projectId as string, path, fetchImpl) : false), () => false)
-    : Promise.resolve(false);
+  const needs = list.map(
+    (keeper, index) =>
+      !!projectId && !payload.scans?.[index]?.path && !!scansAtSave[index] && keeper.freshImage() === scansAtSave[index]
+  );
+  if (!projectId || !needs.some(Boolean)) return { ok: true, projectId, scanAttached: Promise.resolve(false) };
+
+  const scanAttached = Promise.all(list.map((keeper, index) => (needs[index] ? keeper.keep().catch(() => null) : Promise.resolve(null))))
+    .then((paths) => {
+      if (!paths.some(Boolean)) return false;
+      if (!Array.isArray(keepers)) return attachScanPath(projectId, paths[0] as string, fetchImpl);
+      return attachScanPaths(projectId, paths, fetchImpl);
+    })
+    .catch(() => false);
   return { ok: true, projectId, scanAttached };
 }
 
@@ -203,13 +236,14 @@ export function settledWithin(pending: Promise<unknown>, ms: number = SCAN_ATTAC
 /** A signed link slower than this is given up: the thumbnail is shown instead. */
 const LINK_TIMEOUT_MS = 15_000;
 
-/** A 5-minute signed link to a cloud project's kept image, or null. */
-export async function fetchScanUrl(projectId: string, fetchImpl: FetchLike): Promise<string | null> {
+/** A 5-minute signed link to the kept image of a cloud project's sheet (from 1), or null. */
+export async function fetchScanUrl(projectId: string, fetchImpl: FetchLike, sheet: number = 1): Promise<string | null> {
   // A hung request would keep the scan buttons waiting until a reload.
   const controller = typeof AbortController === 'function' ? new AbortController() : null;
   const timer = controller ? setTimeout(() => controller.abort(), LINK_TIMEOUT_MS) : null;
   try {
-    const res = await fetchImpl(`/api/projects/${encodeURIComponent(projectId)}/scan`, {
+    const query = sheet > 1 ? `?n=${sheet}` : '';
+    const res = await fetchImpl(`/api/projects/${encodeURIComponent(projectId)}/scan${query}`, {
       cache: 'no-store',
       ...(controller ? { signal: controller.signal } : {}),
     });
@@ -236,6 +270,8 @@ export interface ScanViewInput {
   hasFullScan: boolean;
   /** The thumbnail saved with the project. */
   thumb?: string | null;
+  /** Which sheet of the project (from 1; default 1). */
+  sheet?: number;
 }
 
 /**
@@ -286,9 +322,16 @@ function wantsLink(input: ScanViewInput): boolean {
   return !input.localImage && input.hasFullScan && typeof input.projectId === 'string' && PROJECT_ID_PATTERN.test(input.projectId);
 }
 
+/** The sheet asked for, from 1. */
+const sheetOf = (input: ScanViewInput): number =>
+  typeof input.sheet === 'number' && Number.isInteger(input.sheet) && input.sheet >= 1 ? input.sheet : 1;
+
+/** Links are cached per project and sheet. */
+const linkKey = (input: ScanViewInput): string => `${input.projectId}#${sheetOf(input)}`;
+
 /** True when showing the scan needs a signed link from the server first. */
 export function scanViewNeedsFetch(input: ScanViewInput, cache?: ScanLinkCache): boolean {
-  return wantsLink(input) && !(cache && cache.get(input.projectId as string));
+  return wantsLink(input) && !(cache && cache.get(linkKey(input)));
 }
 
 /**
@@ -300,11 +343,12 @@ export async function resolveScanView(input: ScanViewInput, fetchImpl: FetchLike
   if (input.localImage) return { src: input.localImage, reduced: false };
   if (wantsLink(input)) {
     const projectId = input.projectId as string;
-    const cached = cache?.get(projectId);
+    const key = linkKey(input);
+    const cached = cache?.get(key);
     if (cached) return { src: cached, reduced: false };
-    const url = await fetchScanUrl(projectId, fetchImpl);
+    const url = await fetchScanUrl(projectId, fetchImpl, sheetOf(input));
     if (url) {
-      cache?.set(projectId, url);
+      cache?.set(key, url);
       return { src: url, reduced: false };
     }
   }

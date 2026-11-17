@@ -884,6 +884,7 @@ export const fr = {
     sheetSize: '{height} × {width} {unit}',
     piecesValue: '{count} pcs',
     sheetsUsed: { one: '{count} feuille', many: '{count} feuilles' },
+    scanSheetsBadge: { one: '{count} fiche', many: '{count} fiches' },
     open: 'Ouvrir',
     openAria: 'Ouvrir {name}',
     /** What the artisan is told when the cloud history is not the source shown. */
@@ -902,6 +903,9 @@ export const fr = {
     linkFailedNote: 'L’image complète n’a pas pu être chargée. Aperçu réduit affiché.',
     close: 'Fermer',
     openImage: "Ouvrir l'image",
+    sheetTitle: 'Fiche {index} sur {count}',
+    previousSheet: 'Fiche précédente',
+    nextSheet: 'Fiche suivante',
   },
   accountPage: {
     eyebrow: 'Compte',

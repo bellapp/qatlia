@@ -361,12 +361,14 @@ test('the history shows the scan in the viewer, no longer in a blank tab', () =>
   const page = fs.readFileSync(path.resolve('src/app/(site)/history/page.tsx'), 'utf8');
   assert.doesNotMatch(page, /window\.open\(/);
   assert.match(page, /<ScanViewer\b/);
-  assert.match(page, /onViewScan: openScan,/);
+  assert.match(page, /onViewScan: \(id: string\) => openScan\(id\),/);
   assert.match(page, /scanPendingId: scanViewer\.pendingKey,/);
   // A device-only row has no server id: only a cloud row asks for the link.
   assert.match(page, /projectId: row\.isCloud \? row\.id : null,/);
-  assert.match(page, /hasFullScan: row\.hasFullScan,/);
-  assert.match(page, /thumb: row\.scanThumb,/);
+  // Sheet by sheet: an old project's single scan is its sheet 1.
+  assert.match(page, /const sheet = row\.scanSheets\[index\] \?\? \{ thumb: row\.scanThumb, hasFullScan: row\.hasFullScan \};/);
+  assert.match(page, /hasFullScan: sheet\.hasFullScan,\s*thumb: sheet\.thumb,\s*sheet: index \+ 1,/);
+  assert.match(page, /onStep: \(delta\) => openScan\(id, index \+ delta\)/);
 });
 
 // Lot 3 fix wave: a kept image without a thumbnail, and the full image loading.
