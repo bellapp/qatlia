@@ -37,6 +37,6 @@ test('at 4 sheets of 4 the zone says so', () => {
 
 test('the zone reads in English and Arabic too', () => {
   const sheets = [{ src: THUMB, pieceCount: 3 }];
-  assert.match(render({ sheets }, 'en'), /Sheet 1/);
+  assert.match(render({ sheets }, 'en'), /Page 1/);
   assert.match(render({ sheets }, 'ar'), /الورقة 1/);
 });

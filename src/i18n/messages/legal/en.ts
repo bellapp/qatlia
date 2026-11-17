@@ -41,7 +41,7 @@ export const legalEn: LegalCatalog = {
         title: 'Credits',
         body:
           'Credits pay for analyses:\n' +
-          '- a complete analysis costs {visionCost} credit. It covers the scan of the cut list, up to {maxScans} photos when it spans several sheets (or, for a list typed by hand, its first optimization run), and every re-run of that list for {windowHours} hours;\n' +
+          '- a complete analysis costs {visionCost} credit. It covers the scan of the cut list, up to {maxScans} photos when it spans several pages (or, for a list typed by hand, its first optimization run), and every re-run of that list for {windowHours} hours;\n' +
           '- exports and quotes are free.\n\n' +
           'Every new account receives {freeCredits} free credits. A failed analysis is not charged.\n\n' +
           'Credits stay on your balance for as long as your account is open. They have no cash value: they cannot be exchanged for money (except for a refund under our refund policy) or transferred to another account.',
