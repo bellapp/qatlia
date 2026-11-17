@@ -207,8 +207,7 @@ test.describe('Atelier localization', () => {
     await expect(html).toHaveAttribute('lang', 'ar');
     await expect(html).toHaveAttribute('dir', 'rtl');
 
-    // Scoped to the header: the pilotage bar carries a second history link.
-    await expect(page.getByRole('banner').getByRole('link', { name: 'السجل' })).toBeVisible();
+    await expect(page.getByRole('navigation', { name: 'شاشات التطبيق' }).getByRole('link', { name: 'سجل قوائم القطع' })).toBeVisible();
     await expect(page.getByRole('heading', { name: 'اللوح الخام في المخزون' })).toBeVisible();
     await expect(page.getByRole('button', { name: 'حسِّن مخطط القطع' })).toBeVisible();
     await expect(page.getByRole('button', { name: 'إعدادات القطع المتقدمة' })).toBeVisible();

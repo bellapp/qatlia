@@ -71,3 +71,16 @@ test('the catalogs no longer name the entries the bar lost', () => {
     assert.equal(messages.includes('sidebar: {'), false, `${locale} drops the old bar`);
   }
 });
+
+test('no end-to-end check still looks for the history or the atelier link in a header', () => {
+  const specs = fs.readdirSync(path.resolve('e2e')).filter((name) => name.endsWith('.spec.ts'));
+  assert.ok(specs.length > 0, 'the end-to-end specs are where this test expects them');
+
+  for (const name of specs) {
+    const stale = read(path.join('e2e', name))
+      .split('\n')
+      .filter((line) => line.includes("getByRole('banner').getByRole('link'"))
+      .filter((line) => /histor|السجل|atelier|workshop|الورشة/i.test(line));
+    assert.deepEqual(stale.map((line) => line.trim()), [], `${name} looks in the header for a link the bar now holds`);
+  }
+});
