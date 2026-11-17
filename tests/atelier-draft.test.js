@@ -6,7 +6,18 @@ const { loadTsModule } = require('./helpers/load-ts-module');
 // (pieces, panel, settings, plan) is kept in the tab while away, and put back
 // on return. Keeping it must never make leaving the atelier fail.
 
-const { ATELIER_DRAFT_KEY, writeAtelierDraft, readAtelierDraft, clearAtelierDraft } = loadTsModule('src/lib/atelier-draft.ts');
+const fs = require('node:fs');
+const path = require('node:path');
+
+const {
+  ATELIER_DRAFT_KEY,
+  writeAtelierDraft,
+  readAtelierDraft,
+  clearAtelierDraft,
+  forgetAtelierDraft,
+  buildAtelierDraft,
+  draftToRestore,
+} = loadTsModule('src/lib/atelier-draft.ts');
 
 /** A storage that can refuse its next `failures` writes, as a full quota does. */
 function fakeStore({ failures = 0 } = {}) {
@@ -117,4 +128,172 @@ test('a storage that refuses everything never makes the atelier fail', () => {
   assert.equal(writeAtelierDraft(blocked, draft()), 'dropped');
   assert.equal(readAtelierDraft(blocked), null);
   assert.doesNotThrow(() => clearAtelierDraft(blocked));
+});
+
+// Sign-out. The menu that signs out sits in the atelier: clearing the draft
+// alone would be undone a moment later, when the atelier closes and keeps it.
+
+test('after a sign-out the draft is gone and the atelier closing does not keep it again', () => {
+  const store = fakeStore();
+  writeAtelierDraft(store, draft());
+
+  forgetAtelierDraft(store);
+
+  assert.equal(store.values.has(ATELIER_DRAFT_KEY), false);
+  assert.equal(writeAtelierDraft(store, draft()), 'dropped', 'the atelier closing behind the sign-out');
+  assert.equal(store.values.has(ATELIER_DRAFT_KEY), false);
+});
+
+test('the next atelier opened after a sign-out keeps its own job as usual', () => {
+  const store = fakeStore();
+  forgetAtelierDraft(store);
+
+  assert.equal(readAtelierDraft(store), null, 'the atelier opens with nothing to restore');
+  assert.equal(writeAtelierDraft(store, draft()), 'full');
+  assert.deepEqual(readAtelierDraft(store), draft());
+});
+
+// What is kept when the atelier is left.
+
+const payload = () => ({ ...draft().project, displayUnit: 'cm' });
+const leaving = (overrides = {}) => ({
+  payload: payload(),
+  hasPlan: true,
+  plannedPieces: payload().pieces,
+  cutMode: '2d',
+  projectId: 'cloud-1',
+  localProjectId: null,
+  restoredAt: '2026-11-17T09:00:00.000Z',
+  ...overrides,
+});
+
+test('a job with its plan is kept whole', () => {
+  const kept = buildAtelierDraft(leaving());
+
+  assert.equal(kept.v, 1);
+  assert.deepEqual(kept.project, payload());
+  assert.equal(kept.plannedPieces, null, 'the plan was made from the pieces on screen: said once');
+  assert.equal(kept.restoredAt, '2026-11-17T09:00:00.000Z');
+  assert.equal(kept.projectId, 'cloud-1');
+});
+
+test('pieces changed since the plan are kept beside the ones the plan was made from', () => {
+  const planned = [{ id: 'p1', height: 72, width: 58, quantity: 2 }];
+
+  assert.deepEqual(buildAtelierDraft(leaving({ plannedPieces: planned })).plannedPieces, planned);
+});
+
+test('a job without a plan is kept without one, and is not called a reopened plan', () => {
+  const kept = buildAtelierDraft(leaving({ hasPlan: false, plannedPieces: null }));
+
+  assert.equal('result' in kept.project, false);
+  assert.deepEqual(kept.project.pieces, payload().pieces);
+  assert.equal(kept.plannedPieces, null);
+  assert.equal(kept.restoredAt, null);
+  assert.equal(kept.cutMode, '2d');
+});
+
+// The round trip, with the modules the atelier restores a saved project with.
+
+test('a job kept and read back restores as a saved project does: plan, sheets in place, unit', () => {
+  const { buildPersistedProjectPayload } = loadTsModule('src/lib/projects/persistence-payload.ts');
+  const { pickRestorableResult } = loadTsModule('src/lib/projects/restore.ts');
+  const { readScanSheets } = loadTsModule('src/lib/projects/scan-sheets.ts');
+  const { resolveProjectUnitMetadata } = loadTsModule('src/lib/units.ts');
+
+  const thumb = 'data:image/jpeg;base64,AAAA';
+  const scanPath = '11111111-1111-4111-8111-111111111111/22222222-2222-4222-8222-222222222222.jpg';
+  const plan = {
+    sheetsUsed: 1,
+    sheets: [{ height: 244, width: 122 }],
+    placedPieces: [{ id: 'p1', x: 0, y: 0, width: 58, height: 72, sheetIndex: 0 }],
+    wastePercentage: 12,
+    cutMode: '2d',
+  };
+  const saved = buildPersistedProjectPayload({
+    name: 'Caissons bas',
+    projectName: 'Caissons bas',
+    // The second sheet has no thumbnail yet and no stored image: it keeps its place.
+    scans: [{ thumb, path: scanPath }, { thumb: undefined, path: undefined }, { thumb }],
+    scanGroup: '33333333-3333-4333-8333-333333333333',
+    sheets: [{ height: 244, width: 122, material: 'mdf' }],
+    sheet: { height: 244, width: 122, material: 'mdf' },
+    pieces: [{ id: 'p1', height: 72, width: 58, quantity: 4, scanIndex: 3 }],
+    options: { kerfWidth: 3 },
+    result: plan,
+    displayUnit: 'mm',
+    migratedFromLegacyUnit: false,
+  });
+  const store = fakeStore();
+
+  writeAtelierDraft(store, buildAtelierDraft(leaving({ payload: saved, plannedPieces: saved.pieces, restoredAt: null })));
+  const { project } = readAtelierDraft(store);
+
+  assert.deepEqual(pickRestorableResult(project.result), { ...plan, offcuts: [], unplacedPieces: [] });
+  assert.deepEqual(readScanSheets(project), [{ thumb, path: scanPath }, {}, { thumb }]);
+  assert.equal(project.scanGroup, '33333333-3333-4333-8333-333333333333');
+  assert.deepEqual(project.pieces, saved.pieces);
+  assert.equal(project.projectName, 'Caissons bas');
+  assert.deepEqual(resolveProjectUnitMetadata(project), { displayUnit: 'mm', canonicalUnit: 'cm', migrated: false, migratedFromLegacyUnit: false });
+});
+
+// Which one wins when the atelier opens.
+
+test('a project opened from the history, or work kept for a sign-in in this tab, comes before the draft', () => {
+  const kept = draft();
+
+  assert.equal(draftToRestore(kept, { openedFromHistory: false, pendingWorkFromThisTab: false }), kept);
+  assert.equal(draftToRestore(kept, { openedFromHistory: true, pendingWorkFromThisTab: false }), null);
+  assert.equal(draftToRestore(kept, { openedFromHistory: false, pendingWorkFromThisTab: true }), null);
+  assert.equal(draftToRestore(null, { openedFromHistory: false, pendingWorkFromThisTab: false }), null);
+});
+
+// The atelier itself, read as text: the page needs a session to run.
+
+const read = (file) => fs.readFileSync(path.resolve(file), 'utf8');
+const atelier = read('src/app/(site)/atelier/page.tsx');
+
+test('the atelier keeps its job when it closes, from what the last render showed', () => {
+  assert.match(atelier, /const leaveDraft = \(\) =>\s*buildAtelierDraft\(\{/);
+  assert.match(atelier, /const leaveDraftRef = useRef\(leaveDraft\);\s*leaveDraftRef\.current = leaveDraft;/, 'refreshed at every render');
+  assert.match(
+    atelier,
+    /return \(\) => \{\s*window\.clearTimeout\(arm\);\s*if \(!armed\) return;\s*writeAtelierDraft\(window\.sessionStorage, leaveDraftRef\.current\(\)\);\s*\};\s*\}, \[\]\);/,
+    'written once, when the atelier closes'
+  );
+});
+
+test('the scan is kept as its thumbnail and its path, never as the full image', () => {
+  const builder = atelier.slice(atelier.indexOf('const leaveDraft = () =>'), atelier.indexOf('const leaveDraftRef = useRef(leaveDraft);'));
+
+  assert.ok(builder.length > 0, 'the builder is delimited');
+  assert.match(builder, /scans: scanSheetsRef\.current\.map\(\(sheet\) => \(\{ thumb: sheet\.thumb, path: sheet\.keeper\.knownPath\(\) \?\? undefined \}\)\)/);
+  assert.equal(builder.includes('.image'), false);
+});
+
+test('the atelier restores the kept job only when nothing comes before it, and forgets it once read', () => {
+  const restore = atelier.slice(atelier.indexOf("const savedProj = sessionStorage.getItem('qatlia_saved_project');"), atelier.indexOf('const handleDisplayUnitChange'));
+
+  assert.match(restore, /const draft = draftToRestore\(readAtelierDraft\(window\.sessionStorage\), \{\s*openedFromHistory: !!savedProj,\s*pendingWorkFromThisTab: /);
+  assert.match(restore, /window\.setTimeout\(\(\) => clearAtelierDraft\(window\.sessionStorage\), 0\);/);
+  assert.match(restore, /openedFromHistoryRef\.current = !!savedProj \|\| !!draft;/, 'work kept for a sign-in elsewhere stays out, as after a reopened project');
+  assert.match(restore, /const parsed = draft \? draft\.project : JSON\.parse\(savedProj \?\? ''\);/, 'one restore path for both');
+  assert.match(restore, /setRestoredAt\(draft \? draft\.restoredAt : readRestoredProjectDate\(/, 'no reopened-plan banner for a plan made in this session');
+  assert.match(restore, /if \(draft\) setCutMode\(draft\.cutMode\);/);
+});
+
+test('a new job leaves no kept job behind', () => {
+  const newJob = atelier.slice(atelier.indexOf('const startNewJob = () => {')).slice(0, 1800);
+
+  assert.match(newJob, /clearAtelierDraft\(window\.sessionStorage\);/);
+});
+
+test('signing out forgets the kept job, from the menu and from the account page', () => {
+  for (const file of ['src/components/AccountMenu.tsx', 'src/app/(site)/account/page.tsx']) {
+    assert.match(
+      read(file),
+      /clearPendingWork\(window\.localStorage, window\.sessionStorage\);\s*forgetAtelierDraft\(window\.sessionStorage\);/,
+      file
+    );
+  }
 });

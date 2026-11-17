@@ -98,6 +98,13 @@ import { saveProjectName, type RenameOutcome } from '@/lib/projects/rename';
 import { deriveQuotationPanels, deriveQuotationPieces } from '@/lib/quotation-items';
 import { buildPdfPayload } from '@/lib/pdf-payload';
 import { buildPersistedProjectPayload } from '@/lib/projects/persistence-payload';
+import {
+  buildAtelierDraft,
+  clearAtelierDraft,
+  draftToRestore,
+  readAtelierDraft,
+  writeAtelierDraft,
+} from '@/lib/atelier-draft';
 import { pickRestorableResult, readRestoredProjectDate } from '@/lib/projects/restore';
 import { downscaleDataUrl } from '@/lib/image-downscale';
 import { createScanKeeper, saveProjectToCloud, settledWithin, type ScanKeeper } from '@/lib/projects/scan-upload';
@@ -643,6 +650,8 @@ const commitPanelName = () => {
    */
   const startNewJob = () => {
     setConfirmingNewJob(false);
+    // Nothing of the old job waits in the tab either.
+    clearAtelierDraft(window.sessionStorage);
     setPieces([]);
     setResult(null);
     plannedPiecesRef.current = null;
@@ -702,6 +711,38 @@ const commitPanelName = () => {
       count: pieces.reduce((s, p) => s + (p.quantity || 1), 0),
     });
   const derivedProjectName = projectName.trim() || automaticProjectName;
+
+  // What to keep if the atelier is left now for another screen of the app: the
+  // job as a save would store it (see src/lib/atelier-draft.ts). A scan keeps
+  // its thumbnail and the path of the image already stored, never the image.
+  const leaveDraft = () =>
+    buildAtelierDraft({
+      payload: buildPersistedProjectPayload({
+        name: projectNameRef.current.trim() || automaticProjectName,
+        projectName: projectNameRef.current.trim() || undefined,
+        scans: scanSheetsRef.current.map((sheet) => ({ thumb: sheet.thumb, path: sheet.keeper.knownPath() ?? undefined })),
+        scanGroup: scanGroupRef.current,
+        pdfGeneratedAt: pdfGeneratedAt || undefined,
+        sheets,
+        sheet: activeSheet,
+        pieces,
+        options,
+        // Typed as a plan for the payload; the draft leaves it out when there is none.
+        result: result as OptimizationResult,
+        displayUnit,
+        migratedFromLegacyUnit: pendingUnitMigration || migratedFromLegacyUnit,
+      }),
+      hasPlan: !!result,
+      plannedPieces: plannedPiecesRef.current,
+      cutMode,
+      projectId: lastSavedProjectId,
+      localProjectId,
+      restoredAt,
+    });
+  // Refreshed at every render: the atelier closes long after the render that
+  // set up the effect which keeps the job.
+  const leaveDraftRef = useRef(leaveDraft);
+  leaveDraftRef.current = leaveDraft;
 
   // Re-sync the free-typed drafts whenever the canonical sheet dimensions or
   // the display unit change from *outside* the draft itself (a cm↔mm toggle,
@@ -765,7 +806,19 @@ const commitPanelName = () => {
     setDisplayUnit(readStoredDisplayUnit(window.localStorage));
 
     const savedProj = sessionStorage.getItem('qatlia_saved_project');
-    openedFromHistoryRef.current = !!savedProj;
+    // The job kept when the atelier was left for another screen of the app. A
+    // project opened from the history comes before it, and so does work kept
+    // for a sign-in asked from this tab, which the atelier resumes further down.
+    const pendingWork = loadPendingWork(window.localStorage);
+    const draft = draftToRestore(readAtelierDraft(window.sessionStorage), {
+      openedFromHistory: !!savedProj,
+      pendingWorkFromThisTab: !!pendingWork && isFromThisTab(window.sessionStorage, pendingWork),
+    });
+    // Read once: gone a tick later, so React's development double pass still finds it.
+    window.setTimeout(() => clearAtelierDraft(window.sessionStorage), 0);
+    // A kept job put back stands like a reopened project: work kept for a
+    // sign-in in another tab is not laid over it.
+    openedFromHistoryRef.current = !!savedProj || !!draft;
     // Set alongside 'qatlia_saved_project' when a project is opened from
     // history (see history/page.tsx's handleLoadProject) — without this,
     // QuotationDialog only ever knew about the *last auto-saved* project
@@ -775,18 +828,18 @@ const commitPanelName = () => {
     // Re-validated here too (defense in depth against a stale/tampered
     // sessionStorage value) — /api/export-quotation's `projectId` must be a
     // genuine UUID or the whole quote request 400s.
-    const restoredProjectIdRaw = sessionStorage.getItem('qatlia_restored_project_id');
+    const restoredProjectIdRaw = draft ? draft.projectId : sessionStorage.getItem('qatlia_restored_project_id');
     const restoredProjectId =
       restoredProjectIdRaw && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(restoredProjectIdRaw)
         ? restoredProjectIdRaw
         : null;
     // A project kept on this device only has no server id; its history entry id
     // lets the name typed in the atelier be written back to that entry.
-    const restoredLocalIdRaw = sessionStorage.getItem('qatlia_restored_local_id');
+    const restoredLocalIdRaw = draft ? draft.localProjectId : sessionStorage.getItem('qatlia_restored_local_id');
     const restoredLocalId = restoredLocalIdRaw && restoredLocalIdRaw.trim() ? restoredLocalIdRaw : null;
-    if (savedProj) {
+    if (savedProj || draft) {
       try {
-        const parsed = JSON.parse(savedProj);
+        const parsed = draft ? draft.project : JSON.parse(savedProj ?? '');
         // A panel price once set in the cut settings becomes the panel's own price.
         const legacyStockPrices = parsed.options?.stockPricingOverrides;
         const restoreSheet = (sheet: Sheet) => withLegacyStockPrice(withoutLegacyPanelLabel(sheet), legacyStockPrices);
@@ -820,12 +873,15 @@ const commitPanelName = () => {
         if (restoredResult) {
           setResult(restoredResult);
           setActiveSheetIndex(0);
-          plannedPiecesRef.current = restoredPieces;
+          plannedPiecesRef.current = draft?.plannedPieces ? normalizePiecesWithColors(draft.plannedPieces as Piece[]) : restoredPieces;
           // A bar plan reopens in bar mode: the header, the stock card, the
           // project name and a re-run all follow the mode, not only the viewer.
           if (restoredResult.cutMode === '1d' || restoredResult.cutMode === '2d') setCutMode(restoredResult.cutMode);
-          setRestoredAt(readRestoredProjectDate(sessionStorage.getItem('qatlia_restored_project_meta')));
+          // A plan made in this session is not a plan reopened as saved.
+          setRestoredAt(draft ? draft.restoredAt : readRestoredProjectDate(sessionStorage.getItem('qatlia_restored_project_meta')));
         }
+        // A kept job comes back in the mode it was left in, plan or not.
+        if (draft) setCutMode(draft.cutMode);
         setPdfGeneratedAt(typeof parsed.pdfGeneratedAt === 'string' ? parsed.pdfGeneratedAt : null);
         if (parsed.options) setOptions((prev) => optionsWithoutStockOverride({ ...prev, ...parsed.options }));
         if (restoredProjectId) setLastSavedProjectId(restoredProjectId);
@@ -865,6 +921,22 @@ const commitPanelName = () => {
         sessionStorage.removeItem('qatlia_restored_local_id');
       }
     }
+  }, []);
+
+  // Leaving for another screen of the app closes the atelier: its job is kept
+  // in the tab, and put back by the effect above on return. Armed a tick after
+  // opening: React's development double mount closes the atelier before it has
+  // shown anything, a job just put back included.
+  useEffect(() => {
+    let armed = false;
+    const arm = window.setTimeout(() => {
+      armed = true;
+    }, 0);
+    return () => {
+      window.clearTimeout(arm);
+      if (!armed) return;
+      writeAtelierDraft(window.sessionStorage, leaveDraftRef.current());
+    };
   }, []);
 
   const handleDisplayUnitChange = (unit: DisplayUnit) => {
