@@ -12,26 +12,18 @@
  */
 
 import { isOwnScanPath } from './scan-image';
+import { SCAN_THUMB_MAX_CHARS, sanitizeScanThumb } from './scan-thumb';
+import { isUuid } from '@/lib/billing/grant';
+import { sanitizeScanSheets, type ScanSheet } from './scan-sheets';
 
-/**
- * Upper bound on a stored thumbnail, in dataURL characters (~110 KB of image).
- * `GET /api/projects` returns every project's options_json at once, so the
- * history page must stay light on a mobile connection.
- */
-export const SCAN_THUMB_MAX_CHARS = 150_000;
+export { SCAN_THUMB_MAX_CHARS, sanitizeScanThumb };
 
 export const PROJECT_NAME_MAX_CHARS = 120;
 
 /** A saved project never needs more stock sheets than this. */
 export const MAX_STORED_SHEETS = 50;
 
-const SCAN_THUMB_PATTERN = /^data:image\/(jpeg|png|webp);base64,[A-Za-z0-9+/]+={0,2}$/;
 const ISO_DATETIME_PATTERN = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2}(\.\d{1,3})?)?(Z|[+-]\d{2}:\d{2})$/;
-
-export function sanitizeScanThumb(value: unknown): string | undefined {
-  if (typeof value !== 'string' || value.length > SCAN_THUMB_MAX_CHARS) return undefined;
-  return SCAN_THUMB_PATTERN.test(value) ? value : undefined;
-}
 
 /** A real instant, normalised to `toISOString()`; anything else is dropped. */
 export function sanitizePdfGeneratedAt(value: unknown): string | undefined {
@@ -57,6 +49,10 @@ export interface ProjectHistoryMetadata {
   pdfGeneratedAt?: string;
   /** Path of the private scan image; only ever the saving artisan's own. */
   scanPath?: string;
+  /** The project's cut-list sheets, in order (see scan-sheets.ts). */
+  scans?: ScanSheet[];
+  /** The scan group the project's photos were read in (migration 018). */
+  scanGroup?: string;
   sheets?: unknown[];
 }
 
@@ -77,6 +73,9 @@ export function pickProjectHistoryMetadata(body: unknown, ownerId?: string): Pro
   const pdfGeneratedAt = sanitizePdfGeneratedAt(source.pdfGeneratedAt);
   if (pdfGeneratedAt) metadata.pdfGeneratedAt = pdfGeneratedAt;
   if (ownerId && isOwnScanPath(source.scanPath, ownerId)) metadata.scanPath = source.scanPath;
+  const scans = sanitizeScanSheets(source.scans, ownerId);
+  if (scans) metadata.scans = scans;
+  if (isUuid(source.scanGroup)) metadata.scanGroup = source.scanGroup as string;
   const sheets = sanitizeSheets(source.sheets);
   if (sheets) metadata.sheets = sheets;
   return metadata;

@@ -130,6 +130,8 @@ export interface Piece {
    * sheet's grain direction (sheet.height = vertical grain by convention).
    */
   grain?: 'none' | 'vertical' | 'horizontal';
+  /** The cut-list sheet (from 1) this piece was read from; absent for a piece added by hand. */
+  scanIndex?: number;
 }
 export interface Sheet {
   id?: string; height: number; width: number; kerf: number; margin?: number;
