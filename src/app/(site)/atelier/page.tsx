@@ -25,8 +25,6 @@ import {
   TrendingUp,
   Scissors,
   Boxes,
-  LayoutGrid,
-  Settings2,
   ClipboardList,
   FilePlus2,
   CheckCircle2,
@@ -294,16 +292,6 @@ export default function Dashboard() {
   // history, or saved there when the server could not be reached.
   const [localProjectId, setLocalProjectId] = useState<string | null>(null);
   const [showAdvancedOptions, setShowAdvancedOptions] = useState<boolean>(false);
-  const advancedOptionsRef = useRef<HTMLDivElement>(null);
-
-  /** Opens the cutting-settings panel and scrolls it into view. */
-  const openAdvancedOptions = () => {
-    setShowAdvancedOptions(true);
-    // Wait one frame so the panel is rendered before measuring where to scroll.
-    requestAnimationFrame(() => {
-      advancedOptionsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    });
-  };
   const [displayUnit, setDisplayUnit] = useState<DisplayUnit>(DEFAULT_DISPLAY_UNIT);
   // True while the restored/current project still owes its next save an
   // explicit unit-metadata rewrite (legacy project with no metadata at all).
@@ -1628,14 +1616,6 @@ const commitPanelName = () => {
                 {t('atelier.sidebar.title')}
               </p>
 
-              <a href="#plan-top" className="inline-flex shrink-0 items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-bold transition-colors bg-brand-400/10 text-brand-500 dark:text-brand-400">
-                <LayoutGrid className="w-4 h-4" />
-                {t('atelier.sidebar.navOptimization')}
-              </a>
-              <a href="#stock-card" className="inline-flex shrink-0 items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-bold transition-colors text-slate-600 dark:text-slate-300 hover:bg-studio-panel hover:text-slate-900 dark:hover:text-white">
-                <PackageOpen className="w-4 h-4" />
-                {t('atelier.sidebar.navMaterials')}
-              </a>
               <button
                 type="button"
                 onClick={() => setIsQuotationDialogOpen(true)}
@@ -1645,19 +1625,6 @@ const commitPanelName = () => {
                 <FileText className="w-4 h-4" />
                 {t('atelier.sidebar.navQuotation')}
               </button>
-              {/* The settings panel sits under the pieces list, far below the
-                  fold: this entry opens it and brings it into view, never
-                  toggles it shut out of sight. */}
-              <button
-                type="button"
-                onClick={openAdvancedOptions}
-                aria-controls="advanced-cutting-options"
-                className="inline-flex shrink-0 items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-bold transition-colors text-slate-600 dark:text-slate-300 hover:bg-studio-panel hover:text-slate-900 dark:hover:text-white"
-              >
-                <Settings2 className="w-4 h-4" />
-                {t('atelier.sidebar.navCutSettings')}
-              </button>
-
               {/* Last: the only entry that leaves the atelier for another page. */}
               <Link href="/history" className="inline-flex shrink-0 items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-bold transition-colors text-slate-600 dark:text-slate-300 hover:bg-studio-panel hover:text-slate-900 dark:hover:text-white">
                 <History className="w-4 h-4" />
@@ -1669,15 +1636,17 @@ const commitPanelName = () => {
                   {formatDisplayValue(activeSheet.height, displayUnit)} × {formatDisplayValue(activeSheet.width, displayUnit)} {displayUnit}
                 </p>
                 {/* Kerf chip (Stitch header pattern): the blade width is a technical
-                    figure — mono, amber-tinted, always visible for machine setup. */}
-                <div
+                    figure — mono, amber-tinted, always visible for machine setup.
+                    It leads to where the blade is set, in the panel card. */}
+                <a
+                  href="#cut-settings"
                   dir="ltr"
-                  className="hidden md:flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-brand-400/10 border border-brand-500/25 text-brand-500 dark:text-brand-400 text-xs font-mono font-bold"
+                  className="hidden md:flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-brand-400/10 hover:bg-brand-400/20 border border-brand-500/25 text-brand-500 dark:text-brand-400 text-xs font-mono font-bold transition-colors"
                   title={t('options.kerf.title')}
                 >
                   <span className="w-1.5 h-1.5 rounded-full bg-brand-400" aria-hidden="true" />
                   {t('options.kerf.chip', { value: n(options.kerfWidth, { maximumFractionDigits: 1 }) })}
-                </div>
+                </a>
               </div>
             </div>
           </nav>
@@ -1870,6 +1839,19 @@ const commitPanelName = () => {
                 <span className="text-xs text-rose-300 font-medium">{t(visionError)}</span>
               </div>
             )}
+
+            {/* Pieces Manager Component: right under the scan that fills it,
+                ahead of the panel the pieces are cut from. */}
+            <div className="p-4 rounded-xl bg-studio-panel border border-studio-border shadow-sm">
+              <PiecesManager
+                pieces={pieces}
+                onUpdatePieces={setPieces}
+                defaultMaterial={activeSheet.material || 'mdf'}
+                displayUnit={displayUnit}
+                showMaterialCol={options.considerMaterial}
+                disabled={isOptimizing}
+              />
+            </div>
 
             {/* Stock Panel Card */}
             <div id="stock-card" className="overflow-hidden rounded-xl bg-studio-panel border border-studio-border shadow-sm">
@@ -2165,53 +2147,53 @@ const commitPanelName = () => {
                   ))}
                 </div>
               )}
-            </div>
 
-            {/* Pieces Manager Component */}
-            <div className="p-4 rounded-xl bg-studio-panel border border-studio-border shadow-sm">
-              <PiecesManager
-                pieces={pieces}
-                onUpdatePieces={setPieces}
-                defaultMaterial={activeSheet.material || 'mdf'}
-                displayUnit={displayUnit}
-                showMaterialCol={options.considerMaterial}
-                disabled={isOptimizing}
-              />
-            </div>
-
-            {/* Collapsible Advanced Options. scroll-mt clears the sticky header
-                and the section nav when the nav entry scrolls here. */}
-            <div ref={advancedOptionsRef} className="rounded-xl overflow-hidden scroll-mt-32">
-              <button
-                type="button"
-                onClick={() => setShowAdvancedOptions(!showAdvancedOptions)}
-                aria-expanded={showAdvancedOptions}
-                aria-controls="advanced-cutting-options"
-                className="w-full px-4 py-3 flex items-center justify-between text-[11px] font-semibold uppercase tracking-wider text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:text-white transition-colors"
-              >
-                <div className="flex items-center gap-2">
-                  <SlidersHorizontal className="w-3.5 h-3.5 text-brand-400" />
-                  <span>{t('atelier.advanced.toggle')}</span>
-                </div>
-                <span className={`transition-transform duration-200 ${showAdvancedOptions ? 'rotate-180' : ''}`}>
-                  <ChevronDown className="w-4 h-4" />
-                </span>
-              </button>
-
-              {showAdvancedOptions && (
-                <div id="advanced-cutting-options" className="px-1 pb-2 animate-in fade-in slide-in-from-top-1 duration-200">
-                  <OptionsPanel
-                    options={options}
-                    onChange={handleOptionsChange}
-                    disabled={isOptimizing}
-                    edgeMarginMm={Math.round((activeSheet.margin ?? 0) * 100) / 10}
-                    onEdgeMarginChange={handleEdgeMarginChange}
-                    edgePrice={edgePrice}
-                    onEdgePriceChange={(price) => void handleEdgePriceChange(price)}
-                    edgePriceSaveFailed={edgePriceSaveFailed}
-                  />
-                </div>
-              )}
+              {/* The cut settings sit with the panel they apply to. The blade
+                  and the edge margin, set for every job, are always shown; the
+                  rarer ones unfold under them. scroll-mt clears the sticky
+                  header and bar when the blade figure of the bar leads here. */}
+              <div id="cut-settings" className="scroll-mt-32 border-t border-studio-border px-4 pt-3.5 pb-3 space-y-3">
+                <h3 className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-wider text-slate-600 dark:text-slate-400">
+                  <Scissors className="w-3.5 h-3.5 text-brand-400" />
+                  {t('atelier.advanced.title')}
+                </h3>
+                <OptionsPanel
+                  part="blade"
+                  options={options}
+                  onChange={handleOptionsChange}
+                  disabled={isOptimizing}
+                  edgeMarginMm={Math.round((activeSheet.margin ?? 0) * 100) / 10}
+                  onEdgeMarginChange={handleEdgeMarginChange}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowAdvancedOptions(!showAdvancedOptions)}
+                  aria-expanded={showAdvancedOptions}
+                  aria-controls="advanced-cutting-options"
+                  className="w-full py-1.5 flex items-center justify-between text-[11px] font-semibold uppercase tracking-wider text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition-colors"
+                >
+                  <span className="flex items-center gap-2">
+                    <SlidersHorizontal className="w-3.5 h-3.5 text-brand-400" />
+                    {t('atelier.advanced.toggle')}
+                  </span>
+                  <span className={`transition-transform duration-200 ${showAdvancedOptions ? 'rotate-180' : ''}`}>
+                    <ChevronDown className="w-4 h-4" />
+                  </span>
+                </button>
+                {showAdvancedOptions && (
+                  <div id="advanced-cutting-options" className="animate-in fade-in slide-in-from-top-1 duration-200">
+                    <OptionsPanel
+                      part="rest"
+                      options={options}
+                      onChange={handleOptionsChange}
+                      disabled={isOptimizing}
+                      edgePrice={edgePrice}
+                      onEdgePriceChange={(price) => void handleEdgePriceChange(price)}
+                      edgePriceSaveFailed={edgePriceSaveFailed}
+                    />
+                  </div>
+                )}
+              </div>
             </div>
 
             {optimizeError && (

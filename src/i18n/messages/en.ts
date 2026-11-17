@@ -176,10 +176,7 @@ export const en: Catalog = {
     },
     sidebar: {
       title: 'Controls',
-      navOptimization: 'Optimization',
-      navMaterials: 'Materials',
       navQuotation: 'Costing & Quotes',
-      navCutSettings: 'Cutting settings',
       navHistory: 'Cut list history',
     },
     project: {
@@ -280,7 +277,8 @@ export const en: Catalog = {
       dismiss: 'Dismiss',
     },
     advanced: {
-      toggle: 'Advanced cutting settings',
+      title: 'Cutting settings',
+      toggle: 'More settings',
     },
     optimize: {
       authRequired: 'Sign in to run an optimization.',

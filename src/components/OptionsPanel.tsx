@@ -31,6 +31,12 @@ interface OptionsPanelProps {
   onEdgePriceChange?: (price: number | null) => void;
   /** The last price could not be saved in the account. */
   edgePriceSaveFailed?: boolean;
+  /**
+   * Which settings to show: 'blade' is the kerf and the edge margin, set for
+   * every job and shown with the panel; 'rest' is all the others, kept
+   * folded. Both when left out.
+   */
+  part?: 'blade' | 'rest';
 }
 
 /** '' resets, '8', '8,5' or '8.5' set, anything else is ignored. */
@@ -91,6 +97,7 @@ export const OptionsPanel: React.FC<OptionsPanelProps> = ({
   edgePrice = null,
   onEdgePriceChange,
   edgePriceSaveFailed = false,
+  part,
 }) => {
   const { t } = useLocale();
   const { currency } = useCurrency();
@@ -108,9 +115,13 @@ export const OptionsPanel: React.FC<OptionsPanelProps> = ({
   const catalogEdgeRange = `${Math.min(...catalogEdgePrices)}–${Math.max(...catalogEdgePrices)}`;
 
   return (
-    <div className="space-y-5 text-xs">
+    // Side by side where the card is wide enough: one column on a phone and
+    // in the narrow left column of a small desktop screen.
+    <div className={part === 'blade' ? 'grid gap-3 sm:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2 text-xs' : 'space-y-5 text-xs'}>
+      {part !== 'rest' && (
+      <>
       <Tooltip text={t('options.kerf.tooltip')}>
-        <div className="p-4 rounded-xl bg-studio-panel/50 border border-studio-border/70">
+        <div className="flex-1 min-w-0 p-4 rounded-xl bg-studio-panel/50 border border-studio-border/70">
           <div className="flex items-center justify-between mb-3">
             <div className="flex items-center gap-2">
               <span className="w-7 h-7 rounded-lg bg-brand-400/10 border border-brand-500/20 flex items-center justify-center">
@@ -133,7 +144,7 @@ export const OptionsPanel: React.FC<OptionsPanelProps> = ({
       </Tooltip>
       {onEdgeMarginChange && (
         <Tooltip text={t('options.margin.tooltip')}>
-          <div className="p-4 rounded-xl bg-studio-panel/50 border border-studio-border/70">
+          <div className="flex-1 min-w-0 p-4 rounded-xl bg-studio-panel/50 border border-studio-border/70">
             <div className="flex items-center justify-between mb-3">
               <div className="flex items-center gap-2">
                 <span className="w-7 h-7 rounded-lg bg-brand-400/10 border border-brand-500/20 flex items-center justify-center">
@@ -155,6 +166,10 @@ export const OptionsPanel: React.FC<OptionsPanelProps> = ({
           </div>
         </Tooltip>
       )}
+      </>
+      )}
+      {part !== 'blade' && (
+      <>
       <Tooltip text={t('options.priority.tooltip')}>
         <div className="flex items-center gap-3">
           <span className="shrink-0 w-7 h-7 rounded-lg bg-brand-400/10 border border-brand-500/20 flex items-center justify-center"><Gauge className="w-3.5 h-3.5 text-brand-400" /></span>
@@ -246,6 +261,8 @@ export const OptionsPanel: React.FC<OptionsPanelProps> = ({
           )}
         </div>
       </Tooltip>
+      </>
+      )}
     </div>
   );
 };

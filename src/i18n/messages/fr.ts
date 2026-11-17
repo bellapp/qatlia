@@ -211,10 +211,7 @@ export const fr = {
     /** Desktop-only "Pilotage" rail — mobile keeps the top navbar instead. */
     sidebar: {
       title: 'Pilotage',
-      navOptimization: 'Optimisation',
-      navMaterials: 'Matériaux',
       navQuotation: 'Chiffrage & Devis',
-      navCutSettings: 'Réglages de coupe',
       navHistory: 'Historique des débits',
     },
     /**
@@ -321,7 +318,8 @@ export const fr = {
       dismiss: 'Ignorer',
     },
     advanced: {
-      toggle: 'Réglages de coupe avancés',
+      title: 'Réglages de coupe',
+      toggle: 'Plus de réglages',
     },
     optimize: {
       authRequired: 'Connectez-vous pour lancer une optimisation.',
