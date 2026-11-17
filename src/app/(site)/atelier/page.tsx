@@ -13,7 +13,6 @@ import {
   AlertTriangle,
   Camera,
   Image as ImageIcon,
-  History,
   SlidersHorizontal,
   ChevronDown,
   FileCode2,
@@ -85,6 +84,7 @@ import { QuotationDialog } from '@/components/QuotationDialog';
 import { ScanViewer, useScanViewer } from '@/components/ScanViewer';
 import { EmptyState } from '@/components/EmptyState';
 import { AccountMenu } from '@/components/AccountMenu';
+import { WorkspaceNav } from '@/components/WorkspaceNav';
 import { QatlIALogo } from '@/components/QatlIALogo';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { useTheme } from '@/components/ThemeProvider';
@@ -1688,15 +1688,6 @@ const commitPanelName = () => {
                 </button>
               </div>
 
-              <Link
-                href="/history"
-                aria-label={t('atelier.header.history')}
-                className="group relative flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-xs font-medium text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:text-white hover:bg-studio-panel transition-all"
-              >
-                <History className="w-4 h-4 text-slate-600 dark:text-slate-400 group-hover:text-brand-400 transition-colors" />
-                <span className="hidden sm:inline">{t('atelier.header.history')}</span>
-              </Link>
-
               <LocaleSwitcher />
               <OnboardingTour />
               <ThemeToggle />
@@ -1729,57 +1720,30 @@ const commitPanelName = () => {
         </div>
       </header>
 
+      {/* The bar shared by every screen. It sticks under the header; the
+          machine figures at its end are the atelier's own addition. */}
+      <WorkspaceNav current="atelier" className="max-w-[1500px] mx-auto px-4 sm:px-6">
+        {/* Machine setup figures, pushed to the trailing edge. */}
+        <p className="hidden lg:block font-mono text-[10px] text-slate-500" dir="ltr">
+          {formatDisplayValue(activeSheet.height, displayUnit)} × {formatDisplayValue(activeSheet.width, displayUnit)} {displayUnit}
+        </p>
+        {/* Kerf chip (Stitch header pattern): the blade width is a technical
+            figure — mono, amber-tinted, always visible for machine setup.
+            It leads to where the blade is set, in the panel card. */}
+        <a
+          href="#cut-settings"
+          dir="ltr"
+          className="hidden md:flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-brand-400/10 hover:bg-brand-400/20 border border-brand-500/25 text-brand-500 dark:text-brand-400 text-xs font-mono font-bold transition-colors"
+          title={t('options.kerf.title')}
+        >
+          <span className="w-1.5 h-1.5 rounded-full bg-brand-400" aria-hidden="true" />
+          {t('options.kerf.chip', { value: n(options.kerfWidth, { maximumFractionDigits: 1 }) })}
+        </a>
+      </WorkspaceNav>
+
       {/* Main Workspace Grid */}
       <main className="max-w-[1500px] mx-auto px-4 sm:px-6 py-6">
         <div className="space-y-4">
-
-          {/* Pilotage bar — the workspace navigation, back on top: as a left
-              rail it ate 14rem of every row below, which is what squeezed the
-              pieces table. It sticks under the header (h-16 = top-16) and is the
-              only element allowed to scroll sideways on a narrow screen. */}
-          <nav
-            aria-label={t('atelier.sidebar.title')}
-            className="sticky top-16 z-30 -mx-4 sm:-mx-6 px-4 sm:px-6 py-2 border-b border-studio-border bg-studio-canvas/85 backdrop-blur-xl"
-          >
-            <div className="flex min-w-0 items-center gap-1 overflow-x-auto overscroll-x-contain">
-              <p className="hidden xl:block shrink-0 pe-3 text-[9px] font-bold uppercase tracking-[0.2em] text-slate-400">
-                {t('atelier.sidebar.title')}
-              </p>
-
-              <button
-                type="button"
-                onClick={() => setIsQuotationDialogOpen(true)}
-                disabled={!result?.costingInput}
-                className="inline-flex shrink-0 items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-bold transition-colors text-slate-600 dark:text-slate-300 hover:bg-studio-panel hover:text-slate-900 dark:hover:text-white disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-transparent"
-              >
-                <FileText className="w-4 h-4" />
-                {t('atelier.sidebar.navQuotation')}
-              </button>
-              {/* Last: the only entry that leaves the atelier for another page. */}
-              <Link href="/history" className="inline-flex shrink-0 items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-bold transition-colors text-slate-600 dark:text-slate-300 hover:bg-studio-panel hover:text-slate-900 dark:hover:text-white">
-                <History className="w-4 h-4" />
-                {t('atelier.sidebar.navHistory')}
-              </Link>
-              {/* Machine setup figures, pushed to the trailing edge. */}
-              <div className="ms-auto flex shrink-0 items-center gap-2 ps-3">
-                <p className="hidden lg:block font-mono text-[10px] text-slate-500" dir="ltr">
-                  {formatDisplayValue(activeSheet.height, displayUnit)} × {formatDisplayValue(activeSheet.width, displayUnit)} {displayUnit}
-                </p>
-                {/* Kerf chip (Stitch header pattern): the blade width is a technical
-                    figure — mono, amber-tinted, always visible for machine setup.
-                    It leads to where the blade is set, in the panel card. */}
-                <a
-                  href="#cut-settings"
-                  dir="ltr"
-                  className="hidden md:flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-brand-400/10 hover:bg-brand-400/20 border border-brand-500/25 text-brand-500 dark:text-brand-400 text-xs font-mono font-bold transition-colors"
-                  title={t('options.kerf.title')}
-                >
-                  <span className="w-1.5 h-1.5 rounded-full bg-brand-400" aria-hidden="true" />
-                  {t('options.kerf.chip', { value: n(options.kerfWidth, { maximumFractionDigits: 1 }) })}
-                </a>
-              </div>
-            </div>
-          </nav>
 
           <div className="min-w-0 w-full space-y-4">
 

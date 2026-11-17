@@ -3,37 +3,84 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 
-// User request, 2026-11-16: in the bar under the header, the history entry sat
-// in the middle of the entries that act on the job on screen. It leaves the
-// atelier for another page, so it goes last, and it says what it lists.
+// Owner request, 2026-11-17: the bar under the header is the same on every
+// screen and only leads from one screen to another. The quotation entry, greyed
+// until a plan existed and a double of the button under the plan, leaves it;
+// so do the second ways to the history and back to the atelier.
 
-const source = fs.readFileSync(path.resolve('src/app/(site)/atelier/page.tsx'), 'utf8');
+const read = (file) => fs.readFileSync(path.resolve(file), 'utf8');
+const atelier = read('src/app/(site)/atelier/page.tsx');
+const history = read('src/app/(site)/history/page.tsx');
 
-/** The entries of the bar, from its first one to the machine figures at its end. */
-function navEntries() {
-  const start = source.indexOf("aria-label={t('atelier.sidebar.title')}");
-  const end = source.indexOf('Machine setup figures', start);
-  assert.ok(start > 0 && end > start, 'the atelier has its bar of entries');
-  return source.slice(start, end);
+/** How many times `needle` appears in `text`. */
+const count = (text, needle) => text.split(needle).length - 1;
+
+/** What the atelier puts inside the shared bar. */
+function atelierBar() {
+  const start = atelier.indexOf('<WorkspaceNav current="atelier"');
+  const end = atelier.indexOf('</WorkspaceNav>', start);
+  assert.ok(start > 0 && end > start, 'the atelier renders the shared bar with content of its own');
+  return atelier.slice(start, end);
 }
 
-test('the history entry is the last one of the bar', () => {
-  const bar = navEntries();
-  const history = bar.indexOf('<Link href="/history"');
+test('the atelier shows the shared bar right under its header, outside the page content', () => {
+  const header = atelier.indexOf('</header>');
+  const bar = atelier.indexOf('<WorkspaceNav current="atelier"');
+  const main = atelier.indexOf('<main ');
 
-  assert.ok(history > 0, 'the bar leads to the history');
-  const quotation = bar.indexOf('atelier.sidebar.navQuotation');
-  assert.ok(quotation > 0 && quotation < history, 'the quotation comes before the history');
-  assert.equal(bar.indexOf('<button', history), -1, 'no entry follows the history');
+  assert.ok(header > 0 && bar > header && main > bar, 'header, then the bar, then the content');
+  assert.equal(count(atelier, '<nav'), 0, 'the atelier no longer builds a bar of its own');
 });
 
-test('the history entry says it lists the cut lists', () => {
-  const bar = navEntries();
-  const link = bar.slice(bar.indexOf('<Link href="/history"'), bar.indexOf('</Link>'));
+test('the atelier bar holds no action and the atelier no second way to the history', () => {
+  assert.equal(atelier.includes('atelier.sidebar'), false);
+  assert.equal(atelier.includes('navQuotation'), false);
+  assert.equal(atelier.includes('href="/history"'), false, 'the shared bar is the way to the history');
+  assert.equal(atelierBar().includes('<button'), false);
+});
 
-  assert.ok(link.includes("t('atelier.sidebar.navHistory')"));
-  for (const [locale, name] of [['fr', 'Historique des débits'], ['en', 'Cut list history'], ['ar', 'سجل قوائم القطع']]) {
-    const messages = fs.readFileSync(path.resolve(`src/i18n/messages/${locale}.ts`), 'utf8');
-    assert.ok(messages.includes(`navHistory: '${name}',`), `${locale} names the entry`);
+test('the machine figures stay at the end of the atelier bar', () => {
+  const bar = atelierBar();
+
+  assert.ok(bar.includes('Machine setup figures'));
+  assert.ok(bar.includes('formatDisplayValue(activeSheet.height, displayUnit)'), 'the panel size');
+  assert.ok(bar.includes('href="#cut-settings"'), 'the blade chip leads to where the blade is set');
+  assert.equal(bar.includes('ms-auto'), false, 'the bar itself pushes them to its end');
+});
+
+test('the quotation opens from one place, the button under the plan', () => {
+  assert.equal(count(atelier, 'setIsQuotationDialogOpen(true)'), 1);
+  assert.ok(atelier.indexOf('setIsQuotationDialogOpen(true)') > atelier.indexOf('</WorkspaceNav>'));
+});
+
+test('the history shows the shared bar and no longer a way back of its own', () => {
+  const header = history.indexOf('</header>');
+  const bar = history.indexOf('<WorkspaceNav current="history"');
+  const main = history.indexOf('<main ');
+
+  assert.ok(header > 0 && bar > header && main > bar, 'header, then the bar, then the content');
+  assert.equal(history.includes('historyPage.backToAtelier'), false);
+  assert.equal(history.includes('href="/atelier"'), false, 'the shared bar is the way back');
+});
+
+test('the catalogs no longer name the entries the bar lost', () => {
+  for (const locale of ['fr', 'en', 'ar']) {
+    const messages = read(`src/i18n/messages/${locale}.ts`);
+    assert.equal(messages.includes('navQuotation'), false, `${locale} drops the quotation entry`);
+    assert.equal(messages.includes('navHistory'), false, `${locale} drops the old history entry`);
+    assert.equal(messages.includes('sidebar: {'), false, `${locale} drops the old bar`);
+  }
+});
+
+test('no end-to-end check still looks for the history or the atelier link in a header', () => {
+  const specs = fs.readdirSync(path.resolve('e2e')).filter((name) => name.endsWith('.spec.ts'));
+  assert.ok(specs.length > 0, 'the end-to-end specs are where this test expects them');
+
+  for (const name of specs) {
+    const stale = read(path.join('e2e', name))
+      .split('\n')
+      .filter((line) => line.includes("getByRole('banner').getByRole('link'"))
+      .filter((line) => /histor|السجل|atelier|workshop|الورشة/i.test(line));
+    assert.deepEqual(stale.map((line) => line.trim()), [], `${name} looks in the header for a link the bar now holds`);
   }
 });

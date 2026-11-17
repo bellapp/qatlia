@@ -14,6 +14,15 @@ export const en: Catalog = {
     lightMode: 'Light mode',
     darkMode: 'Dark mode',
   },
+  workspaceNav: {
+    aria: 'App screens',
+    atelier: 'Cutting workshop',
+    atelierShort: 'Workshop',
+    history: 'Cut list history',
+    historyShort: 'History',
+    panels: 'Panel setup',
+    panelsShort: 'Panels',
+  },
   language: {
     fr: 'French',
     en: 'English',
@@ -173,11 +182,6 @@ export const en: Catalog = {
       history: 'History',
       credits: 'credits',
       creditsAria: 'Photo-analysis credits left',
-    },
-    sidebar: {
-      title: 'Controls',
-      navQuotation: 'Costing & Quotes',
-      navHistory: 'Cut list history',
     },
     project: {
       nameBars: 'Bars {material} — {count} pcs',

@@ -97,14 +97,14 @@ test.describe('Atelier localization', () => {
     await openAtelier(page);
 
     // French is still the default inside the workshop.
-    await expect(page.getByRole('banner').getByRole('link', { name: /historique/i })).toBeVisible();
+    await expect(page.getByRole('navigation', { name: 'Écrans de l’application' }).getByRole('link', { name: 'Historique des débits' })).toBeVisible();
 
     await switchTo(page, 'en');
 
     await expect(page.locator('html')).toHaveAttribute('lang', 'en');
-    // Header: tagline, history, credits, guided tour.
+    // Header: tagline, credits, guided tour. The history is an entry of the bar under it.
     await expect(page.getByText('Cutting & nesting workshop')).toBeVisible();
-    await expect(page.getByRole('banner').getByRole('link', { name: /^history$/i })).toBeVisible();
+    await expect(page.getByRole('navigation', { name: 'App screens' }).getByRole('link', { name: 'Cut list history' })).toBeVisible();
     await expect(page.getByRole('banner').getByRole('link', { name: /credits/i })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Tour', exact: true })).toBeVisible();
     await expect(page.getByTitle('Guided tour')).toBeVisible();
@@ -196,7 +196,7 @@ test.describe('Atelier localization', () => {
 
     await expect(page.locator('html')).toHaveAttribute('lang', 'en');
     await expect(page.getByRole('button', { name: 'Optimize the cut plan' })).toBeVisible();
-    await expect(page.getByRole('banner').getByRole('link', { name: /^history$/i })).toBeVisible();
+    await expect(page.getByRole('navigation', { name: 'App screens' }).getByRole('link', { name: 'Cut list history' })).toBeVisible();
   });
 
   test('Arabic translates the workshop and flips it to RTL', async ({ page }) => {
@@ -207,8 +207,7 @@ test.describe('Atelier localization', () => {
     await expect(html).toHaveAttribute('lang', 'ar');
     await expect(html).toHaveAttribute('dir', 'rtl');
 
-    // Scoped to the header: the pilotage bar carries a second history link.
-    await expect(page.getByRole('banner').getByRole('link', { name: 'السجل' })).toBeVisible();
+    await expect(page.getByRole('navigation', { name: 'شاشات التطبيق' }).getByRole('link', { name: 'سجل قوائم القطع' })).toBeVisible();
     await expect(page.getByRole('heading', { name: 'اللوح الخام في المخزون' })).toBeVisible();
     await expect(page.getByRole('button', { name: 'حسِّن مخطط القطع' })).toBeVisible();
     await expect(page.getByRole('button', { name: 'إعدادات القطع المتقدمة' })).toBeVisible();

@@ -21,6 +21,16 @@ export const fr = {
     lightMode: 'Mode clair',
     darkMode: 'Mode sombre',
   },
+  /** The bar under the header, the same on every screen of the app. */
+  workspaceNav: {
+    aria: 'Écrans de l’application',
+    atelier: 'Atelier débitage',
+    atelierShort: 'Atelier',
+    history: 'Historique des débits',
+    historyShort: 'Historique',
+    panels: 'Configuration des panneaux',
+    panelsShort: 'Panneaux',
+  },
   language: {
     fr: 'français',
     en: 'anglais',
@@ -207,12 +217,6 @@ export const fr = {
       history: 'Historique',
       credits: 'crédits',
       creditsAria: 'Crédits d’analyse photo restants',
-    },
-    /** Desktop-only "Pilotage" rail — mobile keeps the top navbar instead. */
-    sidebar: {
-      title: 'Pilotage',
-      navQuotation: 'Chiffrage & Devis',
-      navHistory: 'Historique des débits',
     },
     /**
      * Name given to the project saved after an optimization. `{material}` is the

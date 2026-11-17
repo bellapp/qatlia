@@ -14,6 +14,15 @@ export const ar: Catalog = {
     lightMode: 'الوضع الفاتح',
     darkMode: 'الوضع الداكن',
   },
+  workspaceNav: {
+    aria: 'شاشات التطبيق',
+    atelier: 'ورشة التقطيع',
+    atelierShort: 'الورشة',
+    history: 'سجل قوائم القطع',
+    historyShort: 'السجل',
+    panels: 'إعداد الألواح',
+    panelsShort: 'الألواح',
+  },
   language: {
     fr: 'الفرنسية',
     en: 'الإنجليزية',
@@ -174,11 +183,6 @@ export const ar: Catalog = {
       history: 'السجل',
       credits: 'رصيد',
       creditsAria: 'الرصيد المتبقي لتحليل الصور',
-    },
-    sidebar: {
-      title: 'التحكم',
-      navQuotation: 'التسعير والعروض',
-      navHistory: 'سجل قوائم القطع',
     },
     project: {
       nameBars: 'قضبان {material} — {count} قطعة',
