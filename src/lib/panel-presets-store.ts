@@ -106,6 +106,17 @@ export function toPresetRow(userId: string, input: PresetInput): Omit<PanelPrese
   };
 }
 
+/**
+ * The columns an edit of a whole panel writes: every attribute, the price
+ * included (`null` when the edit has none, which takes it off). The id, the
+ * owner and the creation date stay as they are.
+ */
+export function toPresetUpdate(input: PresetInput): Omit<PanelPresetRow, 'id' | 'user_id' | 'created_at'> {
+  const { user_id: _owner, ...row } = toPresetRow('', input);
+  void _owner;
+  return { ...row, price_per_sheet: typeof input.pricePerSheet === 'number' ? toStoredPrice(input.pricePerSheet) : null };
+}
+
 /** Writes need the service role; without it the account store is "not ready". */
 export function createPresetsDb(): SupabaseClient | null {
   const config = getSupabaseAdminConfig();
