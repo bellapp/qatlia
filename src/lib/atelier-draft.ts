@@ -181,3 +181,53 @@ export function draftToRestore(
 ): AtelierDraft | null {
   return ahead.openedFromHistory || ahead.pendingWorkFromThisTab ? null : draft;
 }
+
+export interface SavedJob {
+  /** The plan the save stored: the kept job is adopted only when it shows that same plan. */
+  result: unknown;
+  projectId?: string | null;
+  localProjectId?: string | null;
+  /** The images stored after the save, by sheet; `null` leaves a sheet as it is. */
+  scanPaths?: readonly (string | null)[];
+}
+
+/**
+ * A save still running when the atelier was left finishes after the job was
+ * kept: the kept job learns the project the save made, and the images stored
+ * for its sheets. On return, a PDF or a name then updates that project instead
+ * of saving the plan again. Only a kept job showing the same plan, and with no
+ * project yet, is touched; with no kept job, nothing is written. Never throws.
+ */
+export function adoptSavedJob(store: DraftStore, saved: SavedJob): void {
+  let raw: string | null;
+  try {
+    raw = store.getItem(ATELIER_DRAFT_KEY);
+  } catch {
+    return;
+  }
+  if (raw === null) return;
+  let kept: unknown;
+  try {
+    kept = JSON.parse(raw);
+  } catch {
+    return;
+  }
+  if (!isAtelierDraft(kept) || !('result' in kept.project)) return;
+  if (JSON.stringify(kept.project.result) !== JSON.stringify(saved.result)) return;
+
+  let next: AtelierDraft = kept;
+  if (kept.projectId === null && kept.localProjectId === null) {
+    if (saved.projectId) next = { ...next, projectId: saved.projectId };
+    else if (saved.localProjectId) next = { ...next, localProjectId: saved.localProjectId };
+  }
+  const paths = saved.scanPaths;
+  if (paths && Array.isArray(kept.project.scans) && paths.some(Boolean)) {
+    const scans = (kept.project.scans as unknown[]).map((entry, index) => {
+      const sheet = isRecord(entry) ? entry : {};
+      const path = paths[index];
+      return path && typeof sheet.path !== 'string' ? { ...sheet, path } : sheet;
+    });
+    next = { ...next, project: { ...next.project, scans } };
+  }
+  if (next !== kept) tryWrite(store, next);
+}

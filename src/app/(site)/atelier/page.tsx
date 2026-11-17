@@ -99,6 +99,7 @@ import { deriveQuotationPanels, deriveQuotationPieces } from '@/lib/quotation-it
 import { buildPdfPayload } from '@/lib/pdf-payload';
 import { buildPersistedProjectPayload } from '@/lib/projects/persistence-payload';
 import {
+  adoptSavedJob,
   buildAtelierDraft,
   clearAtelierDraft,
   draftToRestore,
@@ -1076,6 +1077,12 @@ const commitPanelName = () => {
       options_json: payload as unknown as LocalHistoryItem['options_json'],
     });
     }
+    // The atelier may have been left while this save ran: the job kept in the
+    // tab learns its project, then the images once stored (src/lib/atelier-draft.ts).
+    adoptSavedJob(window.sessionStorage, { result: nextResult, projectId: savedCloudId, localProjectId: savedLocalId });
+    void scanAttachRef.current.then(() =>
+      adoptSavedJob(window.sessionStorage, { result: nextResult, scanPaths: sheetsAtSave.map((sheet) => sheet.keeper.knownPath()) })
+    );
     // The saved project now carries `committedName`: the line says so, whatever
     // it said before (not saved, saved with the plan), and a late answer from an
     // earlier name commit no longer overwrites it.

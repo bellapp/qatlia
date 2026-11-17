@@ -297,3 +297,81 @@ test('signing out forgets the kept job, from the menu and from the account page'
     );
   }
 });
+
+// A save still running when the atelier is left: the job kept in the tab has no
+// project yet. The save, finishing after, gives it its project, so a PDF
+// exported or a name typed on return updates that project instead of saving
+// the plan a second time.
+
+const { adoptSavedJob } = loadTsModule('src/lib/atelier-draft.ts');
+
+function keptWhileSaving(overrides = {}) {
+  const store = fakeStore();
+  writeAtelierDraft(store, draft({ projectId: null, localProjectId: null, restoredAt: null, ...overrides }));
+  return store;
+}
+
+test('a save finishing after the atelier was left gives the kept job its project', () => {
+  const store = keptWhileSaving();
+
+  adoptSavedJob(store, { result: draft().project.result, projectId: 'cloud-9', localProjectId: null });
+
+  assert.equal(readAtelierDraft(store).projectId, 'cloud-9');
+});
+
+test('a save kept on this device only gives the kept job its local entry', () => {
+  const store = keptWhileSaving();
+
+  adoptSavedJob(store, { result: draft().project.result, projectId: null, localProjectId: 'optimize_1' });
+
+  assert.equal(readAtelierDraft(store).localProjectId, 'optimize_1');
+});
+
+test('the save of another plan leaves the kept job alone', () => {
+  const store = keptWhileSaving();
+
+  adoptSavedJob(store, { result: { sheets: [{ placements: [9] }] }, projectId: 'cloud-9', localProjectId: null });
+
+  assert.equal(readAtelierDraft(store).projectId, null);
+});
+
+test('a kept job that already has its project keeps it', () => {
+  const store = keptWhileSaving({ projectId: 'cloud-1' });
+
+  adoptSavedJob(store, { result: draft().project.result, projectId: 'cloud-9', localProjectId: null });
+
+  assert.equal(readAtelierDraft(store).projectId, 'cloud-1');
+});
+
+test('the images stored after the save fill the sheets that had none, in place', () => {
+  const kept = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa/bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb.jpg';
+  const fresh = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa/cccccccc-cccc-4ccc-8ccc-cccccccccccc.jpg';
+  const project = { ...draft().project, scans: [{ thumb: 'data:image/jpeg;base64,AAAA', path: kept }, {}, { thumb: 'data:image/jpeg;base64,BBBB' }] };
+  const store = keptWhileSaving({ project });
+
+  adoptSavedJob(store, { result: project.result, scanPaths: [null, null, fresh] });
+
+  assert.deepEqual(readAtelierDraft(store).project.scans, [
+    { thumb: 'data:image/jpeg;base64,AAAA', path: kept },
+    {},
+    { thumb: 'data:image/jpeg;base64,BBBB', path: fresh },
+  ]);
+});
+
+test('with no job kept in the tab, a save writes nothing there', () => {
+  const store = fakeStore();
+
+  adoptSavedJob(store, { result: draft().project.result, projectId: 'cloud-9', localProjectId: null });
+
+  assert.equal(store.values.size, 0);
+});
+
+test('the atelier hands each save to the job it may have kept, then the images once stored', () => {
+  const persist = atelier.slice(atelier.indexOf('const persistProject = async'), atelier.indexOf('const recordPdfGenerated'));
+
+  assert.match(persist, /adoptSavedJob\(window\.sessionStorage, \{ result: nextResult, projectId: savedCloudId, localProjectId: savedLocalId \}\);/);
+  assert.match(
+    persist,
+    /void scanAttachRef\.current\.then\(\(\) =>\s*adoptSavedJob\(window\.sessionStorage, \{ result: nextResult, scanPaths: sheetsAtSave\.map\(\(sheet\) => sheet\.keeper\.knownPath\(\)\) \}\)\s*\);/
+  );
+});
