@@ -69,9 +69,8 @@ test('a new job empties the pieces, the name, the scan and the plan', () => {
     "setProjectNameDraft('')",
     'setResult(null)',
     'setRestoredAt(null)',
-    'setPreviewImage(null)',
-    'setScanThumb(null)',
-    'scanKeeper.restore(null)',
+    'setScanSheets([])',
+    'scanGroupRef.current = null',
     'setPdfGeneratedAt(null)',
   ]) {
     assert.ok(body.includes(call), `${call} is part of a new job`);

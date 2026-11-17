@@ -11,7 +11,7 @@
  */
 
 import type { Metadata } from 'next';
-import { ANALYSIS_WINDOW_HOURS, SIGNUP_FREE_CREDITS, VISION_CREDIT_COST } from '@/lib/billing/policy';
+import { ANALYSIS_WINDOW_HOURS, MAX_SCANS_PER_ANALYSIS, SIGNUP_FREE_CREDITS, VISION_CREDIT_COST } from '@/lib/billing/policy';
 import { SUPPORT_EMAIL, SUPPORT_PHONE_E164 } from '@/lib/support';
 import { fr } from '@/i18n/messages/fr';
 import type { TranslationVars } from '@/i18n';
@@ -43,6 +43,7 @@ export function legalVars(): TranslationVars {
     freeCredits: SIGNUP_FREE_CREDITS,
     days: REFUND_WINDOW_DAYS,
     visionCost: VISION_CREDIT_COST,
+    maxScans: MAX_SCANS_PER_ANALYSIS,
     windowHours: ANALYSIS_WINDOW_HOURS,
   };
 }

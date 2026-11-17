@@ -100,7 +100,10 @@ import { buildPdfPayload } from '@/lib/pdf-payload';
 import { buildPersistedProjectPayload } from '@/lib/projects/persistence-payload';
 import { pickRestorableResult, readRestoredProjectDate } from '@/lib/projects/restore';
 import { downscaleDataUrl } from '@/lib/image-downscale';
-import { createScanKeeper, saveProjectToCloud, settledWithin } from '@/lib/projects/scan-upload';
+import { createScanKeeper, saveProjectToCloud, settledWithin, type ScanKeeper } from '@/lib/projects/scan-upload';
+import { MAX_SCAN_SHEETS, appendSheetPieces, fitThumb, readScanSheets, removeScanSheet, thumbBudgetFor, type ScanSheet } from '@/lib/projects/scan-sheets';
+import { isUuid } from '@/lib/billing/grant';
+import { ScanSheets } from '@/components/ScanSheets';
 import { readAnalysisPass, storeAnalysisPass } from '@/lib/billing/analysis-pass-store';
 import { piecesOnlyOnScreen } from '@/lib/new-job';
 import {
@@ -215,6 +218,24 @@ function normalizePiecesWithColors(sourcePieces: Piece[]): Piece[] {
   }));
 }
 
+/**
+ * A cut-list sheet of the project on screen: the image read on this page (in
+ * memory), its thumbnail, the kept image's path of a reopened project, and the
+ * keeper of its full image (the path it is stored under, or the fresh image
+ * still to send; src/lib/projects/scan-upload.ts).
+ */
+type ScreenSheet = { image?: string; thumb?: string; path?: string; keeper: ScanKeeper };
+
+/** A picked photo as a data URL. */
+function readFileAsDataUrl(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result as string);
+    reader.onerror = () => reject(reader.error);
+    reader.readAsDataURL(file);
+  });
+}
+
 const INITIAL_PIECES: Piece[] = normalizePiecesWithColors([
   { id: '1', name: 'Panneau Latéral G', height: 230, width: 120, quantity: 2, material: 'mdf', rotatable: true },
   { id: '2', name: 'Panneau Latéral D', height: 118, width: 48, quantity: 1, material: 'mdf', rotatable: true },
@@ -242,13 +263,23 @@ export default function Dashboard() {
   // answers with a machine-readable code, and holding the key means an artisan
   // who switches language after a failed scan sees the message follow them.
   const [visionError, setVisionError] = useState<TranslationKey | null>(null);
-  const [previewImage, setPreviewImage] = useState<string | null>(null);
-  // Lightweight thumbnail persisted with the project (history card preview).
-  const [scanThumb, setScanThumb] = useState<string | null>(null);
-  // The scan image kept in full with a saved project: the path it is stored
-  // under, and the fresh scan still to send (src/lib/projects/scan-upload.ts).
-  // Held outside React state so two saves in a row never send it twice.
-  const [scanKeeper] = useState(() => createScanKeeper({ fetch: (url, init) => fetch(url, init), downscale: downscaleDataUrl }));
+  // The cut-list sheets read for the project on screen, in order, up to
+  // MAX_SCAN_SHEETS (spec 2026-11-17). The ref mirrors the state so photos
+  // read one after another each see the sheets before them.
+  const [scanSheets, setScanSheetsState] = useState<ScreenSheet[]>([]);
+  const scanSheetsRef = useRef<ScreenSheet[]>([]);
+  const setScanSheets = (next: ScreenSheet[]) => {
+    scanSheetsRef.current = next;
+    setScanSheetsState(next);
+  };
+  // The scan group the project's photos are read in: sent with its next photo
+  // so the first photo's credit covers it (src/lib/billing/scan-group.ts).
+  // It belongs to the project on screen: a new job or a reopened project
+  // replaces it.
+  const scanGroupRef = useRef<string | null>(null);
+  // Each sheet keeps its full image through its own keeper, held outside
+  // React state so two saves in a row never send an image twice.
+  const newKeeper = () => createScanKeeper({ fetch: (url, init) => fetch(url, init), downscale: downscaleDataUrl });
   const scanViewer = useScanViewer();
   // The last save's scan attach (a PATCH that rewrites the project's saved
   // data); a PDF marker or a rename on the same project waits for it first.
@@ -583,7 +614,13 @@ const commitPanelName = () => {
   const currency = useCurrency().currency ?? DEFAULT_CURRENCY;
 
   // Something a new job would clear: without it the button has nothing to do.
-  const hasJobOnScreen = pieces.length > 0 || !!result || !!previewImage || projectNameDraft.trim() !== '';
+  const sheetsFull = scanSheets.length >= MAX_SCAN_SHEETS;
+  // Pieces a sheet gave. A project saved before sheets were numbered has its
+  // one sheet and untagged pieces: they all came from it.
+  const piecesAreTagged = pieces.some((piece) => typeof piece.scanIndex === 'number');
+  const sheetPieceCount = (index: number) =>
+    piecesAreTagged ? pieces.filter((piece) => piece.scanIndex === index + 1).length : index === 0 ? pieces.length : 0;
+  const hasJobOnScreen = pieces.length > 0 || !!result || scanSheets.length > 0 || projectNameDraft.trim() !== '';
 
   /**
    * The new-job button. The plan on screen is already in history with its
@@ -614,9 +651,8 @@ const commitPanelName = () => {
     setZoomLevel(1);
     setOptimizeError(null);
     setVisionError(null);
-    setPreviewImage(null);
-    setScanThumb(null);
-    scanKeeper.restore(null);
+    setScanSheets([]);
+    scanGroupRef.current = null;
     scanAttachRef.current = Promise.resolve(false);
     setPdfGeneratedAt(null);
     // The job on screen is no longer the saved project: the name field writes
@@ -763,14 +799,20 @@ const commitPanelName = () => {
           setProjectNameDraft(parsed.projectName.trim());
           lastPersistedNameRef.current = parsed.projectName.trim();
         }
-        // The scan image comes back with the plan: the card reads it from
-        // `previewImage`, the next save carries it on from `scanThumb`.
-        const restoredThumb = typeof parsed.scanThumb === 'string' ? parsed.scanThumb : null;
-        setScanThumb(restoredThumb);
-        setPreviewImage(restoredThumb);
-        // The full image, when the project kept one, is reached by its path;
-        // the thumbnail on screen is never sent as if it were the full image.
-        scanKeeper.restore(parsed.scanPath);
+        // The sheets come back with the plan (an old project's single scan
+        // reads as one), and the next save carries them on.
+        const restoredSheets = readScanSheets(parsed);
+        // Each sheet's full image, when the project kept it, is reached by its
+        // path; a thumbnail on screen is never sent as if it were the image.
+        setScanSheets(
+          restoredSheets.map((sheet) => {
+            const keeper = newKeeper();
+            keeper.restore(sheet.path);
+            return { ...sheet, keeper };
+          })
+        );
+        // A photo added to it rides on its own group, never on another project's.
+        scanGroupRef.current = isUuid(parsed.scanGroup) ? (parsed.scanGroup as string) : null;
         // The saved plan is put back as it was saved, with no new run and no
         // new save; an old or damaged result gives null and the atelier opens
         // without a plan, as before.
@@ -843,6 +885,23 @@ const commitPanelName = () => {
     setSheets(prev => prev.map(s => ({ ...s, kerf: newOpts.kerfWidth / 10, grainDirection: newOpts.grainDirection })));
   };
 
+  /**
+   * The sheets as saved: each thumbnail fitted to its share of the project's
+   * budget (a single sheet keeps the 600 px one it always had), and the path
+   * of its kept image when its keeper knows it already.
+   */
+  const scansForSave = async (sheets: readonly ScreenSheet[]): Promise<ScanSheet[]> => {
+    const budget = thumbBudgetFor(sheets.length);
+    return Promise.all(
+      sheets.map(async (sheet) => {
+        const source = sheet.thumb && sheet.thumb.length <= budget ? sheet.thumb : sheet.image ?? sheet.thumb;
+        const thumb = await fitThumb(source, budget, downscaleDataUrl);
+        const path = sheet.keeper.knownPath() ?? undefined;
+        return { ...(thumb ? { thumb } : {}), ...(path ? { path } : {}) };
+      })
+    );
+  };
+
   const persistProject = async (
     nextResult: OptimizationResult,
     source: 'optimize' | 'pdf',
@@ -854,6 +913,9 @@ const commitPanelName = () => {
     // this save is itself the rewrite of a legacy record (pendingUnitMigration),
     // or a prior save already carried that historical origin forward.
     const persistedMigratedFromLegacyUnit = pendingUnitMigration || migratedFromLegacyUnit;
+    // The sheets read once: the payload and the image keepers line up by
+    // position, and the images are attached by position.
+    const sheetsAtSave = scanSheetsRef.current;
     // The name committed now, not the one this handler's render saw: the field
     // may have been left while the optimization was running.
     const committedName = projectNameRef.current.trim();
@@ -865,10 +927,11 @@ const commitPanelName = () => {
       // Custom project name (when the artisan named it) > panel label > auto.
       name: committedName || automaticProjectName,
       projectName: committedName || undefined,
-      scanThumb: scanThumb || undefined,
-      // The path already known (a reopened project, an earlier save of this
-      // scan); a new scan's image follows this save (see saveProjectToCloud).
-      scanPath: scanKeeper.knownPath(),
+      // One entry per sheet, thumbnails within the project's budget, with the
+      // paths already known (a reopened project, an earlier save); the images
+      // of new sheets follow this save (see saveProjectToCloud).
+      scans: await scansForSave(sheetsAtSave),
+      scanGroup: scanGroupRef.current,
       pdfGeneratedAt: overrides.pdfGeneratedAt || pdfGeneratedAt || undefined,
       sheets,
       sheet: activeSheet,
@@ -904,7 +967,7 @@ const commitPanelName = () => {
         data: { user },
       } = await supabase.auth.getUser();
       if (user) {
-        const saved = await saveProjectToCloud(payload, scanKeeper, (url, init) => fetch(url, init));
+        const saved = await saveProjectToCloud(payload, sheetsAtSave.map((sheet) => sheet.keeper), (url, init) => fetch(url, init));
         // The project is saved without waiting for the scan image: a new scan's
         // image is sent afterwards and attached to it (`saved.scanAttached`,
         // never rejected); a refusal leaves the thumbnail only.
@@ -1103,57 +1166,108 @@ const commitPanelName = () => {
    * project's kept image through a short signed link, else its thumbnail,
    * marked as reduced. Seeing it spends no credit.
    */
-  const openScanViewer = () => {
-    void scanViewer.show('atelier', {
-      localImage: scanKeeper.freshImage(),
-      projectId: lastSavedProjectId,
-      hasFullScan: scanKeeper.knownPath() !== null,
-      thumb: previewImage,
-    }, t('atelier.scan.previewAlt'));
+  const openScanViewer = (index: number) => {
+    const sheets = scanSheetsRef.current;
+    const sheet = sheets[index];
+    if (!sheet) return;
+    // The image read on this page, else the sheet's kept image through a
+    // short signed link, else its thumbnail; arrows step through the sheets.
+    void scanViewer.show(
+      `atelier-${index}`,
+      {
+        localImage: sheet.keeper.freshImage(),
+        projectId: lastSavedProjectId,
+        hasFullScan: sheet.keeper.knownPath() !== null,
+        thumb: sheet.thumb ?? sheet.image ?? null,
+        sheet: index + 1,
+      },
+      t('atelier.scan.previewAlt'),
+      sheets.length > 1
+        ? { position: { index: index + 1, count: sheets.length }, onStep: (delta) => openScanViewer(index + delta) }
+        : undefined
+    );
   };
 
+  /**
+   * Removes a sheet: its image and every piece read from it, even edited
+   * ones; the sheets after it move down one. The read is not given back.
+   */
+  const removeSheet = (index: number) => {
+    const current = scanSheetsRef.current;
+    if (!current[index]) return;
+    setPieces((prev) => removeScanSheet(prev, index + 1));
+    setScanSheets(current.filter((_, i) => i !== index));
+  };
+
+  /**
+   * Reads the picked photos as the project's next sheets, one after another:
+   * each sends the scan group the previous one got back, so only the first
+   * photo of a project is charged. Photos past MAX_SCAN_SHEETS are ignored,
+   * and the reading stops at the first one that fails.
+   */
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+    const files = Array.from(e.target.files ?? []);
     // Lets the same photo be picked again, which onChange would otherwise ignore.
     e.target.value = '';
+    if (files.length === 0) return;
+    const room = MAX_SCAN_SHEETS - scanSheetsRef.current.length;
+    if (room <= 0) return;
+    const chosen = files.slice(0, room);
 
     setIsProcessingVision(true);
     setVisionError(null);
-
-    const reader = new FileReader();
-    reader.onload = async () => {
-      try {
-        const base64 = reader.result as string;
+    try {
+      let readAll = true;
+      for (const file of chosen) {
+        // eslint-disable-next-line no-await-in-loop
+        const base64 = await readFileAsDataUrl(file);
         // A phone photo is 1–4 MB of base64; Gemini reads a cut list fine at
         // 1600px, so shrink before the upload — it is the slowest leg of the
         // scan on a workshop connection. A failed downscale (no canvas, exotic
         // codec) must never block a scan: fall back to the original bytes.
+        // eslint-disable-next-line no-await-in-loop
         const scanImage = (await downscaleDataUrl(base64, 1600, 0.8)) ?? base64;
-        await runScan(scanImage);
-      } catch (err) {
-        setVisionError('atelier.visionError.network');
-        setIsProcessingVision(false);
-        console.error(err);
+        // eslint-disable-next-line no-await-in-loop
+        const outcome = await runScan(scanImage, { batch: true });
+        if (outcome !== 'read') {
+          readAll = false;
+          // Signed out: only the first photo is kept for after the sign-in.
+          if (outcome === 'signin' && chosen.length > 1) setVisionError('atelier.scan.signInFirstPhoto');
+          break;
+        }
       }
-    };
-    reader.readAsDataURL(file);
+      if (readAll && files.length > room) setVisionError('atelier.scan.extraPhotosIgnored');
+    } catch (err) {
+      setVisionError('atelier.visionError.network');
+      console.error(err);
+    } finally {
+      setIsProcessingVision(false);
+    }
   };
 
   /**
-   * Analyses a (downscaled) cut-list photo. A signed-out visitor is asked to
-   * sign in first, with the photo kept; `resumed` marks the automatic run
-   * after that sign-in, which never asks again.
+   * Analyses a (downscaled) cut-list photo as the project's next sheet. A
+   * signed-out visitor is asked to sign in first, with the photo kept;
+   * `resumed` marks the automatic run after that sign-in, which never asks
+   * again. `batch` leaves the busy state to the caller reading several
+   * photos, so nothing can start a read in between.
    */
-  const runScan = async (scanImage: string, { resumed = false }: { resumed?: boolean } = {}) => {
-    setIsProcessingVision(true);
-    setVisionError(null);
+  const runScan = async (
+    scanImage: string,
+    { resumed = false, batch = false }: { resumed?: boolean; batch?: boolean } = {}
+  ): Promise<'read' | 'failed' | 'signin'> => {
+    const sheetIndex = scanSheetsRef.current.length;
+    if (sheetIndex >= MAX_SCAN_SHEETS) return 'failed';
+    if (!batch) {
+      setIsProcessingVision(true);
+      setVisionError(null);
+    }
     try {
       if (!resumed) {
         const { data: { user } } = await createClient().auth.getUser();
         if (!user) {
           askSignInKeepingWork('scan', scanImage);
-          return;
+          return 'signin';
         }
       }
       const res = await fetch('/api/vision', {
@@ -1162,19 +1276,29 @@ const commitPanelName = () => {
         body: JSON.stringify({
           imageBase64: scanImage,
           sheetMaterial: activeSheet.material || 'mdf',
+          // The project's group, when an earlier photo of it opened one.
+          ...(scanGroupRef.current ? { scanGroup: scanGroupRef.current } : {}),
         }),
       });
 
       const data = await res.json();
       if (data.success && Array.isArray(data.pieces) && data.pieces.length > 0) {
-        // The thumbnail is saved with the project and shown in history:
-        // 600px keeps the cut list readable while staying well under the
-        // server's size cap (SCAN_THUMB_MAX_CHARS), since the history page
-        // loads every project's thumbnail at once.
-        setPreviewImage(scanImage);
-        scanKeeper.newScan(scanImage);
-        void downscaleDataUrl(scanImage, 600, 0.7).then(setScanThumb);
-        const newPieces: Piece[] = data.pieces.map((p: { name?: string; width?: number | string; height?: number | string; quantity?: number | string; material?: string; color?: string }, i: number) => {
+        const sheetNumber = sheetIndex + 1;
+        // The first sheet of a project replaces the list (it clears the
+        // example pieces); sheet 1 read again after it was removed, like any
+        // later sheet, adds to it.
+        const replace = sheetIndex === 0 && scanGroupRef.current === null;
+        scanGroupRef.current = typeof data.scanGroup === 'string' ? data.scanGroup : null;
+        const sheet: ScreenSheet = { image: scanImage, keeper: newKeeper() };
+        sheet.keeper.newScan(scanImage);
+        setScanSheets([...scanSheetsRef.current, sheet]);
+        // The thumbnail shown here, and saved with the project: 600px keeps
+        // the cut list readable; a project of several sheets shrinks them at
+        // save time to share one thumbnail's budget (see scansForSave).
+        void downscaleDataUrl(scanImage, 600, 0.7).then((thumb) => {
+          if (thumb) setScanSheets(scanSheetsRef.current.map((s) => (s === sheet ? { ...s, thumb } : s)));
+        });
+        const readPieces = (offset: number): Piece[] => data.pieces.map((p: { name?: string; width?: number | string; height?: number | string; quantity?: number | string; material?: string; color?: string }, i: number) => {
           // /api/vision always extracts and returns canonical centimetres
           // (see its prompt), so no magnitude-based mm heuristic is applied
           // here — a legitimate 600 cm bar must survive untouched. Only a
@@ -1186,8 +1310,9 @@ const commitPanelName = () => {
           const w = safeFinitePositive(p.width, 10);
           const quantity = Math.max(1, Math.round(safeFinitePositive(p.quantity, 1)));
           return {
-            id: `ext_${Date.now()}_${i}`,
-            name: p.name || t('pieces.defaultName', { index: i + 1 }),
+            id: `ext_${Date.now()}_${sheetNumber}_${i}`,
+            // Unnamed lines go on numbering after the pieces already listed.
+            name: p.name || t('pieces.defaultName', { index: offset + i + 1 }),
             height: Math.round(h * 10) / 10,
             width: Math.round(w * 10) / 10,
             quantity,
@@ -1207,28 +1332,33 @@ const commitPanelName = () => {
             }),
           };
         });
-        setPieces(normalizePiecesWithColors(newPieces));
+        setPieces((prev) =>
+          normalizePiecesWithColors(appendSheetPieces(prev, readPieces(replace ? 0 : prev.length), sheetNumber, replace))
+        );
         storeAnalysisPass(data.analysisPass);
         // The server is the only authority on the balance; it is echoed back
         // only when a credit was actually debited.
         if (typeof data.creditsRemaining === 'number') setUserCredits(data.creditsRemaining);
+        return 'read';
       } else {
         if (res.status === 401 && !resumed) {
           // Signed out since the check above: keep the photo, ask again.
           askSignInKeepingWork('scan', scanImage);
-          return;
+          return 'signin';
         }
         if (typeof data.creditsRemaining === 'number') setUserCredits(data.creditsRemaining);
         // The route's own `message` stays French for non-browser callers; the
         // workshop renders the artisan's language from the `error` code, and a
         // code this build does not know degrades to the generic message.
         setVisionError(visionErrorKey(data.error));
+        return 'failed';
       }
     } catch (err) {
       setVisionError('atelier.visionError.network');
       console.error(err);
+      return 'failed';
     } finally {
-      setIsProcessingVision(false);
+      if (!batch) setIsProcessingVision(false);
     }
   };
 
@@ -1756,15 +1886,15 @@ const commitPanelName = () => {
             {/* Quick Actions: Hero Cards */}
             <div className="grid grid-cols-2 gap-3">
               {/* Take Photo Card */}
-              <label className="group relative flex flex-col gap-3 p-4 rounded-xl bg-studio-panel border border-studio-border shadow-sm hover:border-sky-500/40 hover:bg-studio-field cursor-pointer transition-all duration-200 overflow-hidden">
-                <input type="file" accept="image/*" capture="environment" className="hidden" onChange={handleImageUpload} disabled={isProcessingVision} />
+              <label className={`group relative flex flex-col gap-3 p-4 rounded-xl bg-studio-panel border border-studio-border shadow-sm hover:border-sky-500/40 hover:bg-studio-field cursor-pointer transition-all duration-200 overflow-hidden ${sheetsFull ? 'opacity-50 pointer-events-none' : ''}`}>
+                <input type="file" accept="image/*" capture="environment" className="hidden" onChange={handleImageUpload} disabled={isProcessingVision || sheetsFull} />
                 <div className="absolute inset-0 bg-gradient-to-br from-sky-500/[0.06] to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
                 <div className="relative flex items-center gap-3">
                   <span className="shrink-0 w-10 h-10 rounded-lg bg-sky-500/10 border border-sky-500/20 flex items-center justify-center group-hover:scale-105 group-hover:bg-sky-500/15 transition-all">
                     <Camera className="w-5 h-5 text-sky-400" />
                   </span>
                   <div>
-                    <p className="text-sm font-bold text-slate-800 dark:text-slate-200 group-hover:text-slate-900 dark:text-white transition-colors">{t('atelier.scan.cameraTitle')}</p>
+                    <p className="text-sm font-bold text-slate-800 dark:text-slate-200 group-hover:text-slate-900 dark:text-white transition-colors">{t(scanSheets.length > 0 ? 'atelier.scan.addSheetTitle' : 'atelier.scan.cameraTitle')}</p>
                     <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-tight">{t('atelier.scan.cameraDesc')}</p>
                   </div>
                 </div>
@@ -1772,8 +1902,8 @@ const commitPanelName = () => {
               </label>
 
               {/* Upload File Card */}
-              <label className="group relative flex flex-col gap-3 p-4 rounded-xl bg-studio-panel border border-studio-border shadow-sm hover:border-brand-500/40 hover:bg-studio-field cursor-pointer transition-all duration-200 overflow-hidden">
-                <input type="file" accept="image/*" className="hidden" onChange={handleImageUpload} disabled={isProcessingVision} />
+              <label className={`group relative flex flex-col gap-3 p-4 rounded-xl bg-studio-panel border border-studio-border shadow-sm hover:border-brand-500/40 hover:bg-studio-field cursor-pointer transition-all duration-200 overflow-hidden ${sheetsFull ? 'opacity-50 pointer-events-none' : ''}`}>
+                <input type="file" accept="image/*" multiple className="hidden" onChange={handleImageUpload} disabled={isProcessingVision || sheetsFull} />
                 <div className="absolute inset-0 bg-gradient-to-br from-brand-500/[0.06] to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
                 <div className="relative flex items-center gap-3">
                   <span className="shrink-0 w-10 h-10 rounded-lg bg-brand-400/10 border border-brand-500/20 flex items-center justify-center group-hover:scale-105 group-hover:bg-brand-500/15 transition-all">
@@ -1795,32 +1925,17 @@ const commitPanelName = () => {
                 {t('atelier.scan.visionBadge')}
               </span>
             </div>
+            <p className="-mt-2 text-center text-[11px] text-slate-500 dark:text-slate-400">{t('atelier.scan.sheetsHint', { max: MAX_SCAN_SHEETS })}</p>
 
-            {/* Preview scan if present */}
-            {previewImage && (
-              <div className="flex items-center gap-3 p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20">
-                <button
-                  type="button"
-                  onClick={openScanViewer}
-                  aria-label={t('scanViewer.openAria', { name: derivedProjectName })}
-                  aria-busy={scanViewer.pendingKey === 'atelier' || undefined}
-                  data-testid="atelier-scan-preview"
-                  className="relative w-12 h-12 shrink-0 rounded-lg overflow-hidden border border-emerald-500/30 shadow-sm hover:border-emerald-400 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500 transition-colors"
-                >
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={previewImage} alt="" className="w-full h-full object-cover" />
-                  {scanViewer.pendingKey === 'atelier' && (
-                    <span aria-hidden="true" className="absolute inset-0 flex items-center justify-center bg-slate-950/50 text-white">
-                      <RefreshCw className="w-4 h-4 animate-spin" />
-                    </span>
-                  )}
-                </button>
-                <div className="text-xs">
-                  <span className="text-emerald-400 font-bold block">{t('atelier.scan.analyzedTitle')}</span>
-                  <span className="text-[11px] text-emerald-300/70 font-mono">{tn('atelier.scan.analyzedCount', pieces.length)}</span>
-                </div>
-              </div>
-            )}
+            {/* The sheets read for this project */}
+            <ScanSheets
+              sheets={scanSheets.map((sheet, index) => ({ src: sheet.thumb ?? sheet.image ?? null, pieceCount: sheetPieceCount(index) }))}
+              max={MAX_SCAN_SHEETS}
+              pendingIndex={scanViewer.pendingKey?.startsWith('atelier-') ? Number(scanViewer.pendingKey.slice('atelier-'.length)) : null}
+              busy={isProcessingVision}
+              onOpen={openScanViewer}
+              onRemove={removeSheet}
+            />
 
             {/* Processing Banner */}
             {isProcessingVision && (
@@ -1836,7 +1951,7 @@ const commitPanelName = () => {
             {visionError && (
               <div role="alert" className="flex items-center gap-3 p-3 rounded-xl bg-rose-500/10 border border-rose-500/20">
                 <AlertTriangle className="w-4 h-4 text-rose-400 shrink-0" />
-                <span className="text-xs text-rose-300 font-medium">{t(visionError)}</span>
+                <span className="text-xs text-rose-300 font-medium">{t(visionError, { max: MAX_SCAN_SHEETS })}</span>
               </div>
             )}
 
@@ -1850,6 +1965,7 @@ const commitPanelName = () => {
                 displayUnit={displayUnit}
                 showMaterialCol={options.considerMaterial}
                 disabled={isOptimizing}
+                showScanMarks={scanSheets.length > 1}
               />
             </div>
 

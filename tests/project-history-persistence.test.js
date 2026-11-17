@@ -519,3 +519,54 @@ test('a name or a PDF marker sent with a scan path keeps its own branch, and the
   assert.deepEqual(await marked.json(), { success: true, id: PROJECT_ID, pdfGeneratedAt: '2026-11-12T10:20:39.123Z' });
   assert.equal('scanPath' in state.projects.get(PROJECT_ID).options_json, false);
 });
+
+test('the image sent after the save of a project with several sheets lands on sheet 1, the others kept', async () => {
+  resetState();
+  state.user = { id: UUID };
+  const scans = [{ thumb: TINY_JPEG }, { thumb: TINY_JPEG }];
+  state.projects.set(PROJECT_ID, { user_id: UUID, name: 'Cuisine', options_json: { scans } });
+  const res = await withEnv(CONFIGURED, async () => projectRoute().PATCH(...patch(PROJECT_ID, { scanPath: OWN_SCAN })));
+  assert.equal(res.status, 200);
+  assert.deepEqual(state.updates, [{ id: PROJECT_ID, patch: { options_json: { scans: [{ thumb: TINY_JPEG, path: OWN_SCAN }, { thumb: TINY_JPEG }] } } }]);
+});
+
+test('a save with several sheets keeps them in order, with only the artisan\'s own paths', async () => {
+  resetState();
+  state.user = { id: UUID };
+  const scans = [{ thumb: TINY_JPEG, path: `${UUID}/${PROJECT_ID}.jpg` }, { thumb: TINY_JPEG, path: `${OTHER_UUID}/${PROJECT_ID}.jpg` }];
+  await withEnv(CONFIGURED, () => projectsRoute().POST(post(savePayload({ scans, scanGroup: OTHER_PROJECT_ID }))));
+  assert.deepEqual(state.inserts[0].options_json.scans, [{ thumb: TINY_JPEG, path: `${UUID}/${PROJECT_ID}.jpg` }, { thumb: TINY_JPEG }]);
+  assert.equal(state.inserts[0].options_json.scanGroup, OTHER_PROJECT_ID);
+});
+
+test('the images of several sheets are attached in one PATCH, by position, other keys kept', async () => {
+  resetState();
+  state.user = { id: UUID };
+  const second = `${UUID}/44444444-3333-4444-8888-555555555555.jpg`;
+  const quotation = { quoteNumber: 'D-2026-001' };
+  state.projects.set(PROJECT_ID, { user_id: UUID, options_json: { scans: [{ thumb: TINY_JPEG }, { thumb: TINY_JPEG }, {}], quotation } });
+  const res = await withEnv(CONFIGURED, async () => projectRoute().PATCH(...patch(PROJECT_ID, { scanPaths: [OWN_SCAN, null, second] })));
+  assert.equal(res.status, 200);
+  assert.deepEqual(state.updates, [{ id: PROJECT_ID, patch: { options_json: {
+    scans: [{ thumb: TINY_JPEG, path: OWN_SCAN }, { thumb: TINY_JPEG }, { path: second }], quotation } } }]);
+});
+
+test("a list of image paths with another artisan's path, too many, or nothing to attach is refused with no write", async () => {
+  resetState();
+  state.user = { id: UUID };
+  state.projects.set(PROJECT_ID, { user_id: UUID, options_json: {} });
+  for (const scanPaths of [
+    [`${OTHER_UUID}/44444444-3333-4444-8888-555555555555.jpg`],
+    [OWN_SCAN, 42],
+    [null, null],
+    [],
+    [OWN_SCAN, null, null, null, null],
+    'x',
+  ]) {
+    // eslint-disable-next-line no-await-in-loop
+    const res = await withEnv(CONFIGURED, async () => projectRoute().PATCH(...patch(PROJECT_ID, { scanPaths })));
+    assert.equal(res.status, 400, JSON.stringify(scanPaths));
+    assert.equal((await res.json()).error, 'INVALID_SCAN_PATH');
+  }
+  assert.deepEqual(state.updates, []);
+});

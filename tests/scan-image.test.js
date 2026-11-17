@@ -168,14 +168,14 @@ async function withScanEnv(overrides, fn) {
   }
 }
 
-async function getScan(id = PROJECT_ID, env = SCAN_CONFIGURED) {
+async function getScan(id = PROJECT_ID, env = SCAN_CONFIGURED, query = '') {
   const { GET } = loadTsModule('src/app/api/projects/[id]/scan/route.ts');
   const consoleError = console.error;
   const logged = [];
   console.error = (...args) => { logged.push(args.map(String).join(' ')); };
   try {
     return await withScanEnv(env, async () => {
-      const res = await GET(new Request(`https://qatlia.example/api/projects/${id}/scan`), { params: { id } });
+      const res = await GET(new Request(`https://qatlia.example/api/projects/${id}/scan${query}`), { params: { id } });
       return { res, body: await res.json(), logged };
     });
   } finally {
@@ -274,4 +274,22 @@ test('a failed lookup is a 503 that never leaks the error text', async () => {
   assert.equal(res.status, 503);
   assert.doesNotMatch(JSON.stringify(body), /exploded/);
   assert.deepEqual(scanState.signed, []);
+});
+
+test('a sheet of a project read from several sheets is signed by its number', async () => {
+  const third = `${UUID}/33333333-3333-4444-8888-555555555555.jpg`;
+  resetScanState();
+  scanState.user = { id: UUID };
+  scanState.rows.set(PROJECT_ID, { user_id: UUID, options_json: { scans: [{ path: SCAN_PATH }, {}, { path: third }] } });
+  const first = await getScan(PROJECT_ID, SCAN_CONFIGURED);
+  const sheet3 = await getScan(PROJECT_ID, SCAN_CONFIGURED, '?n=3');
+  assert.equal(first.res.status, 200);
+  assert.equal(sheet3.res.status, 200);
+  assert.deepEqual(scanState.signed.map((call) => call[1]), [SCAN_PATH, third]);
+  for (const query of ['?n=2', '?n=5', '?n=0', '?n=x', '?n=1.5']) {
+    // eslint-disable-next-line no-await-in-loop
+    const { res } = await getScan(PROJECT_ID, SCAN_CONFIGURED, query);
+    assert.equal(res.status, 404, `${query} has no image to sign`);
+  }
+  assert.equal(scanState.signed.length, 2);
 });

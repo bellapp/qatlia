@@ -76,7 +76,7 @@ export function ScanThumb({
   busy?: boolean;
   testId: string;
 }) {
-  const { t } = useLocale();
+  const { t, tn } = useLocale();
   const box = size === 'card' ? 'w-14 h-14' : 'w-10 h-10';
   if (!row.scanThumb && !row.hasFullScan) {
     if (size === 'card') return null;
@@ -100,6 +100,16 @@ export function ScanThumb({
       ) : (
         <span aria-hidden="true" className="w-full h-full flex items-center justify-center bg-studio-field/70 text-slate-500 dark:text-slate-400">
           <FileImage className="w-4 h-4" />
+        </span>
+      )}
+      {row.scanCount > 1 && (
+        // A project read from several sheets says how many.
+        <span
+          className="absolute bottom-0.5 end-0.5 min-w-4 px-1 rounded bg-slate-950/75 text-white text-[9px] font-bold leading-4 text-center"
+          data-testid="history-scan-count"
+        >
+          <span aria-hidden="true">{row.scanCount}</span>
+          <span className="sr-only">{tn('historyPage.scanSheetsBadge', row.scanCount)}</span>
         </span>
       )}
       {busy && (
