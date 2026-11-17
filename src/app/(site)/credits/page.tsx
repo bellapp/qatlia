@@ -13,6 +13,7 @@ import { SupportContact } from '@/components/SupportContact';
 import { BankTransferDetails, type BankTransferDetailsData } from '@/components/BankTransferDetails';
 import { checkoutErrorKey, creditPackLabelKeys } from '@/i18n/domain';
 import { LEGAL_DOCS, LEGAL_ROUTES } from '@/lib/legal';
+import { ANALYSIS_WINDOW_HOURS, MAX_SCANS_PER_ANALYSIS, VISION_CREDIT_COST } from '@/lib/billing/policy';
 
 /** Payment providers are proper nouns, so they are interpolated, not translated. */
 const PAYMENT_PROVIDER_NAMES = { creem: 'Creem', stripe: 'Stripe' } as const;
@@ -253,7 +254,7 @@ export default function CreditsPage() {
             <span dir="ltr" translate="no">{priceOf(CREDIT_PACKS.starter)}</span>
             {headlineAfter}
           </h1>
-          <p className="text-sm text-slate-600 dark:text-slate-400 max-w-xl mx-auto">{t('creditsPage.policy')}</p>
+          <p className="text-sm text-slate-600 dark:text-slate-400 max-w-xl mx-auto">{t('creditsPage.policy', { cost: VISION_CREDIT_COST, sheets: MAX_SCANS_PER_ANALYSIS, hours: ANALYSIS_WINDOW_HOURS })}</p>
         </div>
 
         {checkoutError && (

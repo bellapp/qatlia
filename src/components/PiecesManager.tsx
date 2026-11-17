@@ -260,6 +260,8 @@ interface PiecesManagerProps {
   displayUnit: DisplayUnit;
   showMaterialCol?: boolean;
   disabled?: boolean;
+  /** Marks each piece read from a photo with its sheet (F1–F4): only useful once a project has several. */
+  showScanMarks?: boolean;
 }
 
 type ActivePanel = 'quick-add' | 'import' | 'template' | null;
@@ -299,6 +301,7 @@ export const PiecesManager: React.FC<PiecesManagerProps> = ({
   defaultMaterial,
   displayUnit,
   disabled = false,
+  showScanMarks = false,
 }) => {
   const { t, tn } = useLocale();
   const [searchQuery, setSearchQuery] = useState('');
@@ -946,6 +949,15 @@ export const PiecesManager: React.FC<PiecesManagerProps> = ({
                       className="w-full min-w-0 bg-transparent text-start text-slate-900 dark:text-slate-100 font-medium text-xs outline-none focus:text-slate-900 dark:focus:text-white truncate placeholder-slate-500"
                       placeholder={t('pieces.row.namePlaceholder')}
                     />
+                    {showScanMarks && typeof piece.scanIndex === 'number' && (
+                      <span
+                        className="shrink-0 px-1 rounded bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-[9px] font-bold font-mono"
+                        title={t('pieces.row.sheetMarkTitle', { index: piece.scanIndex })}
+                        data-testid="piece-sheet-mark"
+                      >
+                        {t('pieces.row.sheetMark', { index: piece.scanIndex })}
+                      </span>
+                    )}
                     {/* Below 390px the name has ~25px: the dot and its gap
                         would take 14 of them, so the name keeps the room. */}
                     {!isFocused && (

@@ -7,7 +7,7 @@
  */
 
 import { CREDIT_PACKS, formatMAD } from '@/lib/billing/catalog';
-import { ANALYSIS_WINDOW_HOURS, SIGNUP_FREE_CREDITS, VISION_CREDIT_COST } from '@/lib/billing/policy';
+import { ANALYSIS_WINDOW_HOURS, MAX_SCANS_PER_ANALYSIS, SIGNUP_FREE_CREDITS, VISION_CREDIT_COST } from '@/lib/billing/policy';
 import { supportWhatsAppUrl } from '@/lib/support';
 
 export type Lang = 'fr' | 'ar';
@@ -94,7 +94,7 @@ ${DEMO_VIDEO_URL}
   pricing: {
     fr: `💰 Tarifs QatliA
 🎁 ${SIGNUP_FREE_CREDITS} crédits gratuits à l'inscription pour essayer.
-${VISION_CREDIT_COST} crédit = 1 analyse complète (photo de la fiche + plan de coupe).
+${VISION_CREDIT_COST} crédit = 1 analyse complète (photo de la fiche, jusqu'à ${MAX_SCANS_PER_ANALYSIS} photos si elle tient sur plusieurs feuilles, + plan de coupe).
 Recalculs de la même liste gratuits pendant ${ANALYSIS_WINDOW_HOURS} h, exports PDF gratuits.
 
 Packs, sans abonnement :
@@ -103,7 +103,7 @@ ${PACK_LINES_FR}
 👉 https://qatlia.ma`,
     ar: `💰 الأثمنة ديال QatliA
 🎁 ${SIGNUP_FREE_CREDITS} كريدي مجانا ملي كتسجل باش تجرب.
-${VISION_CREDIT_COST} كريدي = تحليل كامل (صورة الورقة + مخطط التقطيع).
+${VISION_CREDIT_COST} كريدي = تحليل كامل (صورة الورقة، حتى ${MAX_SCANS_PER_ANALYSIS} صور إلا كانت فعدة أوراق، + مخطط التقطيع).
 إعادة الحساب فنفس اللائحة مجانية لمدة ${ANALYSIS_WINDOW_HOURS} ساعة، وملفات PDF مجانية.
 
 الباقات، بلا اشتراك:

@@ -22,7 +22,7 @@ function leftColumn() {
   };
   return {
     scan: at('Quick Actions: Hero Cards'),
-    scanPreview: at('Preview scan if present'),
+    scanPreview: at('<ScanSheets'),
     pieces: at('<PiecesManager'),
     stock: at('id="stock-card"'),
     blade: at('part="blade"'),

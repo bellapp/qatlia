@@ -57,12 +57,14 @@ export function readScanSheets(options: unknown): ScanSheet[] {
 
 /**
  * The list after reading sheet number `sheetNumber` (from 1). The first sheet
- * replaces the list on screen, as a scan always did; a later one adds its
- * pieces at the end. Every read piece is tagged with its sheet.
+ * of a project replaces the list on screen, as a scan always did (it clears
+ * the example pieces); a later one adds its pieces at the end. `replace` lets
+ * the atelier keep the list when sheet 1 is read again after it was removed.
+ * Every read piece is tagged with its sheet.
  */
-export function appendSheetPieces(pieces: Piece[], read: Piece[], sheetNumber: number): Piece[] {
+export function appendSheetPieces(pieces: Piece[], read: Piece[], sheetNumber: number, replace: boolean = sheetNumber <= 1): Piece[] {
   const tagged = read.map((piece) => ({ ...piece, scanIndex: sheetNumber }));
-  return sheetNumber <= 1 ? tagged : [...pieces, ...tagged];
+  return replace ? tagged : [...pieces, ...tagged];
 }
 
 /**

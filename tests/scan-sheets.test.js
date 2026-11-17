@@ -31,6 +31,12 @@ test('a later sheet adds its pieces at the end and keeps everything already ther
   assert.equal(current.length, 2, 'the list on screen is not mutated');
 });
 
+test('sheet 1 read again after it was removed keeps the pieces added by hand', () => {
+  const { appendSheetPieces } = sheets();
+  const out = appendSheetPieces([piece('manuelle')], [piece('a')], 1, false);
+  assert.deepEqual(out.map((p) => [p.name, p.scanIndex]), [['manuelle', undefined], ['a', 1]]);
+});
+
 test('removing a sheet drops its pieces, renumbers the next ones and keeps manual pieces', () => {
   const { removeScanSheet } = sheets();
   const current = [
