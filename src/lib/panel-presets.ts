@@ -116,6 +116,29 @@ export function setDevicePresetPrice(id: string, pricePerSheet: number | null): 
   return updated;
 }
 
+export type PresetUpdateResult =
+  | { ok: true; preset: PanelPreset }
+  | { ok: false; error: 'DUPLICATE'; existingName: string }
+  | { ok: false; error: 'FAILED' };
+
+/**
+ * Edits a panel of the device list as a whole, in its place. A panel made
+ * identical to another one of the list is refused with the other's name.
+ */
+export function updateDevicePreset(id: string, preset: NewPanelPreset): PresetUpdateResult {
+  const saved = loadSavedPresets();
+  if (!saved.some((p) => p.id === id)) return { ok: false, error: 'FAILED' };
+  const duplicate = findDuplicatePreset(preset, saved.filter((p) => p.id !== id));
+  if (duplicate) return { ok: false, error: 'DUPLICATE', existingName: duplicate.name };
+  const updated: PanelPreset = { ...cleanPreset(preset), id, builtIn: false };
+  try {
+    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(saved.map((p) => (p.id === id ? updated : p))));
+  } catch {
+    return { ok: false, error: 'FAILED' };
+  }
+  return { ok: true, preset: updated };
+}
+
 export function deletePreset(id: string): void {
   const saved = loadSavedPresets().filter((p) => p.id !== id);
   window.localStorage.setItem(STORAGE_KEY, JSON.stringify(saved));
@@ -172,6 +195,25 @@ export async function setAccountPresetPrice(id: string, pricePerSheet: number | 
     return res.ok && data?.success && data.preset ? (data.preset as PanelPreset) : null;
   } catch {
     return null;
+  }
+}
+
+/** Edits an account panel as a whole (every attribute, the price included). */
+export async function updateAccountPreset(id: string, preset: NewPanelPreset): Promise<PresetUpdateResult> {
+  try {
+    const res = await fetch(`/api/panel-presets/${encodeURIComponent(id)}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(cleanPreset(preset)),
+    });
+    const data = await res.json().catch(() => null);
+    if (res.ok && data?.success && data.preset) return { ok: true, preset: data.preset as PanelPreset };
+    if (res.status === 409 && data?.error === 'DUPLICATE_PRESET' && typeof data.existingName === 'string') {
+      return { ok: false, error: 'DUPLICATE', existingName: data.existingName };
+    }
+    return { ok: false, error: 'FAILED' };
+  } catch {
+    return { ok: false, error: 'FAILED' };
   }
 }
 
