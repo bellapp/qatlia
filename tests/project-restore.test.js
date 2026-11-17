@@ -79,7 +79,7 @@ test('the atelier puts the saved plan and the scan back on screen', () => {
   assert.match(page, /const restoredResult = pickRestorableResult\(parsed\.result\);/);
   assert.match(page, /if \(restoredResult\) \{\s*setResult\(restoredResult\);\s*setActiveSheetIndex\(0\);/);
   // Every sheet comes back, an old project's single scan as one.
-  assert.match(page, /const restoredSheets = readScanSheets\(parsed\);\s*setScanSheets\(restoredSheets\.map/);
+  assert.match(page, /const restoredSheets = readScanSheets\(parsed\);[\s\S]*?setScanSheets\(\s*restoredSheets\.map/);
 });
 
 test('the history writes the save date and the atelier reads it, then clears it like the other keys', () => {
@@ -285,16 +285,16 @@ test('the upload to /api/scans sits in a try, so its failure cannot stop the sav
 
 test('the atelier wires the scan path: restored, reset by a new scan, sent after a signed-in save only', () => {
   const page = atelierSource();
-  // The keeper holds sheet 1's image: restored from the project, reset by a new first sheet.
-  assert.match(page, /scanKeeper\.restore\(restoredSheets\[0\]\?\.path\);/);
-  assert.match(page, /if \(sheetIndex === 0\) scanKeeper\.newScan\(scanImage\);/);
+  // Each sheet has its own keeper: restored from the project, or holding a new scan.
+  assert.match(page, /const keeper = newKeeper\(\);\s*keeper\.restore\(sheet\.path\);/);
+  assert.match(page, /const sheet: ScreenSheet = \{ image: scanImage, keeper: newKeeper\(\) \};\s*sheet\.keeper\.newScan\(scanImage\);/);
   const scansForSave = page.slice(page.indexOf('const scansForSave = async'), page.indexOf('const persistProject = async'));
-  assert.match(scansForSave, /const path = index === 0 \? scanKeeper\.knownPath\(\) \?\? undefined : sheet\.path;/);
+  assert.match(scansForSave, /const path = sheet\.keeper\.knownPath\(\) \?\? undefined;/);
   const persist = page.slice(page.indexOf('const persistProject = async'), page.indexOf('const recordPdfGenerated'));
   // The save carries the path already known; the image itself never holds it up.
-  assert.match(persist, /buildPersistedProjectPayload\(\{[\s\S]*?scans: await scansForSave\(\),[\s\S]*?\}\)/);
+  assert.match(persist, /buildPersistedProjectPayload\(\{[\s\S]*?scans: await scansForSave\(sheetsAtSave\),[\s\S]*?\}\)/);
   // Only a signed-in save reaches the cloud, and so the image.
-  assert.match(persist, /if \(user\) \{\s*const saved = await saveProjectToCloud\(payload, scanKeeper, \(url, init\) => fetch\(url, init\)\);/);
+  assert.match(persist, /if \(user\) \{\s*const saved = await saveProjectToCloud\(payload, sheetsAtSave\.map\(\(sheet\) => sheet\.keeper\), \(url, init\) => fetch\(url, init\)\);/);
   assert.equal(persist.match(/saveProjectToCloud\(/g).length, 1);
   assert.doesNotMatch(persist, /scanKeeper\.keep\(\)|\/api\/scans/);
 });
@@ -476,9 +476,11 @@ test('the atelier scan preview is a button that opens the viewer', () => {
   assert.match(sheets, /data-testid=\{index === 0 \? 'atelier-scan-preview'/);
   assert.match(sheets, /aria-label=\{`\$\{t\('atelier\.scan\.sheetOpenAria', \{ index: number \}\)\}/);
   assert.match(page, /<ScanViewer\b/);
-  // Sheet 1's full image is the keeper's, the others the image read on this page.
-  assert.match(page, /localImage: first \? scanKeeper\.freshImage\(\) : sheet\.image \?\? null,/);
-  assert.match(page, /hasFullScan: first \? scanKeeper\.knownPath\(\) !== null : false,/);
+  // Every sheet's full image is its keeper's; arrows step through the sheets.
+  assert.match(page, /localImage: sheet\.keeper\.freshImage\(\),/);
+  assert.match(page, /hasFullScan: sheet\.keeper\.knownPath\(\) !== null,/);
+  assert.match(page, /sheet: index \+ 1,/);
+  assert.match(page, /onStep: \(delta\) => openScanViewer\(index \+ delta\)/);
 });
 
 // Lot 3 fix wave.

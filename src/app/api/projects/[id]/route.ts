@@ -6,7 +6,7 @@ import { getSupabaseAdminConfig } from '@/lib/billing/config';
 import { CompanyIdentitySchema, ClientIdentitySchema, QUOTATION_LOCALES } from '@/lib/quotation';
 import { sanitizePdfGeneratedAt, sanitizeProjectName } from '@/lib/projects/history-metadata';
 import { isOwnScanPath } from '@/lib/projects/scan-image';
-import { withFirstScanPath } from '@/lib/projects/scan-sheets';
+import { MAX_SCAN_SHEETS, withFirstScanPath, withScanPaths } from '@/lib/projects/scan-sheets';
 
 /**
  * `GET /api/projects/[id]` — read-only, ownership-checked access to a single
@@ -160,6 +160,7 @@ export async function PATCH(
     const body = (await req.json().catch(() => null)) as Record<string, unknown> | null;
     const isPdfMarker = !!body && typeof body === 'object' && 'pdfGeneratedAt' in body && !('name' in body);
     const isScanPath = !!body && typeof body === 'object' && 'scanPath' in body && !('name' in body) && !('pdfGeneratedAt' in body);
+    const isScanPaths = !!body && typeof body === 'object' && 'scanPaths' in body && !('name' in body) && !('pdfGeneratedAt' in body);
 
     // UUID guard: a non-UUID id can never be a cloud row; refuse early.
     const { id } = await params;
@@ -186,6 +187,36 @@ export async function PATCH(
         return NextResponse.json({ error: 'PROJECT_UPDATE_FAILED' }, { status: 503 });
       }
       return NextResponse.json({ success: true, id, pdfGeneratedAt });
+    }
+
+    if (isScanPaths) {
+      // The kept images of several sheets, by position (null: leave the sheet
+      // as it is). Every path must be the artisan's own, at least one given.
+      const raw = body.scanPaths;
+      const scanPaths = Array.isArray(raw) && raw.length > 0 && raw.length <= MAX_SCAN_SHEETS ? raw : null;
+      const valid =
+        !!scanPaths &&
+        scanPaths.every((path) => path === null || isOwnScanPath(path, user.id)) &&
+        scanPaths.some((path) => path !== null);
+      if (!valid) {
+        return NextResponse.json({ error: 'INVALID_SCAN_PATH' }, { status: 400 });
+      }
+      if (!UUID_PATTERN.test(id)) {
+        return NextResponse.json({ error: 'NOT_FOUND' }, { status: 404 });
+      }
+      const db = createDbClient();
+      const own = await readOwnOptions(db, id, user.id, 'project scan paths');
+      if (!own.ok) return own.response;
+      const { error: updateError } = await db
+        .from('projects')
+        .update({ options_json: withScanPaths(own.existing, scanPaths as (string | null)[]) })
+        .eq('id', id)
+        .eq('user_id', user.id);
+      if (updateError) {
+        console.error('project scan paths update failed:', updateError.message);
+        return NextResponse.json({ error: 'PROJECT_UPDATE_FAILED' }, { status: 503 });
+      }
+      return NextResponse.json({ success: true, id });
     }
 
     if (isScanPath) {

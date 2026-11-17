@@ -328,14 +328,24 @@ export default function HistoryPage() {
    * signed link when the project kept it (a cloud row only), else the
    * thumbnail, marked as reduced. Seeing it spends no credit.
    */
-  const openScan = (id: string) => {
+  const openScan = (id: string, index = 0) => {
     const row = rows.find((candidate) => candidate.id === id);
     if (!row) return;
-    void scanViewer.show(row.id, {
-      projectId: row.isCloud ? row.id : null,
-      hasFullScan: row.hasFullScan,
-      thumb: row.scanThumb,
-    }, row.name);
+    // A project read from several sheets opens on its first; arrows step through them.
+    const sheet = row.scanSheets[index] ?? { thumb: row.scanThumb, hasFullScan: row.hasFullScan };
+    void scanViewer.show(
+      row.id,
+      {
+        projectId: row.isCloud ? row.id : null,
+        hasFullScan: sheet.hasFullScan,
+        thumb: sheet.thumb,
+        sheet: index + 1,
+      },
+      row.name,
+      row.scanSheets.length > 1
+        ? { position: { index: index + 1, count: row.scanSheets.length }, onStep: (delta) => openScan(id, index + delta) }
+        : undefined
+    );
   };
 
   const listProps = {
@@ -344,7 +354,7 @@ export default function HistoryPage() {
     onRename: commitRename,
     onDownloadPdf: (id: string) => { void handleDownloadPdf(id); },
     pdfPendingIds,
-    onViewScan: openScan,
+    onViewScan: (id: string) => openScan(id),
     scanPendingId: scanViewer.pendingKey,
   };
 
