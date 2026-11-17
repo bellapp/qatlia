@@ -519,3 +519,22 @@ test('a name or a PDF marker sent with a scan path keeps its own branch, and the
   assert.deepEqual(await marked.json(), { success: true, id: PROJECT_ID, pdfGeneratedAt: '2026-11-12T10:20:39.123Z' });
   assert.equal('scanPath' in state.projects.get(PROJECT_ID).options_json, false);
 });
+
+test('the image sent after the save of a project with several sheets lands on sheet 1, the others kept', async () => {
+  resetState();
+  state.user = { id: UUID };
+  const scans = [{ thumb: TINY_JPEG }, { thumb: TINY_JPEG }];
+  state.projects.set(PROJECT_ID, { user_id: UUID, name: 'Cuisine', options_json: { scans } });
+  const res = await withEnv(CONFIGURED, async () => projectRoute().PATCH(...patch(PROJECT_ID, { scanPath: OWN_SCAN })));
+  assert.equal(res.status, 200);
+  assert.deepEqual(state.updates, [{ id: PROJECT_ID, patch: { options_json: { scans: [{ thumb: TINY_JPEG, path: OWN_SCAN }, { thumb: TINY_JPEG }] } } }]);
+});
+
+test('a save with several sheets keeps them in order, with only the artisan\'s own paths', async () => {
+  resetState();
+  state.user = { id: UUID };
+  const scans = [{ thumb: TINY_JPEG, path: `${UUID}/${PROJECT_ID}.jpg` }, { thumb: TINY_JPEG, path: `${OTHER_UUID}/${PROJECT_ID}.jpg` }];
+  await withEnv(CONFIGURED, () => projectsRoute().POST(post(savePayload({ scans, scanGroup: OTHER_PROJECT_ID }))));
+  assert.deepEqual(state.inserts[0].options_json.scans, [{ thumb: TINY_JPEG, path: `${UUID}/${PROJECT_ID}.jpg` }, { thumb: TINY_JPEG }]);
+  assert.equal(state.inserts[0].options_json.scanGroup, OTHER_PROJECT_ID);
+});

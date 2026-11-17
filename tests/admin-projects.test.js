@@ -53,3 +53,12 @@ test('summarizeProject : une quantité négative ou non numérique compte pour 1
   const s = summarizeProject({ ...base, options_json: { pieces: [{ quantity: -4 }, { quantity: 'x' }, null] } });
   assert.equal(s.pieceCount, 2);
 });
+
+test('summarizeProject montre toutes les fiches d’un projet scanné en plusieurs feuilles', () => {
+  const a = 'data:image/jpeg;base64,/9j/AAAA';
+  const b = 'data:image/jpeg;base64,/9j/BBBB';
+  const summary = summarizeProject({ id: 'p', name: 'x', material: 'mdf', sheet_width: 1, sheet_height: 1, created_at: '2026-11-17T00:00:00Z',
+    options_json: { scans: [{ thumb: a }, {}, { thumb: b }] } });
+  assert.deepEqual(summary.scanThumbs, [a, b]);
+  assert.equal(summary.scanThumb, a);
+});

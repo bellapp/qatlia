@@ -379,7 +379,7 @@ test('a failed PATCH is only logged, and nothing is attached when the save carri
   const known = saveFetch();
   const restored = keeper(known);
   restored.restore(PATH);
-  const carried = await scanUpload().saveProjectToCloud(savePayload({ scanPath: PATH }), restored, known);
+  const carried = await scanUpload().saveProjectToCloud(savePayload({ scans: [{ path: PATH }] }), restored, known);
   assert.equal(await carried.scanAttached, false);
   const none = keeper(known);
   const plain = await scanUpload().saveProjectToCloud(savePayload(), none, known);

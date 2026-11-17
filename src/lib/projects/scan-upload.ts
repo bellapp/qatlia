@@ -160,7 +160,7 @@ export interface CloudSave {
  * falls back to the device then.
  */
 export async function saveProjectToCloud(
-  payload: { scanPath?: string | null },
+  payload: { scans?: { path?: string }[] },
   keeper: ScanKeeper,
   fetchImpl: FetchLike
 ): Promise<CloudSave> {
@@ -173,7 +173,7 @@ export async function saveProjectToCloud(
   if (!res.ok) return { ok: false, projectId: null, scanAttached: Promise.resolve(false) };
   const data = await res.json().catch(() => null);
   const projectId = data?.success && typeof data.projectId === 'string' ? data.projectId : null;
-  const needsImage = !!projectId && !payload.scanPath && !!scanAtSave && keeper.freshImage() === scanAtSave;
+  const needsImage = !!projectId && !payload.scans?.[0]?.path && !!scanAtSave && keeper.freshImage() === scanAtSave;
   const scanAttached = needsImage
     ? keeper.keep().then((path) => (path ? attachScanPath(projectId as string, path, fetchImpl) : false), () => false)
     : Promise.resolve(false);

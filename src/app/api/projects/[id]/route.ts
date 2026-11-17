@@ -6,6 +6,7 @@ import { getSupabaseAdminConfig } from '@/lib/billing/config';
 import { CompanyIdentitySchema, ClientIdentitySchema, QUOTATION_LOCALES } from '@/lib/quotation';
 import { sanitizePdfGeneratedAt, sanitizeProjectName } from '@/lib/projects/history-metadata';
 import { isOwnScanPath } from '@/lib/projects/scan-image';
+import { withFirstScanPath } from '@/lib/projects/scan-sheets';
 
 /**
  * `GET /api/projects/[id]` — read-only, ownership-checked access to a single
@@ -201,7 +202,7 @@ export async function PATCH(
       if (!own.ok) return own.response;
       const { error: updateError } = await db
         .from('projects')
-        .update({ options_json: { ...own.existing, scanPath } })
+        .update({ options_json: withFirstScanPath(own.existing, scanPath) })
         .eq('id', id)
         .eq('user_id', user.id);
       if (updateError) {

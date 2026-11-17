@@ -8,6 +8,8 @@
  * Pure module: safe to import from a client component or a plain Node test.
  */
 
+import { readScanSheets } from '@/lib/projects/scan-sheets';
+
 export interface ProjectRow {
   id: string;
   name: string | null;
@@ -28,8 +30,10 @@ export interface ProjectSummary {
   pieceCount: number;
   sheetsUsed: number | null;
   wastePercentage: number | null;
-  /** A data:image/ URL of the scanned cut list, or null. */
+  /** A data:image/ URL of the scanned cut list (its first sheet), or null. */
   scanThumb: string | null;
+  /** The thumbnail of every sheet that kept one, in order (up to 4). */
+  scanThumbs: string[];
   pdfGeneratedAt: string | null;
   /** Whether a quotation was saved — its content (the client's own customers and prices) is not shown. */
   hasQuotation: boolean;
@@ -58,7 +62,8 @@ function pieceCount(pieces: unknown): number {
 export function summarizeProject(row: ProjectRow): ProjectSummary {
   const options = asRecord(row.options_json) ?? {};
   const result = asRecord(options.result);
-  const scanThumb = typeof options.scanThumb === 'string' && options.scanThumb.startsWith('data:image/') ? options.scanThumb : null;
+  const scanThumbs = readScanSheets(options).flatMap((sheet) => (sheet.thumb ? [sheet.thumb] : []));
+  const scanThumb = scanThumbs[0] ?? null;
   const pdfGeneratedAt = typeof options.pdfGeneratedAt === 'string' ? options.pdfGeneratedAt : null;
 
   return {
@@ -72,6 +77,7 @@ export function summarizeProject(row: ProjectRow): ProjectSummary {
     sheetsUsed: result ? finiteNumber(result.sheetsUsed) : null,
     wastePercentage: result ? finiteNumber(result.wastePercentage) : null,
     scanThumb,
+    scanThumbs,
     pdfGeneratedAt,
     hasQuotation: asRecord(options.quotation) !== null,
   };

@@ -109,3 +109,14 @@ test('the history reopens a project with no saved data through restoreSeedFromRo
   assert.match(atelier, /if \(parsed\.sheet\) setSheets\(\[restoreSheet\(parsed\.sheet\)\]\);/);
   assert.match(atelier, /typeof parsed\.projectName === 'string' && parsed\.projectName\.trim\(\)/);
 });
+
+test('a project read from several sheets shows its first one and says how many', () => {
+  const row = rows().toHistoryRow({ ...base, options_json: {
+    scans: [{ thumb: TINY_JPEG, path: `${UUID}/${PROJECT_ID}.jpg` }, { thumb: TINY_JPEG }, {}] } });
+  assert.equal(row.scanThumb, TINY_JPEG);
+  assert.equal(row.hasFullScan, true);
+  assert.equal(row.scanCount, 3);
+  const legacy = rows().toHistoryRow({ ...base, options_json: { scanThumb: TINY_JPEG } });
+  assert.equal(legacy.scanCount, 1);
+  assert.equal(rows().toHistoryRow({ ...base, options_json: {} }).scanCount, 0);
+});
