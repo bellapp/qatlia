@@ -280,6 +280,10 @@ test('the atelier restores the kept job only when nothing comes before it, and f
   assert.match(restore, /const parsed = draft \? draft\.project : JSON\.parse\(savedProj \?\? ''\);/, 'one restore path for both');
   assert.match(restore, /setRestoredAt\(draft \? draft\.restoredAt : readRestoredProjectDate\(/, 'no reopened-plan banner for a plan made in this session');
   assert.match(restore, /if \(draft\) setCutMode\(draft\.cutMode\);/);
+  assert.match(restore, /const restoredProjectIdRaw = draft \? draft\.projectId : /, 'the kept job keeps its project');
+  assert.match(restore, /const restoredLocalIdRaw = draft \? draft\.localProjectId : /, 'and its device entry');
+  assert.match(restore, /plannedPiecesRef\.current = draft\?\.plannedPieces \? /, 'and the pieces its plan was made from');
+  assert.match(restore, /pendingWorkFromThisTab: !!pendingWork && isFromThisTab\(window\.sessionStorage, pendingWork\),/);
 });
 
 test('a new job leaves no kept job behind', () => {
@@ -335,12 +339,32 @@ test('the save of another plan leaves the kept job alone', () => {
   assert.equal(readAtelierDraft(store).projectId, null);
 });
 
-test('a kept job that already has its project keeps it', () => {
+test('a plan saved again under a new project moves the kept job to that project, as the atelier does', () => {
+  // A second run, saved as a new project while the atelier was being left:
+  // the job on screen is that new project, not the one before it.
   const store = keptWhileSaving({ projectId: 'cloud-1' });
 
   adoptSavedJob(store, { result: draft().project.result, projectId: 'cloud-9', localProjectId: null });
 
-  assert.equal(readAtelierDraft(store).projectId, 'cloud-1');
+  assert.equal(readAtelierDraft(store).projectId, 'cloud-9');
+});
+
+test('a cloud save of a plan reopened from this device leaves the device entry behind', () => {
+  const store = keptWhileSaving({ localProjectId: 'optimize_1' });
+
+  adoptSavedJob(store, { result: draft().project.result, projectId: 'cloud-9', localProjectId: null });
+
+  const kept = readAtelierDraft(store);
+  assert.equal(kept.projectId, 'cloud-9');
+  assert.equal(kept.localProjectId, null);
+});
+
+test('the images arriving after the save change no project of the kept job', () => {
+  const store = keptWhileSaving({ projectId: 'cloud-9' });
+
+  adoptSavedJob(store, { result: draft().project.result, scanPaths: [null] });
+
+  assert.equal(readAtelierDraft(store).projectId, 'cloud-9');
 });
 
 test('the images stored after the save fill the sheets that had none, in place', () => {

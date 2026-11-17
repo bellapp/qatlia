@@ -195,8 +195,8 @@ export interface SavedJob {
  * A save still running when the atelier was left finishes after the job was
  * kept: the kept job learns the project the save made, and the images stored
  * for its sheets. On return, a PDF or a name then updates that project instead
- * of saving the plan again. Only a kept job showing the same plan, and with no
- * project yet, is touched; with no kept job, nothing is written. Never throws.
+ * of saving the plan again. Only a kept job showing the same plan is touched;
+ * with no kept job, nothing is written. Never throws.
  */
 export function adoptSavedJob(store: DraftStore, saved: SavedJob): void {
   let raw: string | null;
@@ -216,10 +216,12 @@ export function adoptSavedJob(store: DraftStore, saved: SavedJob): void {
   if (JSON.stringify(kept.project.result) !== JSON.stringify(saved.result)) return;
 
   let next: AtelierDraft = kept;
-  if (kept.projectId === null && kept.localProjectId === null) {
-    if (saved.projectId) next = { ...next, projectId: saved.projectId };
-    else if (saved.localProjectId) next = { ...next, localProjectId: saved.localProjectId };
-  }
+  // The same plan, saved: the kept job is that save, as the atelier's own state
+  // would be (a cloud save leaves a device entry behind; a device save keeps
+  // the cloud id the atelier had). A plan run again while the atelier was
+  // left is a new project, never the one before it.
+  if (saved.projectId) next = { ...next, projectId: saved.projectId, localProjectId: null };
+  else if (saved.localProjectId) next = { ...next, localProjectId: saved.localProjectId };
   const paths = saved.scanPaths;
   if (paths && Array.isArray(kept.project.scans) && paths.some(Boolean)) {
     const scans = (kept.project.scans as unknown[]).map((entry, index) => {
