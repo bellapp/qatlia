@@ -3,8 +3,9 @@ import { z } from 'zod';
 import { createClient } from '@/lib/supabase/server';
 import { createClient as createAdminClient, type SupabaseClient } from '@supabase/supabase-js';
 import { getSupabaseAdminConfig, isPlaceholder, isProductionEnv } from '@/lib/billing/config';
-import { VISION_CREDIT_COST } from '@/lib/billing/policy';
+import { MAX_SCANS_PER_ANALYSIS, VISION_CREDIT_COST } from '@/lib/billing/policy';
 import { analysisPassSecret, issueAnalysisPass } from '@/lib/billing/analysis-pass';
+import { claimScanRead, openScanGroup, requestedScanGroup, scanGroupHasRoom } from '@/lib/billing/scan-group';
 import { createRateLimiter, VISION_RATE_LIMIT } from '@/lib/rate-limit';
 import { edgesFromCounts } from '@/lib/pieces/edge-marks';
 
@@ -14,6 +15,9 @@ const VisionSchema = z.object({
     .max(MAX_IMAGE_DATA_URL_LENGTH)
     .regex(/^data:image\/(?:png|jpe?g|webp);base64,[A-Za-z0-9+/=\r\n]+$/),
   sheetMaterial: z.string().default('mdf'),
+  // The scan group of the project's earlier photos (see scan-group.ts). Taken
+  // only when it is a UUID; anything else reads as no group, never a 400.
+  scanGroup: z.unknown().optional(),
 });
 
 /**
@@ -198,6 +202,7 @@ export async function POST(req: Request) {
     }
 
     const { imageBase64 } = parsed.data;
+    const presentedGroup = requestedScanGroup(parsed.data.scanGroup);
 
     // Authenticated but scripted: brake the burst before it can spend anything.
     const rateLimit = visionRateLimiter.check(user.id);
@@ -259,24 +264,32 @@ export async function POST(req: Request) {
       );
     }
 
-    const preflight = await preflightVisionCredits(supabaseAdmin, user.id, user.email);
+    // A later photo of a project whose first was paid: while its group has
+    // room, the read is covered and the balance is not the question. The claim
+    // after the read decides; a group that filled up meanwhile is charged then.
+    const coveredGroup =
+      presentedGroup && (await scanGroupHasRoom(supabaseAdmin, user.id, presentedGroup)) ? presentedGroup : null;
 
-    if (preflight.status === 'error') {
-      return NextResponse.json(
-        { error: 'CREDIT_LEDGER_UNAVAILABLE', message: 'Le décompte des crédits est indisponible. Réessayez dans un instant.' },
-        { status: 503 }
-      );
-    }
+    if (!coveredGroup) {
+      const preflight = await preflightVisionCredits(supabaseAdmin, user.id, user.email);
 
-    if (preflight.status === 'insufficient') {
-      return NextResponse.json(
-        {
-          error: 'INSUFFICIENT_CREDITS',
-          message: 'Votre solde de crédits est épuisé. Rechargez votre compte pour analyser une nouvelle photo.',
-          creditsRemaining: preflight.balance,
-        },
-        { status: 402 }
-      );
+      if (preflight.status === 'error') {
+        return NextResponse.json(
+          { error: 'CREDIT_LEDGER_UNAVAILABLE', message: 'Le décompte des crédits est indisponible. Réessayez dans un instant.' },
+          { status: 503 }
+        );
+      }
+
+      if (preflight.status === 'insufficient') {
+        return NextResponse.json(
+          {
+            error: 'INSUFFICIENT_CREDITS',
+            message: 'Votre solde de crédits est épuisé. Rechargez votre compte pour analyser une nouvelle photo.',
+            creditsRemaining: preflight.balance,
+          },
+          { status: 402 }
+        );
+      }
     }
 
     const systemPrompt = `Tu es un expert en lecture de fiches de débit pour menuisiers et artisans.
@@ -394,6 +407,24 @@ Règles impératives :
       };
     });
 
+    // A covered read counts in its group and costs nothing. One conditional
+    // update decides, so two photos racing for the last place cannot both win:
+    // the loser is charged below like any first photo.
+    if (coveredGroup) {
+      const readsUsed = await claimScanRead(supabaseAdmin, user.id, coveredGroup);
+      if (readsUsed !== null) {
+        return NextResponse.json({
+          success: true,
+          extractionId: 'ext_' + Date.now(),
+          pieces,
+          creditsCharged: 0,
+          scanGroup: coveredGroup,
+          scansLeft: Math.max(0, MAX_SCANS_PER_ANALYSIS - readsUsed),
+          notes: `${pieces.length} pièces extraites avec succès`,
+        });
+      }
+    }
+
     // A valid, successfully parsed analysis is the only thing that costs a credit.
     const outcome = await consumeVisionCredit(supabaseAdmin, user.id);
 
@@ -421,6 +452,10 @@ Règles impératives :
     // The scan opens the analysis: re-optimizing this list is free for the
     // window (see src/lib/billing/analysis-pass.ts).
     const analysisPass = issueAnalysisPass(analysisPassSecret(), user.id);
+    // The paid read opens the project's group: its next photos ride on it. No
+    // group (ledger error, migration 018 not applied) only means they are
+    // charged one by one, as before.
+    const openedGroup = await openScanGroup(supabaseAdmin, user.id);
 
     return NextResponse.json({
       success: true,
@@ -429,6 +464,7 @@ Règles impératives :
       pieces,
       creditsCharged: VISION_CREDIT_COST,
       ...(outcome.balance !== null ? { creditsRemaining: outcome.balance } : {}),
+      ...(openedGroup ? { scanGroup: openedGroup, scansLeft: MAX_SCANS_PER_ANALYSIS - 1 } : {}),
       notes: `${pieces.length} pièces extraites avec succès`,
     });
   } catch (error: unknown) {
