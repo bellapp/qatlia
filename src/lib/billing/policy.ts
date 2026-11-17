@@ -33,6 +33,15 @@ export const OPTIMIZE_CREDIT_COST = 1;
 export const ANALYSIS_WINDOW_HOURS = 24;
 
 /**
+ * Cut-list photos one analysis reads (user decision 2026-11-17): a long list
+ * written over several sheets is one project, so its first paid photo read
+ * covers up to this many, the paid one included, for ANALYSIS_WINDOW_HOURS.
+ * Migration 018 (`scan_groups`) states the same number; a test keeps them in
+ * step.
+ */
+export const MAX_SCANS_PER_ANALYSIS = 4;
+
+/**
  * Credits granted to a new account on sign-up.
  *
  * Stated once here because three surfaces quote it (landing page, auth modal,
