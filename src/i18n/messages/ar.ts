@@ -184,11 +184,6 @@ export const ar: Catalog = {
       credits: 'رصيد',
       creditsAria: 'الرصيد المتبقي لتحليل الصور',
     },
-    sidebar: {
-      title: 'التحكم',
-      navQuotation: 'التسعير والعروض',
-      navHistory: 'سجل قوائم القطع',
-    },
     project: {
       nameBars: 'قضبان {material} — {count} قطعة',
       nameSheets: 'قائمة قطع {material} — {count} قطعة',

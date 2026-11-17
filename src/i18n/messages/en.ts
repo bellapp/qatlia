@@ -183,11 +183,6 @@ export const en: Catalog = {
       credits: 'credits',
       creditsAria: 'Photo-analysis credits left',
     },
-    sidebar: {
-      title: 'Controls',
-      navQuotation: 'Costing & Quotes',
-      navHistory: 'Cut list history',
-    },
     project: {
       nameBars: 'Bars {material} — {count} pcs',
       nameSheets: 'Cut list {material} — {count} pcs',

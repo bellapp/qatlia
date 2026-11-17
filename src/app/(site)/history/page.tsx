@@ -5,13 +5,13 @@ import Link from 'next/link';
 import { createClient } from '@/lib/supabase/client';
 import {
   Zap,
-  ArrowLeft,
   RefreshCw,
   CloudOff,
   Search,
 } from 'lucide-react';
 import { readLocalHistory, renameLocalHistoryItem, type LocalHistoryItem } from '@/lib/history';
 import { AccountMenu } from '@/components/AccountMenu';
+import { WorkspaceNav } from '@/components/WorkspaceNav';
 import { QatlIALogo } from '@/components/QatlIALogo';
 import { EmptyState } from '@/components/EmptyState';
 import { ScanViewer, useScanViewer } from '@/components/ScanViewer';
@@ -363,15 +363,8 @@ export default function HistoryPage() {
       <header className="sticky top-0 z-40 border-b border-studio-border/70 bg-studio-canvas/70 backdrop-blur-2xl backdrop-saturate-150">
         <div className="max-w-6xl mx-auto flex items-center justify-between gap-2 px-4 sm:px-8 h-16">
           <div className="flex items-center gap-2 sm:gap-3 min-w-0">
-            <Link
-              href="/atelier"
-              aria-label={t('historyPage.backToAtelier')}
-              className="shrink-0 flex items-center justify-center gap-2 min-w-10 min-h-10 px-2.5 sm:px-3 py-2 rounded-xl bg-studio-panel hover:bg-studio-field text-slate-700 dark:text-slate-300 text-xs font-semibold border border-studio-border transition-all"
-            >
-              <ArrowLeft className="w-4 h-4 rtl:-scale-x-100" aria-hidden="true" /><span className="hidden sm:inline">{t('historyPage.backToAtelier')}</span>
-            </Link>
             <div className="flex items-center gap-2 min-w-0">
-              <div className="hidden sm:block text-brand-400"><QatlIALogo size="sm" /></div>
+              <div className="text-brand-400"><QatlIALogo size="sm" /></div>
               {/* On a phone the language, credits and account controls fill the
                   bar; the title stays for screen readers (the page heading
                   below names the page too). */}
@@ -394,6 +387,8 @@ export default function HistoryPage() {
           </div>
         </div>
       </header>
+
+      <WorkspaceNav current="history" className="max-w-6xl mx-auto px-4 sm:px-8" />
 
       <main className="max-w-6xl mx-auto px-4 sm:px-8 mt-8 space-y-6">
         <div className="flex flex-wrap items-end justify-between gap-4">

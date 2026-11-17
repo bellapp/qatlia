@@ -218,12 +218,6 @@ export const fr = {
       credits: 'crédits',
       creditsAria: 'Crédits d’analyse photo restants',
     },
-    /** Desktop-only "Pilotage" rail — mobile keeps the top navbar instead. */
-    sidebar: {
-      title: 'Pilotage',
-      navQuotation: 'Chiffrage & Devis',
-      navHistory: 'Historique des débits',
-    },
     /**
      * Name given to the project saved after an optimization. `{material}` is the
      * stable `MaterialType` value upper-cased, not a translated label: it is what

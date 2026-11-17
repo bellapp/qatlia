@@ -160,7 +160,7 @@ test.describe('History page localization', () => {
     await expect(page.getByRole('heading', { name: 'Your cut lists' })).toBeVisible();
     await expect(page.getByText('Reopen a plan, run the nesting again or export the PDF once more.')).toBeVisible();
     await expect(page.getByRole('button', { name: /Refresh/ })).toBeVisible();
-    await expect(page.getByRole('link', { name: 'Workshop', exact: true })).toBeVisible();
+    await expect(page.getByRole('navigation', { name: 'App screens' }).getByRole('link', { name: 'Cutting workshop' })).toBeVisible();
     // Signed out: the sign-in call to action, not the account menu.
     await expect(page.getByRole('link', { name: /^Sign in$/ })).toBeVisible();
     // The empty state of a visitor with no saved plan.
