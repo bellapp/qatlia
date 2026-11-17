@@ -774,6 +774,173 @@ test('a logical add_credits rejection returns 500 so a paid event is retried', a
   });
 });
 
+// --- Vision scan groups: up to 4 cut-list photos per project for one credit ---
+
+const GROUP = '99999999-8888-4777-8666-555555555555';
+const PIECES_OK = [{ name: 'Panneau', height: 230, width: 120, quantity: 2 }];
+
+/** A ledger whose scan-group functions answer as given; everything else as default. */
+function ledgerWith({ hasRoom = false, claim = null, opened = GROUP, balance = HEALTHY_BALANCE, debitBalance = 4 } = {}) {
+  return (name) => {
+    if (name === 'scan_group_has_room') return { data: hasRoom, error: null };
+    if (name === 'claim_scan_read') return { data: claim, error: null };
+    if (name === 'open_scan_group') return { data: opened, error: null };
+    if (name === 'ensure_profile') return { data: balance, error: null };
+    if (name === 'consume_credit') {
+      return balance > 0
+        ? { data: { success: true, balance: debitBalance }, error: null }
+        : { data: { success: false, balance: 0, error: 'INSUFFICIENT_CREDITS' }, error: null };
+    }
+    return defaultRpcResult(name);
+  };
+}
+
+async function runVision(body) {
+  const restore = stubFetch(upstreamOk(PIECES_OK));
+  try {
+    return await withEnv({ ...CONFIGURED, OPENROUTER_API_KEY: 'or_real' }, async () => {
+      const { POST } = loadTsModule('src/app/api/vision/route.ts');
+      const res = await POST(visionRequest(body));
+      return { res, body: await res.json() };
+    });
+  } finally {
+    restore();
+  }
+}
+
+test('a paid photo read opens a scan group of 4 reads', async () => {
+  resetState();
+  state.user = { id: UUID, email: 'artisan@example.ma' };
+  state.admin.rpcResult = ledgerWith();
+
+  const { res, body } = await runVision({ imageBase64: IMAGE });
+
+  assert.equal(res.status, 200);
+  assert.equal(body.creditsCharged, 1);
+  assert.equal(rpcCallsNamed('consume_credit').length, 1);
+  assert.deepEqual(rpcCallsNamed('open_scan_group').map((call) => call.args), [{ p_user_id: UUID }]);
+  assert.equal(body.scanGroup, GROUP);
+  assert.equal(body.scansLeft, 3);
+  assert.equal(typeof body.analysisPass, 'string');
+});
+
+test('a photo read inside a scan group with room costs nothing, even with an empty balance', async () => {
+  resetState();
+  state.user = { id: UUID, email: 'artisan@example.ma' };
+  state.admin.rpcResult = ledgerWith({ hasRoom: true, claim: 2, balance: 0 });
+
+  const { res, body } = await runVision({ imageBase64: IMAGE, scanGroup: GROUP });
+
+  assert.equal(res.status, 200);
+  assert.equal(body.pieces.length, 1);
+  assert.equal(body.creditsCharged, 0);
+  assert.equal(body.creditsRemaining, undefined, 'no debit, so no balance to report');
+  assert.equal(body.analysisPass, undefined, 'only a paid read opens the 24 h of free re-optimizations');
+  assert.equal(body.scanGroup, GROUP);
+  assert.equal(body.scansLeft, 2);
+  assert.equal(rpcCallsNamed('ensure_profile').length, 0, 'a covered read skips the balance check');
+  assert.equal(rpcCallsNamed('consume_credit').length, 0);
+  assert.equal(rpcCallsNamed('open_scan_group').length, 0);
+  assert.deepEqual(rpcCallsNamed('claim_scan_read').map((call) => call.args), [{ p_user_id: UUID, p_group_id: GROUP }]);
+});
+
+test('a read that loses the race for the last place in its group is charged instead', async () => {
+  resetState();
+  state.user = { id: UUID, email: 'artisan@example.ma' };
+  state.admin.rpcResult = ledgerWith({ hasRoom: true, claim: null });
+
+  const { res, body } = await runVision({ imageBase64: IMAGE, scanGroup: GROUP });
+
+  assert.equal(res.status, 200);
+  assert.equal(body.creditsCharged, 1);
+  assert.equal(rpcCallsNamed('consume_credit').length, 1);
+  assert.equal(rpcCallsNamed('open_scan_group').length, 1, 'the paid read opens a fresh group');
+  assert.equal(body.scansLeft, 3);
+});
+
+test('a lost race with an empty balance withholds the result, like any unpaid read', async () => {
+  resetState();
+  state.user = { id: UUID, email: 'artisan@example.ma' };
+  state.admin.rpcResult = ledgerWith({ hasRoom: true, claim: null, balance: 0 });
+
+  const { res, body } = await runVision({ imageBase64: IMAGE, scanGroup: GROUP });
+
+  assert.equal(res.status, 402);
+  assert.equal(body.error, 'INSUFFICIENT_CREDITS');
+  assert.equal(body.pieces, undefined);
+});
+
+test('a full or expired scan group means an ordinary paid read', async () => {
+  resetState();
+  state.user = { id: UUID, email: 'artisan@example.ma' };
+  state.admin.rpcResult = ledgerWith({ hasRoom: false });
+
+  const { res, body } = await runVision({ imageBase64: IMAGE, scanGroup: GROUP });
+
+  assert.equal(res.status, 200);
+  assert.equal(body.creditsCharged, 1);
+  assert.equal(rpcCallsNamed('ensure_profile').length, 1);
+  assert.equal(rpcCallsNamed('claim_scan_read').length, 0, 'no claim on a group without room');
+  assert.equal(rpcCallsNamed('consume_credit').length, 1);
+});
+
+test('a scan group id that is not a UUID is ignored, never sent to the ledger', async () => {
+  resetState();
+  state.user = { id: UUID, email: 'artisan@example.ma' };
+  state.admin.rpcResult = ledgerWith({ hasRoom: true, claim: 2 });
+
+  for (const scanGroup of ['not-a-uuid', 42, { id: GROUP }, "' OR 1=1 --"]) {
+    state.admin.rpcCalls = [];
+    // eslint-disable-next-line no-await-in-loop
+    const { res, body } = await runVision({ imageBase64: IMAGE, scanGroup });
+    assert.equal(res.status, 200, `${JSON.stringify(scanGroup)} must not be refused`);
+    assert.equal(body.creditsCharged, 1);
+    assert.equal(rpcCallsNamed('scan_group_has_room').length, 0);
+  }
+});
+
+test('before migration 018 runs, every photo read is charged as today and answered normally', async () => {
+  resetState();
+  state.user = { id: UUID, email: 'artisan@example.ma' };
+  const missing = { data: null, error: { message: 'Could not find the function public.scan_group_has_room in the schema cache' } };
+  state.admin.rpcResult = (name, args) =>
+    ['scan_group_has_room', 'claim_scan_read', 'open_scan_group'].includes(name)
+      ? missing
+      : ledgerWith()(name, args);
+
+  const first = await runVision({ imageBase64: IMAGE });
+  assert.equal(first.res.status, 200);
+  assert.equal(first.body.creditsCharged, 1);
+  assert.equal(first.body.scanGroup, undefined, 'no group could be opened');
+  assert.equal(first.body.scansLeft, undefined);
+
+  state.admin.rpcCalls = [];
+  const second = await runVision({ imageBase64: IMAGE, scanGroup: GROUP });
+  assert.equal(second.res.status, 200);
+  assert.equal(second.body.creditsCharged, 1);
+  assert.equal(rpcCallsNamed('consume_credit').length, 1);
+});
+
+test('an unreadable photo inside a scan group uses up neither a credit nor a read', async () => {
+  resetState();
+  state.user = { id: UUID, email: 'artisan@example.ma' };
+  state.admin.rpcResult = ledgerWith({ hasRoom: true, claim: 2 });
+  const restore = stubFetch(async () =>
+    new Response(JSON.stringify({ choices: [{ message: { content: 'je ne sais pas' } }] }), { status: 200 })
+  );
+  try {
+    await withEnv({ ...CONFIGURED, OPENROUTER_API_KEY: 'or_real' }, async () => {
+      const { POST } = loadTsModule('src/app/api/vision/route.ts');
+      const res = await POST(visionRequest({ imageBase64: IMAGE, scanGroup: GROUP }));
+      assert.equal(res.status, 422);
+      assert.equal(rpcCallsNamed('claim_scan_read').length, 0);
+      assert.equal(rpcCallsNamed('consume_credit').length, 0);
+    });
+  } finally {
+    restore();
+  }
+});
+
 test('Vision rejects remote image URLs before any model fetch', async () => {
   resetState();
   state.user = { id: UUID, email: 'artisan@example.ma' };
