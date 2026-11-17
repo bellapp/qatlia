@@ -10,8 +10,9 @@
  */
 
 import { MATERIAL_LABEL_KEYS } from '@/i18n/domain';
-import { sanitizePdfGeneratedAt, sanitizeProjectName, sanitizeScanThumb } from '@/lib/projects/history-metadata';
+import { sanitizePdfGeneratedAt, sanitizeProjectName } from '@/lib/projects/history-metadata';
 import { pickRestorableResult } from '@/lib/projects/restore';
+import { readScanSheets } from '@/lib/projects/scan-sheets';
 
 export interface HistoryRow {
   id: string;
@@ -23,8 +24,12 @@ export interface HistoryRow {
   pieceCount: number;
   sheetsUsed: number | null;
   wastePercentage: number | null;
+  /** The thumbnail of the first sheet. */
   scanThumb: string | null;
+  /** Whether the first sheet kept its full image. */
   hasFullScan: boolean;
+  /** Cut-list sheets the project was read from (0 for a list typed by hand). */
+  scanCount: number;
   pdfGeneratedAt: string | null;
   hasPlan: boolean;
   isCloud: boolean;
@@ -70,6 +75,7 @@ function countPieces(pieces: unknown): number {
 export function toHistoryRow(project: HistoryProject): HistoryRow {
   const options = isRecord(project.options_json) ? project.options_json : {};
   const result = isRecord(options.result) ? options.result : {};
+  const scans = readScanSheets(options);
 
   return {
     id: project.id,
@@ -81,8 +87,9 @@ export function toHistoryRow(project: HistoryProject): HistoryRow {
     pieceCount: countPieces(options.pieces),
     sheetsUsed: finiteOrNull(result.sheetsUsed),
     wastePercentage: finiteOrNull(result.wastePercentage),
-    scanThumb: sanitizeScanThumb(options.scanThumb) ?? null,
-    hasFullScan: typeof options.scanPath === 'string' && options.scanPath.length > 0,
+    scanThumb: scans[0]?.thumb ?? null,
+    hasFullScan: !!scans[0]?.path,
+    scanCount: scans.length,
     pdfGeneratedAt: sanitizePdfGeneratedAt(options.pdfGeneratedAt) ?? null,
     hasPlan: pickRestorableResult(options.result) !== null,
     isCloud: UUID_PATTERN.test(project.id),

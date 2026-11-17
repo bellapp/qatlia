@@ -11,7 +11,7 @@
  */
 
 import { CREDIT_PACKS, formatMAD } from '@/lib/billing/catalog';
-import { ANALYSIS_WINDOW_HOURS, SIGNUP_FREE_CREDITS, VISION_CREDIT_COST } from '@/lib/billing/policy';
+import { ANALYSIS_WINDOW_HOURS, MAX_SCANS_PER_ANALYSIS, SIGNUP_FREE_CREDITS, VISION_CREDIT_COST } from '@/lib/billing/policy';
 import { fr } from '@/i18n/messages/fr';
 import { supportWhatsAppUrl } from '@/lib/support';
 import type { HandoffMode } from '@/lib/whatsapp/config';
@@ -58,7 +58,7 @@ export function buildSystemPrompt(handoffMode: HandoffMode): string {
 FAITS (la seule source d'information que tu as le droit d'utiliser) :
 - ${fr.hero.subtitle}
 - ${SIGNUP_FREE_CREDITS} crédits gratuits à l’inscription.
-- ${VISION_CREDIT_COST} crédit par analyse complète (scan de la fiche de débit puis optimisation).
+- ${VISION_CREDIT_COST} crédit par analyse complète (scan de la fiche de débit puis optimisation). Une fiche trop longue pour une feuille peut être photographiée en ${MAX_SCANS_PER_ANALYSIS} photos au plus dans le même projet, pour le même crédit.
 - Les recalculs de la même liste sont gratuits pendant ${ANALYSIS_WINDOW_HOURS} h après l'analyse.
 - Les exports sont gratuits.
 - Packs de crédits :

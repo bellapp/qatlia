@@ -51,7 +51,7 @@ export const legalFr = {
         title: 'Les crédits',
         body:
           'Les crédits paient les analyses :\n' +
-          '- une analyse complète coûte {visionCost} crédit. Elle comprend le scan de la photo (ou, pour une liste saisie à la main, son premier calcul d’optimisation) et tous les recalculs de la liste pendant {windowHours} heures ;\n' +
+          '- une analyse complète coûte {visionCost} crédit. Elle comprend le scan de la fiche, jusqu’à {maxScans} photos si elle tient sur plusieurs feuilles (ou, pour une liste saisie à la main, son premier calcul d’optimisation), et tous les recalculs de la liste pendant {windowHours} heures ;\n' +
           '- les exports et les devis sont gratuits.\n\n' +
           'Chaque nouveau compte reçoit {freeCredits} crédits offerts. Une analyse qui échoue n’est pas décomptée.\n\n' +
           'Les crédits restent sur votre solde tant que votre compte est ouvert. Ils n’ont pas de valeur monétaire : ils ne sont ni échangeables contre de l’argent (hors remboursement prévu par notre politique), ni transférables à un autre compte.',

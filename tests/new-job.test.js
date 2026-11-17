@@ -69,8 +69,8 @@ test('a new job empties the pieces, the name, the scan and the plan', () => {
     "setProjectNameDraft('')",
     'setResult(null)',
     'setRestoredAt(null)',
-    'setPreviewImage(null)',
-    'setScanThumb(null)',
+    'setScanSheets([])',
+    'scanGroupRef.current = null',
     'scanKeeper.restore(null)',
     'setPdfGeneratedAt(null)',
   ]) {

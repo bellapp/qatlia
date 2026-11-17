@@ -262,11 +262,22 @@ export default async function ClientPage({ params }: { params: { id: string } })
                   {project.pdfGeneratedAt ? <span>PDF : {formatDateTime(project.pdfGeneratedAt)}</span> : null}
                   {project.hasQuotation ? <Badge className="bg-sky-500/15 text-sky-400 border-sky-500/30">Devis</Badge> : null}
                 </div>
-                {project.scanThumb ? (
+                {project.scanThumbs.length > 0 ? (
                   <details>
-                    <summary className="cursor-pointer text-[11px] text-amber-400">Voir la photo scannée</summary>
-                    {/* eslint-disable-next-line @next/next/no-img-element -- a stored data: URL, not an optimisable asset */}
-                    <img src={project.scanThumb} alt={`Photo scannée du projet ${project.name}`} className="mt-2 max-h-80 rounded-lg border border-white/10" />
+                    <summary className="cursor-pointer text-[11px] text-amber-400">
+                      {project.scanThumbs.length > 1 ? `Voir les ${project.scanThumbs.length} fiches scannées` : 'Voir la photo scannée'}
+                    </summary>
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      {project.scanThumbs.map((thumb, index) => (
+                        // eslint-disable-next-line @next/next/no-img-element -- a stored data: URL, not an optimisable asset
+                        <img
+                          key={index}
+                          src={thumb}
+                          alt={project.scanThumbs.length > 1 ? `Fiche ${index + 1} du projet ${project.name}` : `Photo scannée du projet ${project.name}`}
+                          className="max-h-80 max-w-full rounded-lg border border-white/10"
+                        />
+                      ))}
+                    </div>
                   </details>
                 ) : null}
               </li>

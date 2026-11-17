@@ -4,6 +4,7 @@ import { createClient } from '@/lib/supabase/server';
 import { createClient as createAdminClient } from '@supabase/supabase-js';
 import { getSupabaseAdminConfig } from '@/lib/billing/config';
 import { SCAN_BUCKET, isOwnScanPath } from '@/lib/projects/scan-image';
+import { readScanSheets } from '@/lib/projects/scan-sheets';
 
 /**
  * `GET /api/projects/[id]/scan` — a signed link, valid 5 minutes, to the scan
@@ -50,7 +51,8 @@ export async function GET(_req: Request, context: { params: { id: string } }) {
     if (!data) return NOT_FOUND();
 
     const optionsJson = data.options_json && typeof data.options_json === 'object' ? (data.options_json as Record<string, unknown>) : {};
-    const scanPath = optionsJson.scanPath;
+    // The first sheet's image: the old single scan, or sheet 1 of the list.
+    const scanPath = readScanSheets(optionsJson)[0]?.path;
     if (!isOwnScanPath(scanPath, user.id)) return NOT_FOUND();
 
     const adminConfig = getSupabaseAdminConfig();

@@ -247,6 +247,18 @@ export const fr = {
       analyzedCount: { one: '{count} cote extraite', many: '{count} cotes extraites' },
       processingTitle: 'Analyse en cours…',
       processingDesc: 'Extraction des dimensions et quantités',
+      addSheetTitle: 'Ajouter une fiche',
+      sheetsHint: 'Jusqu’à {max} fiches par analyse',
+      sheetsTitle: 'Fiches lues',
+      sheetLabel: 'Fiche {index}',
+      sheetOpenAria: 'Voir la fiche {index} en grand',
+      removeSheetAria: 'Retirer la fiche {index}',
+      removeSheetConfirm: 'Retirer la fiche {index} et ses pièces ?',
+      removeSheetYes: 'Retirer',
+      removeSheetNo: 'Annuler',
+      sheetsFull: '{max} fiches sur {max}. Retirez-en une ou commencez un nouveau débit.',
+      extraPhotosIgnored: 'Photos en trop ignorées : {max} fiches au plus par projet.',
+      signInFirstPhoto: 'Connectez-vous pour lire vos fiches. Seule la première photo est gardée.',
     },
     /** One entry per machine-readable code returned by /api/vision. */
     visionError: {
@@ -496,6 +508,8 @@ export const fr = {
       materialAria: 'Matériau : {material}',
       duplicateAria: 'Dupliquer {name}',
       duplicateTitle: 'Dupliquer la pièce',
+      sheetMark: 'F{index}',
+      sheetMarkTitle: 'Lue sur la fiche {index}',
     },
     edge: {
       left: 'Gauche',
@@ -747,7 +761,7 @@ export const fr = {
     // read from the billing catalog.
     headline: '{price} = {count} crédits',
     policy:
-      'Une analyse complète coûte 1 crédit : le scan photo et tous les recalculs de la fiche pendant 24 h. Tous les exports (PDF, DXF, JSON, PNG, devis) sont gratuits et illimités.',
+      'Une analyse complète coûte {cost} crédit : le scan de la fiche, jusqu’à {sheets} photos s’il faut plusieurs feuilles, et tous les recalculs pendant {hours} h. Tous les exports (PDF, DXF, JSON, PNG, devis) sont gratuits et illimités.',
     recommended: 'Recommandé',
     /** Dirham symbol as printed on the cards; identical in every locale. */
     currency: 'DH',
