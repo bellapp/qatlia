@@ -890,8 +890,7 @@ const commitPanelName = () => {
    * budget (a single sheet keeps the 600 px one it always had), and the path
    * of its kept image when its keeper knows it already.
    */
-  const scansForSave = async (): Promise<ScanSheet[]> => {
-    const sheets = scanSheetsRef.current;
+  const scansForSave = async (sheets: readonly ScreenSheet[]): Promise<ScanSheet[]> => {
     const budget = thumbBudgetFor(sheets.length);
     return Promise.all(
       sheets.map(async (sheet) => {
@@ -914,6 +913,9 @@ const commitPanelName = () => {
     // this save is itself the rewrite of a legacy record (pendingUnitMigration),
     // or a prior save already carried that historical origin forward.
     const persistedMigratedFromLegacyUnit = pendingUnitMigration || migratedFromLegacyUnit;
+    // The sheets read once: the payload and the image keepers line up by
+    // position, and the images are attached by position.
+    const sheetsAtSave = scanSheetsRef.current;
     // The name committed now, not the one this handler's render saw: the field
     // may have been left while the optimization was running.
     const committedName = projectNameRef.current.trim();
@@ -928,7 +930,7 @@ const commitPanelName = () => {
       // One entry per sheet, thumbnails within the project's budget, with the
       // paths already known (a reopened project, an earlier save); the images
       // of new sheets follow this save (see saveProjectToCloud).
-      scans: await scansForSave(),
+      scans: await scansForSave(sheetsAtSave),
       scanGroup: scanGroupRef.current,
       pdfGeneratedAt: overrides.pdfGeneratedAt || pdfGeneratedAt || undefined,
       sheets,
@@ -965,7 +967,7 @@ const commitPanelName = () => {
         data: { user },
       } = await supabase.auth.getUser();
       if (user) {
-        const saved = await saveProjectToCloud(payload, scanSheetsRef.current.map((sheet) => sheet.keeper), (url, init) => fetch(url, init));
+        const saved = await saveProjectToCloud(payload, sheetsAtSave.map((sheet) => sheet.keeper), (url, init) => fetch(url, init));
         // The project is saved without waiting for the scan image: a new scan's
         // image is sent afterwards and attached to it (`saved.scanAttached`,
         // never rejected); a refusal leaves the thumbnail only.

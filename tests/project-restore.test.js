@@ -292,9 +292,9 @@ test('the atelier wires the scan path: restored, reset by a new scan, sent after
   assert.match(scansForSave, /const path = sheet\.keeper\.knownPath\(\) \?\? undefined;/);
   const persist = page.slice(page.indexOf('const persistProject = async'), page.indexOf('const recordPdfGenerated'));
   // The save carries the path already known; the image itself never holds it up.
-  assert.match(persist, /buildPersistedProjectPayload\(\{[\s\S]*?scans: await scansForSave\(\),[\s\S]*?\}\)/);
+  assert.match(persist, /buildPersistedProjectPayload\(\{[\s\S]*?scans: await scansForSave\(sheetsAtSave\),[\s\S]*?\}\)/);
   // Only a signed-in save reaches the cloud, and so the image.
-  assert.match(persist, /if \(user\) \{\s*const saved = await saveProjectToCloud\(payload, scanSheetsRef\.current\.map\(\(sheet\) => sheet\.keeper\), \(url, init\) => fetch\(url, init\)\);/);
+  assert.match(persist, /if \(user\) \{\s*const saved = await saveProjectToCloud\(payload, sheetsAtSave\.map\(\(sheet\) => sheet\.keeper\), \(url, init\) => fetch\(url, init\)\);/);
   assert.equal(persist.match(/saveProjectToCloud\(/g).length, 1);
   assert.doesNotMatch(persist, /scanKeeper\.keep\(\)|\/api\/scans/);
 });
