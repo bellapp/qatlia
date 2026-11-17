@@ -67,6 +67,7 @@ import {
   isPanelPrice,
   type PanelPreset,
 } from '@/lib/panel-presets';
+import { STOCK_MATERIAL_VALUES } from '@/lib/panel-form';
 import { OptionsPanel } from '@/components/OptionsPanel';
 import { PiecesManager } from '@/components/PiecesManager';
 import { SheetTabs } from '@/components/SheetTabs';
@@ -168,12 +169,6 @@ const optionsWithoutStockOverride = (options: OptimizationOptions): Optimization
   return rest;
 };
 
-/**
- * The stock materials offered in the workshop's quick selector. These are the
- * stable `MaterialType` payload values — the optimizer, `/api/optimize` and every
- * saved project carry them verbatim; only their labels come from the catalog.
- */
-const STOCK_MATERIAL_VALUES: readonly MaterialType[] = ['mdf', 'aluminium', 'verre', 'contreplaques'];
 
 /**
  * Vision extraction returns raw, unverified numbers from a model response.

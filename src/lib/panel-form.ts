@@ -6,13 +6,21 @@
  * panel-presets-store.ts): a panel accepted here is one the store accepts and
  * the optimizer can cut. Pure module, no browser access.
  */
-import { MATERIAL_TYPE_VALUES } from '@/lib/cutting/binpacking';
+import { MATERIAL_TYPE_VALUES, type MaterialType } from '@/lib/cutting/binpacking';
 import { MAX_GEOMETRY } from '@/lib/cutting/optimize-schema';
 import { PRESET_COLOR_MAX_CHARS, type GrainOrientation } from '@/lib/panel-preset-rules';
 import { isPanelPrice, type NewPanelPreset, type PanelPreset } from '@/lib/panel-presets';
 import { fromCanonicalCm, parseDisplayInputToCanonical, type DisplayUnit } from '@/lib/units';
 
 export const PANEL_NAME_MAX_CHARS = 80;
+
+/**
+ * The stock materials offered when choosing a panel, in the atelier and on the
+ * panel page. These are the stable `MaterialType` payload values: the optimizer,
+ * `/api/optimize` and every saved project carry them verbatim; only their
+ * labels come from the catalog.
+ */
+export const STOCK_MATERIAL_VALUES: readonly MaterialType[] = ['mdf', 'aluminium', 'verre', 'contreplaques'];
 
 export interface PanelFormValues {
   name: string;
