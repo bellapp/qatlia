@@ -177,10 +177,7 @@ export const ar: Catalog = {
     },
     sidebar: {
       title: 'التحكم',
-      navOptimization: 'التحسين',
-      navMaterials: 'المواد',
       navQuotation: 'التسعير والعروض',
-      navCutSettings: 'إعدادات القطع',
       navHistory: 'سجل قوائم القطع',
     },
     project: {
@@ -281,7 +278,8 @@ export const ar: Catalog = {
       dismiss: 'تجاهل',
     },
     advanced: {
-      toggle: 'إعدادات القطع المتقدمة',
+      title: 'إعدادات القطع',
+      toggle: 'إعدادات أخرى',
     },
     optimize: {
       authRequired: 'سجّل الدخول لإجراء التحسين.',

@@ -11,7 +11,7 @@ const source = fs.readFileSync(path.resolve('src/app/(site)/atelier/page.tsx'), 
 
 /** The entries of the bar, from its first one to the machine figures at its end. */
 function navEntries() {
-  const start = source.indexOf('<a href="#plan-top"');
+  const start = source.indexOf("aria-label={t('atelier.sidebar.title')}");
   const end = source.indexOf('Machine setup figures', start);
   assert.ok(start > 0 && end > start, 'the atelier has its bar of entries');
   return source.slice(start, end);
@@ -22,9 +22,9 @@ test('the history entry is the last one of the bar', () => {
   const history = bar.indexOf('<Link href="/history"');
 
   assert.ok(history > 0, 'the bar leads to the history');
-  for (const entry of ['navOptimization', 'navMaterials', 'navQuotation', 'navCutSettings']) {
-    assert.ok(bar.indexOf(`atelier.sidebar.${entry}`) < history, `${entry} comes before the history`);
-  }
+  const quotation = bar.indexOf('atelier.sidebar.navQuotation');
+  assert.ok(quotation > 0 && quotation < history, 'the quotation comes before the history');
+  assert.equal(bar.indexOf('<button', history), -1, 'no entry follows the history');
 });
 
 test('the history entry says it lists the cut lists', () => {
