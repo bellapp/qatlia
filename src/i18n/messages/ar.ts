@@ -181,6 +181,7 @@ export const ar: Catalog = {
       navMaterials: 'المواد',
       navQuotation: 'التسعير والعروض',
       navCutSettings: 'إعدادات القطع',
+      navHistory: 'سجل قوائم القطع',
     },
     project: {
       nameBars: 'قضبان {material} — {count} قطعة',

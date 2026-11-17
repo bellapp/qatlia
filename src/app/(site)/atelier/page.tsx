@@ -1636,10 +1636,6 @@ const commitPanelName = () => {
                 <PackageOpen className="w-4 h-4" />
                 {t('atelier.sidebar.navMaterials')}
               </a>
-              <Link href="/history" className="inline-flex shrink-0 items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-bold transition-colors text-slate-600 dark:text-slate-300 hover:bg-studio-panel hover:text-slate-900 dark:hover:text-white">
-                <History className="w-4 h-4" />
-                {t('atelier.header.history')}
-              </Link>
               <button
                 type="button"
                 onClick={() => setIsQuotationDialogOpen(true)}
@@ -1662,6 +1658,11 @@ const commitPanelName = () => {
                 {t('atelier.sidebar.navCutSettings')}
               </button>
 
+              {/* Last: the only entry that leaves the atelier for another page. */}
+              <Link href="/history" className="inline-flex shrink-0 items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-bold transition-colors text-slate-600 dark:text-slate-300 hover:bg-studio-panel hover:text-slate-900 dark:hover:text-white">
+                <History className="w-4 h-4" />
+                {t('atelier.sidebar.navHistory')}
+              </Link>
               {/* Machine setup figures, pushed to the trailing edge. */}
               <div className="ms-auto flex shrink-0 items-center gap-2 ps-3">
                 <p className="hidden lg:block font-mono text-[10px] text-slate-500" dir="ltr">
