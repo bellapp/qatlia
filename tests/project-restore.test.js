@@ -474,7 +474,7 @@ test('the atelier scan preview is a button that opens the viewer', () => {
   const sheets = fs.readFileSync(path.resolve('src/components/ScanSheets.tsx'), 'utf8');
   assert.match(page, /<ScanSheets\b[\s\S]*?onOpen=\{openScanViewer\}/);
   assert.match(sheets, /data-testid=\{index === 0 \? 'atelier-scan-preview'/);
-  assert.match(sheets, /aria-label=\{t\('atelier\.scan\.sheetOpenAria', \{ index: number \}\)\}/);
+  assert.match(sheets, /aria-label=\{`\$\{t\('atelier\.scan\.sheetOpenAria', \{ index: number \}\)\}/);
   assert.match(page, /<ScanViewer\b/);
   // Sheet 1's full image is the keeper's, the others the image read on this page.
   assert.match(page, /localImage: first \? scanKeeper\.freshImage\(\) : sheet\.image \?\? null,/);
