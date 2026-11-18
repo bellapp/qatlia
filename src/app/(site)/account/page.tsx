@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { clearPendingWork } from '@/lib/pending-work';
+import { forgetAtelierDraft } from '@/lib/atelier-draft';
 import { ArrowLeft, ArrowRight, Coins, KeyRound, LogOut, Receipt, Shield, Zap } from 'lucide-react';
 import { AccountMenu } from '@/components/AccountMenu';
 import { QatlIALogo } from '@/components/QatlIALogo';
@@ -104,6 +105,7 @@ export default function AccountPage() {
     await supabase.auth.signOut();
     // Work kept for a sign-in must not wait for the next person on a shared computer.
     clearPendingWork(window.localStorage, window.sessionStorage);
+    forgetAtelierDraft(window.sessionStorage);
     router.push('/');
     router.refresh();
   };

@@ -30,6 +30,7 @@ export const fr = {
     historyShort: 'Historique',
     panels: 'Configuration des panneaux',
     panelsShort: 'Panneaux',
+    busy: 'Patientez : la lecture ou le calcul en cours serait perdu.',
   },
   language: {
     fr: 'français',
