@@ -289,3 +289,65 @@ test('only the first-contact greeting carries buttons', () => {
   assert.equal(run({ event: { kind: 'image', text: null } }).menu, undefined);
   assert.ok(run({ event: { kind: 'image', text: null }, contact: { greetedAt: null } }).menu);
 });
+
+// --- ad pre-filled messages ----------------------------------------------------
+
+const { isAdPrefill, resolveLang, AD_DEFAULT_LANG, REGREET_QUIET_MINUTES } = load('src/lib/whatsapp/router.ts');
+
+test('isAdPrefill: the ad referral, or one of the texts WhatsApp pre-fills', () => {
+  const ev = (text, referral = null, kind = 'text') => ({ kind, text, referral });
+  assert.equal(isAdPrefill(ev('salam', { source_type: 'ad' })), true);
+  assert.equal(isAdPrefill(ev('Bonjour ! Puis-je en savoir plus à ce sujet ?')), true);
+  assert.equal(isAdPrefill(ev('Hello! Can I get more info on this?')), true);
+  assert.equal(isAdPrefill(ev('مرحبًا! هل يمكنني الحصول على مزيد من المعلومات حول هذا؟')), true);
+  assert.equal(isAdPrefill(ev('Bonjour, combien ça coûte ?')), false);
+  assert.equal(isAdPrefill(ev('سلام')), false);
+  assert.equal(isAdPrefill(ev(null, null, 'image')), false);
+});
+
+test('resolveLang: an ad message sets darija on a first contact and keeps a known contact language', () => {
+  const prefill = { kind: 'text', text: 'Bonjour ! Puis-je en savoir plus à ce sujet ?', referral: null };
+  assert.equal(AD_DEFAULT_LANG, 'ar');
+  assert.equal(resolveLang(prefill, { lang: 'fr', greetedAt: null }), 'ar');
+  assert.equal(resolveLang(prefill, { lang: 'fr', greetedAt: NOW }), 'fr');
+  // Typed text is detected as before.
+  assert.equal(resolveLang({ kind: 'text', text: 'je veux les tarifs', referral: null }, { lang: 'ar', greetedAt: NOW }), 'fr');
+  assert.equal(resolveLang({ kind: 'text', text: '2', referral: null }, { lang: 'ar', greetedAt: NOW }), 'ar');
+});
+
+test('an ad message from a greeted contact gets the menu again, unless it is the tail of the first burst', () => {
+  const prefill = { text: 'Bonjour ! Puis-je en savoir plus à ce sujet ?', referral: { source_type: 'ad' } };
+  const later = run({ event: prefill, contact: { greetedAt: new Date(NOW.getTime() - 60 * 60 * 1000) } });
+  assert.deepEqual(later, {
+    action: 'send',
+    text: COPY.menuAgain,
+    markGreeted: false,
+    handoff: false,
+    menu: { buttons: MENU_BUTTONS, fallbackText: COPY.menuAgainPlain },
+  });
+  const sameBurst = run({
+    event: prefill,
+    contact: { greetedAt: new Date(NOW.getTime() - (REGREET_QUIET_MINUTES - 1) * 60 * 1000) },
+  });
+  assert.deepEqual(sameBurst, { action: 'silent' });
+  // A human who took over still keeps the bot quiet.
+  assert.deepEqual(
+    run({ event: prefill, contact: { greetedAt: null, handoffUntil: new Date(NOW.getTime() + 1000) } }),
+    { action: 'silent' },
+  );
+});
+
+test('the bot links are tagged for WhatsApp, and the darija texts open the Arabic site', () => {
+  const { SITE_LINKS, ATELIER_LINK } = load('src/lib/whatsapp/copy.ts');
+  assert.equal(SITE_LINKS.fr, 'https://qatlia.ma/?utm_source=whatsapp');
+  assert.equal(SITE_LINKS.ar, 'https://qatlia.ma/ar?utm_source=whatsapp');
+  assert.ok(COPY.greeting.includes(SITE_LINKS.fr) && COPY.greeting.includes(SITE_LINKS.ar));
+  assert.ok(COPY.pricing.ar.includes(SITE_LINKS.ar));
+  assert.ok(COPY.howItWorks.ar.includes(SITE_LINKS.ar));
+  // A photo is answered with the workshop, which opens without an account.
+  assert.ok(COPY.imageHint.fr.includes(ATELIER_LINK));
+  assert.ok(COPY.imageHint.ar.includes(ATELIER_LINK));
+  for (const text of [COPY.greeting, COPY.greetingPlain, COPY.pricing.fr, COPY.howItWorks.fr, COPY.imageHint.fr]) {
+    assert.ok(!/https:\/\/qatlia\.ma(?![/?])/.test(text) && !/qatlia\.ma\s/.test(text), 'no untagged site link');
+  }
+});

@@ -35,6 +35,7 @@ function resetState() {
     greetClaims: [],
     greetReleases: [],
     imageHintCount: 0,
+    recordFailedError: null,
     countCalls: [],
     updates: [],
     claims: [],
@@ -59,6 +60,7 @@ stubModule('@supabase/supabase-js', {
   },
 });
 stubModule('@/lib/whatsapp/store', {
+  SEND_FAILED_KIND: 'send_failed',
   WhatsAppTablesMissingError,
   upsertContact: async (db, input) => {
     assert.equal(db, DB);
@@ -78,6 +80,7 @@ stubModule('@/lib/whatsapp/store', {
     return state.claimResult(input);
   },
   recordOutbound: async (db, input) => {
+    if (input.kind === 'send_failed' && state.recordFailedError) throw state.recordFailedError;
     if (input.wamid && state.storedWamids.has(input.wamid)) return false;
     if (input.wamid) state.storedWamids.add(input.wamid);
     state.outbound.push(input);
@@ -500,7 +503,7 @@ test('in redirect mode the fallback carries the redirect text and no handoffUnti
   });
 });
 
-test('a failed send records nothing and leaves the contact un-greeted', async () => {
+test('a failed send is recorded as send_failed and leaves the contact un-greeted', async () => {
   resetState();
   state.sendResult = () => null;
   await withEnv(CONFIGURED, async () => {
@@ -511,8 +514,29 @@ test('a failed send records nothing and leaves the contact un-greeted', async ()
       state.sent.map((m) => m.body),
       [COPY.greeting, COPY.greetingPlain],
     );
-    assert.equal(state.outbound.length, 0);
+    // What the prospect never received stays visible in the log, without a wamid.
+    assert.deepEqual(state.outbound, [
+      { waId: WA_ID, wamid: null, direction: 'bot', kind: 'send_failed', body: COPY.greeting },
+      { waId: WA_ID, wamid: null, direction: 'bot', kind: 'send_failed', body: COPY.greetingPlain },
+    ]);
     assert.equal(state.updates.filter((u) => u.patch.greetedAt !== undefined).length, 0);
+  });
+});
+
+test('a failure to record a failed send does not stop the plain-text fallback', async () => {
+  resetState();
+  state.sendResult = (n) => (n === 1 ? null : 'wamid.PLAIN');
+  state.recordFailedError = new Error('db down');
+  await withEnv(CONFIGURED, async () => {
+    const res = await POST(signedPost(messagesPayload([textMessage('wamid.8b', WA_ID, 'salam')])));
+    assert.equal(res.status, 200);
+    assert.deepEqual(
+      state.sent.map((m) => m.body),
+      [COPY.greeting, COPY.greetingPlain],
+    );
+    assert.deepEqual(state.outbound, [
+      { waId: WA_ID, wamid: 'wamid.PLAIN', direction: 'bot', kind: 'fixed', body: COPY.greetingPlain },
+    ]);
   });
 });
 
@@ -705,7 +729,7 @@ test('a failed greeting send releases the claim so the next message can greet ag
     assert.equal(state.greetReleases[0].waId, WA_ID);
     assert.equal(state.greetReleases[0].at, state.greetClaims[0].at, 'releases exactly what it claimed');
     assert.equal(state.contacts.get(WA_ID).greetedAt, null);
-    assert.equal(state.outbound.length, 0);
+    assert.ok(state.outbound.every((o) => o.kind === 'send_failed' && o.wamid === null));
   });
 });
 
@@ -825,6 +849,7 @@ test('when the button greeting cannot be sent, the plain-text greeting goes inst
       ],
     );
     assert.deepEqual(state.outbound, [
+      { waId: WA_ID, wamid: null, direction: 'bot', kind: 'send_failed', body: COPY.greeting },
       { waId: WA_ID, wamid: 'wamid.PLAIN', direction: 'bot', kind: 'fixed', body: COPY.greetingPlain },
     ]);
     assert.equal(state.greetReleases.length, 0);
@@ -843,6 +868,69 @@ test('tapping a menu button answers like the typed digit, in the contact languag
     );
     assert.equal(state.claims[0].kind, 'text');
     assert.equal(state.claims[0].body, '1');
+    assert.equal(state.assistantCalls.length, 0);
+  });
+});
+
+// --- ad pre-filled messages ----------------------------------------------------
+// WhatsApp pre-fills the first message of an ad tap in the phone's language,
+// which says nothing about the person: the ad speaks darija.
+
+const adPrefill = (id, from, body = 'Bonjour ! Puis-je en savoir plus à ce sujet ?') =>
+  withReferral(textMessage(id, from, body));
+const langUpdates = () => state.updates.filter((u) => u.patch.lang !== undefined).map((u) => u.patch.lang);
+
+test('a first contact through the ad is answered in darija, whatever the pre-filled text language', async () => {
+  resetState();
+  await withEnv(CONFIGURED, async () => {
+    await POST(signedPost(messagesPayload([adPrefill('wamid.ad1', WA_ID)])));
+    assert.equal(state.sent[0].body, COPY.greeting);
+    assert.deepEqual(langUpdates(), ['ar']);
+
+    await POST(signedPost(messagesPayload([buttonTap('wamid.ad2', WA_ID, '2')])));
+    assert.equal(state.sent[1].body, COPY.pricing.ar);
+  });
+});
+
+test('a contact who types French after the ad greeting gets French', async () => {
+  resetState();
+  await withEnv(CONFIGURED, async () => {
+    await POST(signedPost(messagesPayload([adPrefill('wamid.ad3', WA_ID)])));
+    await POST(signedPost(messagesPayload([textMessage('wamid.ad4', WA_ID, 'je veux les tarifs svp')])));
+    assert.deepEqual(langUpdates(), ['ar', 'fr']);
+  });
+});
+
+test('a contact greeted earlier who comes back through the ad gets the menu again, not the assistant', async () => {
+  resetState();
+  state.contacts.set(WA_ID, {
+    waId: WA_ID,
+    lang: 'fr',
+    greetedAt: new Date(Date.now() - 2 * 60 * 60 * 1000),
+    handoffUntil: null,
+  });
+  state.assistantResult = () => ({ reply: 'Bonjour ! QatliA vous permet…', handoff: false });
+  await withEnv(CONFIGURED, async () => {
+    await POST(signedPost(messagesPayload([adPrefill('wamid.ad5', WA_ID)])));
+    assert.equal(state.assistantCalls.length, 0);
+    assert.deepEqual(
+      state.sent.map((m) => [m.body, m.buttons]),
+      [[COPY.menuAgain, MENU_BUTTONS]],
+    );
+    // A known contact keeps its language.
+    assert.deepEqual(langUpdates(), []);
+    assert.equal(state.greetClaims.length, 0);
+  });
+});
+
+test('the pre-filled text that loses the greeting race gets no answer of its own', async () => {
+  resetState();
+  // Another delivery of the same burst (a typed "salam") already greeted the contact.
+  state.greetingWon = () => false;
+  state.assistantResult = () => ({ reply: 'Bonjour ! QatliA vous permet…', handoff: false });
+  await withEnv(CONFIGURED, async () => {
+    await POST(signedPost(messagesPayload([adPrefill('wamid.ad6', WA_ID)])));
+    assert.equal(state.sent.length, 0);
     assert.equal(state.assistantCalls.length, 0);
   });
 });

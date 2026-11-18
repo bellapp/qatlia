@@ -121,6 +121,8 @@ function loadAuthErrorMapper() {
     // Not a stub: the sign-up grant quoted in the modal must be the real
     // SIGNUP_FREE_CREDITS, so a drift between policy and copy fails here.
     '@/lib/billing/policy': loadTsModule(path.join(PROJECT_ROOT, 'src/lib/billing/policy.ts')),
+    // Pure module (the sign-up source tags), loaded for real.
+    '@/lib/acquisition': loadTsModule(path.join(PROJECT_ROOT, 'src/lib/acquisition.ts')),
   };
   const mod = new Module.Module(AUTH_MODAL_PATH, module);
   mod.filename = AUTH_MODAL_PATH;

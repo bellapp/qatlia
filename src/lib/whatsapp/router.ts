@@ -43,6 +43,48 @@ export function detectLang(text: string | null, previous: Lang): Lang {
   return previous;
 }
 
+/**
+ * The texts WhatsApp pre-fills when someone taps a Click-to-WhatsApp ad. They
+ * follow the language of the phone, not the person's: a darija speaker with a
+ * French phone sends the French one.
+ */
+const AD_PREFILLS: readonly RegExp[] = [
+  /^\s*Bonjour\s*!\s*Puis-je en savoir plus/i,
+  /^\s*Hello!?\s*Can I get more info/i,
+  /^\s*مرحب[اًا]*!?\s*هل يمكنني الحصول على مزيد من المعلومات/,
+];
+
+/** The message came from tapping the ad: it carries the ad referral, or is one of WhatsApp's pre-filled texts. */
+export function isAdPrefill(event: Pick<InboundEvent, 'kind' | 'text' | 'referral'>): boolean {
+  if (event.referral !== null) return true;
+  if (event.kind !== 'text' || !event.text) return false;
+  const text = event.text;
+  return AD_PREFILLS.some((prefill) => prefill.test(text));
+}
+
+/** The ad speaks darija, so a first contact through it is answered in darija until they write in French. */
+export const AD_DEFAULT_LANG: Lang = 'ar';
+
+/**
+ * The language to answer in. A pre-filled ad message says nothing about the
+ * person (see AD_PREFILLS): it sets the ad's language on a first contact and
+ * leaves a known contact's language alone. Anything typed is detected.
+ */
+export function resolveLang(
+  event: Pick<InboundEvent, 'kind' | 'text' | 'referral'>,
+  contact: Pick<ContactState, 'lang' | 'greetedAt'>,
+): Lang {
+  if (isAdPrefill(event)) return contact.greetedAt === null ? AD_DEFAULT_LANG : contact.lang;
+  return detectLang(event.text, contact.lang);
+}
+
+/**
+ * An ad message from a contact greeted less than this long ago is the tail of
+ * the first burst (WhatsApp delivers the pre-filled text and a typed "salam"
+ * together), not a new visit: it gets no answer of its own.
+ */
+export const REGREET_QUIET_MINUTES = 10;
+
 // A single digit 1-3 (Latin or Arabic-Indic), optionally in a keycap emoji or
 // followed by "." or ")". Nothing else counts as a menu choice.
 const MENU_CHOICE = /^\s*([1-3١-٣])️?⃣?\s*[.)]?\s*$/;
@@ -109,16 +151,29 @@ export function decide(input: {
     };
   }
 
-  // 5. Photos are read in the workshop, not by the bot.
+  // 5. Back through the ad: the menu again rather than a presentation written by the assistant.
+  if (isAdPrefill(event)) {
+    const quietUntil = contact.greetedAt.getTime() + REGREET_QUIET_MINUTES * 60 * 1000;
+    if (now.getTime() < quietUntil) return { action: 'silent' };
+    return {
+      action: 'send',
+      text: COPY.menuAgain,
+      markGreeted: false,
+      handoff: false,
+      menu: { buttons: MENU_BUTTONS, fallbackText: COPY.menuAgainPlain },
+    };
+  }
+
+  // 6. Photos are read in the workshop, not by the bot.
   if (event.kind === 'image') return reply(COPY.imageHint[lang], false);
 
-  // 6. Media the bot cannot read.
+  // 7. Media the bot cannot read.
   if (HANDOFF_MEDIA_KINDS.has(event.kind)) return toAdvisor(COPY.mediaHandoff[lang], false);
 
   if (event.kind === 'text') {
-    // 7. Daily assistant cap.
+    // 8. Daily assistant cap.
     if (assistantRepliesLast24h >= MAX_ASSISTANT_REPLIES_PER_DAY) return toAdvisor(COPY.advisor[lang], false);
-    // 8. Free text goes to the assistant.
+    // 9. Free text goes to the assistant.
     return { action: 'assistant' };
   }
 

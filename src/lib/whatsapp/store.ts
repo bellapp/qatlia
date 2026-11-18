@@ -15,6 +15,12 @@ const CONTACTS = 'whatsapp_contacts';
 const MESSAGES = 'whatsapp_messages';
 const CONTACT_COLUMNS = 'wa_id, profile_name, lang, greeted_at, handoff_until, referral';
 
+/**
+ * `kind` of a bot row whose send failed even after the retry: the text the
+ * prospect never received, kept so a silent conversation can be explained.
+ */
+export const SEND_FAILED_KIND = 'send_failed';
+
 /** Postgres unique violation. */
 const UNIQUE_VIOLATION = '23505';
 
@@ -197,7 +203,8 @@ export async function updateContact(
 
 /**
  * The last `limit` text messages of the conversation, oldest first, leaving
- * out `excludeWamid` (the inbound message being answered, already stored).
+ * out `excludeWamid` (the inbound message being answered, already stored) and
+ * the sends that failed (the prospect never saw them).
  *
  * The exclusion is done here rather than with a `neq` filter: `wamid <> x` is
  * NULL for rows without a wamid (bot messages whose send was not acknowledged)
@@ -211,17 +218,25 @@ export async function recentHistory(
 ): Promise<HistoryItem[]> {
   const { data, error } = await db
     .from(MESSAGES)
-    .select('direction, body, wamid')
+    .select('direction, body, wamid, kind')
     .eq('wa_id', waId)
     .order('created_at', { ascending: false })
     .order('id', { ascending: false })
-    // One spare row, in case the excluded message is among the newest.
-    .limit(limit + 1);
+    // A few spare rows, for the excluded message and failed sends among the newest.
+    .limit(limit + 4);
   if (error) raise(error, 'read history');
 
-  const rows = (data ?? []) as Array<{ direction: HistoryItem['direction']; body: string | null; wamid: string | null }>;
+  const rows = (data ?? []) as Array<{
+    direction: HistoryItem['direction'];
+    body: string | null;
+    wamid: string | null;
+    kind: string | null;
+  }>;
   return rows
-    .filter((row) => row.body && (excludeWamid === undefined || row.wamid !== excludeWamid))
+    .filter(
+      (row) =>
+        row.body && row.kind !== SEND_FAILED_KIND && (excludeWamid === undefined || row.wamid !== excludeWamid),
+    )
     .slice(0, limit)
     .reverse()
     .map((row) => ({ direction: row.direction, body: row.body as string }));

@@ -150,6 +150,9 @@ export interface ClientIdentity {
   signedUpAt: string | null;
   lastSignInAt: string | null;
   bannedUntil: string | null;
+  /** Source of the tagged visit before sign-up (e.g. "whatsapp"), see src/lib/acquisition.ts. */
+  signupSource: string | null;
+  signupCampaign: string | null;
 }
 
 export interface ClientDetail {
@@ -288,6 +291,8 @@ export async function getClientDetail(db: SupabaseClient, userId: string): Promi
         signedUpAt: str(user.created_at),
         lastSignInAt: str(user.last_sign_in_at),
         bannedUntil: str((user as { banned_until?: unknown }).banned_until),
+        signupSource: str(userMeta.signup_source),
+        signupCampaign: str(userMeta.signup_campaign),
       },
       balance,
       summary: summarizeLedger(ledgerRows, balance),

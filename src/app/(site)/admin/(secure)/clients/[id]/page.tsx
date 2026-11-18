@@ -106,6 +106,11 @@ export default async function ClientPage({ params }: { params: { id: string } })
           <Field label="Connexion">{identity.provider ? PROVIDER_LABELS[identity.provider] ?? identity.provider : '—'}</Field>
           <Field label="Email confirmé">{identity.emailConfirmedAt ? formatDate(identity.emailConfirmedAt) : 'Non'}</Field>
           <Field label="Inscrit le">{formatDateTime(identity.signedUpAt)}</Field>
+          <Field label="Provenance">
+            {identity.signupSource
+              ? `${identity.signupSource}${identity.signupCampaign ? ` · ${identity.signupCampaign}` : ''}`
+              : '—'}
+          </Field>
           <Field label="Dernière connexion">
             {formatDateTime(identity.lastSignInAt)}
             {identity.lastSignInAt ? <span className="text-slate-500"> ({formatRelativeDays(identity.lastSignInAt, now)})</span> : null}

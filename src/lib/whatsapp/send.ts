@@ -9,15 +9,35 @@
  * Never throws: the caller is a webhook that must answer 200 whatever happens.
  * Failures are logged with the HTTP status, the error name or a provider error
  * code only, never a token, an API key nor a response body.
+ *
+ * A send is tried a second time when the first one surely did not go out (the
+ * connection failed, or the provider answered 429 or 503). A timeout, a 500,
+ * 502 or 504 is not retried: the message may have left, and the prospect
+ * would get it twice.
  */
 
 import type { WhatsAppConfig, YCloudConfig } from '@/lib/whatsapp/config';
 import type { MenuButton } from '@/lib/whatsapp/copy';
 
 const SEND_TIMEOUT_MS = 10000;
+export const SEND_RETRY_DELAY_MS = 500;
 const YCLOUD_SEND_URL = 'https://api.ycloud.com/v2/whatsapp/messages/sendDirectly';
 
 type Message = { body: string; buttons?: readonly MenuButton[] };
+
+/** One attempt: the message id, or whether trying again is safe. */
+type Attempt = { id: string } | { id: null; retry: boolean };
+
+const sent = (id: string): Attempt => ({ id });
+const failed = (retry: boolean): Attempt => ({ id: null, retry });
+
+/**
+ * Too many requests, or the provider unavailable: it did not take the message.
+ * Other 5xx (often a gateway timeout) may come after the message was accepted.
+ */
+function retryableStatus(status: number): boolean {
+  return status === 429 || status === 503;
+}
 
 /** The type-specific part of a send request. Both APIs share the interactive shape; only the link preview flag differs. */
 function content(message: Message, previewKey: 'preview_url' | 'previewUrl'): Record<string, unknown> {
@@ -34,10 +54,11 @@ function content(message: Message, previewKey: 'preview_url' | 'previewUrl'): Re
   };
 }
 
-function logFailure(error: unknown): null {
+/** A thrown fetch: a connection failure is safe to retry, a timeout or an abort is not. */
+function logFailure(error: unknown): Attempt {
   const reason = error instanceof Error ? error.name : 'unknown error';
   console.error(`[whatsapp] send failed (${reason})`);
-  return null;
+  return failed(reason !== 'TimeoutError' && reason !== 'AbortError');
 }
 
 async function sendViaMeta(
@@ -45,7 +66,7 @@ async function sendViaMeta(
   to: string,
   message: Message,
   fetchImpl: typeof fetch,
-): Promise<string | null> {
+): Promise<Attempt> {
   const url = `https://graph.facebook.com/${config.graphVersion}/${config.phoneNumberId}/messages`;
   try {
     const res = await fetchImpl(url, {
@@ -65,16 +86,16 @@ async function sendViaMeta(
 
     if (!res.ok) {
       console.error(`[whatsapp] send failed (HTTP ${res.status})`);
-      return null;
+      return failed(retryableStatus(res.status));
     }
 
     const json = (await res.json()) as { messages?: Array<{ id?: unknown }> };
     const id = json?.messages?.[0]?.id;
     if (typeof id !== 'string' || !id) {
       console.error('[whatsapp] send failed (no message id in the response)');
-      return null;
+      return failed(false);
     }
-    return id;
+    return sent(id);
   } catch (error) {
     return logFailure(error);
   }
@@ -85,7 +106,7 @@ async function sendViaYCloud(
   to: string,
   message: Message,
   fetchImpl: typeof fetch,
-): Promise<string | null> {
+): Promise<Attempt> {
   try {
     const res = await fetchImpl(YCLOUD_SEND_URL, {
       method: 'POST',
@@ -103,30 +124,38 @@ async function sendViaYCloud(
 
     if (!res.ok) {
       console.error(`[whatsapp] send failed (YCloud HTTP ${res.status})`);
-      return null;
+      return failed(retryableStatus(res.status));
     }
 
     const json = (await res.json()) as { id?: unknown; wamid?: unknown; status?: unknown; errorCode?: unknown };
     if (json?.status === 'failed') {
       const code = typeof json.errorCode === 'string' || typeof json.errorCode === 'number' ? String(json.errorCode) : 'unknown';
       console.error(`[whatsapp] send failed (YCloud error ${code.slice(0, 40)})`);
-      return null;
+      return failed(false);
     }
     // The WhatsApp id lets the store recognise this message; the YCloud id is a
     // unique stand-in when WhatsApp has not assigned one yet.
-    if (typeof json?.wamid === 'string' && json.wamid) return json.wamid;
-    if (typeof json?.id === 'string' && json.id) return `ycloud:${json.id}`;
+    if (typeof json?.wamid === 'string' && json.wamid) return sent(json.wamid);
+    if (typeof json?.id === 'string' && json.id) return sent(`ycloud:${json.id}`);
     console.error('[whatsapp] send failed (no message id in the YCloud response)');
-    return null;
+    return failed(false);
   } catch (error) {
     return logFailure(error);
   }
 }
 
-function send(config: WhatsAppConfig, to: string, message: Message, fetchImpl: typeof fetch): Promise<string | null> {
+function attempt(config: WhatsAppConfig, to: string, message: Message, fetchImpl: typeof fetch): Promise<Attempt> {
   return config.ycloud
     ? sendViaYCloud(config.ycloud, to, message, fetchImpl)
     : sendViaMeta(config, to, message, fetchImpl);
+}
+
+async function send(config: WhatsAppConfig, to: string, message: Message, fetchImpl: typeof fetch): Promise<string | null> {
+  const first = await attempt(config, to, message, fetchImpl);
+  if (first.id !== null) return first.id;
+  if (!first.retry) return null;
+  await new Promise((resolve) => setTimeout(resolve, SEND_RETRY_DELAY_MS));
+  return (await attempt(config, to, message, fetchImpl)).id;
 }
 
 /** Returns the id of the sent message, or `null` on any failure. */
