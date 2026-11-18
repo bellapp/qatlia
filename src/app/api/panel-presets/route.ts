@@ -178,7 +178,13 @@ async function copyCatalogOnce(db: SupabaseClient, user: User, existing: Account
     const missing = missingCatalogPanels(existing, currency, MAX_PRESETS_PER_USER - existing.length);
     let list = existing;
     if (missing.length > 0) {
-      const rows = missing.map((preset) => toPresetRow(user.id, preset as Parameters<typeof toPresetRow>[1]));
+      // One millisecond apart: rows inserted together would share one now(),
+      // and the list, ordered by creation, would come back shuffled.
+      const start = Date.now();
+      const rows = missing.map((preset, index) => ({
+        ...toPresetRow(user.id, preset as Parameters<typeof toPresetRow>[1]),
+        created_at: new Date(start + index).toISOString(),
+      }));
       let { data, error } = await db.from('panel_presets').insert(rows).select(PRESET_COLUMNS);
       if (error && isMissingColumnError(error)) {
         // Migration 015 not applied yet: the panels are copied, without their price.
@@ -225,15 +231,15 @@ type AccountPreset = ReturnType<typeof toAccountPreset>;
 async function withoutTwins(db: SupabaseClient, userId: string, created: AccountPreset[], fallback: AccountPreset[]): Promise<AccountPreset[]> {
   const { data, error } = await selectUserPresets(db, userId);
   if (error) return fallback;
-  const rows = ((data || []) as unknown as PanelPresetRow[])
-    .slice()
-    .sort((a, b) => (a.created_at ?? '').localeCompare(b.created_at ?? '') || a.id.localeCompare(b.id));
-  const kept: AccountPreset[] = [];
+  const rows = (data || []) as unknown as PanelPresetRow[];
+  // Earliest first, ties broken by id, so that every read picks the same twins.
+  const byAge = rows.slice().sort((a, b) => (a.created_at ?? '').localeCompare(b.created_at ?? '') || a.id.localeCompare(b.id));
+  const earlier: AccountPreset[] = [];
   const twins: string[] = [];
-  for (const preset of rows.map(toAccountPreset)) {
+  for (const preset of byAge.map(toAccountPreset)) {
     const fromCatalogue = PANEL_CATALOG.some((entry) => entry.name === preset.name);
-    if (fromCatalogue && findDuplicatePreset(preset, kept)) twins.push(preset.id);
-    else kept.push(preset);
+    if (fromCatalogue && findDuplicatePreset(preset, earlier)) twins.push(preset.id);
+    else earlier.push(preset);
   }
   const mine = new Set(created.map((preset) => preset.id));
   const ownTwins = twins.filter((id) => mine.has(id));
@@ -241,5 +247,6 @@ async function withoutTwins(db: SupabaseClient, userId: string, created: Account
     const { error: deleteError } = await db.from('panel_presets').delete().in('id', ownTwins).eq('user_id', userId);
     if (deleteError) console.error('panel catalogue twins removal failed:', deleteError.message);
   }
-  return kept;
+  // The list in its usual order, without the twins.
+  return rows.map(toAccountPreset).filter((preset) => !twins.includes(preset.id));
 }

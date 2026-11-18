@@ -158,3 +158,13 @@ test('a device holding only the untouched catalogue sends nothing, and is marked
   assert.equal(calls.length, 0);
   assert.ok(values.get('qatlia-panel-presets-imported:user-2'));
 });
+
+test('the catalogue as the device copy stored it is not sent at sign-in', async () => {
+  deviceList([]);
+  presets().copyCatalogToDeviceOnce('EUR');
+  const calls = answer(200, { success: true, created: [], duplicates: [], invalid: 0 });
+
+  await presets().importDevicePresetsOnce('user-3');
+
+  assert.equal(calls.length, 0);
+});

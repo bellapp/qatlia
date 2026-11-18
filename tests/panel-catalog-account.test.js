@@ -24,12 +24,19 @@ function resetState() {
   state.meanwhile = null;
 }
 
+/** Ids in no particular order, like gen_random_uuid(). */
+function randomId() {
+  const n = (state.nextId++ * 2654435761) % 4294967296;
+  return `${n.toString(16).padStart(8, '0')}-0000-4000-8000-000000000000`;
+}
+
 const MISSING_COLUMN = { code: '42703', message: 'column panel_presets.price_per_sheet does not exist' };
 
 function table() {
   const filters = [];
   let action = { kind: 'select' };
   let columns = '';
+  let ordered = false;
   const run = () => {
     const touchesPrice = columns.includes('price_per_sheet') || (action.rows || []).some((r) => 'price_per_sheet' in r);
     if (state.priceColumnMissing && touchesPrice) return { data: null, error: MISSING_COLUMN };
@@ -41,11 +48,13 @@ function table() {
     }
     if (action.kind === 'insert') {
       if (state.insertFails) return { data: null, error: { code: '500', message: 'insert failed' } };
-      const created = action.rows.map((r) => ({ id: `00000000-0000-4000-8000-${String(state.nextId++).padStart(12, '0')}`, created_at: '2026-11-18T10:00:00Z', ...r }));
+      const created = action.rows.map((r) => ({ id: randomId(), created_at: '2026-11-18T10:00:00.000Z', ...r }));
       state.rows.push(...created);
       return { data: created, error: null };
     }
-    return { data: state.rows.filter(matches), error: null };
+    // Ordered by creation only, like selectUserPresets: rows created together keep no order of their own.
+    const found = state.rows.filter(matches);
+    return { data: ordered ? [...found].sort((a, b) => a.created_at.localeCompare(b.created_at) || b.id.localeCompare(a.id)) : found, error: null };
   };
   const matches = (r) => filters.every(([c, v, op]) => (op === 'in' ? v.includes(r[c]) : r[c] === v));
   const query = {
@@ -53,7 +62,7 @@ function table() {
     eq: (c, v) => (filters.push([c, v]), query),
     in: (c, v) => (filters.push([c, v, 'in']), query),
     delete: () => ((action = { kind: 'delete' }), query),
-    order: () => query,
+    order: () => ((ordered = true), query),
     insert: (rows) => ((action = { kind: 'insert', rows }), query),
     then: (resolve, reject) => Promise.resolve(run()).then(resolve, reject),
   };
@@ -88,7 +97,7 @@ const { MAX_PRESETS_PER_USER } = loadTsModule('src/lib/panel-presets-store.ts');
 const get = async () => (await listRoute().GET(new Request('https://qatlia.example/api/panel-presets'))).json();
 
 const own = (extra = {}) => ({
-  id: `own-${state.nextId++}`, user_id: UUID, name: 'Mon MDF', height: 244, width: 122, material: 'mdf', color: null, has_grain: false, grain_orientation: null, price_per_sheet: null, created_at: '2026-11-01T10:00:00Z', ...extra,
+  id: `own-${state.nextId++}`, user_id: UUID, name: 'Mon MDF', height: 244, width: 122, material: 'mdf', color: null, has_grain: false, grain_orientation: null, price_per_sheet: null, created_at: '2020-01-01T10:00:00.000Z', ...extra,
 });
 
 test('the first read of a list copies the catalogue into it, and says it is done', async () => {
@@ -227,4 +236,19 @@ test('a read only ever removes the copies it made itself', async () => {
   assert.equal(state.rows.filter((r) => r.name === '031 Blanc lisse 18 mm').length, 1);
   assert.equal(state.rows.length, PANEL_CATALOG.length);
   assert.deepEqual(body.presets.map((p) => p.id).sort(), state.rows.map((r) => r.id).sort());
+});
+
+// Advisor review, 2026-11-18: rows inserted together share one now(), and
+// the list is ordered by creation only, so the catalogue came back shuffled.
+
+test('the catalogue keeps its own order, on the first read and on every read after', async () => {
+  resetState();
+
+  const first = await get();
+  state.user.app_metadata.panel_catalog = 1;
+  const again = await get();
+
+  const names = PANEL_CATALOG.map((p) => p.name);
+  assert.deepEqual(first.presets.map((p) => p.name), names);
+  assert.deepEqual(again.presets.map((p) => p.name), names);
 });
