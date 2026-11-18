@@ -10,7 +10,10 @@
  */
 import { useCallback, useEffect, useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
+import { useCurrency } from '@/components/currency-store';
 import {
+  DEVICE_PRESET_CAP,
+  copyCatalogToDeviceOnce,
   createAccountPresets,
   deleteAccountPreset,
   deletePreset,
@@ -39,14 +42,12 @@ export interface PanelPresetsState {
   remove(id: string): Promise<boolean>;
 }
 
-/** The device list's own cap (see savePreset): past it, a new panel is refused, never an old one dropped. */
-const DEVICE_PRESET_CAP = 40;
-
 export function usePanelPresets(): PanelPresetsState {
   const [presets, setPresets] = useState<PanelPreset[]>([]);
   const [source, setSource] = useState<'device' | 'account'>('device');
   const [signedIn, setSignedIn] = useState(false);
   const [ready, setReady] = useState(false);
+  const { currency } = useCurrency();
 
   useEffect(() => {
     let cancelled = false;
@@ -74,6 +75,14 @@ export function usePanelPresets(): PanelPresetsState {
       cancelled = true;
     };
   }, []);
+
+  // Signed out, the catalogue is copied into the device list once, in the
+  // currency shown (unknown until the currency store answers). Signed in, the
+  // account copy is the server's (GET /api/panel-presets).
+  useEffect(() => {
+    if (!ready || signedIn || !currency) return;
+    if (copyCatalogToDeviceOnce(currency)) setPresets(loadSavedPresets());
+  }, [ready, signedIn, currency]);
 
   const add = useCallback(async (preset: NewPanelPreset): Promise<PresetWriteResult> => {
     const duplicate = findDuplicatePreset(preset, presets);

@@ -187,7 +187,7 @@ export const fr = {
    */
   materials: {
     mdf: 'MDF / Bois',
-    melamine: 'Mélaminé Blanc',
+    melamine: 'Mélaminé',
     chene: 'Chêne Massif',
     contreplaques: 'Contreplaqué',
     stratifie: 'Stratifié',
@@ -288,7 +288,6 @@ export const fr = {
       unitGroupAria: 'Unité d’affichage du projet',
       presetAria: 'Choisir un panneau prédéfini',
       presetPlaceholder: 'Panneaux prédéfinis…',
-      presetBuiltIn: 'Tailles standards',
       presetSaved: 'Mes panneaux sauvegardés',
       savePreset: 'Sauvegarder',
       savePresetAria: 'Sauvegarder le panneau actuel comme préréglage',
@@ -852,7 +851,7 @@ export const fr = {
     subtitle: 'La liste des panneaux avec lesquels vous travaillez. Vous les retrouvez dans l’atelier, au moment de choisir le panneau d’un débit.',
     addTitle: 'Ajouter un panneau',
     editTitle: 'Modifier « {name} »',
-    standardSizes: 'Tailles standards',
+    standardSizes: 'Catalogue QatliA',
     standardSizeAria: 'Préremplir avec {name}',
     addSubmit: 'Ajouter à ma liste',
     save: 'Enregistrer',

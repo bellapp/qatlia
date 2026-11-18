@@ -93,3 +93,40 @@ test('an account that cannot be reached, or answers anything else, is a failure'
     assert.deepEqual(await presets().updateAccountPreset('cloud-1', attributes(OAK)), { ok: false, error: 'FAILED' }, String(status));
   }
 });
+
+// The panel catalogue on a device without an account (owner request,
+// 2026-11-18): copied once into the device list, never again after.
+
+const catalog = () => loadTsModule('src/lib/panel-catalog.ts');
+
+test('a device list gets the catalogue once, priced in the currency shown', () => {
+  deviceList([WHITE]);
+
+  assert.equal(presets().copyCatalogToDeviceOnce('MAD'), true);
+  const stored = JSON.parse(values.get('qatlia-panel-presets'));
+  assert.equal(stored.length, 1 + catalog().PANEL_CATALOG.length);
+  assert.equal(stored[0].id, 'p-1', 'the artisan’s own panels first, untouched');
+  assert.equal(stored[1].name, '031 Blanc lisse 18 mm');
+  assert.equal(stored[1].pricePerSheet, 530);
+  assert.ok(stored.slice(1).every((p) => p.id.startsWith('p-') && !p.builtIn), 'panels of the artisan, ready to change');
+});
+
+test('a device list that had the catalogue never gets it back', () => {
+  deviceList([]);
+  presets().copyCatalogToDeviceOnce('MAD');
+  values.set('qatlia-panel-presets', '[]');
+
+  assert.equal(presets().copyCatalogToDeviceOnce('MAD'), false);
+  assert.equal(values.get('qatlia-panel-presets'), '[]');
+});
+
+test('the device copy skips what is there and stays within the device cap', () => {
+  const many = Array.from({ length: 35 }, (_, i) => ({ id: `p-${i}`, name: `P${i}`, height: 100 + i, width: 50, material: 'mdf' }));
+  deviceList(many);
+
+  presets().copyCatalogToDeviceOnce('EUR');
+
+  const stored = JSON.parse(values.get('qatlia-panel-presets'));
+  assert.equal(stored.length, 40);
+  assert.equal(stored[35].pricePerSheet, 49.07, 'euros for a euro visitor');
+});

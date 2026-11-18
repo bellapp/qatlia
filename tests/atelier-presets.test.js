@@ -94,3 +94,18 @@ test('each refusal says its own reason', () => {
   assert.match(save, /saved\.error === 'DUPLICATE'\s*\? t\('atelier\.stock\.presetDuplicate', \{ name: saved\.existingName \?\? '' \}\)/);
   assert.match(save, /t\(saved\.error === 'LIMIT' \? 'atelier\.stock\.presetLimit' : 'atelier\.stock\.presetSaveFailed'\)/);
 });
+
+// Owner request, 2026-11-18: the standard sizes are no longer a fixed group of
+// their own. The catalogue is copied into the artisan's list, and the picker
+// shows that list only.
+
+test('the panel picker shows the artisan’s list only', () => {
+  const card = stockCard();
+
+  assert.equal(atelier.includes('BUILT_IN_PRESETS'), false);
+  assert.equal(card.includes('presetBuiltIn'), false, 'no standard sizes group');
+  assert.match(atelier, /const allPresets = savedPresets;/);
+  for (const locale of ['fr', 'en', 'ar']) {
+    assert.equal(read(`src/i18n/messages/${locale}.ts`).includes('presetBuiltIn'), false, locale);
+  }
+});

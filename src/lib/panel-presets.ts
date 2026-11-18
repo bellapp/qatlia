@@ -1,7 +1,8 @@
 'use client';
 
 /**
- * Panel presets: predefined stock panels plus artisan-saved ones.
+ * Panel presets: the stock panels the artisan works with. The catalogue they
+ * start from is copied into their list (see ./panel-catalog).
  *
  * A signed-in artisan's presets live in their account (`/api/panel-presets`,
  * table `panel_presets`), so they follow them to any device. An anonymous
@@ -13,6 +14,8 @@
  */
 
 import { findDuplicatePreset, type GrainOrientation, type PanelPresetAttributes } from './panel-preset-rules';
+import { PANEL_CATALOG_VERSION, missingCatalogPanels } from './panel-catalog';
+import type { AppCurrency } from './currency';
 
 export { findDuplicatePreset };
 
@@ -31,17 +34,12 @@ export interface PanelPreset extends PanelPresetAttributes {
 export type NewPanelPreset = Omit<PanelPreset, 'id' | 'builtIn'>;
 
 const STORAGE_KEY = 'qatlia-panel-presets';
+/** Set once the panel catalogue was copied into this device's list. */
+const CATALOG_COPIED_KEY = `qatlia-panel-catalog-v${PANEL_CATALOG_VERSION}`;
+/** The device list's cap: keeps localStorage tiny and the dropdown usable. */
+export const DEVICE_PRESET_CAP = 40;
 /** Set once a user's device presets have been copied into their account. */
 const IMPORTED_KEY_PREFIX = 'qatlia-panel-presets-imported:';
-
-/** Common Moroccan workshop stock sizes (cm) — editable, not authoritative. */
-export const BUILT_IN_PRESETS: PanelPreset[] = [
-  { id: 'bi-244x122', name: 'Grand panneau 244 × 122', height: 244, width: 122, material: 'mdf', builtIn: true },
-  { id: 'bi-210x100', name: 'Panneau 210 × 100', height: 210, width: 100, material: 'mdf', builtIn: true },
-  { id: 'bi-200x100', name: 'Panneau 200 × 100', height: 200, width: 100, material: 'mdf', builtIn: true },
-  { id: 'bi-183x122', name: 'Contreplaqué 183 × 122', height: 183, width: 122, material: 'contreplaques', builtIn: true },
-  { id: 'bi-122x61', name: 'Demi-panneau 122 × 61', height: 122, width: 61, material: 'mdf', builtIn: true },
-];
 
 /** The attributes worth storing, without blanks: an empty colour is no colour,
  *  and a direction only exists on a grained panel. */
@@ -96,9 +94,32 @@ export function savePreset(preset: NewPanelPreset): PanelPreset {
     builtIn: false,
   };
   saved.push(entry);
-  // Soft cap: 40 user presets keeps localStorage tiny and the dropdown usable.
-  window.localStorage.setItem(STORAGE_KEY, JSON.stringify(saved.slice(-40)));
+  window.localStorage.setItem(STORAGE_KEY, JSON.stringify(saved.slice(-DEVICE_PRESET_CAP)));
   return entry;
+}
+
+/**
+ * Copies the panel catalogue (./panel-catalog) into this device's list once:
+ * the panels not there yet, within the device cap, priced in `currency`.
+ * True when panels were added. A device that had it never gets it back,
+ * whatever was removed since. Never throws.
+ */
+export function copyCatalogToDeviceOnce(currency: AppCurrency): boolean {
+  if (typeof window === 'undefined') return false;
+  try {
+    if (window.localStorage.getItem(CATALOG_COPIED_KEY)) return false;
+    const saved = loadSavedPresets();
+    const added: PanelPreset[] = missingCatalogPanels(saved, currency, DEVICE_PRESET_CAP - saved.length).map((preset, index) => ({
+      ...cleanPreset(preset),
+      id: `p-${Date.now()}-${index}-${Math.floor(Math.random() * 1e4)}`,
+      builtIn: false,
+    }));
+    window.localStorage.setItem(STORAGE_KEY, JSON.stringify([...saved, ...added]));
+    window.localStorage.setItem(CATALOG_COPIED_KEY, '1');
+    return added.length > 0;
+  } catch {
+    return false;
+  }
 }
 
 export type PresetUpdateResult =

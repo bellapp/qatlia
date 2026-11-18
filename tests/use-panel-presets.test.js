@@ -53,3 +53,13 @@ test('every write goes to the account or to the device, as the list was read', (
 test('the device list refuses a panel past its cap instead of dropping the oldest', () => {
   assert.match(body('add'), /loadSavedPresets\(\)\.length >= DEVICE_PRESET_CAP/);
 });
+
+// Owner request, 2026-11-18: signed out, the catalogue is copied into the
+// device list, in the currency shown, once the session is known to be absent.
+
+test('signed out, the catalogue is copied once into the device list', () => {
+  assert.match(source, /const \{ currency \} = useCurrency\(\);/);
+  assert.match(source, /if \(!ready \|\| signedIn \|\| !currency\) return;/);
+  assert.match(source, /if \(copyCatalogToDeviceOnce\(currency\)\) setPresets\(loadSavedPresets\(\)\);/);
+  assert.match(source, /\}, \[ready, signedIn, currency\]\);/);
+});

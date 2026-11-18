@@ -124,15 +124,17 @@ test('a material the stock list does not offer still shows on a panel that has i
   assert.match(renderForm({ initial: { ...EMPTY_PANEL_FORM, material: 'melamine' } }), /<option value="melamine" selected="">/);
 });
 
-test('the standard sizes are offered as shortcuts when adding', () => {
-  const { BUILT_IN_PRESETS } = loadTsModule('src/lib/panel-presets.ts');
-  const html = renderForm({ shortcuts: BUILT_IN_PRESETS });
+test('the catalogue panels are offered as shortcuts when adding, by name', () => {
+  const { catalogPresetsFor } = loadTsModule('src/lib/panel-catalog.ts');
+  const catalogue = catalogPresetsFor('MAD');
+  const html = renderForm({ shortcuts: catalogue });
 
-  assert.match(html, />Tailles standards</);
-  for (const preset of BUILT_IN_PRESETS) {
+  assert.match(html, />Catalogue QatliA</);
+  for (const preset of catalogue) {
     assert.ok(html.includes(`aria-label="Préremplir avec ${preset.name}"`), preset.name);
+    assert.ok(html.includes(`>${preset.name}</span>`), `${preset.name} named on its button`);
   }
-  assert.equal(renderForm().includes('Tailles standards'), false, 'none when editing');
+  assert.equal(renderForm().includes('Catalogue QatliA'), false, 'none when editing');
 });
 
 test('a refusal from the list is said in the form', () => {
@@ -149,7 +151,8 @@ test('the page shows the shared bar, the list hook and the unit the artisan chos
   assert.match(page, /usePanelPresets\(\)/);
   assert.match(page, /readStoredDisplayUnit\(window\.localStorage\)/);
   assert.match(page, /writeStoredDisplayUnit\(window\.localStorage, /);
-  assert.match(page, /shortcuts=\{BUILT_IN_PRESETS\}/);
+  assert.match(page, /shortcuts=\{catalogPresetsFor\(currency\)\}/);
+  assert.equal(page.includes('BUILT_IN_PRESETS'), false);
 });
 
 test('removing a panel asks a second click, which expires', () => {
@@ -171,7 +174,7 @@ test('the panel page is kept out of search engines', () => {
 test('the atelier and the page offer the same stock materials', () => {
   const { STOCK_MATERIAL_VALUES } = loadTsModule('src/lib/panel-form.ts');
 
-  assert.deepEqual([...STOCK_MATERIAL_VALUES], ['mdf', 'aluminium', 'verre', 'contreplaques']);
+  assert.deepEqual([...STOCK_MATERIAL_VALUES], ['mdf', 'melamine', 'aluminium', 'verre', 'contreplaques'], 'the catalogue’s melamine among them');
   const atelier = read('src/app/(site)/atelier/page.tsx');
   assert.equal(atelier.includes("const STOCK_MATERIAL_VALUES"), false, 'one list, shared');
   assert.match(atelier, /import \{[^}]*STOCK_MATERIAL_VALUES[^}]*\} from '@\/lib\/panel-form';/);
@@ -236,4 +239,12 @@ test('what happened is said on screen, where the artisan is looking', () => {
 
 test('a whole-panel edit that fails unexpectedly still answers as the route does', () => {
   assert.match(read('src/app/api/panel-presets/[id]/route.ts'), /return await updateWholePreset\(user\.id, id, raw\);/);
+});
+
+test('melamine is called melamine, whatever its colour', () => {
+  assert.equal(translate('fr', 'materials.melamine'), 'Mélaminé');
+  assert.equal(translate('en', 'materials.melamine'), 'Melamine');
+  assert.equal(translate('ar', 'materials.melamine'), 'ميلامين');
+  const { getMaterialDef } = loadTsModule('src/lib/cutting/binpacking.ts');
+  assert.equal(getMaterialDef('melamine').label, 'Mélaminé', 'in the PDF too');
 });

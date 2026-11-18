@@ -53,7 +53,6 @@ import {
 } from '@/lib/edge-prices';
 import { PIECE_COLOR_PALETTE, getResolvedPieceColor } from '@/lib/pieces/catalog';
 import {
-  BUILT_IN_PRESETS,
   isPanelPrice,
   type PanelPreset,
 } from '@/lib/panel-presets';
@@ -344,7 +343,7 @@ export default function Dashboard() {
   const { presets: savedPresets, add: addPreset, ready: presetsReady, signedIn: presetsSignedIn, source: presetsSource } = usePanelPresets();
   const [isSavingPreset, setIsSavingPreset] = useState(false);
 
-  const allPresets = [...BUILT_IN_PRESETS, ...savedPresets];
+  const allPresets = savedPresets;
 
   // The artisan's one price per metre of edge banding: in the account when
   // signed in (migration 015), on the device otherwise. Null: each colour
@@ -2064,13 +2063,8 @@ const commitPanelName = () => {
                     onChange={(e) => {
                       const preset = allPresets.find((p) => p.id === e.target.value);
                       if (!preset) return;
-                      // A saved panel brings its grain back; a standard size
-                      // leaves the current grain setting alone.
-                      const grain = preset.builtIn
-                        ? {}
-                        : { hasGrain: !!preset.hasGrain, grainOrientation: preset.hasGrain ? preset.grainOrientation ?? 'vertical' : undefined };
-                      // A saved panel also brings its colour and its price; a
-                      // standard size has no price of its own (catalog price).
+                      // A saved panel brings its grain, its colour and its price back.
+                      const grain = { hasGrain: !!preset.hasGrain, grainOrientation: preset.hasGrain ? preset.grainOrientation ?? 'vertical' : undefined };
                       const { pricePerSheet: _previousPrice, ...withoutPrice } = activeSheet;
                       void _previousPrice;
                       const nextSheet: Sheet = {
@@ -2079,7 +2073,7 @@ const commitPanelName = () => {
                         width: preset.width,
                         material: (preset.material as MaterialType) || activeSheet.material,
                         ...grain,
-                        ...(preset.builtIn ? {} : { color: preset.color || undefined }),
+                        color: preset.color || undefined,
                         ...(isPanelPrice(preset.pricePerSheet) ? { pricePerSheet: preset.pricePerSheet } : {}),
                       };
                       setSheets([nextSheet]);
@@ -2089,11 +2083,6 @@ const commitPanelName = () => {
                     className="w-full appearance-none bg-studio-field border border-studio-border hover:border-studio-border-hover rounded-lg py-2 ps-8 pe-3 text-xs font-semibold text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-brand-500/50 cursor-pointer transition-colors [&>option]:bg-white [&>option]:text-slate-900 dark:[&>option]:bg-slate-900 dark:[&>option]:text-slate-100"
                   >
                     <option value="" disabled>{t('atelier.stock.presetPlaceholder')}</option>
-                    <optgroup label={t('atelier.stock.presetBuiltIn')}>
-                      {BUILT_IN_PRESETS.map((p) => (
-                        <option key={p.id} value={p.id}>{p.name}</option>
-                      ))}
-                    </optgroup>
                     {savedPresets.length > 0 && (
                       <optgroup label={t('atelier.stock.presetSaved')}>
                         {savedPresets.map((p) => {
