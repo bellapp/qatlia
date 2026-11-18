@@ -54,3 +54,21 @@ export function findDuplicatePreset<T extends PanelPresetAttributes>(
 ): T | undefined {
   return saved.find((candidate) => isSamePanel(candidate, preset));
 }
+
+/** Highest panel price the account store keeps (same bound as isPanelPrice). */
+const MAX_PANEL_PRICE = 1_000_000;
+
+/**
+ * The new price of the saved panel in use, when the panel page gave it one
+ * the panel in use does not have; null otherwise. The atelier offers it, and
+ * the artisan decides: a price they typed on purpose is never replaced alone.
+ */
+export function savedPriceChange(
+  inUse: PanelPresetAttributes & { pricePerSheet?: number | null },
+  saved: readonly (PanelPresetAttributes & { name: string; pricePerSheet?: unknown })[],
+): { name: string; price: number } | null {
+  const panel = findDuplicatePreset(inUse, saved);
+  const price = panel?.pricePerSheet;
+  if (!panel || typeof price !== 'number' || !Number.isFinite(price) || price < 0 || price > MAX_PANEL_PRICE) return null;
+  return price === inUse.pricePerSheet ? null : { name: panel.name, price };
+}

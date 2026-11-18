@@ -58,6 +58,7 @@ import {
   type PanelPreset,
 } from '@/lib/panel-presets';
 import { STOCK_MATERIAL_VALUES } from '@/lib/panel-form';
+import { savedPriceChange } from '@/lib/panel-preset-rules';
 import { usePanelPresets } from '@/lib/use-panel-presets';
 import { OptionsPanel } from '@/components/OptionsPanel';
 import { PiecesManager } from '@/components/PiecesManager';
@@ -514,6 +515,22 @@ const commitPanelName = () => {
     const { pricePerSheet: _previous, ...rest } = activeSheet;
     void _previous;
     const nextSheet: Sheet = parsed === null ? rest : { ...rest, pricePerSheet: parsed };
+    setSheets([nextSheet]);
+    repriceResult({ sheet: nextSheet });
+  };
+
+  // A saved panel whose price changed on the panel page while this one was in
+  // use: its new price is offered under the price field, never applied alone.
+  // Only once the list in use is read: until then the device list stands in
+  // for the account one, and its prices may be other ones.
+  const savedPrice = cutMode === '2d' && presetsReady ? savedPriceChange(activeSheet, savedPresets) : null;
+  const savedPriceKey = savedPrice ? `${savedPrice.name}:${savedPrice.price}:${activeSheet.pricePerSheet ?? ''}` : null;
+  // « Garder le prix actuel » hides the offer until a price changes again.
+  const [keptPriceKey, setKeptPriceKey] = useState<string | null>(null);
+
+  const applySavedPrice = () => {
+    if (!savedPrice) return;
+    const nextSheet: Sheet = { ...activeSheet, pricePerSheet: savedPrice.price };
     setSheets([nextSheet]);
     repriceResult({ sheet: nextSheet });
   };
@@ -2180,6 +2197,30 @@ const commitPanelName = () => {
                   </div>
                 )}
               </div>
+
+              {savedPrice && keptPriceKey !== savedPriceKey ? (
+                <div role="status" className="mx-4 mb-2 flex flex-wrap items-center gap-x-3 gap-y-1.5 px-3 py-2 rounded-lg bg-brand-400/10 border border-brand-500/25 text-[11px] font-semibold text-slate-700 dark:text-slate-200">
+                  <span dir="auto" className="min-w-0">
+                    {t('atelier.stock.savedPriceChanged', { name: savedPrice.name, price: n(savedPrice.price) })}
+                  </span>
+                  <span className="flex flex-wrap items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={applySavedPrice}
+                      className="min-h-9 px-3 rounded-lg bg-brand-400 hover:bg-brand-500 text-slate-950 font-bold transition-colors"
+                    >
+                      {t('atelier.stock.applySavedPrice')}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setKeptPriceKey(savedPriceKey)}
+                      className="min-h-9 px-3 rounded-lg border border-studio-border bg-studio-panel hover:bg-studio-field font-bold text-slate-700 dark:text-slate-300 transition-colors"
+                    >
+                      {t('atelier.stock.keepPrice')}
+                    </button>
+                  </span>
+                </div>
+              ) : null}
 
               {presetFeedback && (
                 <div role="status" className={`mx-4 mb-2 px-3 py-2 rounded-lg text-[11px] font-semibold ${presetFeedback.tone === 'success' ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-300' : 'bg-amber-500/10 text-amber-600 dark:text-amber-300'}`}>
