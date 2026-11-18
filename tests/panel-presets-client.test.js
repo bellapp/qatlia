@@ -130,3 +130,31 @@ test('the device copy skips what is there and stays within the device cap', () =
   assert.equal(stored.length, 40);
   assert.equal(stored[35].pricePerSheet, 49.07, 'euros for a euro visitor');
 });
+
+// Review, 2026-11-18: signing in after a visit without an account. The device
+// import does not send the catalogue panels the visitor left as they were: a
+// new account gets them from the server copy anyway, and an account that had
+// removed some must not get them back from a new phone. A catalogue panel the
+// visitor changed (name, price…) is theirs, and is sent.
+
+test('the device import leaves out the catalogue panels left untouched, in any currency', async () => {
+  const [white, grey] = catalog().catalogPresetsFor('MAD');
+  const [, , anthracite] = catalog().catalogPresetsFor('EUR');
+  const mine = { ...white, id: 'p-10', name: 'Blanc atelier', pricePerSheet: 500 };
+  deviceList([WHITE, mine, { ...grey, id: 'p-11', builtIn: false }, { ...anthracite, id: 'p-12', builtIn: false }]);
+  const calls = answer(200, { success: true, created: [], duplicates: [], invalid: 0 });
+
+  assert.equal(await presets().importDevicePresetsOnce('user-1'), true);
+
+  assert.deepEqual(JSON.parse(calls[0].init.body).presets.map((p) => p.name), ['MDF blanc', 'Blanc atelier']);
+  assert.ok(values.get('qatlia-panel-presets-imported:user-1'), 'marked as imported');
+});
+
+test('a device holding only the untouched catalogue sends nothing, and is marked as imported', async () => {
+  deviceList(catalog().catalogPresetsFor('MAD').map((p, i) => ({ ...p, id: `p-${i}`, builtIn: false })));
+  const calls = answer(200, { success: true, created: [], duplicates: [], invalid: 0 });
+
+  assert.equal(await presets().importDevicePresetsOnce('user-2'), false);
+  assert.equal(calls.length, 0);
+  assert.ok(values.get('qatlia-panel-presets-imported:user-2'));
+});

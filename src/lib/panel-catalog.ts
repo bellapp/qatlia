@@ -12,7 +12,7 @@
  * Pure module, no browser access: shared by the account route and the device
  * list.
  */
-import { catalogPriceIn, type AppCurrency } from '@/lib/currency';
+import { APP_CURRENCIES, catalogPriceIn, type AppCurrency } from '@/lib/currency';
 import { findDuplicatePreset, type PanelPresetAttributes } from '@/lib/panel-preset-rules';
 import type { NewPanelPreset, PanelPreset } from '@/lib/panel-presets';
 
@@ -74,4 +74,18 @@ export function missingCatalogPanels(existing: readonly PanelPresetAttributes[],
       void _builtIn;
       return preset;
     });
+}
+
+/**
+ * True for a panel still exactly as the catalogue gave it: same panel, same
+ * name, and the catalogue price in one of the currencies. A panel the
+ * artisan changed in any way is theirs.
+ */
+export function isUntouchedCatalogPanel(preset: PanelPresetAttributes & { name: string; pricePerSheet?: number | null }): boolean {
+  return PANEL_CATALOG.some(
+    (entry) =>
+      entry.name === preset.name &&
+      !!findDuplicatePreset(preset, [entry]) &&
+      APP_CURRENCIES.some((currency) => catalogPriceIn(entry.priceMad, currency) === preset.pricePerSheet)
+  );
 }

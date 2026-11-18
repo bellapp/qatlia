@@ -20,6 +20,8 @@ function resetState() {
   state.flagThrows = false;
   state.flagCalls = [];
   state.nextId = 1;
+  state.deleted = [];
+  state.meanwhile = null;
 }
 
 const MISSING_COLUMN = { code: '42703', message: 'column panel_presets.price_per_sheet does not exist' };
@@ -31,17 +33,26 @@ function table() {
   const run = () => {
     const touchesPrice = columns.includes('price_per_sheet') || (action.rows || []).some((r) => 'price_per_sheet' in r);
     if (state.priceColumnMissing && touchesPrice) return { data: null, error: MISSING_COLUMN };
+    if (action.kind === 'delete') {
+      const gone = state.rows.filter(matches);
+      state.rows = state.rows.filter((r) => !matches(r));
+      state.deleted.push(...gone.map((r) => r.id));
+      return { data: gone, error: null };
+    }
     if (action.kind === 'insert') {
       if (state.insertFails) return { data: null, error: { code: '500', message: 'insert failed' } };
       const created = action.rows.map((r) => ({ id: `00000000-0000-4000-8000-${String(state.nextId++).padStart(12, '0')}`, created_at: '2026-11-18T10:00:00Z', ...r }));
       state.rows.push(...created);
       return { data: created, error: null };
     }
-    return { data: state.rows.filter((r) => filters.every(([c, v]) => r[c] === v)), error: null };
+    return { data: state.rows.filter(matches), error: null };
   };
+  const matches = (r) => filters.every(([c, v, op]) => (op === 'in' ? v.includes(r[c]) : r[c] === v));
   const query = {
     select: (cols = '') => ((columns = cols), query),
     eq: (c, v) => (filters.push([c, v]), query),
+    in: (c, v) => (filters.push([c, v, 'in']), query),
+    delete: () => ((action = { kind: 'delete' }), query),
     order: () => query,
     insert: (rows) => ((action = { kind: 'insert', rows }), query),
     then: (resolve, reject) => Promise.resolve(run()).then(resolve, reject),
@@ -66,7 +77,8 @@ stubModule('@supabase/supabase-js', {
     },
   }),
 });
-stubModule('@/lib/currency-server', { resolveRequestCurrency: async () => state.currency });
+// Runs between the read of the list and the copy: another read copying meanwhile.
+stubModule('@/lib/currency-server', { resolveRequestCurrency: async () => (state.meanwhile?.(), state.currency) });
 process.env.NEXT_PUBLIC_SUPABASE_URL = 'https://real.supabase.co';
 process.env.SUPABASE_SERVICE_ROLE_KEY = 'sbsvc_real';
 
@@ -91,7 +103,7 @@ test('the first read of a list copies the catalogue into it, and says it is done
     id: body.presets[1].id, name: '031 Blanc lisse 18 mm', height: 280, width: 207, material: 'melamine', color: 'Blanc lisse / Polaire', pricePerSheet: 530,
   });
   assert.ok(state.rows.every((r) => r.user_id === UUID));
-  assert.deepEqual(state.flagCalls, [[UUID, { app_metadata: { provider: 'google', providers: ['google'], panel_catalog: 1 } }]], 'what the account held stays');
+  assert.deepEqual(state.flagCalls, [[UUID, { app_metadata: { panel_catalog: 1 } }]], 'only the flag: the auth server merges it into what the account holds');
 });
 
 test('a panel the artisan already has is not copied twice', async () => {
@@ -182,4 +194,37 @@ test('a copy whose marking throws still answers the copied panels', async () => 
   const body = await get();
 
   assert.equal(body.presets.length, PANEL_CATALOG.length);
+});
+
+// Review, 2026-11-18: two first reads at once (two tabs, or the panel page
+// opened while the atelier still loads) both find the account unmarked and
+// both copy the catalogue. Each then removes the copies it made that another
+// read made first, and answers the list without the twins.
+
+test('two first reads at once leave one copy of each catalogue panel', async () => {
+  resetState();
+
+  const [a, b] = await Promise.all([get(), get()]);
+
+  const names = state.rows.map((r) => r.name);
+  assert.equal(names.length, PANEL_CATALOG.length);
+  assert.equal(new Set(names).size, PANEL_CATALOG.length);
+  const kept = new Set(state.rows.map((r) => r.id));
+  for (const body of [a, b]) {
+    assert.equal(body.presets.length, PANEL_CATALOG.length);
+    assert.ok(body.presets.every((p) => kept.has(p.id)), 'no removed twin answered');
+  }
+});
+
+test('a read only ever removes the copies it made itself', async () => {
+  resetState();
+  const other = own({ name: '031 Blanc lisse 18 mm', height: 280, width: 207, material: 'melamine', color: 'Blanc lisse / Polaire', price_per_sheet: 530 });
+  state.meanwhile = () => state.rows.push(other);
+
+  const body = await get();
+
+  assert.ok(state.rows.some((r) => r.id === other.id), 'the copy another read made first stays');
+  assert.equal(state.rows.filter((r) => r.name === '031 Blanc lisse 18 mm').length, 1);
+  assert.equal(state.rows.length, PANEL_CATALOG.length);
+  assert.deepEqual(body.presets.map((p) => p.id).sort(), state.rows.map((r) => r.id).sort());
 });

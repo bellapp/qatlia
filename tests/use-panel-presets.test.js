@@ -63,3 +63,18 @@ test('signed out, the catalogue is copied once into the device list', () => {
   assert.match(source, /if \(copyCatalogToDeviceOnce\(currency\)\) setPresets\(loadSavedPresets\(\)\);/);
   assert.match(source, /\}, \[ready, signedIn, currency\]\);/);
 });
+
+// Review, 2026-11-18: the first read of an account copies the catalogue into
+// it. The device's own panels are sent before that read, so the copy skips
+// the ones the visitor already had (their names and prices stay) and only
+// fills the room left in the account.
+
+test('signed in, the device list is sent before the account is first read', () => {
+  const load = source.slice(source.indexOf('setSignedIn(true);'), source.indexOf("setSource('account');"));
+  const sent = load.indexOf('await importDevicePresetsOnce(user.id)');
+  const read = load.indexOf('await fetchAccountPresets()');
+
+  assert.ok(sent > 0 && read > 0);
+  assert.ok(sent < read, 'import first');
+  assert.equal(load.split('fetchAccountPresets()').length - 1, 1, 'one read');
+});

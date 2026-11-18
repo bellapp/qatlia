@@ -14,7 +14,7 @@
  */
 
 import { findDuplicatePreset, type GrainOrientation, type PanelPresetAttributes } from './panel-preset-rules';
-import { PANEL_CATALOG_VERSION, missingCatalogPanels } from './panel-catalog';
+import { PANEL_CATALOG_VERSION, isUntouchedCatalogPanel, missingCatalogPanels } from './panel-catalog';
 import type { AppCurrency } from './currency';
 
 export { findDuplicatePreset };
@@ -224,6 +224,11 @@ export async function deleteAccountPreset(id: string): Promise<boolean> {
  * while the account store was unavailable are still copied later. The device
  * copy is never deleted; the server's duplicate check absorbs any overlap
  * (another device, a second run).
+ *
+ * Catalogue panels left as the catalogue gave them are not sent: the account
+ * has its own copy of the catalogue (GET /api/panel-presets), and one that
+ * removed some must not get them back from a new device. True when panels
+ * were sent.
  */
 export async function importDevicePresetsOnce(userId: string): Promise<boolean> {
   if (typeof window === 'undefined') return false;
@@ -233,7 +238,7 @@ export async function importDevicePresetsOnce(userId: string): Promise<boolean> 
   } catch {
     return false;
   }
-  const device = loadSavedPresets();
+  const device = loadSavedPresets().filter((preset) => !isUntouchedCatalogPanel(preset));
   if (device.length > 0) {
     const result = await createAccountPresets(device.map(cleanPreset));
     if (!result.ok) return false;

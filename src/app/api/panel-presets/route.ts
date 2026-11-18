@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { createClient } from '@/lib/supabase/server';
 import type { SupabaseClient, User } from '@supabase/supabase-js';
 import { findDuplicatePreset } from '@/lib/panel-preset-rules';
-import { PANEL_CATALOG_VERSION, missingCatalogPanels } from '@/lib/panel-catalog';
+import { PANEL_CATALOG, PANEL_CATALOG_VERSION, missingCatalogPanels } from '@/lib/panel-catalog';
 import { resolveRequestCurrency } from '@/lib/currency-server';
 import { DEFAULT_CURRENCY } from '@/lib/currency';
 import {
@@ -59,8 +59,7 @@ export async function GET(req?: Request) {
     }
 
     const presets = ((data || []) as unknown as PanelPresetRow[]).map(toAccountPreset);
-    const copied = await copyCatalogOnce(db, user, presets, req);
-    return NextResponse.json({ success: true, presets: [...presets, ...copied] });
+    return NextResponse.json({ success: true, presets: await copyCatalogOnce(db, user, presets, req) });
   } catch (err) {
     console.error('panel presets GET error:', err);
     return NextResponse.json({ error: 'SERVER_ERROR' }, { status: 500 });
@@ -167,16 +166,17 @@ const CATALOG_FLAG = 'panel_catalog';
  * Copies the panel catalogue (src/lib/panel-catalog.ts) into the artisan's
  * list once: only the panels they do not have yet, within their limit, priced
  * in their currency. Marked as done in the account afterwards, so a failed
- * copy is tried again on the next read and a done one never again. Never
- * throws: the list is answered whatever happens here.
+ * copy is tried again on the next read and a done one never again. Answers
+ * the list with the copied panels. Never throws: the list is answered
+ * whatever happens here.
  */
-async function copyCatalogOnce(db: SupabaseClient, user: User, existing: ReturnType<typeof toAccountPreset>[], req?: Request) {
+async function copyCatalogOnce(db: SupabaseClient, user: User, existing: AccountPreset[], req?: Request): Promise<AccountPreset[]> {
   const meta = (user.app_metadata ?? {}) as Record<string, unknown>;
-  if (meta[CATALOG_FLAG] === PANEL_CATALOG_VERSION) return [];
+  if (meta[CATALOG_FLAG] === PANEL_CATALOG_VERSION) return existing;
   try {
     const currency = req ? await resolveRequestCurrency(req, user.id) : DEFAULT_CURRENCY;
     const missing = missingCatalogPanels(existing, currency, MAX_PRESETS_PER_USER - existing.length);
-    let created: ReturnType<typeof toAccountPreset>[] = [];
+    let list = existing;
     if (missing.length > 0) {
       const rows = missing.map((preset) => toPresetRow(user.id, preset as Parameters<typeof toPresetRow>[1]));
       let { data, error } = await db.from('panel_presets').insert(rows).select(PRESET_COLUMNS);
@@ -190,22 +190,56 @@ async function copyCatalogOnce(db: SupabaseClient, user: User, existing: ReturnT
       }
       if (error) {
         console.error('panel catalogue copy failed:', error.message);
-        return [];
+        return existing;
       }
-      created = ((data || []) as unknown as PanelPresetRow[]).map(toAccountPreset);
+      const created = ((data || []) as unknown as PanelPresetRow[]).map(toAccountPreset);
+      list = await withoutTwins(db, user.id, created, [...existing, ...created]);
     }
-    // What the account already holds is sent back with the flag: whether the
-    // update merges or replaces it, the sign-in providers stay.
+    // Only the flag: the auth server merges app_metadata key by key, so what
+    // the account holds (sign-in providers) stays as it is now.
     try {
-      const { error: flagError } = await db.auth.admin.updateUserById(user.id, { app_metadata: { ...meta, [CATALOG_FLAG]: PANEL_CATALOG_VERSION } });
+      const { error: flagError } = await db.auth.admin.updateUserById(user.id, { app_metadata: { [CATALOG_FLAG]: PANEL_CATALOG_VERSION } });
       if (flagError) console.error('panel catalogue flag failed:', flagError.message);
     } catch (err) {
       // Not marked: the next read finds the panels already there and copies none.
       console.error('panel catalogue flag error:', err);
     }
-    return created;
+    return list;
   } catch (err) {
     console.error('panel catalogue copy error:', err);
-    return [];
+    return existing;
   }
+}
+
+type AccountPreset = ReturnType<typeof toAccountPreset>;
+
+/**
+ * Two first reads at once (two tabs) both find the account unmarked and both
+ * copy the catalogue: the table has no unique index to stop the second. After
+ * its copy, a read lists the account again; a catalogue panel that an earlier
+ * one already covers (same panel by the usual rule; earlier by creation, then
+ * id) is a twin. The read removes the twins it made itself, never another
+ * read's, and answers the list without any twin. `fallback` is answered when
+ * the account cannot be listed again.
+ */
+async function withoutTwins(db: SupabaseClient, userId: string, created: AccountPreset[], fallback: AccountPreset[]): Promise<AccountPreset[]> {
+  const { data, error } = await selectUserPresets(db, userId);
+  if (error) return fallback;
+  const rows = ((data || []) as unknown as PanelPresetRow[])
+    .slice()
+    .sort((a, b) => (a.created_at ?? '').localeCompare(b.created_at ?? '') || a.id.localeCompare(b.id));
+  const kept: AccountPreset[] = [];
+  const twins: string[] = [];
+  for (const preset of rows.map(toAccountPreset)) {
+    const fromCatalogue = PANEL_CATALOG.some((entry) => entry.name === preset.name);
+    if (fromCatalogue && findDuplicatePreset(preset, kept)) twins.push(preset.id);
+    else kept.push(preset);
+  }
+  const mine = new Set(created.map((preset) => preset.id));
+  const ownTwins = twins.filter((id) => mine.has(id));
+  if (ownTwins.length > 0) {
+    const { error: deleteError } = await db.from('panel_presets').delete().in('id', ownTwins).eq('user_id', userId);
+    if (deleteError) console.error('panel catalogue twins removal failed:', deleteError.message);
+  }
+  return kept;
 }

@@ -84,3 +84,17 @@ test('the copy stops where the list is full', () => {
   assert.deepEqual(missingCatalogPanels([], 'MAD', 0), []);
   assert.deepEqual(missingCatalogPanels([], 'MAD', -2), []);
 });
+
+test('an untouched catalogue panel is recognised, a changed one is not', () => {
+  const { catalogPresetsFor, isUntouchedCatalogPanel } = loadTsModule('src/lib/panel-catalog.ts');
+  const [white] = catalogPresetsFor('MAD');
+  const [whiteUsd] = catalogPresetsFor('USD');
+
+  assert.equal(isUntouchedCatalogPanel({ ...white, id: 'p-1' }), true);
+  assert.equal(isUntouchedCatalogPanel(whiteUsd), true, 'priced in another currency');
+  assert.equal(isUntouchedCatalogPanel({ ...white, name: 'Blanc atelier' }), false, 'renamed');
+  assert.equal(isUntouchedCatalogPanel({ ...white, pricePerSheet: 500 }), false, 'repriced');
+  assert.equal(isUntouchedCatalogPanel({ ...white, pricePerSheet: undefined }), false, 'price cleared');
+  assert.equal(isUntouchedCatalogPanel({ ...white, color: 'Blanc' }), false, 'recoloured');
+  assert.equal(isUntouchedCatalogPanel({ ...white, height: 244, width: 122 }), false, 'resized');
+});

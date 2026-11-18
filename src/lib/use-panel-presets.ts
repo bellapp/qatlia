@@ -57,12 +57,13 @@ export function usePanelPresets(): PanelPresetsState {
         const { data: { user } } = await createClient().auth.getUser();
         if (cancelled || !user) return;
         setSignedIn(true);
-        let account = await fetchAccountPresets();
-        if (account === null) return;
         // First signed-in visit on this device: copy its presets into the
-        // account so nothing saved before is lost.
-        if (await importDevicePresetsOnce(user.id)) account = (await fetchAccountPresets()) ?? account;
-        if (cancelled) return;
+        // account so nothing saved before is lost. Before the first read,
+        // which copies the catalogue into a new account: the copy then skips
+        // the panels the visitor already had and only fills the room left.
+        await importDevicePresetsOnce(user.id);
+        const account = await fetchAccountPresets();
+        if (cancelled || account === null) return;
         setPresets(account);
         setSource('account');
       } catch {
