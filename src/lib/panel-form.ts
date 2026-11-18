@@ -9,7 +9,7 @@
 import { MATERIAL_TYPE_VALUES, type MaterialType } from '@/lib/cutting/binpacking';
 import { MAX_GEOMETRY } from '@/lib/cutting/optimize-schema';
 import { PRESET_COLOR_MAX_CHARS, type GrainOrientation } from '@/lib/panel-preset-rules';
-import { isPanelPrice, type NewPanelPreset, type PanelPreset } from '@/lib/panel-presets';
+import { BUILT_IN_PRESETS, isPanelPrice, type NewPanelPreset, type PanelPreset } from '@/lib/panel-presets';
 import { fromCanonicalCm, parseDisplayInputToCanonical, type DisplayUnit } from '@/lib/units';
 
 export const PANEL_NAME_MAX_CHARS = 80;
@@ -99,4 +99,16 @@ export function parsePanelForm(
       ...(price !== null ? { pricePerSheet: price } : {}),
     },
   };
+}
+
+/**
+ * The add form after a standard size is clicked: its size and material, and
+ * its name while the artisan has not typed one (a name another standard size
+ * put there is replaced too, never one the artisan typed).
+ */
+export function applyShortcut(values: PanelFormValues, preset: PanelPreset, unit: DisplayUnit): PanelFormValues {
+  const filled = panelToForm(preset, unit);
+  const name = values.name.trim();
+  const nameIsOurs = name === '' || BUILT_IN_PRESETS.some((builtIn) => builtIn.name === name);
+  return { ...values, height: filled.height, width: filled.width, material: filled.material, name: nameIsOurs ? preset.name : values.name };
 }

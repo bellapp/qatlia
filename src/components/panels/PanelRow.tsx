@@ -11,6 +11,8 @@ interface PanelRowProps {
   unit: DisplayUnit;
   /** The first click on « Supprimer » was made: the button now asks to confirm. */
   confirmingDelete: boolean;
+  /** The list cannot be written now (still loading, or the account out of reach). */
+  disabled?: boolean;
   onEdit(): void;
   onDelete(): void;
 }
@@ -18,14 +20,14 @@ interface PanelRowProps {
 const TAG = 'px-2 py-0.5 rounded-md bg-studio-field border border-studio-border text-[11px] font-semibold text-slate-600 dark:text-slate-300';
 
 /** One panel of the artisan's list: what tells it apart, then edit and delete. */
-export function PanelRow({ preset, unit, confirmingDelete, onEdit, onDelete }: PanelRowProps) {
+export function PanelRow({ preset, unit, confirmingDelete, disabled = false, onEdit, onDelete }: PanelRowProps) {
   const { t, n } = useLocale();
 
   return (
     <article className="flex flex-wrap items-center gap-3 px-4 py-3.5 rounded-xl bg-studio-panel border border-studio-border shadow-sm">
       <div className="flex-1 min-w-0 basis-60 space-y-2">
         <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1 min-w-0">
-          <h3 dir="auto" className="min-w-0 max-w-full truncate text-sm font-bold text-slate-900 dark:text-white">{preset.name}</h3>
+          <h4 dir="auto" className="min-w-0 max-w-full truncate text-sm font-bold text-slate-900 dark:text-white">{preset.name}</h4>
           <span dir="ltr" className="font-mono text-xs font-bold text-slate-600 dark:text-slate-400">
             {formatDimensions(preset.height, preset.width, unit)}
           </span>
@@ -48,7 +50,8 @@ export function PanelRow({ preset, unit, confirmingDelete, onEdit, onDelete }: P
           type="button"
           aria-label={t('panelsPage.editAria', { name: preset.name })}
           onClick={onEdit}
-          className="inline-flex min-h-10 items-center gap-1.5 px-3 rounded-lg border border-studio-border bg-studio-panel hover:bg-studio-field text-xs font-bold text-slate-800 dark:text-slate-200 transition-colors"
+          disabled={disabled}
+          className="inline-flex min-h-10 items-center gap-1.5 px-3 rounded-lg border border-studio-border bg-studio-panel hover:bg-studio-field text-xs font-bold text-slate-800 dark:text-slate-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
         >
           <Pencil className="w-3.5 h-3.5" aria-hidden="true" />
           <span>{t('panelsPage.edit')}</span>
@@ -58,7 +61,8 @@ export function PanelRow({ preset, unit, confirmingDelete, onEdit, onDelete }: P
             type="button"
             aria-label={t('panelsPage.confirmDeleteAria', { name: preset.name })}
             onClick={onDelete}
-            className="inline-flex min-h-10 items-center gap-1.5 px-3 rounded-lg border border-red-600 bg-red-600 hover:bg-red-700 text-xs font-bold text-white transition-colors"
+            disabled={disabled}
+            className="inline-flex min-h-10 items-center gap-1.5 px-3 rounded-lg border border-red-600 bg-red-600 hover:bg-red-700 text-xs font-bold text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <Trash2 className="w-3.5 h-3.5" aria-hidden="true" />
             <span>{t('panelsPage.confirmDelete')}</span>
@@ -68,7 +72,8 @@ export function PanelRow({ preset, unit, confirmingDelete, onEdit, onDelete }: P
             type="button"
             aria-label={t('panelsPage.deleteAria', { name: preset.name })}
             onClick={onDelete}
-            className="inline-flex min-h-10 items-center gap-1.5 px-3 rounded-lg border border-studio-border bg-studio-panel hover:bg-studio-field text-xs font-bold text-red-700 dark:text-red-400 transition-colors"
+            disabled={disabled}
+            className="inline-flex min-h-10 items-center gap-1.5 px-3 rounded-lg border border-studio-border bg-studio-panel hover:bg-studio-field text-xs font-bold text-red-700 dark:text-red-400 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <Trash2 className="w-3.5 h-3.5" aria-hidden="true" />
             <span>{t('panelsPage.delete')}</span>

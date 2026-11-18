@@ -5,7 +5,7 @@ const { loadTsModule } = require('./helpers/load-ts-module');
 // The form of the panel page: what the artisan types, in their unit, becomes a
 // panel the account store accepts, or says which fields are wrong.
 
-const { PANEL_NAME_MAX_CHARS, EMPTY_PANEL_FORM, panelToForm, parsePanelForm } = loadTsModule('src/lib/panel-form.ts');
+const { PANEL_NAME_MAX_CHARS, EMPTY_PANEL_FORM, panelToForm, parsePanelForm, applyShortcut } = loadTsModule('src/lib/panel-form.ts');
 
 const filled = (overrides = {}) => ({
   ...EMPTY_PANEL_FORM,
@@ -88,4 +88,33 @@ test('a saved panel opened in the form and saved again is the same panel', () =>
 
 test('the empty form starts on MDF, vertical grain unticked, nothing typed', () => {
   assert.deepEqual(EMPTY_PANEL_FORM, { name: '', height: '', width: '', material: 'mdf', color: '', hasGrain: false, grainOrientation: 'vertical', price: '' });
+});
+
+// The standard sizes fill the add form. Review, 2026-11-17: a second size
+// clicked kept the name of the first, and the list showed a panel named
+// « Grand panneau 244 × 122 » at 122 × 61.
+
+const BIG = { id: 'bi-244x122', name: 'Grand panneau 244 × 122', height: 244, width: 122, material: 'mdf', builtIn: true };
+const HALF = { id: 'bi-122x61', name: 'Demi-panneau 122 × 61', height: 122, width: 61, material: 'mdf', builtIn: true };
+const PLY = { id: 'bi-183x122', name: 'Contreplaqué 183 × 122', height: 183, width: 122, material: 'contreplaques', builtIn: true };
+
+test('a standard size fills the size, the material, and the name while none is typed', () => {
+  const next = applyShortcut(EMPTY_PANEL_FORM, BIG, 'cm');
+
+  assert.deepEqual([next.name, next.height, next.width, next.material], ['Grand panneau 244 × 122', '244', '122', 'mdf']);
+  assert.equal(applyShortcut(EMPTY_PANEL_FORM, BIG, 'mm').height, '2440');
+});
+
+test('a second standard size replaces the name the first one gave', () => {
+  const next = applyShortcut(applyShortcut(EMPTY_PANEL_FORM, BIG, 'cm'), HALF, 'cm');
+
+  assert.deepEqual([next.name, next.height, next.width], ['Demi-panneau 122 × 61', '122', '61']);
+  assert.equal(applyShortcut(next, PLY, 'cm').material, 'contreplaques');
+});
+
+test('a name typed by the artisan is never replaced by a standard size', () => {
+  const typed = { ...applyShortcut(EMPTY_PANEL_FORM, BIG, 'cm'), name: 'MDF atelier' };
+
+  assert.equal(applyShortcut(typed, HALF, 'cm').name, 'MDF atelier');
+  assert.equal(applyShortcut({ ...EMPTY_PANEL_FORM, name: 'Mon panneau' }, BIG, 'cm').name, 'Mon panneau');
 });

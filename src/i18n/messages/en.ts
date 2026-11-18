@@ -782,6 +782,7 @@ export const en: Catalog = {
     confirmDeleteAria: 'Confirm deleting {name}',
     empty: 'No panel saved yet. Add the first one: you will not type its size again.',
     deviceNote: 'This list is kept on this device. Sign in to find it everywhere.',
+    accountUnreachable: 'Your account is not answering right now. Reload the page in a moment to change your list.',
     loadingAria: 'Loading your panels',
     pricePlaceholder: 'Optional',
     grainDirectionLabel: 'Grain direction',

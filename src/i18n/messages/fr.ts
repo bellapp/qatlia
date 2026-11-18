@@ -866,6 +866,7 @@ export const fr = {
     confirmDeleteAria: 'Confirmer la suppression de {name}',
     empty: 'Aucun panneau enregistré. Ajoutez le premier : vous n’aurez plus à ressaisir ses dimensions.',
     deviceNote: 'Cette liste est gardée sur cet appareil. Connectez-vous pour la retrouver partout.',
+    accountUnreachable: 'Votre compte ne répond pas pour l’instant. Rechargez la page dans un moment pour modifier votre liste.',
     loadingAria: 'Chargement de vos panneaux',
     pricePlaceholder: 'Facultatif',
     grainDirectionLabel: 'Sens du ramage',

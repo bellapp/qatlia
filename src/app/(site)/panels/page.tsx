@@ -41,7 +41,14 @@ export default function PanelsPage() {
   const [editError, setEditError] = useState<string | null>(null);
   const [confirmingDeleteId, setConfirmingDeleteId] = useState<string | null>(null);
   const confirmTimer = useRef<number | null>(null);
-  const [notice, setNotice] = useState('');
+  // Said on screen where the artisan is looking: under the add form, or above
+  // the list for an edit or a removal.
+  const [notice, setNotice] = useState<{ where: 'add' | 'list'; text: string; tone: 'success' | 'warning' }>({ where: 'list', text: '', tone: 'success' });
+
+  // Signed in, but the account list could not be read: what the page shows is
+  // the device list, and a panel written to it would not reach the account.
+  const accountOutOfReach = ready && signedIn && source === 'device';
+  const locked = !ready || accountOutOfReach;
 
   useEffect(() => {
     setUnit(readStoredDisplayUnit(window.localStorage));
@@ -85,7 +92,7 @@ export default function PanelsPage() {
       return;
     }
     setAddKey((key) => key + 1);
-    setNotice(t('panelsPage.savedOk', { name: preset.name }));
+    setNotice({ where: 'add', text: t('panelsPage.savedOk', { name: preset.name }), tone: 'success' });
   };
 
   const handleUpdate = async (id: string, preset: NewPanelPreset) => {
@@ -98,7 +105,7 @@ export default function PanelsPage() {
       return;
     }
     setEditingId(null);
-    setNotice(t('panelsPage.savedOk', { name: preset.name }));
+    setNotice({ where: 'list', text: t('panelsPage.savedOk', { name: preset.name }), tone: 'success' });
   };
 
   /** The first click asks, the second removes; the question goes away on its own. */
@@ -111,7 +118,7 @@ export default function PanelsPage() {
     }
     setConfirmingDeleteId(null);
     const removed = await remove(id);
-    setNotice(t(removed ? 'atelier.stock.presetDeleted' : 'panelsPage.deleteFailed'));
+    setNotice({ where: 'list', text: t(removed ? 'atelier.stock.presetDeleted' : 'panelsPage.deleteFailed'), tone: removed ? 'success' : 'warning' });
   };
 
   return (
@@ -157,8 +164,11 @@ export default function PanelsPage() {
           </p>
         ) : null}
 
-        {/* Always in the page, so a screen reader hears each change as it happens. */}
-        <p role="status" aria-live="polite" className="sr-only">{notice}</p>
+        {accountOutOfReach ? (
+          <p className="px-3.5 py-2.5 rounded-xl bg-amber-500/10 border border-amber-500/30 text-xs font-semibold text-amber-800 dark:text-amber-200">
+            {t('panelsPage.accountUnreachable')}
+          </p>
+        ) : null}
 
         <div className="flex flex-col lg:flex-row lg:items-start gap-6">
           <section aria-labelledby="add-panel-title" className="lg:w-[380px] lg:shrink-0 rounded-xl bg-studio-panel border border-studio-border shadow-sm">
@@ -170,11 +180,13 @@ export default function PanelsPage() {
                 initial={EMPTY_PANEL_FORM}
                 unit={unit}
                 submitLabel={t('panelsPage.addSubmit')}
-                busy={adding}
+                busy={adding || locked}
                 error={addError}
                 onSubmit={(preset) => void handleAdd(preset)}
                 shortcuts={BUILT_IN_PRESETS}
               />
+              {/* Always in the page, so a screen reader hears each change as it happens. */}
+              <p role="status" aria-live="polite" className={`mt-3 text-xs font-semibold empty:hidden ${notice.tone === 'success' ? 'text-emerald-700 dark:text-emerald-300' : 'text-red-600 dark:text-red-400'}`}>{notice.where === 'add' ? notice.text : ''}</p>
             </div>
           </section>
 
@@ -195,6 +207,8 @@ export default function PanelsPage() {
                 ))}
               </div>
             </div>
+
+            <p role="status" aria-live="polite" className={`text-xs font-semibold empty:hidden ${notice.tone === 'success' ? 'text-emerald-700 dark:text-emerald-300' : 'text-red-600 dark:text-red-400'}`}>{notice.where === 'list' ? notice.text : ''}</p>
 
             {!ready && presets.length === 0 ? (
               <div role="status" aria-label={t('panelsPage.loadingAria')} className="space-y-3">
@@ -236,6 +250,7 @@ export default function PanelsPage() {
                         preset={preset}
                         unit={unit}
                         confirmingDelete={confirmingDeleteId === preset.id}
+                        disabled={locked}
                         onEdit={() => {
                           setEditingId(preset.id);
                           setEditError(null);

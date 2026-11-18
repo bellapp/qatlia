@@ -102,7 +102,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
 
     const raw: unknown = await req.json().catch(() => null);
     if (raw && typeof raw === 'object' && 'name' in raw) {
-      return updateWholePreset(user.id, id, raw);
+      return await updateWholePreset(user.id, id, raw);
     }
     const body = PriceBodySchema.safeParse(raw);
     if (!body.success) {

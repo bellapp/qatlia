@@ -4,7 +4,7 @@ import { useState, type FormEvent } from 'react';
 import { useLocale } from '@/components/LocaleProvider';
 import { materialLabelKey } from '@/i18n/domain';
 import type { TranslationKey } from '@/i18n';
-import { PANEL_NAME_MAX_CHARS, STOCK_MATERIAL_VALUES, panelToForm, parsePanelForm, type PanelFormError, type PanelFormValues } from '@/lib/panel-form';
+import { PANEL_NAME_MAX_CHARS, STOCK_MATERIAL_VALUES, applyShortcut, panelToForm, parsePanelForm, type PanelFormError, type PanelFormValues } from '@/lib/panel-form';
 import { PRESET_COLOR_MAX_CHARS } from '@/lib/panel-preset-rules';
 import type { NewPanelPreset, PanelPreset } from '@/lib/panel-presets';
 import type { DisplayUnit } from '@/lib/units';
@@ -76,8 +76,7 @@ export function PanelForm({ idPrefix, initial, unit, submitLabel, busy, error, o
                 type="button"
                 aria-label={t('panelsPage.standardSizeAria', { name: preset.name })}
                 onClick={() => {
-                  const filled = panelToForm(preset, unit);
-                  setValues((current) => ({ ...current, height: filled.height, width: filled.width, material: filled.material, name: current.name || preset.name }));
+                  setValues((current) => applyShortcut(current, preset, unit));
                   setErrors((current) => current.filter((field) => field !== 'height' && field !== 'width' && field !== 'name'));
                 }}
                 className="min-h-10 px-3 rounded-full border border-studio-border bg-studio-panel hover:border-brand-500/50 hover:bg-brand-400/10 font-mono text-[11px] font-bold text-slate-700 dark:text-slate-300 transition-colors"

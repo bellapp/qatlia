@@ -782,6 +782,7 @@ export const ar: Catalog = {
     confirmDeleteAria: 'تأكيد حذف {name}',
     empty: 'لا توجد ألواح محفوظة. أضف الأول: لن تعيد كتابة مقاساته.',
     deviceNote: 'هذه القائمة محفوظة على هذا الجهاز. سجّل الدخول لتجدها في كل مكان.',
+    accountUnreachable: 'حسابك لا يستجيب الآن. أعد تحميل الصفحة بعد قليل لتعديل قائمتك.',
     loadingAria: 'جارٍ تحميل ألواحك',
     pricePlaceholder: 'اختياري',
     grainDirectionLabel: 'اتجاه العروق',

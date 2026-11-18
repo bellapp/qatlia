@@ -59,6 +59,16 @@ test('each panel can be edited and removed, the buttons naming it', () => {
   assert.match(html, /<button type="button" aria-label="Supprimer Chêne clair"[^>]*>[\s\S]*?Supprimer<\/span><\/button>/);
 });
 
+test('a row can be shown with its buttons waiting', () => {
+  const html = renderComponent(ROW, 'PanelRow', { preset: OAK, unit: 'cm', confirmingDelete: false, disabled: true, onEdit: noop, onDelete: noop });
+
+  assert.equal((html.match(/<button[^>]* disabled=""/g) || []).length, 2);
+});
+
+test('a panel of the list is a heading under the list heading', () => {
+  assert.match(renderComponent(ROW, 'PanelRow', { preset: OAK, unit: 'cm', confirmingDelete: false, onEdit: noop, onDelete: noop }), /<h4 dir="auto"/);
+});
+
 test('removing asks once: the second click confirms', () => {
   const html = renderComponent(ROW, 'PanelRow', { preset: OAK, unit: 'cm', confirmingDelete: true, onEdit: noop, onDelete: noop });
 
@@ -199,4 +209,31 @@ test('the page asks the same question in French before it removes a panel', () =
   assert.equal(translate('fr', 'panelsPage.confirmDelete'), 'Supprimer ce panneau ?');
   assert.equal(translate('fr', 'panelsPage.empty'), 'Aucun panneau enregistré. Ajoutez le premier : vous n’aurez plus à ressaisir ses dimensions.');
   assert.equal(translate('fr', 'panelsPage.deviceNote'), 'Cette liste est gardée sur cet appareil. Connectez-vous pour la retrouver partout.');
+});
+
+// Review, 2026-11-17.
+
+test('signed in with the account out of reach, the page says so and writes nothing', () => {
+  const page = read(PAGE);
+
+  assert.match(page, /const accountOutOfReach = ready && signedIn && source === 'device';/);
+  assert.match(page, /\{accountOutOfReach \? \(/);
+  assert.match(page, /t\('panelsPage\.accountUnreachable'\)/);
+  assert.match(page, /const locked = !ready \|\| accountOutOfReach;/);
+  assert.match(page, /busy=\{adding \|\| locked\}/, 'the add form waits');
+  assert.match(page, /disabled=\{locked\}/, 'and so do the rows');
+  assert.equal(translate('fr', 'panelsPage.accountUnreachable'), 'Votre compte ne répond pas pour l’instant. Rechargez la page dans un moment pour modifier votre liste.');
+});
+
+test('what happened is said on screen, where the artisan is looking', () => {
+  const page = read(PAGE);
+
+  assert.equal(page.includes('className="sr-only">{notice}'), false, 'not for screen readers only');
+  assert.match(page, /<p role="status" aria-live="polite"[^>]*>\{notice\.where === 'add' \? notice\.text : ''\}<\/p>/, 'under the add form');
+  assert.match(page, /<p role="status" aria-live="polite"[^>]*>\{notice\.where === 'list' \? notice\.text : ''\}<\/p>/, 'above the list');
+  assert.match(page, /setNotice\(\{ where: 'list', text: t\(removed \? 'atelier\.stock\.presetDeleted' : 'panelsPage\.deleteFailed'\), tone: removed \? 'success' : 'warning' \}\);/);
+});
+
+test('a whole-panel edit that fails unexpectedly still answers as the route does', () => {
+  assert.match(read('src/app/api/panel-presets/[id]/route.ts'), /return await updateWholePreset\(user\.id, id, raw\);/);
 });
