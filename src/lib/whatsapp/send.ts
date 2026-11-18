@@ -11,8 +11,9 @@
  * code only, never a token, an API key nor a response body.
  *
  * A send is tried a second time when the first one surely did not go out (the
- * connection failed, or the provider answered 429 or 5xx). A timeout is not
- * retried: the message may have left, and the prospect would get it twice.
+ * connection failed, or the provider answered 429 or 503). A timeout, a 500,
+ * 502 or 504 is not retried: the message may have left, and the prospect
+ * would get it twice.
  */
 
 import type { WhatsAppConfig, YCloudConfig } from '@/lib/whatsapp/config';
@@ -30,9 +31,12 @@ type Attempt = { id: string } | { id: null; retry: boolean };
 const sent = (id: string): Attempt => ({ id });
 const failed = (retry: boolean): Attempt => ({ id: null, retry });
 
-/** Too many requests or a server error: the provider did not take the message. */
+/**
+ * Too many requests, or the provider unavailable: it did not take the message.
+ * Other 5xx (often a gateway timeout) may come after the message was accepted.
+ */
 function retryableStatus(status: number): boolean {
-  return status === 429 || status >= 500;
+  return status === 429 || status === 503;
 }
 
 /** The type-specific part of a send request. Both APIs share the interactive shape; only the link preview flag differs. */

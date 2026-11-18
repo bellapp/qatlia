@@ -154,9 +154,9 @@ ${PACK_LINES_AR}
   },
 
   imageHint: {
-    fr: `Merci pour la photo ! Pour obtenir le plan de coupe, ouvrez l'atelier et prenez votre fiche de mesure en photo : l'IA lit les pièces pour vous. Vous créez ensuite votre compte gratuit (${SIGNUP_FREE_CREDITS} crédits offerts), votre photo est gardée.
+    fr: `Merci pour la photo ! Pour obtenir le plan de coupe, ouvrez l'atelier et prenez votre fiche de mesure en photo : l'IA lit les pièces pour vous. Vous créez ensuite votre compte gratuit (${SIGNUP_FREE_CREDITS} crédits offerts) : la photo prise dans l'atelier est gardée pendant l'inscription.
 👉 ${ATELIER_LINK}`,
-    ar: `شكرا على الصورة! باش تاخد مخطط التقطيع، حل الورشة وصوّر ورقة القياسات، والذكاء الاصطناعي غادي يقرا القطع. من بعد دير حساب مجاني (${SIGNUP_FREE_CREDITS} كريدي فابور)، والصورة ديالك كتبقى محفوظة.
+    ar: `شكرا على الصورة! باش تاخد مخطط التقطيع، حل الورشة وصوّر ورقة القياسات، والذكاء الاصطناعي غادي يقرا القطع. من بعد دير حساب مجاني (${SIGNUP_FREE_CREDITS} كريدي فابور)، والصورة اللي صورتي فالورشة كتبقى محفوظة.
 👉 ${ATELIER_LINK}`,
   },
 

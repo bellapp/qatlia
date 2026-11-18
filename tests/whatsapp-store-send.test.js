@@ -592,7 +592,7 @@ function sequenceFetch(responders) {
 }
 const okMeta = () => new Response(JSON.stringify({ messages: [{ id: 'wamid.RETRY' }] }), { status: 200 });
 
-test('a send the provider answered 5xx or 429 is tried once more', async () => {
+test('a send the provider answered 503 or 429 is tried once more', async () => {
   for (const status of [503, 429]) {
     const fetchImpl = sequenceFetch([() => new Response('{}', { status }), okMeta]);
     assert.equal(await sendText(CONFIG, '1', 'hi', fetchImpl), 'wamid.RETRY', String(status));
@@ -619,6 +619,10 @@ test('a refused message, a provider failure or a timeout is not sent twice', asy
   const failedStatus = () => new Response(JSON.stringify({ id: 'yc', status: 'failed', errorCode: '131047' }), { status: 200 });
   for (const [config, respond] of [
     [CONFIG, () => new Response('{}', { status: 400 })],
+    // A gateway error may come after the provider accepted the message.
+    [CONFIG, () => new Response('{}', { status: 500 })],
+    [YCLOUD_CONFIG, () => new Response('{}', { status: 502 })],
+    [YCLOUD_CONFIG, () => new Response('{}', { status: 504 })],
     [YCLOUD_CONFIG, failedStatus],
     [YCLOUD_CONFIG, timeout],
   ]) {
