@@ -81,3 +81,52 @@ test('blocked storage never throws', () => {
   assert.doesNotThrow(() => rememberAcquisition(memoryStore({ failWrites: true }), '?utm_source=whatsapp', NOW));
   assert.deepEqual(signupMetadata(memoryStore({ failReads: true }), NOW), {});
 });
+
+// --- Google sign-up: the cookie copy and the callback rule -----------------------
+
+const {
+  ACQUISITION_COOKIE,
+  NEW_ACCOUNT_WINDOW_MS,
+  acquisitionCookie,
+  parseAcquisitionCookie,
+  tagsForNewAccount,
+} = loadTsModule('src/lib/acquisition.ts');
+
+test('the cookie carries the remembered tags until the visit expires', () => {
+  const visit = { tags: { signup_source: 'whatsapp', signup_campaign: 'ctwa' }, at: NOW - 1000 };
+  const cookie = acquisitionCookie(visit, NOW, true);
+  assert.match(cookie, new RegExp(`^${ACQUISITION_COOKIE}=`));
+  assert.match(cookie, /Path=\/; Max-Age=\d+; SameSite=Lax; Secure$/);
+  assert.equal(Number(/Max-Age=(\d+)/.exec(cookie)[1]), Math.floor((ACQUISITION_TTL_MS - 1000) / 1000));
+  assert.doesNotMatch(acquisitionCookie(visit, NOW, false), /Secure/);
+
+  // What the browser sends back is read like a query string.
+  const sent = `theme=dark; ${cookie.split(';')[0]}; other=1`;
+  assert.deepEqual(parseAcquisitionCookie(sent), { signup_source: 'whatsapp', signup_campaign: 'ctwa' });
+});
+
+test('a missing, foreign or tampered cookie gives no tags', () => {
+  assert.deepEqual(parseAcquisitionCookie(null), {});
+  assert.deepEqual(parseAcquisitionCookie('theme=dark'), {});
+  assert.deepEqual(parseAcquisitionCookie(`${ACQUISITION_COOKIE}=%E0%A4%A`), {});
+  assert.deepEqual(parseAcquisitionCookie(`${ACQUISITION_COOKIE}=${encodeURIComponent('utm_source=<b>')}`), {});
+  assert.deepEqual(
+    parseAcquisitionCookie(`${ACQUISITION_COOKIE}=${encodeURIComponent('utm_source=whatsapp&role=admin')}`),
+    { signup_source: 'whatsapp' },
+  );
+});
+
+test('only an account created moments ago, without a source yet, is tagged', () => {
+  const tags = { signup_source: 'whatsapp' };
+  const created = (msAgo) => new Date(NOW - msAgo).toISOString();
+  assert.deepEqual(tagsForNewAccount({ created_at: created(30 * 1000), user_metadata: { full_name: 'K' } }, tags, NOW), tags);
+  // An older account signing in again keeps its first source (or none).
+  assert.equal(tagsForNewAccount({ created_at: created(NEW_ACCOUNT_WINDOW_MS + 1), user_metadata: {} }, tags, NOW), null);
+  assert.equal(
+    tagsForNewAccount({ created_at: created(1000), user_metadata: { signup_source: 'facebook' } }, tags, NOW),
+    null,
+  );
+  assert.equal(tagsForNewAccount({ created_at: created(1000), user_metadata: {} }, {}, NOW), null);
+  assert.equal(tagsForNewAccount(null, tags, NOW), null);
+  assert.equal(tagsForNewAccount({ created_at: 'not a date' }, tags, NOW), null);
+});

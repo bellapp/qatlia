@@ -1,6 +1,26 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { safeRedirectPath } from '@/lib/pending-work';
+import { parseAcquisitionCookie, tagsForNewAccount } from '@/lib/acquisition';
+
+type ServerClient = ReturnType<typeof createClient>;
+type SessionUser = Parameters<typeof tagsForNewAccount>[0];
+
+/**
+ * A Google sign-up creates the account here: give it the source of the visit
+ * that led to it (src/lib/acquisition.ts), as the email sign-up form does.
+ * Never blocks the sign-in.
+ */
+async function tagNewAccount(supabase: ServerClient, user: SessionUser, cookieHeader: string | null): Promise<void> {
+  try {
+    const tags = tagsForNewAccount(user, parseAcquisitionCookie(cookieHeader), Date.now());
+    if (!tags) return;
+    const { error } = await supabase.auth.updateUser({ data: tags });
+    if (error) console.error('[auth] could not record the sign-up source', error.name);
+  } catch (error) {
+    console.error('[auth] could not record the sign-up source', error instanceof Error ? error.name : 'unknown error');
+  }
+}
 
 export async function GET(request: Request) {
   const { searchParams, origin } = new URL(request.url);
@@ -11,8 +31,9 @@ export async function GET(request: Request) {
 
   if (code) {
     const supabase = createClient();
-    const { error } = await supabase.auth.exchangeCodeForSession(code);
+    const { data, error } = await supabase.auth.exchangeCodeForSession(code);
     if (!error) {
+      await tagNewAccount(supabase, data?.user ?? null, request.headers.get('cookie'));
       return NextResponse.redirect(`${origin}${redirect}`);
     }
   }
