@@ -337,13 +337,11 @@ export default function Dashboard() {
   // this `true` forever even after its pending rewrite is done. Fresh
   // projects (no restore) start false.
   const [migratedFromLegacyUnit, setMigratedFromLegacyUnit] = useState<boolean>(false);
-  // Panel presets: artisan-saved stock panels + management UI state. A
-  // signed-in artisan's list lives in their account; the device list is for
-  // anonymous use and is the fallback while the account store is unavailable.
   // The panels the artisan works with, read and written where the panel page
   // (« Configuration des panneaux ») does: the card picks one and saves the one
   // just typed; the list itself is managed on that page.
-  const { presets: savedPresets, add: addPreset } = usePanelPresets();
+  const { presets: savedPresets, add: addPreset, ready: presetsReady, signedIn: presetsSignedIn, source: presetsSource } = usePanelPresets();
+  const [isSavingPreset, setIsSavingPreset] = useState(false);
 
   const allPresets = [...BUILT_IN_PRESETS, ...savedPresets];
 
@@ -444,16 +442,28 @@ const commitPanelName = () => {
       grainOrientation: activeSheet.hasGrain ? (activeSheet.grainOrientation ?? 'vertical') : undefined,
       ...(isPanelPrice(activeSheet.pricePerSheet) ? { pricePerSheet: activeSheet.pricePerSheet } : {}),
     };
-    const saved = await addPreset(preset);
-    if (!saved.ok) {
-      const text = saved.error === 'DUPLICATE'
-        ? t('atelier.stock.presetDuplicate', { name: saved.existingName ?? '' })
-        : t(saved.error === 'LIMIT' ? 'atelier.stock.presetLimit' : 'atelier.stock.presetSaveFailed');
-      setPresetFeedback({ tone: 'warning', text });
+    // Signed in, but the account list could not be read: a panel written to the
+    // device now would never reach the account, and would vanish once the
+    // account answers again. The panel page refuses for the same reason.
+    if (presetsSignedIn && presetsSource === 'device') {
+      setPresetFeedback({ tone: 'warning', text: t('panelsPage.accountUnreachable') });
       return;
     }
-    setPresetNameDraft('');
-    setPresetFeedback({ tone: 'success', text: t('atelier.stock.presetSavedOk', { name }) });
+    setIsSavingPreset(true);
+    try {
+      const saved = await addPreset(preset);
+      if (!saved.ok) {
+        const text = saved.error === 'DUPLICATE'
+          ? t('atelier.stock.presetDuplicate', { name: saved.existingName ?? '' })
+          : t(saved.error === 'LIMIT' ? 'atelier.stock.presetLimit' : 'atelier.stock.presetSaveFailed');
+        setPresetFeedback({ tone: 'warning', text });
+        return;
+      }
+      setPresetNameDraft('');
+      setPresetFeedback({ tone: 'success', text: t('atelier.stock.presetSavedOk', { name }) });
+    } finally {
+      setIsSavingPreset(false);
+    }
   };
 
   /** Colour and grain next to a saved preset's name, so two panels of the
@@ -2027,7 +2037,7 @@ const commitPanelName = () => {
                 )}
               </div>
 
-              {/* Panel presets: pick a stock size, name it, save or delete it */}
+              {/* Panel presets: pick a stock size, or save the one typed under a name. */}
               <div className="flex flex-wrap items-center gap-2 px-4 pb-2 -mt-1">
                 <div className="relative flex-1 min-w-[180px]">
                   <PackageOpen className="w-3.5 h-3.5 text-slate-400 pointer-events-none absolute start-2.5 top-1/2 -translate-y-1/2 z-10" aria-hidden="true" />
@@ -2085,8 +2095,9 @@ const commitPanelName = () => {
                 <button
                   type="button"
                   onClick={() => void handleSavePreset()}
+                  disabled={!presetsReady || isSavingPreset}
                   aria-label={t('atelier.stock.savePresetAria')}
-                  className="px-3 py-2 rounded-lg bg-studio-field border border-studio-border hover:border-brand-500/50 text-[11px] font-bold text-slate-600 dark:text-slate-300 hover:text-brand-500 dark:hover:text-brand-400 flex items-center gap-1.5 transition-colors"
+                  className="px-3 py-2 rounded-lg bg-studio-field border border-studio-border hover:border-brand-500/50 text-[11px] font-bold text-slate-600 dark:text-slate-300 hover:text-brand-500 dark:hover:text-brand-400 flex items-center gap-1.5 transition-colors disabled:opacity-50 disabled:cursor-wait"
                 >
                   <BookmarkPlus className="w-3.5 h-3.5" />
                   {t('atelier.stock.savePreset')}

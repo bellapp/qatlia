@@ -101,21 +101,6 @@ export function savePreset(preset: NewPanelPreset): PanelPreset {
   return entry;
 }
 
-/** Sets (or, with null, clears) the price of a preset saved on this device. */
-export function setDevicePresetPrice(id: string, pricePerSheet: number | null): PanelPreset | null {
-  const saved = loadSavedPresets();
-  let updated: PanelPreset | null = null;
-  const next = saved.map((p) => {
-    if (p.id !== id) return p;
-    const { pricePerSheet: _previous, ...rest } = p;
-    void _previous;
-    updated = pricePerSheet === null ? rest : { ...rest, pricePerSheet: Math.round(pricePerSheet * 100) / 100 };
-    return updated;
-  });
-  window.localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
-  return updated;
-}
-
 export type PresetUpdateResult =
   | { ok: true; preset: PanelPreset }
   | { ok: false; error: 'DUPLICATE'; existingName: string }
@@ -180,21 +165,6 @@ export async function createAccountPresets(presets: NewPanelPreset[]): Promise<A
     return { ok: false, error: data?.error === 'PRESET_LIMIT' ? 'PRESET_LIMIT' : 'FAILED' };
   } catch {
     return { ok: false, error: 'FAILED' };
-  }
-}
-
-/** Sets (or, with null, clears) the price of an account preset; the updated preset, or null. */
-export async function setAccountPresetPrice(id: string, pricePerSheet: number | null): Promise<PanelPreset | null> {
-  try {
-    const res = await fetch(`/api/panel-presets/${encodeURIComponent(id)}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ pricePerSheet }),
-    });
-    const data = await res.json().catch(() => null);
-    return res.ok && data?.success && data.preset ? (data.preset as PanelPreset) : null;
-  } catch {
-    return null;
   }
 }
 

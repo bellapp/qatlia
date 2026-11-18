@@ -64,3 +64,33 @@ test('the link says where it leads, in the three languages', () => {
     assert.ok(read(`src/i18n/messages/${locale}.ts`).includes(`managePresets: '${words}',`), locale);
   }
 });
+
+// Review, 2026-11-18: the card wrote to the device list while a signed-in
+// artisan's account was out of reach, as the panel page refuses to; the panel
+// then vanished on the next visit, once the account list was back.
+
+const handleSave = () => atelier.slice(atelier.indexOf('const handleSavePreset = async'), atelier.indexOf('const presetDetails'));
+
+test('saving waits for the list, and never while the account is out of reach', () => {
+  assert.match(atelier, /const \{ presets: savedPresets, add: addPreset, ready: presetsReady, signedIn: presetsSignedIn, source: presetsSource \} = usePanelPresets\(\);/);
+  const save = handleSave();
+  const guard = save.indexOf("if (presetsSignedIn && presetsSource === 'device') {");
+  assert.ok(guard > 0, 'the guard exists');
+  assert.ok(guard < save.indexOf('await addPreset(preset)'), 'before any write');
+  assert.match(save.slice(guard), /^[^]*?setPresetFeedback\(\{ tone: 'warning', text: t\('panelsPage\.accountUnreachable'\) \}\);\s*return;/);
+});
+
+test('the save button waits for the list and for a save under way', () => {
+  const card = stockCard();
+  const button = card.slice(card.lastIndexOf('<button', card.indexOf('onClick={() => void handleSavePreset()}')), card.indexOf('</button>', card.indexOf('onClick={() => void handleSavePreset()}')));
+
+  assert.match(button, /disabled=\{!presetsReady \|\| isSavingPreset\}/);
+  assert.match(handleSave(), /setIsSavingPreset\(true\);[^]*finally \{\s*setIsSavingPreset\(false\);\s*\}/);
+});
+
+test('each refusal says its own reason', () => {
+  const save = handleSave();
+
+  assert.match(save, /saved\.error === 'DUPLICATE'\s*\? t\('atelier\.stock\.presetDuplicate', \{ name: saved\.existingName \?\? '' \}\)/);
+  assert.match(save, /t\(saved\.error === 'LIMIT' \? 'atelier\.stock\.presetLimit' : 'atelier\.stock\.presetSaveFailed'\)/);
+});
