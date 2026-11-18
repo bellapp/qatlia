@@ -20,6 +20,7 @@ import {
   FileText,
   PackageOpen,
   BookmarkPlus,
+  ArrowRight,
   Trash2,
   TrendingUp,
   Scissors,
@@ -50,24 +51,14 @@ import {
   fetchAccountEdgePrice,
   saveAccountEdgePrice,
 } from '@/lib/edge-prices';
-import { isSamePanel } from '@/lib/panel-preset-rules';
 import { PIECE_COLOR_PALETTE, getResolvedPieceColor } from '@/lib/pieces/catalog';
 import {
   BUILT_IN_PRESETS,
-  loadSavedPresets,
-  savePreset,
-  deletePreset,
-  findDuplicatePreset,
-  fetchAccountPresets,
-  createAccountPresets,
-  deleteAccountPreset,
-  importDevicePresetsOnce,
-  setDevicePresetPrice,
-  setAccountPresetPrice,
   isPanelPrice,
   type PanelPreset,
 } from '@/lib/panel-presets';
 import { STOCK_MATERIAL_VALUES } from '@/lib/panel-form';
+import { usePanelPresets } from '@/lib/use-panel-presets';
 import { OptionsPanel } from '@/components/OptionsPanel';
 import { PiecesManager } from '@/components/PiecesManager';
 import { SheetTabs } from '@/components/SheetTabs';
@@ -346,36 +337,11 @@ export default function Dashboard() {
   // this `true` forever even after its pending rewrite is done. Fresh
   // projects (no restore) start false.
   const [migratedFromLegacyUnit, setMigratedFromLegacyUnit] = useState<boolean>(false);
-  // Panel presets: artisan-saved stock panels + management UI state. A
-  // signed-in artisan's list lives in their account; the device list is for
-  // anonymous use and is the fallback while the account store is unavailable.
-  const [savedPresets, setSavedPresets] = useState<PanelPreset[]>([]);
-  const [presetSource, setPresetSource] = useState<'device' | 'account'>('device');
-  const [isPresetManageOpen, setIsPresetManageOpen] = useState(false);
-
-  useEffect(() => {
-    let cancelled = false;
-    setSavedPresets(loadSavedPresets());
-    (async () => {
-      try {
-        const { data: { user } } = await createClient().auth.getUser();
-        if (!user) return;
-        let account = await fetchAccountPresets();
-        if (account === null) return;
-        // First signed-in visit on this device: copy its presets into the
-        // account so nothing saved before is lost.
-        if (await importDevicePresetsOnce(user.id)) account = (await fetchAccountPresets()) ?? account;
-        if (cancelled) return;
-        setSavedPresets(account);
-        setPresetSource('account');
-      } catch {
-        /* the device list stays in use */
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, []);
+  // The panels the artisan works with, read and written where the panel page
+  // (« Configuration des panneaux ») does: the card picks one and saves the one
+  // just typed; the list itself is managed on that page.
+  const { presets: savedPresets, add: addPreset, ready: presetsReady, signedIn: presetsSignedIn, source: presetsSource } = usePanelPresets();
+  const [isSavingPreset, setIsSavingPreset] = useState(false);
 
   const allPresets = [...BUILT_IN_PRESETS, ...savedPresets];
 
@@ -476,43 +442,28 @@ const commitPanelName = () => {
       grainOrientation: activeSheet.hasGrain ? (activeSheet.grainOrientation ?? 'vertical') : undefined,
       ...(isPanelPrice(activeSheet.pricePerSheet) ? { pricePerSheet: activeSheet.pricePerSheet } : {}),
     };
-    const duplicate = findDuplicatePreset(preset, savedPresets);
-    if (duplicate) {
-      setPresetFeedback({ tone: 'warning', text: t('atelier.stock.presetDuplicate', { name: duplicate.name }) });
+    // Signed in, but the account list could not be read: a panel written to the
+    // device now would never reach the account, and would vanish once the
+    // account answers again. The panel page refuses for the same reason.
+    if (presetsSignedIn && presetsSource === 'device') {
+      setPresetFeedback({ tone: 'warning', text: t('panelsPage.accountUnreachable') });
       return;
     }
-    if (presetSource === 'account') {
-      const saved = await createAccountPresets([preset]);
+    setIsSavingPreset(true);
+    try {
+      const saved = await addPreset(preset);
       if (!saved.ok) {
-        setPresetFeedback({ tone: 'warning', text: t(saved.error === 'PRESET_LIMIT' ? 'atelier.stock.presetLimit' : 'atelier.stock.presetSaveFailed') });
+        const text = saved.error === 'DUPLICATE'
+          ? t('atelier.stock.presetDuplicate', { name: saved.existingName ?? '' })
+          : t(saved.error === 'LIMIT' ? 'atelier.stock.presetLimit' : 'atelier.stock.presetSaveFailed');
+        setPresetFeedback({ tone: 'warning', text });
         return;
       }
-      if (saved.duplicates.length > 0) {
-        setPresetFeedback({ tone: 'warning', text: t('atelier.stock.presetDuplicate', { name: saved.duplicates[0].existingName }) });
-        return;
-      }
-      setSavedPresets((current) => [...current, ...saved.created]);
-    } else {
-      savePreset(preset);
-      setSavedPresets(loadSavedPresets());
+      setPresetNameDraft('');
+      setPresetFeedback({ tone: 'success', text: t('atelier.stock.presetSavedOk', { name }) });
+    } finally {
+      setIsSavingPreset(false);
     }
-    setPresetNameDraft('');
-    setPresetFeedback({ tone: 'success', text: t('atelier.stock.presetSavedOk', { name }) });
-  };
-
-  /** Removes a saved panel preset from the workshop's list. */
-  const handleDeletePreset = async (id: string) => {
-    if (presetSource === 'account') {
-      if (!(await deleteAccountPreset(id))) {
-        setPresetFeedback({ tone: 'warning', text: t('atelier.stock.presetSaveFailed') });
-        return;
-      }
-      setSavedPresets((current) => current.filter((p) => p.id !== id));
-    } else {
-      deletePreset(id);
-      setSavedPresets(loadSavedPresets());
-    }
-    setPresetFeedback({ tone: 'success', text: t('atelier.stock.presetDeleted') });
   };
 
   /** Colour and grain next to a saved preset's name, so two panels of the
@@ -578,35 +529,6 @@ const commitPanelName = () => {
     }
   };
 
-  /** Changes the price of a saved panel; the stock panel follows when it is that panel. */
-  const handlePresetPrice = async (preset: PanelPreset, raw: string) => {
-    const parsed = parsePriceInput(raw);
-    if (parsed === 'invalid' || (parsed ?? undefined) === preset.pricePerSheet) return;
-    const updated = presetSource === 'account'
-      ? await setAccountPresetPrice(preset.id, parsed)
-      : setDevicePresetPrice(preset.id, parsed);
-    if (!updated) {
-      setPresetFeedback({ tone: 'warning', text: t('atelier.stock.presetSaveFailed') });
-      return;
-    }
-    setSavedPresets((current) => current.map((p) => (p.id === preset.id ? { ...updated, builtIn: false } : p)));
-    setPresetFeedback({ tone: 'success', text: t('atelier.stock.presetPriceSaved', { name: preset.name }) });
-    const current = {
-      height: activeSheet.height,
-      width: activeSheet.width,
-      material: activeSheet.material,
-      color: activeSheet.color,
-      hasGrain: activeSheet.hasGrain,
-      grainOrientation: activeSheet.grainOrientation,
-    };
-    if (isSamePanel(current, preset)) {
-      const { pricePerSheet: _previous, ...rest } = activeSheet;
-      void _previous;
-      const nextSheet: Sheet = parsed === null ? rest : { ...rest, pricePerSheet: parsed };
-      setSheets([nextSheet]);
-      repriceResult({ sheet: nextSheet });
-    }
-  };
 
 
   const { theme } = useTheme();
@@ -2115,7 +2037,7 @@ const commitPanelName = () => {
                 )}
               </div>
 
-              {/* Panel presets: pick a stock size, name it, save or delete it */}
+              {/* Panel presets: pick a stock size, or save the one typed under a name. */}
               <div className="flex flex-wrap items-center gap-2 px-4 pb-2 -mt-1">
                 <div className="relative flex-1 min-w-[180px]">
                   <PackageOpen className="w-3.5 h-3.5 text-slate-400 pointer-events-none absolute start-2.5 top-1/2 -translate-y-1/2 z-10" aria-hidden="true" />
@@ -2173,22 +2095,20 @@ const commitPanelName = () => {
                 <button
                   type="button"
                   onClick={() => void handleSavePreset()}
+                  disabled={!presetsReady || isSavingPreset}
                   aria-label={t('atelier.stock.savePresetAria')}
-                  className="px-3 py-2 rounded-lg bg-studio-field border border-studio-border hover:border-brand-500/50 text-[11px] font-bold text-slate-600 dark:text-slate-300 hover:text-brand-500 dark:hover:text-brand-400 flex items-center gap-1.5 transition-colors"
+                  className="px-3 py-2 rounded-lg bg-studio-field border border-studio-border hover:border-brand-500/50 text-[11px] font-bold text-slate-600 dark:text-slate-300 hover:text-brand-500 dark:hover:text-brand-400 flex items-center gap-1.5 transition-colors disabled:opacity-50 disabled:cursor-wait"
                 >
                   <BookmarkPlus className="w-3.5 h-3.5" />
                   {t('atelier.stock.savePreset')}
                 </button>
-                {savedPresets.length > 0 && (
-                  <button
-                    type="button"
-                    onClick={() => setIsPresetManageOpen((v) => !v)}
-                    className="px-2.5 py-2 rounded-lg text-[11px] font-bold text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition-colors"
-                    aria-expanded={isPresetManageOpen}
-                  >
-                    {t('atelier.stock.managePresets')}
-                  </button>
-                )}
+                {/* The list itself is managed on its own page. */}
+                <Link href="/panels"
+                  className="inline-flex items-center gap-1 px-2.5 py-2 rounded-lg text-[11px] font-bold text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition-colors"
+                >
+                  {t('atelier.stock.managePresets')}
+                  <ArrowRight className="w-3.5 h-3.5 rtl:-scale-x-100" aria-hidden="true" />
+                </Link>
               </div>
 
               {/* Panel name + preset name: the panel's own identity and the
@@ -2264,45 +2184,6 @@ const commitPanelName = () => {
               {presetFeedback && (
                 <div role="status" className={`mx-4 mb-2 px-3 py-2 rounded-lg text-[11px] font-semibold ${presetFeedback.tone === 'success' ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-300' : 'bg-amber-500/10 text-amber-600 dark:text-amber-300'}`}>
                   {presetFeedback.text}
-                </div>
-              )}
-
-              {isPresetManageOpen && savedPresets.length > 0 && (
-                <div className="px-4 pb-4 space-y-1" data-testid="preset-manager">
-                  {savedPresets.map((p) => (
-                    <div key={p.id} className="flex items-center justify-between px-3 py-2 rounded-lg bg-studio-field border border-studio-border">
-                      <span className="text-[11px] font-semibold text-slate-700 dark:text-slate-200">
-                        {p.name}
-                        <span className="ms-2 font-mono text-[10px] text-slate-500" dir="ltr">{formatDisplayValue(p.height, displayUnit)}×{formatDisplayValue(p.width, displayUnit)} {displayUnit}</span>
-                        {presetDetails(p) && (
-                          <span className="ms-2 text-[10px] font-normal text-slate-500 dark:text-slate-400">{presetDetails(p)}</span>
-                        )}
-                      </span>
-                      <span className="ms-auto me-2 flex items-center gap-1 shrink-0">
-                        <input
-                          key={`${p.id}-${p.pricePerSheet ?? ''}`}
-                          type="text"
-                          inputMode="decimal"
-                          dir="ltr"
-                          defaultValue={isPanelPrice(p.pricePerSheet) ? String(p.pricePerSheet) : ''}
-                          onBlur={(e) => void handlePresetPrice(p, e.target.value)}
-                          onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur(); }}
-                          placeholder={t('atelier.stock.presetPricePlaceholder')}
-                          aria-label={t('atelier.stock.presetPriceAria', { name: p.name })}
-                          className="w-20 px-2 py-1 rounded-md bg-studio-panel border border-studio-border text-[11px] font-mono text-slate-800 dark:text-slate-200 outline-none focus:border-brand-500/50"
-                        />
-                        <span className="text-[10px] text-slate-500" translate="no">{t('atelier.cost.currency')}</span>
-                      </span>
-                      <button
-                        type="button"
-                        onClick={() => void handleDeletePreset(p.id)}
-                        aria-label={t('atelier.stock.deletePresetAria')}
-                        className="p-1 rounded-md text-slate-400 hover:text-rose-400 transition-colors"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
-                    </div>
-                  ))}
                 </div>
               )}
 
