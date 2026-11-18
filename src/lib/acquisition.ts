@@ -10,8 +10,12 @@
  *   from auth.users group by 1;
  *
  * First touch wins: a later tagged visit does not overwrite a remembered one
- * until it expires. A sign-in with Google creates the account elsewhere and
- * carries no tags.
+ * until it expires.
+ *
+ * A sign-up with Google creates the account at Google's return, on the server
+ * (/auth/callback), where localStorage cannot be read. The remembered tags are
+ * therefore mirrored in a cookie, and the callback writes them into an account
+ * created moments ago that has no source yet (see tagsForNewAccount).
  *
  * Storage is passed in, so the rules run in a plain Node test.
  */
@@ -90,6 +94,64 @@ export function rememberAcquisition(storage: StorageLike, search: string, now: n
 /** The user_metadata fields to add at sign-up: empty when no tagged visit is remembered. */
 export function signupMetadata(storage: StorageLike, now: number): Acquisition['tags'] {
   return loadAcquisition(storage, now)?.tags ?? {};
+}
+
+// --- Google sign-up -------------------------------------------------------------
+
+export const ACQUISITION_COOKIE = 'qatlia-acq';
+
+/**
+ * An account created less than this long before the callback runs is the one
+ * this sign-in just created. An older account signing in again is left alone:
+ * its source is where it came from the first time.
+ */
+export const NEW_ACCOUNT_WINDOW_MS = 10 * 60 * 1000;
+
+/** The Set-Cookie value mirroring a remembered visit, until that visit expires. */
+export function acquisitionCookie(visit: Acquisition, now: number, secure: boolean): string {
+  const params = new URLSearchParams();
+  for (const [param, key] of Object.entries(TAGS) as Array<[keyof typeof TAGS, MetadataKey]>) {
+    const value = visit.tags[key];
+    if (value) params.set(param, value);
+  }
+  const maxAge = Math.max(0, Math.floor((visit.at + ACQUISITION_TTL_MS - now) / 1000));
+  const flags = `Path=/; Max-Age=${maxAge}; SameSite=Lax${secure ? '; Secure' : ''}`;
+  return `${ACQUISITION_COOKIE}=${encodeURIComponent(params.toString())}; ${flags}`;
+}
+
+/** The tags carried by a Cookie request header, validated like a query string; empty when absent. */
+export function parseAcquisitionCookie(header: string | null): Acquisition['tags'] {
+  if (!header) return {};
+  for (const part of header.split(';')) {
+    const separator = part.indexOf('=');
+    if (separator === -1 || part.slice(0, separator).trim() !== ACQUISITION_COOKIE) continue;
+    try {
+      return parseAcquisition(decodeURIComponent(part.slice(separator + 1).trim()), 0)?.tags ?? {};
+    } catch {
+      return {};
+    }
+  }
+  return {};
+}
+
+interface AccountLike {
+  created_at?: string | null;
+  user_metadata?: Record<string, unknown> | null;
+}
+
+/** The tags to write into an account the sign-in just created, or null when there is nothing to write. */
+export function tagsForNewAccount(
+  user: AccountLike | null | undefined,
+  tags: Acquisition['tags'],
+  now: number,
+): Acquisition['tags'] | null {
+  if (!user || !tags.signup_source) return null;
+  if (typeof user.user_metadata?.signup_source === 'string') return null;
+  const createdAt = user.created_at ? Date.parse(user.created_at) : NaN;
+  if (!Number.isFinite(createdAt) || now - createdAt > NEW_ACCOUNT_WINDOW_MS || createdAt - now > 60 * 1000) {
+    return null;
+  }
+  return tags;
 }
 
 /** signupMetadata for the current browser; empty wherever localStorage is unavailable. */

@@ -113,7 +113,7 @@ where kind = 'send_failed'
 order by created_at desc;
 ```
 
-**Inscriptions venues de WhatsApp.** Les liens du site envoyés par le bot portent `utm_source=whatsapp`. La première visite marquée est retenue dans le navigateur pendant 30 jours, puis enregistrée dans le compte à l'inscription par email (`signup_source`, visible dans la fiche client de l'admin, champ « Provenance »). Une inscription avec Google ne la porte pas.
+**Inscriptions venues de WhatsApp.** Les liens du site envoyés par le bot portent `utm_source=whatsapp`. La première visite marquée est retenue dans le navigateur pendant 30 jours, puis enregistrée dans le compte à l'inscription (`signup_source`, visible dans la fiche client de l'admin, champ « Provenance »). Avec Google, le compte est créé au retour de Google (`/auth/callback`) : la provenance y arrive par un cookie (`qatlia-acq`) et n'est écrite que dans un compte créé dans les 10 dernières minutes, jamais dans un compte ancien qui se reconnecte.
 
 ```sql
 select raw_user_meta_data->>'signup_source' as provenance, count(*)
