@@ -44,7 +44,7 @@ export const LANDING_ALTERNATES = {
 export const PUBLIC_ROUTES = [LANDING_PATHS.fr, LANDING_PATHS.ar, '/terms', '/privacy', '/refund'] as const;
 
 /** Routes crawlers have no reason to fetch: APIs, account and admin screens. */
-export const PRIVATE_ROUTES = ['/api/', '/admin', '/account', '/auth/', '/signup', '/history', '/credits/success'] as const;
+export const PRIVATE_ROUTES = ['/api/', '/admin', '/account', '/auth/', '/signup', '/history', '/panels', '/credits/success'] as const;
 
 /**
  * QatlIA's official profiles elsewhere. Listed as `sameAs` so search engines and AI

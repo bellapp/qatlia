@@ -20,6 +20,7 @@ interface WorkspaceEntry {
 export const WORKSPACE_ENTRIES: ReadonlyArray<WorkspaceEntry> = [
   { screen: 'atelier', href: '/atelier', label: 'workspaceNav.atelier', shortLabel: 'workspaceNav.atelierShort' },
   { screen: 'history', href: '/history', label: 'workspaceNav.history', shortLabel: 'workspaceNav.historyShort' },
+  { screen: 'panels', href: '/panels', label: 'workspaceNav.panels', shortLabel: 'workspaceNav.panelsShort' },
 ];
 
 const ICONS: Record<WorkspaceScreen, LucideIcon> = {
