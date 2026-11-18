@@ -33,7 +33,7 @@ export const dynamic = 'force-dynamic';
  * The first read of an account's list copies the panel catalogue into it
  * (see copyCatalogOnce); the list answered includes the copied panels.
  */
-export async function GET(req?: Request) {
+export async function GET(req: Request) {
   try {
     const supabase = createClient();
     const {
