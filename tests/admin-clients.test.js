@@ -214,3 +214,12 @@ test('getClientDetail : échec de la lecture du compte donne error', async () =>
   state.authError = { message: 'network' };
   assert.deepEqual(await getClientDetail(client, UUID), { status: 'error' });
 });
+
+test("getClientDetail : la provenance de l'inscription vient de user_metadata", async () => {
+  const { client, state } = freshDb();
+  assert.equal((await getClientDetail(client, UUID)).client.identity.signupSource, null);
+  state.authUser.user_metadata = { full_name: 'Karim', signup_source: 'whatsapp', signup_campaign: 'ctwa' };
+  const identity = (await getClientDetail(client, UUID)).client.identity;
+  assert.equal(identity.signupSource, 'whatsapp');
+  assert.equal(identity.signupCampaign, 'ctwa');
+});

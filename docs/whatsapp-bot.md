@@ -9,7 +9,9 @@ Le bot répond aux messages WhatsApp reçus sur le numéro de QatliA (06 00 93 7
 - les choix 1, 2 et 3 reçoivent des réponses fixes (les mêmes textes que les réponses rapides) ;
 - le texte libre est traité par l'IA, qui s'appuie uniquement sur les informations du code de QatliA (prix, offres, FAQ) ;
 - les vocaux, vidéos, documents, localisations et contacts sont passés à un humain ;
-- le bot répond en français ou en arabe selon la langue du prospect ;
+- le bot répond en français ou en arabe selon la langue du prospect. Un premier contact venu de la publicité reçoit la darija par défaut, comme la pub : le message que WhatsApp pré-remplit (« Bonjour ! Puis-je en savoir plus… ») suit la langue du téléphone et ne dit rien de la personne. Le bot passe au français dès que la personne écrit en français ;
+- une personne déjà accueillie qui revient par la publicité reçoit de nouveau le menu à boutons (pas une présentation écrite par l'IA) ;
+- une photo reçoit le lien direct de l'atelier (`qatlia.ma/atelier`), qui s'ouvre sans compte et garde la photo pendant l'inscription ;
 - **en coexistence, le bot ne répond qu'aux personnes venues de la publicité** (Click-to-WhatsApp). Les clients existants qui écrivent à la ligne de support continuent de n'avoir que vous comme interlocuteur. Avec `WHATSAPP_BOT_SCOPE=all`, le bot répond à tout le monde ;
 - **chaque passage à un humain** (vocal, choix 3, réponse envoyée depuis l'app, question hors des informations de QatliA) fait taire le bot pour ce contact pendant 24 h.
 
@@ -99,3 +101,23 @@ Les noms ci-dessous sont exacts. Les valeurs ne doivent jamais être écrites da
   3. Tester ensuite le passage à un humain **en dernier**, chaque fois depuis un numéro neuf (en appuyant de nouveau sur la publicité et en attendant l'accueil), car chaque passage à un humain fait taire le bot pour ce contact pendant 24 h : après l'accueil, un vocal ; puis `3` ; puis, après l'accueil, une réponse envoyée depuis l'app et vérifier que le bot se tait.
 - [ ] **6. Retour arrière immédiat.** Mettre `WHATSAPP_BOT_ENABLED=false` dans Vercel, redéployer, puis réactiver le message d'accueil dans l'app WhatsApp Business.
 - [ ] **7. Où lire les conversations.** Dans Supabase, table `whatsapp_messages`. Une boîte de réception web est hors périmètre de la v1.
+
+## Suivi
+
+**Envois ratés.** Un envoi refusé ou coupé est retenté une fois (jamais après un délai dépassé, pour ne pas envoyer deux fois le même message). S'il échoue encore, le texte est enregistré avec `kind = 'send_failed'` : les logs Vercel ne sont gardés que quelques minutes, la table le garde. Pour voir les prospects restés sans réponse :
+
+```sql
+select wa_id, created_at, left(body, 60) as debut
+from whatsapp_messages
+where kind = 'send_failed'
+order by created_at desc;
+```
+
+**Inscriptions venues de WhatsApp.** Les liens du site envoyés par le bot portent `utm_source=whatsapp`. La première visite marquée est retenue dans le navigateur pendant 30 jours, puis enregistrée dans le compte à l'inscription par email (`signup_source`, visible dans la fiche client de l'admin, champ « Provenance »). Une inscription avec Google ne la porte pas.
+
+```sql
+select raw_user_meta_data->>'signup_source' as provenance, count(*)
+from auth.users
+where created_at > now() - interval '30 days'
+group by 1;
+```

@@ -561,3 +561,69 @@ test('sendButtons returns null when the provider refuses the message', async () 
   const fetchImpl = fakeFetch(() => new Response('{}', { status: 400 }));
   assert.equal(await sendButtons(YCLOUD_CONFIG, '1', 'Bonjour', BUTTONS, fetchImpl), null);
 });
+
+// --- failed sends --------------------------------------------------------------
+
+test('recentHistory leaves out the sends that failed', async () => {
+  const rows = [
+    { direction: 'bot', body: 'never received', wamid: null, kind: 'send_failed' },
+    { direction: 'bot', body: 'received', wamid: 'wamid.R', kind: 'fixed' },
+    { direction: 'user', body: 'hello', wamid: 'wamid.B', kind: 'text' },
+  ];
+  const db = fakeDb(() => ok(rows));
+  assert.deepEqual(await recentHistory(db, '1', 10), [
+    { direction: 'user', body: 'hello' },
+    { direction: 'bot', body: 'received' },
+  ]);
+  assert.match(db.queries[0].columns, /\bkind\b/);
+});
+
+// --- one retry -----------------------------------------------------------------
+
+function sequenceFetch(responders) {
+  const calls = [];
+  const impl = async (url, init) => {
+    calls.push({ url, init });
+    const respond = responders[Math.min(calls.length, responders.length) - 1];
+    return respond();
+  };
+  impl.calls = calls;
+  return impl;
+}
+const okMeta = () => new Response(JSON.stringify({ messages: [{ id: 'wamid.RETRY' }] }), { status: 200 });
+
+test('a send the provider answered 5xx or 429 is tried once more', async () => {
+  for (const status of [503, 429]) {
+    const fetchImpl = sequenceFetch([() => new Response('{}', { status }), okMeta]);
+    assert.equal(await sendText(CONFIG, '1', 'hi', fetchImpl), 'wamid.RETRY', String(status));
+    assert.equal(fetchImpl.calls.length, 2);
+  }
+});
+
+test('a connection failure is tried once more, and gives up after the second failure', async () => {
+  const fetchImpl = sequenceFetch([
+    () => {
+      throw new TypeError('fetch failed');
+    },
+  ]);
+  assert.equal(await sendText(YCLOUD_CONFIG, '1', 'hi', fetchImpl), null);
+  assert.equal(fetchImpl.calls.length, 2);
+});
+
+test('a refused message, a provider failure or a timeout is not sent twice', async () => {
+  const timeout = () => {
+    const error = new Error('timed out');
+    error.name = 'TimeoutError';
+    throw error;
+  };
+  const failedStatus = () => new Response(JSON.stringify({ id: 'yc', status: 'failed', errorCode: '131047' }), { status: 200 });
+  for (const [config, respond] of [
+    [CONFIG, () => new Response('{}', { status: 400 })],
+    [YCLOUD_CONFIG, failedStatus],
+    [YCLOUD_CONFIG, timeout],
+  ]) {
+    const fetchImpl = sequenceFetch([respond, okMeta]);
+    assert.equal(await sendText(config, '1', 'hi', fetchImpl), null);
+    assert.equal(fetchImpl.calls.length, 1);
+  }
+});

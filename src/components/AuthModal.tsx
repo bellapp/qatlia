@@ -7,6 +7,7 @@ import { QatlIALogo } from '@/components/QatlIALogo';
 import { useLocale } from '@/components/LocaleProvider';
 import type { TranslationKey } from '@/i18n';
 import { SIGNUP_FREE_CREDITS } from '@/lib/billing/policy';
+import { browserSignupMetadata } from '@/lib/acquisition';
 
 /**
  * Vision analyses granted on sign-up, read from the credit policy so the copy
@@ -233,7 +234,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
         const { data, error } = await supabase.auth.signUp({
           email,
           password,
-          options: { data: { full_name: fullName } },
+          options: { data: { full_name: fullName, ...browserSignupMetadata() } },
         });
         if (error) throw error;
         if (isExistingAccount(data.user)) {

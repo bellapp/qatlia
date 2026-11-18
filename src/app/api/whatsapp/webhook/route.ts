@@ -16,10 +16,11 @@ import { getWhatsAppConfig, type WhatsAppConfig } from '@/lib/whatsapp/config';
 import { verifySignature } from '@/lib/whatsapp/signature';
 import { parseWebhook, type EchoEvent, type InboundEvent } from '@/lib/whatsapp/payload';
 import { COPY, type MenuButton } from '@/lib/whatsapp/copy';
-import { HANDOFF_HOURS, decide, detectLang, type Decision } from '@/lib/whatsapp/router';
+import { HANDOFF_HOURS, decide, resolveLang, type Decision } from '@/lib/whatsapp/router';
 import { HISTORY_MESSAGES, askAssistant } from '@/lib/whatsapp/assistant';
 import { sendButtons, sendText } from '@/lib/whatsapp/send';
 import {
+  SEND_FAILED_KIND,
   WhatsAppTablesMissingError,
   claimGreeting,
   claimInbound,
@@ -50,7 +51,11 @@ function handoffDeadline(now: Date): Date {
   return new Date(now.getTime() + HANDOFF_HOURS * HOUR_MS);
 }
 
-/** Sends one text (with reply buttons when given) and logs it. Returns false (and records nothing) when the send failed. */
+/**
+ * Sends one text (with reply buttons when given) and logs it. Returns false when the send failed;
+ * the failure is then logged as a `send_failed` row, so a prospect left without an answer shows up
+ * in the database (the platform logs are kept only for minutes).
+ */
 async function deliver(
   db: SupabaseClient,
   config: WhatsAppConfig,
@@ -60,7 +65,15 @@ async function deliver(
   buttons?: readonly MenuButton[],
 ): Promise<boolean> {
   const wamid = buttons ? await sendButtons(config, waId, body, buttons) : await sendText(config, waId, body);
-  if (wamid === null) return false;
+  if (wamid === null) {
+    try {
+      await recordOutbound(db, { waId, wamid: null, direction: 'bot', kind: SEND_FAILED_KIND, body });
+    } catch (error) {
+      // Recording is a diagnostic: it must not stop the caller from trying its plain-text fallback.
+      console.error('[whatsapp] could not record a failed send', describeError(error));
+    }
+    return false;
+  }
   await recordOutbound(db, { waId, wamid, direction: 'bot', kind, body });
   return true;
 }
@@ -92,7 +105,8 @@ async function handleInbound(db: SupabaseClient, config: WhatsAppConfig, event: 
   const claimed = await claimInbound(db, { wamid: event.wamid, waId, kind: event.kind, body: event.text });
   if (!claimed) return; // Meta redelivered a message that was already handled.
 
-  const lang = detectLang(event.text, contact.lang);
+  // A pre-filled ad message follows the phone's language, not the person's: see resolveLang.
+  const lang = resolveLang(event, contact);
   if (lang !== contact.lang) {
     await updateContact(db, waId, { lang });
     contact = { ...contact, lang };

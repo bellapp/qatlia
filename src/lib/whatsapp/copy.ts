@@ -14,6 +14,18 @@ export type Lang = 'fr' | 'ar';
 
 export const DEMO_VIDEO_URL = 'https://youtu.be/dQE_PzXUAR0';
 
+/** Tags every site link the bot sends, so a sign-up can be traced back to WhatsApp (see src/lib/acquisition.ts). */
+export const WHATSAPP_TRACKING = 'utm_source=whatsapp';
+
+/** The site in the reader's language: the darija texts open the Arabic landing page. */
+export const SITE_LINKS: Record<Lang, string> = {
+  fr: `https://qatlia.ma/?${WHATSAPP_TRACKING}`,
+  ar: `https://qatlia.ma/ar?${WHATSAPP_TRACKING}`,
+};
+
+/** The workshop opens without an account: the photo is kept and read right after sign-up. */
+export const ATELIER_LINK = `https://qatlia.ma/atelier?${WHATSAPP_TRACKING}`;
+
 const SUPPORT_URL = supportWhatsAppUrl();
 
 // Packs are listed from the catalog so a price change reaches the bot too.
@@ -42,16 +54,23 @@ export const MENU_BUTTONS: readonly MenuButton[] = [
 const GREETING_INTRO_FR = `Bonjour 👋 Merci pour votre intérêt !
 QatliA optimise la découpe de vos panneaux : prenez en photo votre fiche de mesure et recevez le plan de coupe en PDF en quelques secondes.
 🎥 Démo en 1 min : ${DEMO_VIDEO_URL}
-👉 Essai gratuit : https://qatlia.ma`;
+👉 Essai gratuit : ${SITE_LINKS.fr}`;
 
 const GREETING_INTRO_AR = `مرحبا 👋 QatliA كيعطيك مخطط تقطيع الألواح من صورة ورقة القياسات فثواني.
-👉 جرّب مجانا: https://qatlia.ma`;
+👉 جرّب مجانا: ${SITE_LINKS.ar}`;
+
+const MENU_AGAIN_FR = 'Re-bonjour 👋 Choisissez ci-dessous 👇 ou posez directement votre question ✍️';
+const MENU_AGAIN_AR = 'مرحبا بيك مرة أخرى 👋 ختار من التحت 👇 ولا سول سؤالك مباشرة';
 
 export const COPY: {
   /** First-contact message, sent with the MENU_BUTTONS under it. */
   greeting: string;
   /** The same greeting as plain text with a typed 1/2/3 menu, used when the button message cannot be sent. */
   greetingPlain: string;
+  /** Short menu for a contact already greeted who comes back through the ad, sent with the MENU_BUTTONS. */
+  menuAgain: string;
+  /** The same as plain text with a typed 1/2/3 menu. */
+  menuAgainPlain: string;
   howItWorks: Record<Lang, string>;
   pricing: Record<Lang, string>;
   advisor: Record<Lang, string>;
@@ -76,17 +95,29 @@ Ou posez directement votre question ✍️
 ${GREETING_INTRO_AR}
 جاوب بـ 1 / 2 / 3 ولا سول سؤالك مباشرة`,
 
+  menuAgain: `${MENU_AGAIN_FR}
+
+${MENU_AGAIN_AR}`,
+
+  menuAgainPlain: `${MENU_AGAIN_FR}
+1️⃣ Comment ça marche
+2️⃣ Tarifs
+3️⃣ Parler à un conseiller
+
+${MENU_AGAIN_AR}
+جاوب بـ 1 / 2 / 3`,
+
   howItWorks: {
     fr: `Voici comment ça marche en 1 minute 🎥
 ${DEMO_VIDEO_URL}
 
-1. Créez votre compte sur https://qatlia.ma
+1. Créez votre compte sur ${SITE_LINKS.fr}
 2. Prenez en photo votre fiche de mesure
 3. Lancez l'optimisation, et vous obtenez le plan de coupe et le PDF pour l'atelier.`,
     ar: `شوف كيفاش كيخدم فدقيقة 🎥
 ${DEMO_VIDEO_URL}
 
-1. دير حساب فـ https://qatlia.ma
+1. دير حساب فـ ${SITE_LINKS.ar}
 2. صوّر ورقة القياسات
 3. ضغط على التحسين، وغادي يعطيك مخطط التقطيع وتقرير PDF للورشة.`,
   },
@@ -100,7 +131,7 @@ Recalculs de la même liste gratuits pendant ${ANALYSIS_WINDOW_HOURS} h, exports
 Packs, sans abonnement :
 ${PACK_LINES_FR}
 
-👉 https://qatlia.ma`,
+👉 ${SITE_LINKS.fr}`,
     ar: `💰 الأثمنة ديال QatliA
 🎁 ${SIGNUP_FREE_CREDITS} كريدي مجانا ملي كتسجل باش تجرب.
 ${VISION_CREDIT_COST} كريدي = تحليل كامل (صورة الورقة، حتى ${MAX_SCANS_PER_ANALYSIS} صور إلا كانت فعدة أوراق، + مخطط التقطيع).
@@ -109,7 +140,7 @@ ${VISION_CREDIT_COST} كريدي = تحليل كامل (صورة الورقة، 
 الباقات، بلا اشتراك:
 ${PACK_LINES_AR}
 
-👉 https://qatlia.ma`,
+👉 ${SITE_LINKS.ar}`,
   },
 
   advisor: {
@@ -123,8 +154,10 @@ ${PACK_LINES_AR}
   },
 
   imageHint: {
-    fr: `Merci pour la photo ! Pour obtenir votre plan de coupe, créez votre compte sur https://qatlia.ma puis prenez votre fiche de mesure en photo dans l'atelier : l'IA lit les pièces pour vous.`,
-    ar: `شكرا على الصورة! باش تاخد مخطط التقطيع، دير حساب فـ https://qatlia.ma وصوّر ورقة القياسات فالورشة، والذكاء الاصطناعي غادي يقرا القطع.`,
+    fr: `Merci pour la photo ! Pour obtenir le plan de coupe, ouvrez l'atelier et prenez votre fiche de mesure en photo : l'IA lit les pièces pour vous. Vous créez ensuite votre compte gratuit (${SIGNUP_FREE_CREDITS} crédits offerts), votre photo est gardée.
+👉 ${ATELIER_LINK}`,
+    ar: `شكرا على الصورة! باش تاخد مخطط التقطيع، حل الورشة وصوّر ورقة القياسات، والذكاء الاصطناعي غادي يقرا القطع. من بعد دير حساب مجاني (${SIGNUP_FREE_CREDITS} كريدي فابور)، والصورة ديالك كتبقى محفوظة.
+👉 ${ATELIER_LINK}`,
   },
 
   mediaHandoff: {
