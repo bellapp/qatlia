@@ -739,6 +739,7 @@ const commitPanelName = () => {
       projectId: lastSavedProjectId,
       localProjectId,
       restoredAt,
+      keptAt: Date.now(),
     });
   // Refreshed at every render: the atelier closes long after the render that
   // set up the effect which keeps the job.
@@ -808,13 +809,16 @@ const commitPanelName = () => {
 
     const savedProj = sessionStorage.getItem('qatlia_saved_project');
     // The job kept when the atelier was left for another screen of the app. A
-    // project opened from the history comes before it, and so does work kept
-    // for a sign-in asked from this tab, which the atelier resumes further down.
+    // project opened from the history comes before it; work kept for a sign-in
+    // asked from this tab too, unless the job was changed after it (see
+    // draftToRestore). That older work is then dropped, never resumed later.
     const pendingWork = loadPendingWork(window.localStorage);
+    const pendingFromThisTab = pendingWork && isFromThisTab(window.sessionStorage, pendingWork) ? pendingWork : null;
     const draft = draftToRestore(readAtelierDraft(window.sessionStorage), {
       openedFromHistory: !!savedProj,
-      pendingWorkFromThisTab: !!pendingWork && isFromThisTab(window.sessionStorage, pendingWork),
+      pendingWork: pendingFromThisTab,
     });
+    if (draft && pendingFromThisTab) clearPendingWork(window.localStorage, window.sessionStorage);
     // Read once: gone a tick later, so React's development double pass still finds it.
     window.setTimeout(() => clearAtelierDraft(window.sessionStorage), 0);
     // A kept job put back stands like a reopened project: work kept for a
@@ -1801,7 +1805,7 @@ const commitPanelName = () => {
 
       {/* The bar shared by every screen. It sticks under the header; the
           machine figures at its end are the atelier's own addition. */}
-      <WorkspaceNav current="atelier" className="max-w-[1500px] mx-auto px-4 sm:px-6">
+      <WorkspaceNav current="atelier" busy={isProcessingVision || isOptimizing} className="max-w-[1500px] mx-auto px-4 sm:px-6">
         {/* Machine setup figures, pushed to the trailing edge. */}
         <p className="hidden lg:block font-mono text-[10px] text-slate-500" dir="ltr">
           {formatDisplayValue(activeSheet.height, displayUnit)} × {formatDisplayValue(activeSheet.width, displayUnit)} {displayUnit}

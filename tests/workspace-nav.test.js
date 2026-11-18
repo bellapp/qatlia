@@ -97,3 +97,24 @@ test('every name of the bar is written in the three languages', () => {
   assert.equal(translate('fr', 'workspaceNav.panels'), 'Configuration des panneaux');
   assert.equal(translate('fr', 'workspaceNav.panelsShort'), 'Panneaux');
 });
+
+// Owner decision, 2026-11-17: leaving the atelier while a cut list is being
+// read or a plan computed would lose what was paid for. The bar waits.
+
+test('while the atelier is busy, the bar only shows the other screens, without leading to them', () => {
+  const html = render({ current: 'atelier', busy: true });
+  const rendered = links(html);
+
+  assert.deepEqual(rendered.map((link) => link.href), ['/atelier'], 'only the screen on display stays a link');
+  const waiting = [...html.matchAll(/<span aria-disabled="true" title="([^"]+)"[^>]*>/g)];
+  const { WORKSPACE_ENTRIES } = loadComponentModule(SOURCE);
+  assert.equal(waiting.length, WORKSPACE_ENTRIES.length - 1, 'every other screen waits');
+  assert.match(waiting[0][1], /^Patientez/);
+  assert.match(html, />Historique des débits</, 'still named');
+});
+
+test('the atelier makes the bar wait while a cut list is read or a plan computed', () => {
+  const atelier = require('node:fs').readFileSync(require('node:path').resolve('src/app/(site)/atelier/page.tsx'), 'utf8');
+
+  assert.match(atelier, /<WorkspaceNav current="atelier" busy=\{isProcessingVision \|\| isOptimizing\} /);
+});

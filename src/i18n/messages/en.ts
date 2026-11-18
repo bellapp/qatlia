@@ -22,6 +22,7 @@ export const en: Catalog = {
     historyShort: 'History',
     panels: 'Panel setup',
     panelsShort: 'Panels',
+    busy: 'Please wait: the reading or the calculation under way would be lost.',
   },
   language: {
     fr: 'French',

@@ -52,6 +52,7 @@ function draft(overrides = {}) {
     projectId: 'cloud-1',
     localProjectId: null,
     restoredAt: '2026-11-17T09:00:00.000Z',
+    keptAt: 2000,
     ...overrides,
   };
 }
@@ -164,6 +165,7 @@ const leaving = (overrides = {}) => ({
   projectId: 'cloud-1',
   localProjectId: null,
   restoredAt: '2026-11-17T09:00:00.000Z',
+  keptAt: 2000,
   ...overrides,
 });
 
@@ -175,6 +177,7 @@ test('a job with its plan is kept whole', () => {
   assert.equal(kept.plannedPieces, null, 'the plan was made from the pieces on screen: said once');
   assert.equal(kept.restoredAt, '2026-11-17T09:00:00.000Z');
   assert.equal(kept.projectId, 'cloud-1');
+  assert.equal(kept.keptAt, 2000, 'when it was kept');
 });
 
 test('pieces changed since the plan are kept beside the ones the plan was made from', () => {
@@ -239,13 +242,30 @@ test('a job kept and read back restores as a saved project does: plan, sheets in
 
 // Which one wins when the atelier opens.
 
-test('a project opened from the history, or work kept for a sign-in in this tab, comes before the draft', () => {
+test('a project opened from the history comes before the kept job', () => {
   const kept = draft();
 
-  assert.equal(draftToRestore(kept, { openedFromHistory: false, pendingWorkFromThisTab: false }), kept);
-  assert.equal(draftToRestore(kept, { openedFromHistory: true, pendingWorkFromThisTab: false }), null);
-  assert.equal(draftToRestore(kept, { openedFromHistory: false, pendingWorkFromThisTab: true }), null);
-  assert.equal(draftToRestore(null, { openedFromHistory: false, pendingWorkFromThisTab: false }), null);
+  assert.equal(draftToRestore(kept, { openedFromHistory: false, pendingWork: null }), kept);
+  assert.equal(draftToRestore(kept, { openedFromHistory: true, pendingWork: null }), null);
+  assert.equal(draftToRestore(null, { openedFromHistory: false, pendingWork: null }), null);
+});
+
+// Owner decision, 2026-11-17: of the job kept when the atelier was left and the
+// work kept for a sign-in asked from this tab, the newest comes back.
+
+test('work kept for a sign-in comes back when nothing was changed after it', () => {
+  const pieces = draft().project.pieces;
+
+  assert.equal(draftToRestore(draft({ keptAt: 1000 }), { openedFromHistory: false, pendingWork: { savedAt: 1500, pieces } }), null, 'kept before it');
+  assert.equal(draftToRestore(draft({ keptAt: 2000 }), { openedFromHistory: false, pendingWork: { savedAt: 1500, pieces } }), null, 'kept after it, same pieces: the sign-in resumes');
+});
+
+test('a job changed after the sign-in was asked comes back instead of the older work', () => {
+  const kept = draft({ keptAt: 2000 });
+  const older = { savedAt: 1500, pieces: [{ id: 'p1', height: 72, width: 58, quantity: 1 }] };
+
+  assert.equal(draftToRestore(kept, { openedFromHistory: false, pendingWork: older }), kept);
+  assert.equal(draftToRestore(kept, { openedFromHistory: true, pendingWork: older }), null, 'a reopened project still comes first');
 });
 
 // The atelier itself, read as text: the page needs a session to run.
@@ -255,6 +275,7 @@ const atelier = read('src/app/(site)/atelier/page.tsx');
 
 test('the atelier keeps its job when it closes, from what the last render showed', () => {
   assert.match(atelier, /const leaveDraft = \(\) =>\s*buildAtelierDraft\(\{/);
+  assert.match(atelier, /keptAt: Date\.now\(\),/);
   assert.match(atelier, /const leaveDraftRef = useRef\(leaveDraft\);\s*leaveDraftRef\.current = leaveDraft;/, 'refreshed at every render');
   assert.match(
     atelier,
@@ -274,7 +295,7 @@ test('the scan is kept as its thumbnail and its path, never as the full image', 
 test('the atelier restores the kept job only when nothing comes before it, and forgets it once read', () => {
   const restore = atelier.slice(atelier.indexOf("const savedProj = sessionStorage.getItem('qatlia_saved_project');"), atelier.indexOf('const handleDisplayUnitChange'));
 
-  assert.match(restore, /const draft = draftToRestore\(readAtelierDraft\(window\.sessionStorage\), \{\s*openedFromHistory: !!savedProj,\s*pendingWorkFromThisTab: /);
+  assert.match(restore, /const draft = draftToRestore\(readAtelierDraft\(window\.sessionStorage\), \{\s*openedFromHistory: !!savedProj,\s*pendingWork: pendingFromThisTab,\s*\}\);/);
   assert.match(restore, /window\.setTimeout\(\(\) => clearAtelierDraft\(window\.sessionStorage\), 0\);/);
   assert.match(restore, /openedFromHistoryRef\.current = !!savedProj \|\| !!draft;/, 'work kept for a sign-in elsewhere stays out, as after a reopened project');
   assert.match(restore, /const parsed = draft \? draft\.project : JSON\.parse\(savedProj \?\? ''\);/, 'one restore path for both');
@@ -283,7 +304,8 @@ test('the atelier restores the kept job only when nothing comes before it, and f
   assert.match(restore, /const restoredProjectIdRaw = draft \? draft\.projectId : /, 'the kept job keeps its project');
   assert.match(restore, /const restoredLocalIdRaw = draft \? draft\.localProjectId : /, 'and its device entry');
   assert.match(restore, /plannedPiecesRef\.current = draft\?\.plannedPieces \? /, 'and the pieces its plan was made from');
-  assert.match(restore, /pendingWorkFromThisTab: !!pendingWork && isFromThisTab\(window\.sessionStorage, pendingWork\),/);
+  assert.match(restore, /const pendingFromThisTab = pendingWork && isFromThisTab\(window\.sessionStorage, pendingWork\) \? pendingWork : null;/);
+  assert.match(restore, /if \(draft && pendingFromThisTab\) clearPendingWork\(window\.localStorage, window\.sessionStorage\);/, 'the older work is dropped, never resumed later');
 });
 
 test('a new job leaves no kept job behind', () => {

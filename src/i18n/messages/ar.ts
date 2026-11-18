@@ -22,6 +22,7 @@ export const ar: Catalog = {
     historyShort: 'السجل',
     panels: 'إعداد الألواح',
     panelsShort: 'الألواح',
+    busy: 'انتظر: ستضيع القراءة أو الحساب الجاري.',
   },
   language: {
     fr: 'الفرنسية',

@@ -34,6 +34,11 @@ interface WorkspaceNavProps {
   className?: string;
   /** Trailing slot, pushed to the end of the row (the atelier's machine figures). */
   children?: ReactNode;
+  /**
+   * A cut list is being read or a plan computed: leaving now would lose what
+   * was paid for, so the other screens show without leading anywhere.
+   */
+  busy?: boolean;
 }
 
 /**
@@ -42,7 +47,7 @@ interface WorkspaceNavProps {
  * It sticks under the header (h-16 = top-16) and is the only element allowed
  * to scroll sideways on a narrow screen.
  */
-export function WorkspaceNav({ current, className, children }: WorkspaceNavProps) {
+export function WorkspaceNav({ current, className, children, busy = false }: WorkspaceNavProps) {
   const { t } = useLocale();
 
   return (
@@ -55,6 +60,25 @@ export function WorkspaceNav({ current, className, children }: WorkspaceNavProps
           {WORKSPACE_ENTRIES.map((entry) => {
             const Icon = ICONS[entry.screen];
             const isCurrent = entry.screen === current;
+            const labels = (
+              <>
+                <Icon className="w-4 h-4 shrink-0" aria-hidden="true" />
+                <span className="hidden sm:inline">{t(entry.label)}</span>
+                <span className="sm:hidden">{t(entry.shortLabel)}</span>
+              </>
+            );
+            if (busy && !isCurrent) {
+              return (
+                <span
+                  key={entry.screen}
+                  aria-disabled="true"
+                  title={t('workspaceNav.busy')}
+                  className="inline-flex min-h-10 shrink-0 items-center gap-2 px-3 rounded-lg text-xs font-bold text-slate-400 dark:text-slate-500 cursor-wait"
+                >
+                  {labels}
+                </span>
+              );
+            }
             return (
               <Link
                 key={entry.screen}
@@ -66,9 +90,7 @@ export function WorkspaceNav({ current, className, children }: WorkspaceNavProps
                     : 'text-slate-600 dark:text-slate-300 hover:bg-studio-panel hover:text-slate-900 dark:hover:text-white'
                 }`}
               >
-                <Icon className="w-4 h-4 shrink-0" aria-hidden="true" />
-                <span className="hidden sm:inline">{t(entry.label)}</span>
-                <span className="sm:hidden">{t(entry.shortLabel)}</span>
+                {labels}
               </Link>
             );
           })}

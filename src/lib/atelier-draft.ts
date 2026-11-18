@@ -22,6 +22,8 @@ export interface AtelierDraft {
   localProjectId: string | null;
   /** ISO date shown by the "reopened plan" banner, when the plan came from the history. */
   restoredAt: string | null;
+  /** When the atelier was left (ms): set against work kept for a sign-in, the newest wins. */
+  keptAt: number;
 }
 
 type DraftStore = Pick<Storage, 'getItem' | 'setItem' | 'removeItem'>;
@@ -42,7 +44,8 @@ function isAtelierDraft(value: unknown): value is AtelierDraft {
     && (value.cutMode === '2d' || value.cutMode === '1d')
     && isStringOrNull(value.projectId)
     && isStringOrNull(value.localProjectId)
-    && isStringOrNull(value.restoredAt);
+    && isStringOrNull(value.restoredAt)
+    && typeof value.keptAt === 'number' && Number.isFinite(value.keptAt);
 }
 
 function tryWrite(store: DraftStore, draft: AtelierDraft): boolean {
@@ -149,6 +152,7 @@ export interface AtelierLeaveState {
   projectId: string | null;
   localProjectId: string | null;
   restoredAt: string | null;
+  keptAt: number;
 }
 
 /** The draft of an atelier being left: its job as a save would store it, minus a plan that is not there. */
@@ -167,19 +171,29 @@ export function buildAtelierDraft(state: AtelierLeaveState): AtelierDraft {
     projectId: state.projectId,
     localProjectId: state.localProjectId,
     restoredAt: state.hasPlan ? state.restoredAt : null,
+    keptAt: state.keptAt,
   };
 }
 
 /**
  * The draft the atelier puts back as it opens, or null. A project opened from
- * the history is what the artisan just asked for; work kept for a sign-in asked
- * from this tab is resumed by the atelier itself. Both come before the draft.
+ * the history is what the artisan just asked for: it comes first. Work kept for
+ * a sign-in asked from this tab (`pendingWork`, null otherwise) is resumed by
+ * the atelier itself, unless the job was changed after it: a draft kept later,
+ * with other pieces, is the newer work and comes back instead (owner decision,
+ * 2026-11-17). Kept later with the same pieces, it is the same work: the sign-in
+ * resumes.
  */
 export function draftToRestore(
   draft: AtelierDraft | null,
-  ahead: { openedFromHistory: boolean; pendingWorkFromThisTab: boolean }
+  ahead: { openedFromHistory: boolean; pendingWork: { savedAt: number; pieces: readonly unknown[] } | null }
 ): AtelierDraft | null {
-  return ahead.openedFromHistory || ahead.pendingWorkFromThisTab ? null : draft;
+  if (!draft || ahead.openedFromHistory) return null;
+  const pending = ahead.pendingWork;
+  if (!pending) return draft;
+  const changedSince = draft.keptAt > pending.savedAt
+    && JSON.stringify(draft.project.pieces ?? []) !== JSON.stringify(pending.pieces);
+  return changedSince ? draft : null;
 }
 
 export interface SavedJob {
