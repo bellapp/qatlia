@@ -70,7 +70,28 @@ function createFakeSupabase() {
           if (state.authError) return { data: { user: null }, error: state.authError };
           return { data: { user: state.authUser && state.authUser.id === id ? state.authUser : null }, error: null };
         },
+        deleteUser: async (id) => {
+          state.rpcCalls.push({ name: 'auth.deleteUser', args: { id } });
+          if (state.deleteError) return { data: { user: null }, error: state.deleteError };
+          return { data: { user: state.authUser }, error: null };
+        },
       },
+    },
+    // Storage: `state.storage[bucket]` lists the file names in any folder;
+    // `state.storageError` makes every call fail.
+    storage: {
+      from: (bucket) => ({
+        list: async (folder, options) => {
+          state.rpcCalls.push({ name: 'storage.list', args: { bucket, folder, options } });
+          if (state.storageError) return { data: null, error: state.storageError };
+          return { data: (state.storage?.[bucket] ?? []).map((name) => ({ name })), error: null };
+        },
+        remove: async (paths) => {
+          state.rpcCalls.push({ name: 'storage.remove', args: { bucket, paths } });
+          if (state.storageError) return { data: null, error: state.storageError };
+          return { data: paths.map((name) => ({ name })), error: null };
+        },
+      }),
     },
   };
 

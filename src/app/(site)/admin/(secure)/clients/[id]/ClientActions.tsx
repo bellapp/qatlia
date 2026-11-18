@@ -2,7 +2,7 @@
 
 import { useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Minus, Plus, Save } from 'lucide-react';
+import { Minus, Plus, Save, Trash2 } from 'lucide-react';
 
 const inputClass =
   'w-full px-3 py-2 rounded-lg bg-white/5 border border-white/10 text-sm text-slate-200 outline-none focus:border-amber-500/40';
@@ -159,6 +159,102 @@ export function CreditAdjustForm({ userId, balance }: { userId: string; balance:
         {busy ? '…' : confirming ? `Confirmer le retrait de ${quantity} crédit${quantity > 1 ? 's' : ''}` : direction === 'add' ? 'Ajouter les crédits' : 'Retirer les crédits'}
       </button>
       <p className="text-[11px] text-slate-500">Le client verra « Ajustement QatliA » dans son historique, sans le motif.</p>
+      <Feedback message={message} />
+    </form>
+  );
+}
+
+/**
+ * Delete the account, once the admin has typed the client's email (its id
+ * when it has none). The route refuses again on its own for an account that
+ * has paid or an admin account; `blockedReason` only spares a useless try.
+ */
+export function DeleteAccountForm({
+  userId,
+  confirmValue,
+  blockedReason,
+}: {
+  userId: string;
+  confirmValue: string;
+  blockedReason: string | null;
+}) {
+  const router = useRouter();
+  const [typed, setTyped] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [message, setMessage] = useState<Message>(null);
+
+  if (blockedReason) {
+    return <p className="text-xs text-slate-400">{blockedReason}</p>;
+  }
+
+  const matches = typed.trim().toLowerCase() === confirmValue.trim().toLowerCase();
+
+  const submit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!matches || busy) return;
+    setBusy(true);
+    setMessage(null);
+    try {
+      const res = await fetch(`/api/admin/clients/${userId}`, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ confirm: typed.trim() }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (res.ok && data.success) {
+        router.push('/admin/clients');
+        router.refresh();
+        return;
+      }
+      if (data.error === 'HAS_PAYMENTS') {
+        setMessage({ tone: 'error', text: 'Refusé : ce client a payé ou a une commande en cours.' });
+      } else if (data.error === 'ADMIN_ACCOUNT') {
+        setMessage({ tone: 'error', text: 'Refusé : c’est un compte admin.' });
+      } else if (data.error === 'CONFIRMATION_MISMATCH') {
+        setMessage({ tone: 'error', text: 'La confirmation ne correspond pas.' });
+      } else if (res.status === 404) {
+        setMessage({ tone: 'error', text: 'Ce compte n’existe plus.' });
+      } else if (res.status === 401) {
+        setMessage({ tone: 'error', text: 'Session expirée : reconnectez-vous.' });
+      } else {
+        setMessage({ tone: 'error', text: 'La suppression n’est pas passée. Rien n’a été supprimé, réessayez.' });
+      }
+    } catch {
+      setMessage({ tone: 'error', text: 'Erreur réseau. Rechargez la page pour voir si le compte existe encore.' });
+    }
+    setBusy(false);
+  };
+
+  return (
+    <form onSubmit={submit} className="space-y-3">
+      <p className="text-xs text-slate-400">
+        Supprime définitivement le compte et tout ce qui va avec : profil, crédits, projets, panneaux, photos scannées, note.
+        L’adresse pourra se réinscrire comme un nouveau client. L’action reste dans le journal admin.
+      </p>
+      <label className="block">
+        <span className={labelClass}>Tapez « {confirmValue} » pour confirmer</span>
+        <input
+          type="text"
+          dir="ltr"
+          autoComplete="off"
+          autoCapitalize="none"
+          spellCheck={false}
+          value={typed}
+          onChange={(e) => {
+            setTyped(e.target.value);
+            setMessage(null);
+          }}
+          className={inputClass}
+        />
+      </label>
+      <button
+        type="submit"
+        disabled={!matches || busy}
+        className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 disabled:opacity-40 text-white text-[11px] font-black uppercase tracking-wider"
+      >
+        <Trash2 className="w-3.5 h-3.5" aria-hidden="true" />
+        {busy ? '…' : 'Supprimer le compte définitivement'}
+      </button>
       <Feedback message={message} />
     </form>
   );

@@ -5,7 +5,7 @@ import type { SupabaseClient } from '@supabase/supabase-js';
  * to which client, and when. Server-only.
  */
 
-export type AuditAction = 'payment_granted' | 'payment_refused' | 'credits_adjusted' | 'note_updated';
+export type AuditAction = 'payment_granted' | 'payment_refused' | 'credits_adjusted' | 'note_updated' | 'account_deleted';
 
 export interface AuditEntry {
   adminId: string;
