@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
-import { requireAdminPage } from '@/lib/admin/auth';
+import { isAdminUserId, requireAdminPage } from '@/lib/admin/auth';
 import { getAdminDb } from '@/lib/admin/db';
 import { getClientDetail, LEDGER_LIMIT } from '@/lib/admin/clients';
 import { classifyLedgerEntry, isPaymentKind } from '@/lib/admin/ledger';
@@ -18,7 +18,7 @@ import {
   packLabel,
 } from '@/lib/admin/format';
 import { Badge, EmptyRow, Field, Notice, Section, Stat, td, th } from '../../ui';
-import { ClientNoteForm, CreditAdjustForm } from './ClientActions';
+import { ClientNoteForm, CreditAdjustForm, DeleteAccountForm } from './ClientActions';
 
 export const dynamic = 'force-dynamic';
 
@@ -53,6 +53,12 @@ export default async function ClientPage({ params }: { params: { id: string } })
     .filter((d): d is string => typeof d === 'string')
     .sort()
     .pop() ?? null;
+  // The delete route checks all of this again, on the whole ledger.
+  const deleteBlockedReason = isAdminUserId(identity.userId)
+    ? 'Compte admin : il ne peut pas être supprimé d’ici.'
+    : summary.purchaseCount > 0 || client.orders.some((order) => ['pending', 'paid', 'granted'].includes(order.status))
+      ? 'Ce client a payé ou a une commande en cours : son compte ne peut pas être supprimé d’ici.'
+      : null;
 
   return (
     <>
@@ -315,6 +321,10 @@ export default async function ClientPage({ params }: { params: { id: string } })
           </ul>
         )}
       </Section>
+
+      <Section title="Supprimer le compte">
+        <DeleteAccountForm userId={identity.userId} confirmValue={identity.email ?? identity.userId} blockedReason={deleteBlockedReason} />
+      </Section>
     </>
   );
 }
@@ -324,6 +334,7 @@ const AUDIT_LABELS: Record<string, string> = {
   payment_refused: 'Paiement refusé',
   credits_adjusted: 'Crédits ajustés',
   note_updated: 'Note modifiée',
+  account_deleted: 'Compte supprimé',
 };
 
 const FIELD_LABELS: Record<string, string> = { phone: 'téléphone', tags: 'étiquettes', note: 'note' };
