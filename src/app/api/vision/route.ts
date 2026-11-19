@@ -7,7 +7,7 @@ import { MAX_SCANS_PER_ANALYSIS, VISION_CREDIT_COST } from '@/lib/billing/policy
 import { analysisPassSecret, issueAnalysisPass } from '@/lib/billing/analysis-pass';
 import { claimScanRead, openScanGroup, requestedScanGroup, scanGroupHasRoom } from '@/lib/billing/scan-group';
 import { createRateLimiter, VISION_RATE_LIMIT } from '@/lib/rate-limit';
-import { edgesFromCounts } from '@/lib/pieces/edge-marks';
+import { readCutList } from '@/lib/vision/read-cut-list';
 
 const MAX_IMAGE_DATA_URL_LENGTH = 8 * 1024 * 1024;
 const VisionSchema = z.object({
@@ -29,75 +29,6 @@ const visionRateLimiter = createRateLimiter(VISION_RATE_LIMIT);
 
 export const maxDuration = 60; // 60s timeout Vercel
 export const dynamic = 'force-dynamic';
-
-function extractJson(text: string): { pieces?: Array<{ name?: string; width: number | string; height: number | string; quantity?: number | string }> } | null {
-  let cleaned = text.trim();
-  // Strip Markdown code fences
-  cleaned = cleaned.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '').trim();
-
-  // Try direct parse
-  try {
-    return JSON.parse(cleaned);
-  } catch {}
-
-  // Find first { and last }
-  const firstBrace = cleaned.indexOf('{');
-  const lastBrace = cleaned.lastIndexOf('}');
-  if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
-    const substr = cleaned.substring(firstBrace, lastBrace + 1);
-    try {
-      return JSON.parse(substr);
-    } catch {}
-  }
-
-  // Find [ ... ] if array returned
-  const firstBracket = cleaned.indexOf('[');
-  const lastBracket = cleaned.lastIndexOf(']');
-  if (firstBracket !== -1 && lastBracket !== -1 && lastBracket > firstBracket) {
-    const substr = cleaned.substring(firstBracket, lastBracket + 1);
-    try {
-      const arr = JSON.parse(substr);
-      return { pieces: arr };
-    } catch {}
-  }
-
-  // Truncated generation (finish_reason "length"): close the dangling JSON so
-  // complete rows already written are salvageable instead of discarding the
-  // whole analysis. The tail is cut back to the last complete piece object.
-  if (cleaned.includes('"pieces"')) {
-    const start = cleaned.indexOf('{');
-    if (start !== -1) {
-      const tail = cleaned.slice(start);
-      // Keep only fully-written piece objects: from the opening piece brace to
-      // the last complete `}` that closes one (followed by optional comma/space).
-      const piecesStart = tail.indexOf('[', tail.indexOf('"pieces"'));
-      if (piecesStart !== -1) {
-        const inner = tail.slice(piecesStart + 1);
-        let lastComplete = -1;
-        let depth = 0;
-        for (let i = 0; i < inner.length; i++) {
-          const ch = inner[i];
-          if (ch === '{') depth++;
-          else if (ch === '}') {
-            depth--;
-            if (depth === 0) lastComplete = i;
-          }
-        }
-        if (lastComplete > 0) {
-          const salvage = tail.slice(0, piecesStart + 1) + inner.slice(0, lastComplete + 1) + ']}';
-          try {
-            const parsed = JSON.parse(salvage);
-            if (parsed && Array.isArray(parsed.pieces) && parsed.pieces.length > 0) {
-              return parsed;
-            }
-          } catch {}
-        }
-      }
-    }
-  }
-
-  return null;
-}
 
 type AdminClient = SupabaseClient;
 
@@ -217,12 +148,9 @@ export async function POST(req: Request) {
       );
     }
 
-    const openrouterKey = process.env.OPENROUTER_API_KEY;
-    const openaiKey = process.env.OPENAI_API_KEY;
-    const apiKey = openrouterKey || openaiKey;
-    const isUsingOpenRouter = !isPlaceholder(openrouterKey);
+    const apiKey = process.env.OPENROUTER_API_KEY || process.env.OPENAI_API_KEY;
 
-    // No analysis provider configured.
+    // No analysis provider configured: checked before anything billable.
     if (isPlaceholder(apiKey)) {
       // In production that is a broken deployment, not a demo: handing out
       // sample pieces would look like a successful analysis of the real photo.
@@ -292,95 +220,31 @@ export async function POST(req: Request) {
       }
     }
 
-    const systemPrompt = `Tu es un expert en lecture de fiches de débit pour menuisiers et artisans.
-Tu dois analyser attentivement l'image et extraire les dimensions EXACTES de chaque ligne sous la convention : HAUTEUR (Y) × LARGEUR (X) = QUANTITÉ en CENTIMÈTRES (cm).
-
-Règles impératives :
-1. Extrais les cotes en centimètres (cm). Si l'image contient des millimètres (ex: 2300 x 1200 ou 418.00 x 380.00), convertis en centimètres (ex: 230 x 120, 41.8 x 38).
-2. La quantité est le nombre à droite (ex: "418 x 380   7" -> height: 41.8, width: 38, quantity: 7). Si la fiche a une colonne de quantité (العدد, Qté, Nb), la quantité est TOUJOURS le nombre de cette colonne : un trait dans une colonne de chants n'est jamais une quantité, même s'il ressemble à un "1".
-3. "name" : le libellé écrit sur la ligne (ex: "Côté G"), recopié tel quel. Si la ligne n'en a pas, mets "" : n'invente jamais de nom.
-4. Chants (bandes de chant) : UNIQUEMENT si la fiche a une colonne dédiée aux chants (en-tête حواف, تسفيط, Chants ou équivalent). Pour chaque ligne, compte les chants marqués dans cette colonne :
-   - "edgesHeight" = nombre de chants le long de la HAUTEUR (côtés de la première cote) : "|" = 1, "||" = 2 ;
-   - "edgesWidth" = nombre de chants le long de la LARGEUR (côtés de la deuxième cote) : "—" = 1, "=" = 2 ;
-   - un rectangle "□" = 4 chants : edgesHeight 2 et edgesWidth 2 ; "⊐" ou "[" = 3 chants : edgesHeight 1 et edgesWidth 2 ;
-   - case vide, marque illisible, ou fiche sans colonne de chants : edgesHeight 0 et edgesWidth 0. Les lignes du quadrillage ne sont jamais des chants. N'invente jamais de chant.
-   - SEULES les marques écrites DANS la colonne des chants comptent. Un signe « = » écrit sur la ligne des cotes, entre les dimensions et la quantité (ex: "88 x 32 = 4"), est un signe égal qui sépare la quantité : ce n'est JAMAIS un chant. De même, un « x », « × », « - » ou « / » entre deux cotes n'est jamais un chant.
-5. Retourne STRICTEMENT un objet JSON :
-{
-  "pieces": [
-    { "name": "", "height": 230, "width": 120, "quantity": 2, "edgesHeight": 0, "edgesWidth": 0 },
-    { "name": "", "height": 118, "width": 48, "quantity": 1, "edgesHeight": 1, "edgesWidth": 0 },
-    { "name": "Côté G", "height": 41.8, "width": 38, "quantity": 7, "edgesHeight": 2, "edgesWidth": 0 },
-    { "name": "", "height": 53.1, "width": 48, "quantity": 4, "edgesHeight": 0, "edgesWidth": 1 },
-    { "name": "", "height": 51.3, "width": 48, "quantity": 2, "edgesHeight": 2, "edgesWidth": 2 }
-  ]
-}`;
-
-    const userPrompt = `Extrais la liste des pièces de cette image sous format JSON {"pieces": [...]}.`;
-
-    const endpoint = isUsingOpenRouter
-      ? 'https://openrouter.ai/api/v1/chat/completions'
-      : 'https://api.openai.com/v1/chat/completions';
-
-    const model = isUsingOpenRouter
-      ? (process.env.OPENROUTER_MODEL || 'google/gemini-3.7-flash')
-      : 'gpt-4o-mini';
-
-    const res = await fetch(endpoint, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${apiKey}`,
-        ...(isUsingOpenRouter
-          ? {
-              'HTTP-Referer': 'https://qatlia.vercel.app',
-              'X-Title': 'QatliA Cutting Optimization',
-            }
-          : {}),
-      },
-      body: JSON.stringify({
-        model,
-        // Large cut lists (30+ rows) need room: each row is ~50 output tokens,
-        // and vision models may spend hidden reasoning tokens first. 8000
-        // covers a full A4 cut list without the truncation that used to yield
-        // an unusable unterminated JSON (reported as "no readable measures").
-        max_tokens: 8000,
-        response_format: { type: 'json_object' },
-        messages: [
-          { role: 'system', content: systemPrompt },
-          {
-            role: 'user',
-            content: [
-              { type: 'text', text: userPrompt },
-              { type: 'image_url', image_url: { url: imageBase64 } },
-            ],
-          },
-        ],
-      }),
-    });
-
-    // Upstream failure: the artisan got nothing, so nothing is debited.
-    if (!res.ok) {
-      const errText = await res.text();
-      console.error('Vision API error:', errText);
-      if (errText.includes('rate limit') || errText.includes('429')) {
+    // The read itself (src/lib/vision/read-cut-list.ts): the same request the
+    // site always sent. Any failure means the artisan got nothing, so nothing is debited.
+    const read = await readCutList(imageBase64);
+    if (read.status === 'unavailable') {
+      return NextResponse.json(
+        {
+          error: 'VISION_UNAVAILABLE',
+          message: 'L\'analyse photo est momentanément indisponible. Réessayez dans un instant.',
+        },
+        { status: 503 }
+      );
+    }
+    if (read.status === 'error') {
+      if (read.rateLimited) {
         return NextResponse.json(
           { error: 'AI_RATE_LIMIT', message: 'Service temporairement saturé. Veuillez réessayer dans un instant.' },
           { status: 429 }
         );
       }
       return NextResponse.json(
-        { error: 'AI_SERVICE_ERROR', message: `Erreur d'analyse (${res.status}). Veuillez réessayer avec une photo plus nette.` },
+        { error: 'AI_SERVICE_ERROR', message: `Erreur d'analyse (${read.httpStatus}). Veuillez réessayer avec une photo plus nette.` },
         { status: 502 }
       );
     }
-
-    const data = await res.json();
-    const rawContent = data.choices?.[0]?.message?.content || '';
-    const parsedJson = extractJson(rawContent);
-
-    // Nothing readable was extracted: no usable result, so no debit.
-    if (!parsedJson || !Array.isArray(parsedJson.pieces) || parsedJson.pieces.length === 0) {
+    if (read.status === 'unreadable') {
       return NextResponse.json(
         {
           error: 'AI_PARSE_ERROR',
@@ -389,23 +253,7 @@ Règles impératives :
         { status: 422 }
       );
     }
-
-    // Normalisation des pièces (toujours en centimètres canoniques)
-    const rawPieces = parsedJson.pieces || [];
-    const pieces = rawPieces.map((p: { name?: string; height?: number | string; width?: number | string; quantity?: number | string; edgesHeight?: unknown; edgesWidth?: unknown }) => {
-      // Edge marks read from the chants column; absent when the line has none,
-      // so a piece without edges keeps exactly the shape it had before.
-      const edges = edgesFromCounts(p.edgesHeight, p.edgesWidth);
-      return {
-        // An unnamed line comes back with an empty name: the atelier numbers it in
-        // the artisan's own language. A generic "Pièce 3" invented by the model counts as unnamed.
-        name: p.name && !/^pi[eè]ce\s*\d+$/i.test(String(p.name).trim()) ? String(p.name).trim() : '',
-        height: Math.abs(parseFloat(String(p.height || 10))),
-        width: Math.abs(parseFloat(String(p.width || 10))),
-        quantity: Math.max(1, parseInt(String(p.quantity || 1), 10) || 1),
-        ...(edges ? { edges } : {}),
-      };
-    });
+    const { pieces } = read;
 
     // A covered read counts in its group and costs nothing. One conditional
     // update decides, so two photos racing for the last place cannot both win:

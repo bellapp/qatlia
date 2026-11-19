@@ -970,5 +970,11 @@ export const ar: Catalog = {
     },
     closeAria: 'إغلاق',
   },
+  photoLink: {
+    opening: 'جارٍ فتح ورقتك…',
+    expiredTitle: 'انتهت صلاحية هذا الرابط',
+    expiredBody: 'صوّر ورقة القياسات في الورشة: الذكاء الاصطناعي يقرأ القطع بدلاً منك.',
+    openAtelier: 'افتح الورشة',
+  },
   legal: legalAr,
 };

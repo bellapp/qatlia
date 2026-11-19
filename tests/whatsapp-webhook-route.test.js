@@ -47,7 +47,8 @@ function resetState() {
     assistantCount: 0,
     historyCalls: [],
     clientArgs: null,
-    mediaCalls: [],
+    photoCalls: [],
+    photoOutcome: 'hint',
   });
 }
 resetState();
@@ -124,10 +125,10 @@ stubModule('@/lib/whatsapp/send', {
     return state.sendResult(state.sent.length);
   },
 });
-stubModule('@/lib/whatsapp/media', {
-  fetchMediaDataUrl: async (config, mediaId) => {
-    state.mediaCalls.push(mediaId);
-    return { ok: false, reason: 'lookup_refused', status: 400 };
+stubModule('@/lib/whatsapp/photo', {
+  handlePhoto: async (input) => {
+    state.photoCalls.push(input);
+    return state.photoOutcome;
   },
 });
 stubModule('@/lib/whatsapp/assistant', {
@@ -151,6 +152,7 @@ const ENV_KEYS = [
   'WHATSAPP_HANDOFF_MODE',
   'WHATSAPP_BOT_SCOPE',
   'WHATSAPP_BOT_MODEL',
+  'WHATSAPP_PHOTO_DAILY_CAP',
   'OPENROUTER_API_KEY',
   'OPENROUTER_MODEL',
   'NEXT_PUBLIC_SUPABASE_URL',
@@ -714,15 +716,16 @@ test('a concurrent delivery that loses the greeting claim is handled as a follow
   });
 });
 
-test('a concurrent delivery that loses the greeting claim and sends a photo gets the image hint', async () => {
+test('a first photo the reading cannot take gets the image hint, and the contact is marked greeted', async () => {
   resetState();
-  state.greetingWon = () => false;
   await withEnv(CONFIGURED, async () => {
     await POST(signedPost(messagesPayload([imageMessage('wamid.f2', WA_ID)])));
     assert.deepEqual(
       state.sent.map((m) => m.body),
       [COPY.imageHint.fr]
     );
+    assert.equal(state.greetClaims.length, 0);
+    assert.equal(state.updates.filter((u) => u.patch.greetedAt instanceof Date).length, 1);
   });
 });
 
@@ -769,30 +772,70 @@ test('two photos in a row get one image hint, recorded under its own kind', asyn
   });
 });
 
-test('a photo is probed for download once, and still gets the image hint', async () => {
+test('a photo goes to the photo reading with the event, the language and the photo cap', async () => {
   resetState();
-  state.contacts.set(WA_ID, { waId: WA_ID, lang: 'fr', greetedAt: new Date(), handoffUntil: null });
-  await withEnv(CONFIGURED, async () => {
-    const logged = [];
-    const original = console.log;
-    console.log = (...args) => logged.push(args.join(' '));
-    try {
-      await POST(signedPost(messagesPayload([imageMessage('wamid.p1', WA_ID)])));
-    } finally {
-      console.log = original;
-    }
-    assert.deepEqual(state.mediaCalls, ['media-wamid.p1']);
-    assert.deepEqual(logged, ['[whatsapp] media probe lookup_refused 400']);
-    assert.equal(state.sent[0].body, COPY.imageHint.fr);
+  state.contacts.set(WA_ID, { waId: WA_ID, lang: 'ar', greetedAt: new Date(), handoffUntil: null });
+  state.photoOutcome = 'handled';
+  await withEnv({ ...CONFIGURED, WHATSAPP_PHOTO_DAILY_CAP: '50' }, async () => {
+    await POST(signedPost(messagesPayload([imageMessage('wamid.p1', WA_ID)])));
+    assert.equal(state.photoCalls.length, 1);
+    const call = state.photoCalls[0];
+    assert.equal(call.event.mediaId, 'media-wamid.p1');
+    assert.equal(call.lang, 'ar');
+    assert.equal(call.config.photoDailyCap, 50);
+    assert.equal(call.db, DB);
+    assert.equal(state.sent.length, 0, 'the photo flow sends its own messages');
   });
 });
 
-test('a text message is never probed', async () => {
+test('the photo flow delivers and records under its own kinds', async () => {
   resetState();
   state.contacts.set(WA_ID, { waId: WA_ID, lang: 'fr', greetedAt: new Date(), handoffUntil: null });
+  state.photoOutcome = 'handled';
   await withEnv(CONFIGURED, async () => {
-    await POST(signedPost(messagesPayload([textMessage('wamid.p2', WA_ID, '1')])));
-    assert.deepEqual(state.mediaCalls, []);
+    await POST(signedPost(messagesPayload([imageMessage('wamid.p2', WA_ID)])));
+    assert.equal(await state.photoCalls[0].deliver('📸 …', 'photo_reading'), true);
+    assert.deepEqual(state.sent.map((m) => m.body), ['📸 …']);
+    assert.equal(state.outbound[0].kind, 'photo_reading');
+  });
+});
+
+test('a photo as the very first message is read: no greeting, the contact is marked greeted', async () => {
+  resetState();
+  state.photoOutcome = 'handled';
+  await withEnv(CONFIGURED, async () => {
+    await POST(signedPost(messagesPayload([imageMessage('wamid.p3', WA_ID)])));
+    assert.equal(state.photoCalls.length, 1);
+    assert.equal(state.greetClaims.length, 0);
+    assert.ok(!state.sent.some((m) => m.body === COPY.greeting));
+    assert.equal(state.updates.filter((u) => u.patch.greetedAt instanceof Date).length, 1);
+  });
+});
+
+test('a silent photo outcome sends nothing and greets nobody', async () => {
+  resetState();
+  state.photoOutcome = 'silent';
+  await withEnv(CONFIGURED, async () => {
+    await POST(signedPost(messagesPayload([imageMessage('wamid.p4', WA_ID)])));
+    assert.equal(state.sent.length, 0);
+    assert.equal(state.updates.filter((u) => u.patch.greetedAt !== undefined).length, 0);
+  });
+});
+
+test('the photo cap defaults to 300, and a bad value falls back to it', async () => {
+  for (const value of [undefined, 'abc', '-3']) {
+    resetState();
+    state.contacts.set(WA_ID, { waId: WA_ID, lang: 'fr', greetedAt: new Date(), handoffUntil: null });
+    await withEnv({ ...CONFIGURED, WHATSAPP_PHOTO_DAILY_CAP: value }, async () => {
+      await POST(signedPost(messagesPayload([imageMessage(`wamid.c${value}`, WA_ID)])));
+      assert.equal(state.photoCalls[0].config.photoDailyCap, 300, String(value));
+    });
+  }
+  resetState();
+  state.contacts.set(WA_ID, { waId: WA_ID, lang: 'fr', greetedAt: new Date(), handoffUntil: null });
+  await withEnv({ ...CONFIGURED, WHATSAPP_PHOTO_DAILY_CAP: '0' }, async () => {
+    await POST(signedPost(messagesPayload([imageMessage('wamid.c0', WA_ID)])));
+    assert.equal(state.photoCalls[0].config.photoDailyCap, 0, '0 turns the reading off');
   });
 });
 
