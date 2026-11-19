@@ -134,3 +134,43 @@ test('a preview fetch does not count as an opening; a browser does', async () =>
   await loadPhotoLink('k7m2qx9dab', 'Mozilla/5.0 (Linux; Android 14) Chrome/130.0 Mobile Safari/537.36');
   assert.deepEqual(state.calls.map((c) => c.options), [{ markOpened: false }, { markOpened: true }]);
 });
+
+// --- Preview of the plan (plan 2026-11-19-whatsapp-plan-apercu, Task 2) ---
+
+const preview = loadTsModule('src/lib/whatsapp/photo-summary.ts');
+const { pickRestorableResult } = loadTsModule('src/lib/projects/restore.ts');
+
+test('the preview is a plan the atelier restores, laid out on the draft pieces', () => {
+  const result = preview.photoPreviewPlan(DRAFT);
+  assert.ok(pickRestorableResult(result), 'restorable like a reopened plan');
+  assert.equal(result.sheets[0].height, 244);
+  assert.equal(result.sheets[0].width, 122);
+  const ids = new Set(preview.atelierPieces(DRAFT).map((p) => p.id));
+  assert.ok(result.placedPieces.length > 0);
+  for (const placed of result.placedPieces) assert.ok(ids.has(String(placed.pieceId).split('_')[0]), `placed piece ${placed.pieceId} comes from a draft piece`);
+  assert.equal(result.placedPieces.length, 11, '7 + 4 pieces placed');
+});
+
+test('the draft carries the preview and its marker', () => {
+  const result = preview.photoPreviewPlan(DRAFT);
+  const draft = photoDraftToAtelierDraft(DRAFT, 1, 'cm', result);
+  assert.equal(draft.project.photoPreview, true);
+  assert.deepEqual(draft.project.result, result);
+  assert.deepEqual(draft.project.pieces, preview.atelierPieces(DRAFT));
+  assert.equal(photoDraftToAtelierDraft(DRAFT, 1).project.result, undefined, 'no result unless given');
+});
+
+test('only a project carrying photoPreview === true is a preview', () => {
+  assert.equal(preview.isPhotoPreview({ photoPreview: true }), true);
+  for (const value of [{}, null, undefined, { photoPreview: 'yes' }, 'x']) assert.equal(preview.isPhotoPreview(value), false);
+});
+
+test('a preview too big for the tab storage still keeps the pieces', () => {
+  const result = preview.photoPreviewPlan(DRAFT);
+  const draft = photoDraftToAtelierDraft(DRAFT, 1, 'cm', result);
+  const withPlan = JSON.stringify(draft).length;
+  const store = memoryStorage();
+  const tight = { ...store, setItem: (k, v) => { if (String(v).length >= withPlan) throw new Error('QuotaExceededError'); store.setItem(k, v); } };
+  assert.equal(writeAtelierDraft(tight, draft), 'without-plan');
+  assert.deepEqual(readAtelierDraft(tight).project.pieces, draft.project.pieces);
+});

@@ -106,6 +106,8 @@ import { createScanKeeper, saveProjectToCloud, settledWithin, type ScanKeeper } 
 import { MAX_SCAN_SHEETS, appendSheetPieces, fitThumb, readScanSheets, removeScanSheet, thumbBudgetFor, type ScanSheet } from '@/lib/projects/scan-sheets';
 import { isUuid } from '@/lib/billing/grant';
 import { ScanSheets } from '@/components/ScanSheets';
+import { isPhotoPreview } from '@/lib/whatsapp/photo-summary';
+import { photoPreviewStep, previewExportGate } from '@/lib/whatsapp/photo-preview';
 import { readAnalysisPass, storeAnalysisPass } from '@/lib/billing/analysis-pass-store';
 import { piecesOnlyOnScreen } from '@/lib/new-job';
 import {
@@ -309,6 +311,16 @@ export default function Dashboard() {
   const resumingRef = useRef(false);
   // A project opened from history wins over older kept work.
   const openedFromHistoryRef = useRef(false);
+  // The plan on screen is the free preview of a WhatsApp link (/w/<code>):
+  // signed in, the paid optimization runs once; signed out, the banner asks
+  // for the free account (src/lib/whatsapp/photo-preview.ts).
+  // Two roles: photoPreviewRef says the plan on screen is still the free
+  // preview (cleared only by a successful paid run, it gates every export);
+  // previewAutoRunRef says the automatic run is still to try (consumed before
+  // it starts, so a double effect never charges twice).
+  const photoPreviewRef = useRef(false);
+  const previewAutoRunRef = useRef(false);
+  const [showPhotoBanner, setShowPhotoBanner] = useState(false);
   const [isDownloadingPdf, setIsDownloadingPdf] = useState<boolean>(false);
   const [isQuotationDialogOpen, setIsQuotationDialogOpen] = useState<boolean>(false);
   // The id /api/projects last confirmed saving, if any — the quotation
@@ -604,6 +616,9 @@ const commitPanelName = () => {
     setPieces([]);
     setResult(null);
     plannedPiecesRef.current = null;
+    photoPreviewRef.current = false;
+    previewAutoRunRef.current = false;
+    setShowPhotoBanner(false);
     setRestoredAt(null);
     setActiveSheetIndex(0);
     setZoomLevel(1);
@@ -688,6 +703,7 @@ const commitPanelName = () => {
       localProjectId,
       restoredAt,
       keptAt: Date.now(),
+      photoPreview: photoPreviewRef.current,
     });
   // Refreshed at every render: the atelier closes long after the render that
   // set up the effect which keeps the job.
@@ -767,6 +783,8 @@ const commitPanelName = () => {
       pendingWork: pendingFromThisTab,
     });
     if (draft && pendingFromThisTab) clearPendingWork(window.localStorage, window.sessionStorage);
+    photoPreviewRef.current = !!draft && isPhotoPreview(draft.project);
+    previewAutoRunRef.current = photoPreviewRef.current;
     // Read once: gone a tick later, so React's development double pass still finds it.
     window.setTimeout(() => clearAtelierDraft(window.sessionStorage), 0);
     // A kept job put back stands like a reopened project: work kept for a
@@ -1161,6 +1179,9 @@ const commitPanelName = () => {
       const data = await res.json().catch(() => null);
 
       if (!res.ok || !data?.success) {
+        // Any answer but 401 means the server saw a signed-in user: the
+        // sign-up banner no longer applies (the preview stays gated).
+        if (res.status !== 401) setShowPhotoBanner(false);
         if (res.status === 401 && !resumed) {
           // Keep the pieces and run again right after sign-in.
           askSignInKeepingWork('optimize');
@@ -1181,6 +1202,9 @@ const commitPanelName = () => {
       const optResult = data.result as OptimizationResult;
       setResult(optResult);
       setRestoredAt(null);
+      // A paid plan now: no longer the free preview of a WhatsApp link.
+      photoPreviewRef.current = false;
+      setShowPhotoBanner(false);
       plannedPiecesRef.current = pieces;
       setActiveSheetIndex(0);
       if (typeof data.creditsRemaining === 'number') setUserCredits(data.creditsRemaining);
@@ -1190,6 +1214,28 @@ const commitPanelName = () => {
     } finally {
       setIsOptimizing(false);
     }
+  };
+
+  /**
+   * The free preview of a WhatsApp link never leaves as a file
+   * (previewExportGate): signed out, the sign-up comes first and the paid run
+   * follows; signed in, the paid run starts instead of the export. True when
+   * the export was stopped.
+   */
+  const previewBlocksExport = async (): Promise<boolean> => {
+    if (!photoPreviewRef.current) return false;
+    let signedIn = false;
+    try {
+      const { data: { user } } = await createClient().auth.getUser();
+      signedIn = !!user;
+    } catch {
+      /* treated as signed out */
+    }
+    const gate = previewExportGate({ preview: photoPreviewRef.current, signedIn });
+    if (gate === 'allow') return false;
+    if (gate === 'run') void handleRunOptimization();
+    else askSignInKeepingWork('optimize');
+    return true;
   };
 
   /**
@@ -1393,6 +1439,34 @@ const commitPanelName = () => {
     }
   };
 
+  // A preview from a WhatsApp link: once the sign-in is known, either the paid
+  // run starts (signed in) or the banner shows (signed out). The marker is
+  // consumed before the run, so a double effect cannot charge twice.
+  useEffect(() => {
+    if (!previewAutoRunRef.current) return;
+    let cancelled = false;
+    (async () => {
+      let signedIn = false;
+      try {
+        const { data: { user } } = await createClient().auth.getUser();
+        signedIn = !!user;
+      } catch {
+        /* treated as signed out */
+      }
+      if (cancelled) return;
+      const step = photoPreviewStep({ preview: previewAutoRunRef.current, signedIn });
+      if (step === 'run') {
+        previewAutoRunRef.current = false;
+        setResumeRequest({ action: 'optimize', resumed: true });
+      } else if (step === 'banner') {
+        setShowPhotoBanner(true);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   // Runs a resumed action once the kept pieces and panel are on screen.
   useEffect(() => {
     if (!resumeRequest) return;
@@ -1444,8 +1518,9 @@ const commitPanelName = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const handleDownloadJson = () => {
+  const handleDownloadJson = async () => {
     if (!result) return;
+    if (await previewBlocksExport()) return;
     const json = JSON.stringify({
       // Geometry below is always canonical cm; this only records which unit
       // the artisan had selected for display at export time.
@@ -1516,6 +1591,7 @@ const commitPanelName = () => {
   };
 
   const handleDownloadPng = async () => {
+    if (await previewBlocksExport()) return;
     const svg = document.querySelector('svg');
     if (!svg) return;
     const clone = svg.cloneNode(true) as SVGSVGElement;
@@ -1546,6 +1622,7 @@ const commitPanelName = () => {
 
   const handleDownloadDxf = async () => {
     if (!result) return;
+    if (await previewBlocksExport()) return;
     try {
       const res = await fetch('/api/export-dxf', {
         method: 'POST',
@@ -1581,6 +1658,8 @@ const commitPanelName = () => {
 
   const handleDownloadPdf = async () => {
     if (!result) return;
+    // A preview becomes a plan only through the paid run.
+    if (await previewBlocksExport()) return;
 
     const supabase = createClient();
     const { data: { user } } = await supabase.auth.getUser();
@@ -2320,6 +2399,23 @@ const commitPanelName = () => {
                   </div>
                 )}
 
+                {showPhotoBanner && (
+                  <div
+                    role="status"
+                    data-testid="photo-preview-banner"
+                    className="flex flex-wrap items-center justify-between gap-3 p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/30"
+                  >
+                    <p className="text-xs font-semibold text-amber-800 dark:text-amber-300 min-w-0">{t('atelier.photoPreview.banner')}</p>
+                    <button
+                      type="button"
+                      onClick={() => void previewBlocksExport()}
+                      className="px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-600 text-black text-xs font-black"
+                    >
+                      {t('atelier.photoPreview.cta')}
+                    </button>
+                  </div>
+                )}
+
                 {/* Cost Summary Banner — the subtotal comes from result.costBreakdown
                     (src/lib/costing.ts), the same figure shown in the cost
                     breakdown below and rendered in the PDF export. No estimated
@@ -2589,7 +2685,11 @@ const commitPanelName = () => {
                       pricing) means there is nothing real to quote a client for. */}
                   {result?.costingInput && (
                     <button
-                      onClick={() => setIsQuotationDialogOpen(true)}
+                      onClick={async () => {
+                        // The free preview is not quoted: sign-up or the paid run first.
+                        if (await previewBlocksExport()) return;
+                        setIsQuotationDialogOpen(true);
+                      }}
                       aria-label={t('quotation.openButtonAria')}
                       className="col-span-4 py-2.5 rounded-xl bg-indigo-500/10 hover:bg-indigo-500/20 border border-indigo-500/30 text-indigo-400 font-black text-xs flex items-center justify-center gap-2 transition-all"
                     >
@@ -2897,6 +2997,11 @@ const commitPanelName = () => {
           isOpen={isQuotationDialogOpen}
           onClose={() => setIsQuotationDialogOpen(false)}
           onRequireAuth={() => {
+            if (photoPreviewRef.current) {
+              setIsQuotationDialogOpen(false);
+              askSignInKeepingWork('optimize');
+              return;
+            }
             setPendingAuthAction('quotation');
             setIsAuthModalOpen(true);
           }}

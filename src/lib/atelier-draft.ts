@@ -153,12 +153,19 @@ export interface AtelierLeaveState {
   localProjectId: string | null;
   restoredAt: string | null;
   keptAt: number;
+  /**
+   * The plan on screen is the free preview of a WhatsApp link: kept as one, so
+   * a sign-in made elsewhere (the login page) still runs the paid optimization.
+   */
+  photoPreview?: boolean;
 }
 
 /** The draft of an atelier being left: its job as a save would store it, minus a plan that is not there. */
 export function buildAtelierDraft(state: AtelierLeaveState): AtelierDraft {
   const { result: plan, ...withoutPlan } = state.payload as Record<string, unknown>;
-  const project = state.hasPlan ? { ...withoutPlan, result: plan } : withoutPlan;
+  const project = state.hasPlan
+    ? { ...withoutPlan, result: plan, ...(state.photoPreview ? { photoPreview: true } : {}) }
+    : withoutPlan;
   // Said only when the list on screen is no longer the one the plan was made from.
   const plannedDiffers = state.hasPlan
     && state.plannedPieces !== null

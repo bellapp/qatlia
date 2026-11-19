@@ -110,7 +110,7 @@ test('another database error is thrown', async () => {
   await assert.rejects(() => reservePhotoRead(fake.client, WA, NOW, 300));
 });
 
-test('completing writes ok, the code, the result and a 7-day expiry', async () => {
+test('completing writes ok, the code, the result and a 24-hour expiry', async () => {
   const fake = createFakeSupabase();
   const summary = { pieceCount: 2, lineCount: 1, sheetsUsed: 1, wastePercent: 90, sheet: { height: 278, width: 208 }, unplaced: 0 };
   const pieces = [{ name: '', height: 50, width: 40, quantity: 2 }];
@@ -122,7 +122,7 @@ test('completing writes ok, the code, the result and a 7-day expiry', async () =
       pieces,
       sheet: null,
       summary,
-      expires_at: new Date(NOW.getTime() + 7 * 24 * 60 * MIN).toISOString(),
+      expires_at: new Date(NOW.getTime() + 24 * 60 * MIN).toISOString(),
     },
   ]);
   assert.ok(has(fake.state.fromCalls[0], 'eq', 'id', 'r1'));
@@ -189,7 +189,7 @@ test('codes are 10 characters of the unambiguous alphabet, and do not repeat', (
   assert.equal(codes.size, 1000);
 });
 
-test('every reservation purges the content of expired reads, so it does not outlive its 7 days', async () => {
+test('every reservation purges the content of expired reads, so it does not outlive its 24 hours', async () => {
   const fake = createFakeSupabase();
   seed(fake);
   await reservePhotoRead(fake.client, WA, NOW, 300);
@@ -218,4 +218,13 @@ test('opening without markOpened (a link preview) leaves opened_at alone', async
   const draft = await openPhotoDraft(fake.client, 'abcdefghjk', NOW, { markOpened: false });
   assert.equal(draft.pieces.length, 1);
   assert.equal(updates(fake).length, 0);
+});
+
+test('the 24-hour boundary: a link a minute before its end opens, a minute after it is expired', async () => {
+  const fake = createFakeSupabase();
+  fake.state.tables[TABLE] = (call) => (has(call, 'update') ? null : row({ expires_at: new Date(NOW.getTime() + MIN).toISOString() }));
+  assert.notEqual(await openPhotoDraft(fake.client, 'abcdefghjk', NOW), 'expired');
+  fake.state.tables[TABLE] = (call) => (has(call, 'update') ? null : row({ expires_at: new Date(NOW.getTime() - MIN).toISOString() }));
+  assert.equal(await openPhotoDraft(fake.client, 'abcdefghjk', NOW), 'expired');
+  assert.equal(loadTsModule('src/lib/whatsapp/photo-store.ts').PHOTO_READ_TTL_HOURS, 24);
 });
