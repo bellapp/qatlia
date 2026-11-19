@@ -142,7 +142,8 @@ test('listing presets requires a signed-in artisan', async () => {
 
 test('an artisan only sees their own presets, with numbers and grain mapped for the atelier', async () => {
   resetState();
-  state.user = { id: UUID };
+  // The panel catalogue is already in this account (tests/panel-catalog-account.test.js covers the copy).
+  state.user = { id: UUID, app_metadata: { panel_catalog: 1 } };
   state.rows = [
     row({ height: '244', width: '122', has_grain: true, grain_orientation: 'horizontal' }),
     row({ id: OTHER_PRESET_ID, user_id: OTHER_UUID, name: 'Pas à moi' }),

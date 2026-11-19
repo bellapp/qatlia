@@ -151,7 +151,8 @@ const PRESET_ID = '22222222-3333-4444-8888-555555555555';
 const state = { user: null, presets: [], edgePrices: [], priceColumnMissing: false, edgeTableMissing: false };
 
 function resetState() {
-  state.user = { id: UUID };
+  // The panel catalogue is already in this account (tests/panel-catalog-account.test.js covers the copy).
+  state.user = { id: UUID, app_metadata: { panel_catalog: 1 } };
   state.presets = [];
   state.edgePrices = [];
   state.priceColumnMissing = false;
