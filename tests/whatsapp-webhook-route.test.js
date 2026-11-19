@@ -47,6 +47,7 @@ function resetState() {
     assistantCount: 0,
     historyCalls: [],
     clientArgs: null,
+    mediaCalls: [],
   });
 }
 resetState();
@@ -121,6 +122,12 @@ stubModule('@/lib/whatsapp/send', {
   sendButtons: async (config, to, body, buttons) => {
     state.sent.push({ to, body, config, buttons });
     return state.sendResult(state.sent.length);
+  },
+});
+stubModule('@/lib/whatsapp/media', {
+  fetchMediaDataUrl: async (config, mediaId) => {
+    state.mediaCalls.push(mediaId);
+    return { ok: false, reason: 'lookup_refused', status: 400 };
   },
 });
 stubModule('@/lib/whatsapp/assistant', {
@@ -759,6 +766,33 @@ test('two photos in a row get one image hint, recorded under its own kind', asyn
     await POST(signedPost(messagesPayload([imageMessage('wamid.i2', WA_ID)])));
     assert.equal(state.sent.length, 1, 'no second hint');
     assert.equal(state.claims.length, 2, 'the second photo is still recorded');
+  });
+});
+
+test('a photo is probed for download once, and still gets the image hint', async () => {
+  resetState();
+  state.contacts.set(WA_ID, { waId: WA_ID, lang: 'fr', greetedAt: new Date(), handoffUntil: null });
+  await withEnv(CONFIGURED, async () => {
+    const logged = [];
+    const original = console.log;
+    console.log = (...args) => logged.push(args.join(' '));
+    try {
+      await POST(signedPost(messagesPayload([imageMessage('wamid.p1', WA_ID)])));
+    } finally {
+      console.log = original;
+    }
+    assert.deepEqual(state.mediaCalls, ['media-wamid.p1']);
+    assert.deepEqual(logged, ['[whatsapp] media probe lookup_refused 400']);
+    assert.equal(state.sent[0].body, COPY.imageHint.fr);
+  });
+});
+
+test('a text message is never probed', async () => {
+  resetState();
+  state.contacts.set(WA_ID, { waId: WA_ID, lang: 'fr', greetedAt: new Date(), handoffUntil: null });
+  await withEnv(CONFIGURED, async () => {
+    await POST(signedPost(messagesPayload([textMessage('wamid.p2', WA_ID, '1')])));
+    assert.deepEqual(state.mediaCalls, []);
   });
 });
 

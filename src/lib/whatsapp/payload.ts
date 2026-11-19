@@ -27,6 +27,8 @@ export interface InboundEvent {
   kind: InboundKind;
   text: string | null;
   referral: Record<string, unknown> | null;
+  /** Meta's id of the photo (kind 'image'), to download it; null for every other kind. */
+  mediaId: string | null;
 }
 
 export interface EchoEvent {
@@ -54,7 +56,7 @@ const messageSchema = z.object({
   id: z.string().min(1),
   type: z.string().optional(),
   text: z.object({ body: z.string() }).partial().optional(),
-  image: z.object({ caption: z.string() }).partial().optional(),
+  image: z.object({ caption: z.string(), id: z.string(), mime_type: z.string() }).partial().optional(),
   interactive: z
     .object({ type: z.string(), button_reply: z.object({ id: z.string() }).partial() })
     .partial()
@@ -129,6 +131,7 @@ function parseInbound(
     kind,
     text,
     referral: message.referral ?? null,
+    mediaId: kind === 'image' && message.image?.id ? message.image.id : null,
   };
 }
 
