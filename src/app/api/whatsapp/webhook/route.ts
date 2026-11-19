@@ -19,6 +19,7 @@ import { COPY, type MenuButton } from '@/lib/whatsapp/copy';
 import { HANDOFF_HOURS, decide, resolveLang, type Decision } from '@/lib/whatsapp/router';
 import { HISTORY_MESSAGES, askAssistant } from '@/lib/whatsapp/assistant';
 import { sendButtons, sendText } from '@/lib/whatsapp/send';
+import { fetchMediaDataUrl } from '@/lib/whatsapp/media';
 import {
   SEND_FAILED_KIND,
   WhatsAppTablesMissingError,
@@ -97,6 +98,20 @@ async function handleEcho(db: SupabaseClient, config: WhatsAppConfig, event: Ech
   }
 }
 
+/**
+ * Temporary probe (plan 2026-11-19, Task 1): can our Meta token download the
+ * photos prospects send? Logs only the outcome (and a status or size), never
+ * the image or the number. Removed once the photo reading uses the download.
+ */
+async function probeMedia(config: WhatsAppConfig, mediaId: string): Promise<void> {
+  try {
+    const result = await fetchMediaDataUrl(config, mediaId);
+    console.log('[whatsapp] media probe', result.ok ? 'ok' : result.reason, result.ok ? result.bytes : result.status ?? '');
+  } catch (error) {
+    console.error('[whatsapp] media probe threw', describeError(error));
+  }
+}
+
 async function handleInbound(db: SupabaseClient, config: WhatsAppConfig, event: InboundEvent): Promise<void> {
   const now = new Date();
   const { waId } = event;
@@ -104,6 +119,8 @@ async function handleInbound(db: SupabaseClient, config: WhatsAppConfig, event: 
   let contact = await upsertContact(db, { waId, profileName: event.profileName, referral: event.referral });
   const claimed = await claimInbound(db, { wamid: event.wamid, waId, kind: event.kind, body: event.text });
   if (!claimed) return; // Meta redelivered a message that was already handled.
+
+  if (event.kind === 'image' && event.mediaId) await probeMedia(config, event.mediaId);
 
   // A pre-filled ad message follows the phone's language, not the person's: see resolveLang.
   const lang = resolveLang(event, contact);
