@@ -22,7 +22,9 @@ function createFakeSupabase() {
     const call = { table: name, ops: [] };
     state.fromCalls.push(call);
     const result = (mode) => {
-      if (state.tableErrors[name]) return { data: null, error: state.tableErrors[name] };
+      // An error, or a function of the recorded call returning one (or null), e.g. a failing insert only.
+      const failure = typeof state.tableErrors[name] === 'function' ? state.tableErrors[name](call) : state.tableErrors[name];
+      if (failure) return { data: null, error: failure };
       // A function seeds per-query answers, e.g. a lookup that finds nothing
       // followed by an insert that returns the new row.
       const seeded = state.tables[name];
