@@ -34,6 +34,16 @@ export interface WhatsAppConfig {
   openrouterKey: string | null;
   /** `null`: replies go straight to the Meta Graph API. */
   ycloud: YCloudConfig | null;
+  /** Photos of cut lists the bot may read per 24 hours, all numbers together; 0 turns the reading off. */
+  photoDailyCap: number;
+}
+
+const DEFAULT_PHOTO_DAILY_CAP = 300;
+
+function readPhotoDailyCap(env: Env): number {
+  const raw = env.WHATSAPP_PHOTO_DAILY_CAP;
+  if (typeof raw !== 'string' || !/^\d+$/.test(raw.trim())) return DEFAULT_PHOTO_DAILY_CAP;
+  return Number(raw.trim());
 }
 
 const DEFAULT_GRAPH_VERSION = 'v23.0';
@@ -95,5 +105,6 @@ export function getWhatsAppConfig(env: Env = process.env): WhatsAppConfig | null
     model: read(env, 'WHATSAPP_BOT_MODEL') ?? read(env, 'OPENROUTER_MODEL') ?? DEFAULT_MODEL,
     openrouterKey: read(env, 'OPENROUTER_API_KEY'),
     ycloud: readYCloud(env),
+    photoDailyCap: readPhotoDailyCap(env),
   };
 }

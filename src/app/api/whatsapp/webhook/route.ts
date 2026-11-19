@@ -15,11 +15,11 @@ import { getSupabaseAdminConfig } from '@/lib/billing/config';
 import { getWhatsAppConfig, type WhatsAppConfig } from '@/lib/whatsapp/config';
 import { verifySignature } from '@/lib/whatsapp/signature';
 import { parseWebhook, type EchoEvent, type InboundEvent } from '@/lib/whatsapp/payload';
-import { COPY, type MenuButton } from '@/lib/whatsapp/copy';
+import { COPY, type Lang, type MenuButton } from '@/lib/whatsapp/copy';
 import { HANDOFF_HOURS, decide, resolveLang, type Decision } from '@/lib/whatsapp/router';
 import { HISTORY_MESSAGES, askAssistant } from '@/lib/whatsapp/assistant';
 import { sendButtons, sendText } from '@/lib/whatsapp/send';
-import { fetchMediaDataUrl } from '@/lib/whatsapp/media';
+import { handlePhoto, type PhotoMessageKind } from '@/lib/whatsapp/photo';
 import {
   SEND_FAILED_KIND,
   WhatsAppTablesMissingError,
@@ -62,7 +62,7 @@ async function deliver(
   config: WhatsAppConfig,
   waId: string,
   body: string,
-  kind: 'fixed' | 'assistant' | 'image_hint',
+  kind: 'fixed' | 'assistant' | 'image_hint' | PhotoMessageKind,
   buttons?: readonly MenuButton[],
 ): Promise<boolean> {
   const wamid = buttons ? await sendButtons(config, waId, body, buttons) : await sendText(config, waId, body);
@@ -99,17 +99,35 @@ async function handleEcho(db: SupabaseClient, config: WhatsAppConfig, event: Ech
 }
 
 /**
- * Temporary probe (plan 2026-11-19, Task 1): can our Meta token download the
- * photos prospects send? Logs only the outcome (and a status or size), never
- * the image or the number. Removed once the photo reading uses the download.
+ * A photo: read as a cut list when the reading can (src/lib/whatsapp/photo.ts),
+ * otherwise today's hint pointing to the atelier, once per cooldown window.
+ * Either way the contact counts as greeted: a menu right after would bury the
+ * answer.
  */
-async function probeMedia(config: WhatsAppConfig, mediaId: string): Promise<void> {
-  try {
-    const result = await fetchMediaDataUrl(config, mediaId);
-    console.log('[whatsapp] media probe', result.ok ? 'ok' : result.reason, result.ok ? result.bytes : result.status ?? '');
-  } catch (error) {
-    console.error('[whatsapp] media probe threw', describeError(error));
+async function handlePhotoMessage(
+  db: SupabaseClient,
+  config: WhatsAppConfig,
+  event: InboundEvent,
+  contact: { greetedAt: Date | null },
+  lang: Lang,
+  now: Date,
+): Promise<void> {
+  const { waId } = event;
+  const outcome = await handlePhoto({
+    db,
+    config,
+    event,
+    lang,
+    now,
+    deliver: (text, kind) => deliver(db, config, waId, text, kind),
+  });
+  if (outcome === 'silent') return;
+  if (outcome === 'hint') {
+    const since = new Date(now.getTime() - IMAGE_HINT_COOLDOWN_MINUTES * 60 * 1000);
+    if ((await countBotMessages(db, waId, 'image_hint', since)) > 0) return;
+    if (!(await deliver(db, config, waId, COPY.imageHint[lang], 'image_hint'))) return;
   }
+  if (contact.greetedAt === null) await updateContact(db, waId, { greetedAt: now });
 }
 
 async function handleInbound(db: SupabaseClient, config: WhatsAppConfig, event: InboundEvent): Promise<void> {
@@ -119,8 +137,6 @@ async function handleInbound(db: SupabaseClient, config: WhatsAppConfig, event: 
   let contact = await upsertContact(db, { waId, profileName: event.profileName, referral: event.referral });
   const claimed = await claimInbound(db, { wamid: event.wamid, waId, kind: event.kind, body: event.text });
   if (!claimed) return; // Meta redelivered a message that was already handled.
-
-  if (event.kind === 'image' && event.mediaId) await probeMedia(config, event.mediaId);
 
   // A pre-filled ad message follows the phone's language, not the person's: see resolveLang.
   const lang = resolveLang(event, contact);
@@ -152,13 +168,13 @@ async function handleInbound(db: SupabaseClient, config: WhatsAppConfig, event: 
 
   if (decision.action === 'silent') return;
 
+  if (decision.action === 'photo') {
+    await handlePhotoMessage(db, config, event, contact, lang, now);
+    return;
+  }
+
   if (decision.action === 'send') {
-    const isImageHint = event.kind === 'image' && decision.text === COPY.imageHint[lang];
-    if (isImageHint) {
-      const since = new Date(now.getTime() - IMAGE_HINT_COOLDOWN_MINUTES * 60 * 1000);
-      if ((await countBotMessages(db, waId, 'image_hint', since)) > 0) return;
-    }
-    const kind = isImageHint ? 'image_hint' : 'fixed';
+    const kind = 'fixed';
     // A message with buttons that cannot be sent falls back to its plain-text version, so the contact still gets an answer.
     const sent = decision.menu
       ? (await deliver(db, config, waId, decision.text, kind, decision.menu.buttons)) ||

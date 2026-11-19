@@ -168,18 +168,26 @@ test('stickers, reactions and unknown kinds are ignored', () => {
   }
 });
 
-test('image gets the image hint', () => {
-  assert.deepEqual(run({ event: { kind: 'image', text: null } }), {
-    action: 'send',
-    text: COPY.imageHint.fr,
-    markGreeted: false,
-    handoff: false,
-  });
+test('an image goes to the photo reading', () => {
+  assert.deepEqual(run({ event: { kind: 'image', text: null } }), { action: 'photo' });
 });
 
-test('a new contact sending an image is greeted first', () => {
-  const d = run({ event: { kind: 'image', text: null }, contact: { greetedAt: null } });
-  assert.equal(d.text, COPY.greeting);
+test('a photo as the very first message is read, not greeted', () => {
+  assert.deepEqual(run({ event: { kind: 'image', text: null }, contact: { greetedAt: null } }), { action: 'photo' });
+});
+
+test('a photo carrying the ad referral is read', () => {
+  const referral = { source_type: 'ad', source_id: '1' };
+  assert.deepEqual(run({ event: { kind: 'image', text: null, referral }, contact: { greetedAt: null } }), { action: 'photo' });
+});
+
+test('a photo during a human hand-off stays silent', () => {
+  const handoffUntil = new Date(NOW.getTime() + 60 * 60 * 1000);
+  assert.deepEqual(run({ event: { kind: 'image', text: null }, contact: { handoffUntil } }), { action: 'silent' });
+});
+
+test('a menu choice typed as a caption still wins', () => {
+  assert.equal(run({ event: { kind: 'image', text: '2' } }).text, COPY.pricing.fr);
 });
 
 test('audio, video, document, location, contacts: mediaHandoff', () => {
@@ -286,8 +294,8 @@ test('the button greeting points at the buttons; its plain fallback keeps the ty
 
 test('only the first-contact greeting carries buttons', () => {
   assert.equal(run({ event: { text: '2' } }).menu, undefined);
-  assert.equal(run({ event: { kind: 'image', text: null } }).menu, undefined);
-  assert.ok(run({ event: { kind: 'image', text: null }, contact: { greetedAt: null } }).menu);
+  assert.equal(run({ event: { kind: 'video', text: null } }).menu, undefined);
+  assert.ok(run({ event: { kind: 'video', text: null }, contact: { greetedAt: null } }).menu);
 });
 
 // --- ad pre-filled messages ----------------------------------------------------

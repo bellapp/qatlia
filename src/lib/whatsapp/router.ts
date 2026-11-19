@@ -29,7 +29,9 @@ export interface Menu {
 export type Decision =
   | { action: 'silent' }
   | { action: 'send'; text: string; markGreeted: boolean; handoff: boolean; menu?: Menu }
-  | { action: 'assistant' };
+  | { action: 'assistant' }
+  /** A photo: the webhook tries to read it as a cut list (src/lib/whatsapp/photo.ts). */
+  | { action: 'photo' };
 
 const ARABIC_LETTER = /[؀-ۿ]/;
 const LATIN_LETTERS = /[A-Za-zÀ-ÖØ-öø-ÿ]/g;
@@ -140,6 +142,10 @@ export function decide(input: {
   if (choice === 2) return reply(COPY.pricing[lang], true);
   if (choice === 3) return toAdvisor(COPY.advisor[lang], true);
 
+  // 3b. A photo is read as a cut list, even as the very first message: these
+  // are the prospects the reading is for, and a menu would only bury it.
+  if (event.kind === 'image') return { action: 'photo' };
+
   // 4. First contact: the menu comes as buttons, so one tap is enough to answer.
   if (contact.greetedAt === null) {
     return {
@@ -163,9 +169,6 @@ export function decide(input: {
       menu: { buttons: MENU_BUTTONS, fallbackText: COPY.menuAgainPlain },
     };
   }
-
-  // 6. Photos are read in the workshop, not by the bot.
-  if (event.kind === 'image') return reply(COPY.imageHint[lang], false);
 
   // 7. Media the bot cannot read.
   if (HANDOFF_MEDIA_KINDS.has(event.kind)) return toAdvisor(COPY.mediaHandoff[lang], false);
