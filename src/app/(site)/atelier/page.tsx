@@ -54,8 +54,10 @@ import {
 import { PIECE_COLOR_PALETTE, getResolvedPieceColor } from '@/lib/pieces/catalog';
 import {
   isPanelPrice,
+  type NewPanelPreset,
   type PanelPreset,
 } from '@/lib/panel-presets';
+import { listPanelFor, saveActionFor, typedPanelPrice } from '@/lib/atelier-panel-choice';
 import { STOCK_MATERIAL_VALUES } from '@/lib/panel-form';
 import { savedPriceChange } from '@/lib/panel-preset-rules';
 import { usePanelPresets } from '@/lib/use-panel-presets';
@@ -340,7 +342,10 @@ export default function Dashboard() {
   // The panels the artisan works with, read and written where the panel page
   // (« Configuration des panneaux ») does: the card picks one and saves the one
   // just typed; the list itself is managed on that page.
-  const { presets: savedPresets, add: addPreset, ready: presetsReady, signedIn: presetsSignedIn, source: presetsSource } = usePanelPresets();
+  const { presets: savedPresets, add: addPreset, update: updatePreset, ready: presetsReady, signedIn: presetsSignedIn, source: presetsSource } = usePanelPresets();
+  // The panel last picked from the list: it stays shown, and « Sauvegarder »
+  // updates it, while its size is kept (see src/lib/atelier-panel-choice.ts).
+  const [pickedPresetId, setPickedPresetId] = useState<string | null>(null);
   const [isSavingPreset, setIsSavingPreset] = useState(false);
 
   const allPresets = savedPresets;
@@ -399,10 +404,25 @@ export default function Dashboard() {
     projectNameRef.current = name;
     setProjectName(name);
   };
-  const [presetNameDraft, setPresetNameDraft] = useState<string>('');
   // Price of the stock panel (MAD per panel), as typed; committed on blur.
   const [panelPriceDraft, setPanelPriceDraft] = useState<string>('');
   const [presetFeedback, setPresetFeedback] = useState<{ tone: 'success' | 'warning'; text: string } | null>(null);
+
+  // The panel on the card as the list would store it: its own name (the one on
+  // the plan and the PDF), size, material, colour, grain and price. The name
+  // and the price as typed, so « Sauvegarder » wakes up while typing.
+  const cardPanel: NewPanelPreset = {
+    name: panelNameDraft,
+    height: activeSheet.height,
+    width: activeSheet.width,
+    material: activeSheet.material ?? undefined,
+    color: activeSheet.color?.trim() || undefined,
+    hasGrain: !!activeSheet.hasGrain,
+    grainOrientation: activeSheet.hasGrain ? (activeSheet.grainOrientation ?? 'vertical') : undefined,
+    pricePerSheet: typedPanelPrice(panelPriceDraft, activeSheet.pricePerSheet),
+  };
+  const listPanel = listPanelFor(cardPanel, savedPresets, pickedPresetId);
+  const saveAction = saveActionFor(cardPanel, savedPresets, pickedPresetId);
 
   useEffect(() => {
     setPanelNameDraft(activeSheet.label || '');
@@ -430,18 +450,14 @@ const commitPanelName = () => {
    *  same size are distinct when their material, colour or grain differ; only
    *  an identical panel is refused (see src/lib/panel-preset-rules.ts). */
   const handleSavePreset = async () => {
-    const name = presetNameDraft.trim()
-      || `${formatDisplayValue(activeSheet.height, displayUnit)}×${formatDisplayValue(activeSheet.width, displayUnit)} ${displayUnit}`;
-    const preset = {
-      name,
-      height: activeSheet.height,
-      width: activeSheet.width,
-      material: activeSheet.material ?? undefined,
-      color: activeSheet.color?.trim() || undefined,
-      hasGrain: !!activeSheet.hasGrain,
-      grainOrientation: activeSheet.hasGrain ? (activeSheet.grainOrientation ?? 'vertical') : undefined,
-      ...(isPanelPrice(activeSheet.pricePerSheet) ? { pricePerSheet: activeSheet.pricePerSheet } : {}),
-    };
+    // A panel of the list kept as it is: nothing to save (the button is greyed out).
+    if (saveAction.kind === 'saved') return;
+    // An update keeps the list's name when the card has none; a new panel
+    // without a name is named after its size.
+    const name = saveAction.kind === 'update'
+      ? saveAction.preset.name
+      : cardPanel.name.trim() || `${formatDisplayValue(activeSheet.height, displayUnit)}×${formatDisplayValue(activeSheet.width, displayUnit)} ${displayUnit}`;
+    const preset = { ...cardPanel, name };
     // Signed in, but the account list could not be read: a panel written to the
     // device now would never reach the account, and would vanish once the
     // account answers again. The panel page refuses for the same reason.
@@ -451,7 +467,7 @@ const commitPanelName = () => {
     }
     setIsSavingPreset(true);
     try {
-      const saved = await addPreset(preset);
+      const saved = saveAction.kind === 'update' ? await updatePreset(saveAction.target.id, saveAction.preset) : await addPreset(preset);
       if (!saved.ok) {
         const text = saved.error === 'DUPLICATE'
           ? t('atelier.stock.presetDuplicate', { name: saved.existingName ?? '' })
@@ -459,8 +475,7 @@ const commitPanelName = () => {
         setPresetFeedback({ tone: 'warning', text });
         return;
       }
-      setPresetNameDraft('');
-      setPresetFeedback({ tone: 'success', text: t('atelier.stock.presetSavedOk', { name }) });
+      setPresetFeedback({ tone: 'success', text: t(saveAction.kind === 'update' ? 'atelier.stock.presetUpdatedOk' : 'atelier.stock.presetSavedOk', { name }) });
     } finally {
       setIsSavingPreset(false);
     }
@@ -1977,6 +1992,74 @@ const commitPanelName = () => {
                 </div>
               </div>
 
+              {/* First in the card: pick a panel of the list (it stays shown), or
+                  save the one on the card (see src/lib/atelier-panel-choice.ts). */}
+              <div className="flex flex-wrap items-center gap-2 px-4 pt-4">
+                <div className="relative flex-1 min-w-[180px]">
+                  <PackageOpen className="w-3.5 h-3.5 text-slate-400 pointer-events-none absolute start-2.5 top-1/2 -translate-y-1/2 z-10" aria-hidden="true" />
+                  <select
+                    value={listPanel?.id ?? ''}
+                    aria-label={t('atelier.stock.presetAria')}
+                    onChange={(e) => {
+                      const preset = allPresets.find((p) => p.id === e.target.value);
+                      if (!preset) return;
+                      // A saved panel brings its grain, its colour and its price back.
+                      const grain = { hasGrain: !!preset.hasGrain, grainOrientation: preset.hasGrain ? preset.grainOrientation ?? 'vertical' : undefined };
+                      const { pricePerSheet: _previousPrice, ...withoutPrice } = activeSheet;
+                      void _previousPrice;
+                      const nextSheet: Sheet = {
+                        ...withoutPrice,
+                        label: preset.name,
+                        height: preset.height,
+                        width: preset.width,
+                        material: (preset.material as MaterialType) || activeSheet.material,
+                        ...grain,
+                        color: preset.color || undefined,
+                        ...(isPanelPrice(preset.pricePerSheet) ? { pricePerSheet: preset.pricePerSheet } : {}),
+                      };
+                      setPickedPresetId(preset.id);
+                      setSheets([nextSheet]);
+                      setActiveSheetIndex(0);
+                      repriceResult({ sheet: nextSheet });
+                    }}
+                    className="w-full appearance-none bg-studio-field border border-studio-border hover:border-studio-border-hover rounded-lg py-2 ps-8 pe-3 text-xs font-semibold text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-brand-500/50 cursor-pointer transition-colors [&>option]:bg-white [&>option]:text-slate-900 dark:[&>option]:bg-slate-900 dark:[&>option]:text-slate-100"
+                  >
+                    <option value="" disabled>{t('atelier.stock.presetPlaceholder')}</option>
+                    {savedPresets.length > 0 && (
+                      <optgroup label={t('atelier.stock.presetSaved')}>
+                        {savedPresets.map((p) => {
+                          const details = presetDetails(p);
+                          return (
+                            <option key={p.id} value={p.id}>{details ? `${p.name} — ${details}` : p.name}</option>
+                          );
+                        })}
+                      </optgroup>
+                    )}
+                  </select>
+                  <svg className="w-3 h-3 text-slate-400 pointer-events-none absolute end-2.5 top-1/2 -translate-y-1/2" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                    <path fillRule="evenodd" d="M5.23 7.21a.75.75 0 0 1 1.06.02L10 11.168l3.71-3.938a.75.75 0 1 1 1.08 1.04l-4.25 4.5a.75.75 0 0 1-1.08 0l-4.25-4.5a.75.75 0 0 1 .02-1.06Z" clipRule="evenodd" />
+                  </svg>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => void handleSavePreset()}
+                  disabled={!presetsReady || isSavingPreset}
+                  aria-disabled={saveAction.kind === 'saved' || undefined}
+                  aria-label={t(saveAction.kind === 'update' ? 'atelier.stock.updatePresetAria' : 'atelier.stock.savePresetAria')}
+                  className="px-3 py-2 rounded-lg bg-studio-field border border-studio-border hover:border-brand-500/50 text-[11px] font-bold text-slate-600 dark:text-slate-300 hover:text-brand-500 dark:hover:text-brand-400 flex items-center gap-1.5 transition-colors disabled:opacity-50 disabled:cursor-wait aria-disabled:opacity-50 aria-disabled:cursor-not-allowed"
+                >
+                  <BookmarkPlus className="w-3.5 h-3.5" />
+                  {t(saveAction.kind === 'update' ? 'atelier.stock.updatePreset' : 'atelier.stock.savePreset')}
+                </button>
+                {/* The list itself is managed on its own page. */}
+                <Link href="/panels"
+                  className="inline-flex items-center gap-1 px-2.5 py-2 rounded-lg text-[11px] font-bold text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition-colors"
+                >
+                  {t('atelier.stock.managePresets')}
+                  <ArrowRight className="w-3.5 h-3.5 rtl:-scale-x-100" aria-hidden="true" />
+                </Link>
+              </div>
+
               <div className={cutMode === '1d' ? 'p-4 grid grid-cols-2 gap-3' : 'p-4 grid grid-cols-3 gap-3'}>
                 {cutMode === '1d' ? null : <div className="rounded-lg bg-studio-field border border-studio-border px-3 py-2 space-y-0.5 focus-within:border-brand-500/50 focus-within:ring-1 focus-within:ring-brand-500/20 transition-all">
                   <label className="text-[9px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">{t('atelier.stock.heightLabel', { unit: displayUnit })}</label>
@@ -2053,72 +2136,8 @@ const commitPanelName = () => {
                 )}
               </div>
 
-              {/* Panel presets: pick a stock size, or save the one typed under a name. */}
-              <div className="flex flex-wrap items-center gap-2 px-4 pb-2 -mt-1">
-                <div className="relative flex-1 min-w-[180px]">
-                  <PackageOpen className="w-3.5 h-3.5 text-slate-400 pointer-events-none absolute start-2.5 top-1/2 -translate-y-1/2 z-10" aria-hidden="true" />
-                  <select
-                    value=""
-                    aria-label={t('atelier.stock.presetAria')}
-                    onChange={(e) => {
-                      const preset = allPresets.find((p) => p.id === e.target.value);
-                      if (!preset) return;
-                      // A saved panel brings its grain, its colour and its price back.
-                      const grain = { hasGrain: !!preset.hasGrain, grainOrientation: preset.hasGrain ? preset.grainOrientation ?? 'vertical' : undefined };
-                      const { pricePerSheet: _previousPrice, ...withoutPrice } = activeSheet;
-                      void _previousPrice;
-                      const nextSheet: Sheet = {
-                        ...withoutPrice,
-                        height: preset.height,
-                        width: preset.width,
-                        material: (preset.material as MaterialType) || activeSheet.material,
-                        ...grain,
-                        color: preset.color || undefined,
-                        ...(isPanelPrice(preset.pricePerSheet) ? { pricePerSheet: preset.pricePerSheet } : {}),
-                      };
-                      setSheets([nextSheet]);
-                      setActiveSheetIndex(0);
-                      repriceResult({ sheet: nextSheet });
-                    }}
-                    className="w-full appearance-none bg-studio-field border border-studio-border hover:border-studio-border-hover rounded-lg py-2 ps-8 pe-3 text-xs font-semibold text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-brand-500/50 cursor-pointer transition-colors [&>option]:bg-white [&>option]:text-slate-900 dark:[&>option]:bg-slate-900 dark:[&>option]:text-slate-100"
-                  >
-                    <option value="" disabled>{t('atelier.stock.presetPlaceholder')}</option>
-                    {savedPresets.length > 0 && (
-                      <optgroup label={t('atelier.stock.presetSaved')}>
-                        {savedPresets.map((p) => {
-                          const details = presetDetails(p);
-                          return (
-                            <option key={p.id} value={p.id}>{details ? `${p.name} — ${details}` : p.name}</option>
-                          );
-                        })}
-                      </optgroup>
-                    )}
-                  </select>
-                  <svg className="w-3 h-3 text-slate-400 pointer-events-none absolute end-2.5 top-1/2 -translate-y-1/2" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-                    <path fillRule="evenodd" d="M5.23 7.21a.75.75 0 0 1 1.06.02L10 11.168l3.71-3.938a.75.75 0 1 1 1.08 1.04l-4.25 4.5a.75.75 0 0 1-1.08 0l-4.25-4.5a.75.75 0 0 1 .02-1.06Z" clipRule="evenodd" />
-                  </svg>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => void handleSavePreset()}
-                  disabled={!presetsReady || isSavingPreset}
-                  aria-label={t('atelier.stock.savePresetAria')}
-                  className="px-3 py-2 rounded-lg bg-studio-field border border-studio-border hover:border-brand-500/50 text-[11px] font-bold text-slate-600 dark:text-slate-300 hover:text-brand-500 dark:hover:text-brand-400 flex items-center gap-1.5 transition-colors disabled:opacity-50 disabled:cursor-wait"
-                >
-                  <BookmarkPlus className="w-3.5 h-3.5" />
-                  {t('atelier.stock.savePreset')}
-                </button>
-                {/* The list itself is managed on its own page. */}
-                <Link href="/panels"
-                  className="inline-flex items-center gap-1 px-2.5 py-2 rounded-lg text-[11px] font-bold text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition-colors"
-                >
-                  {t('atelier.stock.managePresets')}
-                  <ArrowRight className="w-3.5 h-3.5 rtl:-scale-x-100" aria-hidden="true" />
-                </Link>
-              </div>
-
-              {/* Panel name + preset name: the panel's own identity and the
-                  name under which "Sauvegarder" stores it. */}
+              {/* The panel's name (on the plan, the PDF and in the list when
+                  saved), its colour and its price. */}
               <div className="flex flex-wrap items-center gap-2 px-4 pb-2">
                 <div className="flex-1 min-w-[160px] space-y-1">
                   <label htmlFor="panel-name-input" className="text-[9px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 block">
@@ -2133,20 +2152,6 @@ const commitPanelName = () => {
                     onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur(); }}
                     placeholder={t('atelier.stock.panelNamePlaceholder')}
                     aria-label={t('atelier.stock.panelNameLabel')}
-                    className="w-full px-2.5 py-1.5 rounded-lg bg-studio-field border border-studio-border text-slate-800 dark:text-slate-200 text-xs outline-none focus:border-brand-500/50 focus:ring-1 focus:ring-brand-500/20 transition-all"
-                  />
-                </div>
-                <div className="flex-1 min-w-[160px] space-y-1">
-                  <label htmlFor="preset-name-input" className="text-[9px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 block">
-                    {t('atelier.stock.presetNameLabel')}
-                  </label>
-                  <input
-                    id="preset-name-input"
-                    type="text"
-                    value={presetNameDraft}
-                    onChange={(e) => setPresetNameDraft(e.target.value)}
-                    placeholder={t('atelier.stock.presetNamePlaceholder')}
-                    aria-label={t('atelier.stock.presetNameLabel')}
                     className="w-full px-2.5 py-1.5 rounded-lg bg-studio-field border border-studio-border text-slate-800 dark:text-slate-200 text-xs outline-none focus:border-brand-500/50 focus:ring-1 focus:ring-brand-500/20 transition-all"
                   />
                 </div>

@@ -53,7 +53,7 @@ test('picking a panel, saving it, and typing one by hand all stay in the card', 
 
   assert.match(card, /aria-label=\{t\('atelier\.stock\.presetAria'\)\}/, 'the panel picker');
   assert.match(card, /onClick=\{\(\) => void handleSavePreset\(\)\}/, 'Sauvegarder');
-  assert.match(card, /id="preset-name-input"/, 'the name to save it under');
+  assert.match(card, /id="panel-name-input"/, 'the panel’s name, saved with it');
   assert.match(card, /aria-label=\{t\('atelier\.stock\.heightAria'/, 'the height');
   assert.match(card, /aria-label=\{t\(cutMode === '1d' \? 'atelier\.stock\.lengthAria' : 'atelier\.stock\.widthAria'/, 'the width');
   assert.match(card, /aria-label=\{t\('atelier\.stock\.materialAria'\)\}/, 'the material');
@@ -72,7 +72,7 @@ test('the link says where it leads, in the three languages', () => {
 const handleSave = () => atelier.slice(atelier.indexOf('const handleSavePreset = async'), atelier.indexOf('const presetDetails'));
 
 test('saving waits for the list, and never while the account is out of reach', () => {
-  assert.match(atelier, /const \{ presets: savedPresets, add: addPreset, ready: presetsReady, signedIn: presetsSignedIn, source: presetsSource \} = usePanelPresets\(\);/);
+  assert.match(atelier, /const \{ presets: savedPresets, add: addPreset, update: updatePreset, ready: presetsReady, signedIn: presetsSignedIn, source: presetsSource \} = usePanelPresets\(\);/);
   const save = handleSave();
   const guard = save.indexOf("if (presetsSignedIn && presetsSource === 'device') {");
   assert.ok(guard > 0, 'the guard exists');
@@ -85,6 +85,10 @@ test('the save button waits for the list and for a save under way', () => {
   const button = card.slice(card.lastIndexOf('<button', card.indexOf('onClick={() => void handleSavePreset()}')), card.indexOf('</button>', card.indexOf('onClick={() => void handleSavePreset()}')));
 
   assert.match(button, /disabled=\{!presetsReady \|\| isSavingPreset\}/);
+  // Greyed out, not disabled, while there is nothing to save: a click still
+  // leaves the field being typed in, which commits it, then saves.
+  assert.match(button, /aria-disabled=\{saveAction\.kind === 'saved' \|\| undefined\}/);
+  assert.match(button, /aria-disabled:opacity-50/);
   assert.match(handleSave(), /setIsSavingPreset\(true\);[^]*finally \{\s*setIsSavingPreset\(false\);\s*\}/);
 });
 
@@ -107,5 +111,64 @@ test('the panel picker shows the artisan’s list only', () => {
   assert.match(atelier, /const allPresets = savedPresets;/);
   for (const locale of ['fr', 'en', 'ar']) {
     assert.equal(read(`src/i18n/messages/${locale}.ts`).includes('presetBuiltIn'), false, locale);
+  }
+});
+
+// Owner request, 2026-11-19 (preview of PR #80): the picker comes first in
+// the card and keeps the panel picked; one name field, the panel’s own; and
+// « Sauvegarder » updates a panel of the list that was changed, adds a new
+// one, and is greyed out while there is nothing to save (see
+// src/lib/atelier-panel-choice.ts).
+
+test('the panel picker comes first in the card', () => {
+  const card = stockCard();
+  const picker = card.indexOf("aria-label={t('atelier.stock.presetAria')}");
+
+  assert.ok(picker > 0);
+  assert.ok(picker < card.indexOf('data-testid="sheet-height-input"'), 'before the size');
+  assert.ok(picker < card.indexOf("aria-label={t('atelier.stock.materialAria')}"), 'before the material');
+});
+
+test('the panel picked stays shown, and gives the card its name', () => {
+  const card = stockCard();
+
+  assert.match(atelier, /const \[pickedPresetId, setPickedPresetId\] = useState<string \| null>\(null\);/);
+  assert.match(atelier, /const listPanel = listPanelFor\(cardPanel, savedPresets, pickedPresetId\);/);
+  assert.match(card, /value=\{listPanel\?\.id \?\? ''\}/);
+  assert.match(card, /setPickedPresetId\(preset\.id\);/);
+  assert.match(card, /label: preset\.name,/);
+});
+
+test('one name field: the panel’s own, saved with it', () => {
+  for (const gone of ['preset-name-input', 'presetNameDraft', 'presetNameLabel', 'presetNamePlaceholder']) {
+    assert.equal(atelier.includes(gone), false, gone);
+  }
+  for (const locale of ['fr', 'en', 'ar']) {
+    assert.equal(read(`src/i18n/messages/${locale}.ts`).includes('presetNameLabel'), false, locale);
+  }
+  // The name and the price as typed: the button wakes up while typing.
+  assert.match(atelier, /const cardPanel: NewPanelPreset = \{\s*name: panelNameDraft,/);
+  assert.match(atelier, /pricePerSheet: typedPanelPrice\(panelPriceDraft, activeSheet\.pricePerSheet\)/);
+});
+
+test('« Sauvegarder » updates a changed panel of the list, and adds a new one', () => {
+  const save = handleSave();
+  const card = stockCard();
+
+  assert.match(atelier, /const saveAction = saveActionFor\(cardPanel, savedPresets, pickedPresetId\);/);
+  assert.match(save, /const saved = saveAction\.kind === 'update' \? await updatePreset\(saveAction\.target\.id, saveAction\.preset\) : await addPreset\(preset\);/);
+  assert.match(card, /t\(saveAction\.kind === 'update' \? 'atelier\.stock\.updatePreset' : 'atelier\.stock\.savePreset'\)/);
+  assert.match(save, /t\(saveAction\.kind === 'update' \? 'atelier\.stock\.presetUpdatedOk' : 'atelier\.stock\.presetSavedOk', \{ name \}\)/);
+});
+
+test('the picker, the update and its message, in the three languages', () => {
+  const words = {
+    fr: ["presetPlaceholder: 'Choisir un de mes panneaux…',", "updatePreset: 'Mettre à jour',", "presetUpdatedOk: 'Panneau « {name} » mis à jour.',"],
+    en: ["presetPlaceholder: 'Choose one of my panels…',", "updatePreset: 'Update',", "presetUpdatedOk: 'Panel “{name}” updated.',"],
+    ar: ["presetPlaceholder: 'اختر أحد ألواحي…',", "updatePreset: 'تحديث',", "presetUpdatedOk: 'تم تحديث اللوح « {name} ».',"],
+  };
+  for (const [locale, lines] of Object.entries(words)) {
+    const messages = read(`src/i18n/messages/${locale}.ts`);
+    for (const line of lines) assert.ok(messages.includes(line), `${locale}: ${line}`);
   }
 });
