@@ -12,6 +12,7 @@ import type { ReadPiece, ReadSheet } from '@/lib/vision/read-cut-list';
 import type { PhotoDraft, PhotoSummary } from '@/lib/whatsapp/photo-store';
 import type { AtelierDraft } from '@/lib/atelier-draft';
 import type { Lang } from '@/lib/whatsapp/copy';
+import type { DisplayUnit } from '@/lib/units';
 
 /** Lines of the cut list repeated in the reply; the rest is counted. */
 const SHOWN_LINES = 5;
@@ -23,6 +24,22 @@ export function photoLink(code: string): string {
 /** The panel a summary is computed on: the one stated on the sheet, or the atelier's default. */
 export function panelFor(sheet: ReadSheet | null): ReadSheet {
   return sheet ?? { height: DEFAULT_STOCK_SHEET.height, width: DEFAULT_STOCK_SHEET.width };
+}
+
+/** Panel sides the bot believes, in cm. Outside this, the size was misread (mm, a piece line) and the default is used. */
+const PANEL_MIN_CM = 30;
+const PANEL_MAX_CM = 400;
+
+export function plausiblePanel(sheet: ReadSheet | null): ReadSheet | null {
+  if (!sheet) return null;
+  const ok = (side: number) => Number.isFinite(side) && side >= PANEL_MIN_CM && side <= PANEL_MAX_CM;
+  return ok(sheet.height) && ok(sheet.width) ? sheet : null;
+}
+
+/** The lines the plan can use: a size the reader could not turn into a positive number is left out. */
+export function usablePieces(pieces: ReadPiece[]): ReadPiece[] {
+  const positive = (value: number) => Number.isFinite(value) && value > 0;
+  return pieces.filter((p) => positive(p.height) && positive(p.width) && positive(p.quantity));
 }
 
 export function summarizeCutList(pieces: ReadPiece[], sheet: ReadSheet | null): PhotoSummary {
@@ -53,12 +70,19 @@ function pieceLines(pieces: ReadPiece[], lang: Lang): string {
   const unnamed = lang === 'fr' ? 'Pièce' : 'قطعة';
   const shown = pieces
     .slice(0, SHOWN_LINES)
-    .map((p, i) => `${p.name || `${unnamed} ${i + 1}`} ${number(p.height, lang)} × ${number(p.width, lang)} ×${p.quantity}`)
+    .map((p, i) => `${p.name || `${unnamed} ${i + 1}`} ${ltr(lang, `${number(p.height, lang)} × ${number(p.width, lang)} ×${p.quantity}`)}`)
     .join(' · ');
   const rest = pieces.length - SHOWN_LINES;
   if (rest <= 0) return shown;
   return `${shown} … (+${rest} ${lang === 'fr' ? 'autres' : 'أخرى'})`;
 }
+
+/**
+ * In a right-to-left message, "278×208" or "41.8 × 38 ×7" would show with
+ * their numbers in reverse order: each is wrapped in a left-to-right isolate
+ * (U+2066 … U+2069). French text is left as is.
+ */
+const ltr = (lang: Lang, text: string) => (lang === 'ar' ? `⁦${text}⁩` : text);
 
 export function photoResultText(lang: Lang, summary: PhotoSummary, pieces: ReadPiece[], link: string): string {
   const panel = `${number(summary.sheet.height, lang)}×${number(summary.sheet.width, lang)}`;
@@ -66,10 +90,11 @@ export function photoResultText(lang: Lang, summary: PhotoSummary, pieces: ReadP
 
   if (lang === 'ar') {
     const lines = [
-      `✅ تقرات ${summary.pieceCount} قطعة · ${summary.sheetsUsed} لوحة ${panel} · ${summary.wastePercent}% ضياع`,
+      // Labelled figures (« القطع: 14 ») rather than counted nouns: no number agreement to get wrong.
+      `✅ القطع اللي تقرات: ${ltr(lang, String(summary.pieceCount))} · اللوحات: ${ltr(lang, String(summary.sheetsUsed))} (${ltr(lang, panel)}) · الهدر: ${ltr(lang, `${summary.wastePercent}%`)}`,
       ...(standard ? ['(لوحة عادية، تقدر تبدلها فالورشة)'] : []),
       pieceLines(pieces, lang),
-      ...(summary.unplaced > 0 ? [`⚠️ ${summary.unplaced} قطعة كبر من اللوحة`] : []),
+      ...(summary.unplaced > 0 ? [`⚠️ قطع كبر من اللوحة: ${ltr(lang, String(summary.unplaced))}`] : []),
       `👉 شوف المخطط كامل (من بعد التسجيل فابور): ${link}`,
     ];
     return lines.join('\n');
@@ -93,13 +118,16 @@ export function photoResultText(lang: Lang, summary: PhotoSummary, pieces: ReadP
  * photo, on the panel its summary used: the atelier restores it on opening as
  * it restores a job kept while visiting another screen.
  */
-export function photoDraftToAtelierDraft(draft: PhotoDraft, now: number): AtelierDraft {
+export function photoDraftToAtelierDraft(draft: PhotoDraft, now: number, displayUnit: DisplayUnit = 'cm'): AtelierDraft {
   return {
     v: 1,
     project: {
       pieces: draft.pieces.map((p, i) => ({ ...p, id: String(i + 1), material: 'mdf', rotatable: true })),
       sheets: [{ ...DEFAULT_STOCK_SHEET, height: draft.sheet.height, width: draft.sheet.width }],
       projectName: 'Fiche WhatsApp',
+      // Stated, so the atelier does not take the job for a legacy save (src/lib/units.ts).
+      displayUnit,
+      canonicalUnit: 'cm',
     },
     plannedPieces: null,
     cutMode: '2d',

@@ -11,14 +11,14 @@ const { stubModule } = require('./helpers/stub-module');
 const state = { draft: null, calls: [], db: {} };
 stubModule('@/lib/admin/db', { getAdminDb: () => state.db });
 stubModule('@/lib/whatsapp/photo-store', {
-  openPhotoDraft: async (db, code, now) => {
-    state.calls.push({ db, code, now });
+  openPhotoDraft: async (db, code, now, options) => {
+    state.calls.push({ db, code, now, options });
     if (state.draft instanceof Error) throw state.draft;
     return state.draft;
   },
 });
 
-const { loadPhotoLink, isPhotoCode } = loadTsModule('src/lib/whatsapp/photo-link.ts');
+const { loadPhotoLink, isPhotoCode, isLinkPreviewAgent } = loadTsModule('src/lib/whatsapp/photo-link.ts');
 const { photoDraftToAtelierDraft } = loadTsModule('src/lib/whatsapp/photo-summary.ts');
 const { writeAtelierDraft, readAtelierDraft } = loadTsModule('src/lib/atelier-draft.ts');
 
@@ -58,6 +58,14 @@ test('the atelier draft carries the pieces, the panel used and a project name', 
     ]
   );
   assert.deepEqual(draft.project.pieces[1].edges, { left: true, right: false, top: false, bottom: false });
+});
+
+test('the draft states its unit, the visitor’s own or cm, so the atelier does not take it for a legacy save', () => {
+  assert.equal(photoDraftToAtelierDraft(DRAFT, 1).project.displayUnit, 'cm');
+  assert.equal(photoDraftToAtelierDraft(DRAFT, 1, 'mm').project.displayUnit, 'mm');
+  const { resolveProjectUnitMetadata } = loadTsModule('src/lib/units.ts');
+  const meta = resolveProjectUnitMetadata(photoDraftToAtelierDraft(DRAFT, 1, 'mm').project);
+  assert.deepEqual([meta.displayUnit, meta.migrated, meta.migratedFromLegacyUnit], ['mm', false, false]);
 });
 
 test('the draft survives the atelier draft store round trip', () => {
@@ -107,4 +115,22 @@ test('no database configured, or a database error : null, never a crash', async 
   } finally {
     console.error = original;
   }
+});
+
+test('link preview crawlers are recognised, browsers are not', () => {
+  for (const agent of ['WhatsApp/2.23.20.0', 'facebookexternalhit/1.1 (+http://www.facebook.com/externalhit_uatext.php)', 'Facebot', 'Mozilla/5.0 (compatible; Googlebot/2.1)', 'TelegramBot (like TwitterBot)']) {
+    assert.equal(isLinkPreviewAgent(agent), true, agent);
+  }
+  for (const agent of ['Mozilla/5.0 (Linux; Android 14; SM-A546B) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0 Mobile Safari/537.36', null, '']) {
+    assert.equal(isLinkPreviewAgent(agent), false, String(agent));
+  }
+});
+
+test('a preview fetch does not count as an opening; a browser does', async () => {
+  state.db = {};
+  state.draft = DRAFT;
+  state.calls = [];
+  await loadPhotoLink('k7m2qx9dab', 'WhatsApp/2.23.20.0');
+  await loadPhotoLink('k7m2qx9dab', 'Mozilla/5.0 (Linux; Android 14) Chrome/130.0 Mobile Safari/537.36');
+  assert.deepEqual(state.calls.map((c) => c.options), [{ markOpened: false }, { markOpened: true }]);
 });

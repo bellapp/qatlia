@@ -9,6 +9,8 @@ import type { WhatsAppConfig } from '@/lib/whatsapp/config';
  */
 
 export const MAX_MEDIA_BYTES = 5 * 1024 * 1024;
+/** Each Meta request gets this long, so a stuck call fails instead of eating the webhook's time. */
+export const MEDIA_TIMEOUT_MS = 10_000;
 
 const ACCEPTED_TYPES = ['image/jpeg', 'image/png', 'image/webp'] as const;
 type AcceptedType = (typeof ACCEPTED_TYPES)[number];
@@ -29,7 +31,10 @@ export async function fetchMediaDataUrl(
 
   let lookup: Response;
   try {
-    lookup = await fetchImpl(`https://graph.facebook.com/${config.graphVersion}/${encodeURIComponent(mediaId)}`, { headers });
+    lookup = await fetchImpl(`https://graph.facebook.com/${config.graphVersion}/${encodeURIComponent(mediaId)}`, {
+      headers,
+      signal: AbortSignal.timeout(MEDIA_TIMEOUT_MS),
+    });
   } catch {
     return { ok: false, reason: 'lookup_failed' };
   }
@@ -51,7 +56,7 @@ export async function fetchMediaDataUrl(
 
   let buffer: ArrayBuffer;
   try {
-    const download = await fetchImpl(info.url, { headers });
+    const download = await fetchImpl(info.url, { headers, signal: AbortSignal.timeout(MEDIA_TIMEOUT_MS) });
     if (!download.ok) return { ok: false, reason: 'download_failed', status: download.status };
     buffer = await download.arrayBuffer();
   } catch {

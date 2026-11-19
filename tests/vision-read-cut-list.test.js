@@ -12,18 +12,18 @@ const IMAGE = `data:image/png;base64,${'a'.repeat(64)}`;
 
 const { readCutList } = loadTsModule('src/lib/vision/read-cut-list.ts');
 
-async function read(modelAnswer, options, { env = { OPENROUTER_API_KEY: 'or_real' }, status = 200, rawBody } = {}) {
+async function read(modelAnswer, options, { env = { OPENROUTER_API_KEY: 'or_real' }, status = 200, rawBody, fetchImpl } = {}) {
   const bodies = [];
   const keys = ['OPENROUTER_API_KEY', 'OPENAI_API_KEY', 'OPENROUTER_MODEL'];
   const saved = Object.fromEntries(keys.map((k) => [k, process.env[k]]));
   for (const k of keys) delete process.env[k];
   Object.assign(process.env, env);
   const originalFetch = globalThis.fetch;
-  globalThis.fetch = async (_url, init) => {
-    bodies.push(JSON.parse(init.body));
+  globalThis.fetch = fetchImpl ?? (async (_url, init) => {
+    bodies.push({ ...JSON.parse(init.body), signal: init.signal });
     const text = rawBody ?? JSON.stringify({ choices: [{ message: { content: modelAnswer } }] });
     return new Response(text, { status, headers: { 'Content-Type': 'application/json' } });
-  };
+  });
   try {
     return { result: await readCutList(IMAGE, options), bodies };
   } finally {
@@ -94,9 +94,11 @@ test('no pieces, or an answer that is not JSON : unreadable', async () => {
   assert.deepEqual((await read('je ne vois pas de fiche')).result, { status: 'unreadable' });
 });
 
-test('upstream rate limit : error, rateLimited', async () => {
-  const { result } = await read(null, undefined, { status: 429, rawBody: 'Too many requests' });
+test('upstream rate limit, as the site has always told it (the body says so) : error, rateLimited', async () => {
+  const { result } = await read(null, undefined, { status: 429, rawBody: 'code 429: too many requests' });
   assert.deepEqual(result, { status: 'error', rateLimited: true, httpStatus: 429 });
+  const silent = await read(null, undefined, { status: 429, rawBody: 'Too many requests' });
+  assert.deepEqual(silent.result, { status: 'error', rateLimited: false, httpStatus: 429 }, 'a bare 429 status stays a 502 on the site, as before');
   const worded = await read(null, undefined, { status: 500, rawBody: 'provider rate limit reached' });
   assert.deepEqual(worded.result, { status: 'error', rateLimited: true, httpStatus: 500 });
 });
@@ -110,4 +112,19 @@ test('no provider key : unavailable, nothing sent', async () => {
   const { result, bodies } = await read(answer({ pieces: [] }), undefined, { env: {} });
   assert.deepEqual(result, { status: 'unavailable' });
   assert.equal(bodies.length, 0);
+});
+
+test('timeoutMs gives the request a deadline; running out of time is an error, not a throw', async () => {
+  const timed = await read(answer({ pieces: [{ height: 1, width: 1, quantity: 1 }] }), { readPanel: true, timeoutMs: 30000 });
+  assert.ok(timed.bodies[0].signal instanceof AbortSignal);
+  const site = await read(answer({ pieces: [{ height: 1, width: 1, quantity: 1 }] }));
+  assert.equal(site.bodies[0].signal, undefined, 'the site request has no deadline, as before');
+
+  const timeout = Object.assign(new Error('The operation was aborted due to timeout'), { name: 'TimeoutError' });
+  const { result } = await read(null, { timeoutMs: 5 }, { fetchImpl: async () => { throw timeout; } });
+  assert.deepEqual(result, { status: 'error', rateLimited: false, httpStatus: 0 });
+});
+
+test('any other network failure still throws, as the site route expects', async () => {
+  await assert.rejects(() => read(null, undefined, { fetchImpl: async () => { throw new TypeError('fetch failed'); } }));
 });

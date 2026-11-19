@@ -13,10 +13,12 @@ const LOOKUP_URL = 'https://graph.facebook.com/v23.0/MEDIA1';
 const FILE_URL = 'https://lookaside.example/x';
 const BYTES = Buffer.from([1, 2, 3]);
 
+const signals = [];
 function stubFetch({ lookup, download }) {
   const calls = [];
   const impl = async (url, init) => {
     calls.push({ url: String(url), auth: init?.headers?.Authorization });
+    signals.push(init?.signal);
     if (String(url) === LOOKUP_URL) return lookup();
     return download();
   };
@@ -83,4 +85,12 @@ test('an image type the reader does not take : bad_type', async () => {
 
 test('the limit is 5 MB', () => {
   assert.equal(MAX_MEDIA_BYTES, 5 * 1024 * 1024);
+});
+
+test('both requests carry a deadline, so a stuck Meta call cannot eat the webhook time', async () => {
+  signals.length = 0;
+  const { impl } = stubFetch({ lookup: okLookup(), download: okDownload() });
+  await fetchMediaDataUrl(CONFIG, 'MEDIA1', impl);
+  assert.equal(signals.length, 2);
+  assert.ok(signals.every((signal) => signal instanceof AbortSignal));
 });

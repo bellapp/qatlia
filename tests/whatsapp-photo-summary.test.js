@@ -6,7 +6,7 @@ const { loadTsModule } = require('./helpers/load-ts-module');
 // the plan computed on the panel stated on the sheet, or the atelier's
 // default 278 × 208, always named; the first lines; the link.
 
-const { summarizeCutList, photoLink, photoResultText } = loadTsModule('src/lib/whatsapp/photo-summary.ts');
+const { summarizeCutList, photoLink, photoResultText, plausiblePanel, usablePieces } = loadTsModule('src/lib/whatsapp/photo-summary.ts');
 const { PHOTO_COPY, ATELIER_LINK } = loadTsModule('src/lib/whatsapp/copy.ts');
 
 const piece = (height, width, quantity = 1, name = '') => ({ name, height, width, quantity });
@@ -59,17 +59,34 @@ test('French singular forms and a stated panel', () => {
   assert.doesNotMatch(text, /autres/);
 });
 
-test('Arabic reply : same figures and link, no French words from the template', () => {
+test('Arabic reply : labelled figures (no number agreement to get wrong), the site word for waste, numbers kept left-to-right', () => {
   const pieces = [piece(41.8, 38, 7, 'Côté G'), piece(53.1, 48, 4)];
   const summary = { pieceCount: 11, lineCount: 2, sheetsUsed: 1, wastePercent: 12, sheet: { height: 278, width: 208 }, unplaced: 1 };
   const text = photoResultText('ar', summary, pieces, LINK);
-  assert.match(text, /11/);
-  assert.match(text, /278×208/);
-  assert.match(text, /12 ?%/);
+  const LRI = '⁦';
+  const PDI = '⁩';
+  assert.ok(text.includes(`${LRI}11${PDI}`), 'count isolated');
+  assert.ok(text.includes(`${LRI}278×208${PDI}`), 'panel isolated');
+  assert.ok(text.includes(`${LRI}12%${PDI}`), 'waste isolated');
+  assert.ok(text.includes(`${LRI}41.8 × 38 ×7${PDI}`), 'piece sizes isolated');
+  assert.match(text, /الهدر/);
+  assert.doesNotMatch(text, /ضياع/);
   assert.ok(text.endsWith(LINK));
   for (const word of ['pièce', 'panneau', 'chute', 'Voir', 'standard', 'autres']) {
     assert.ok(!text.includes(word), `no "${word}" in the Arabic reply`);
   }
+});
+
+test('a panel outside 30–400 cm (read in mm, or nonsense) is not trusted', () => {
+  assert.deepEqual(plausiblePanel({ height: 244, width: 122 }), { height: 244, width: 122 });
+  assert.equal(plausiblePanel({ height: 2800, width: 2070 }), null);
+  assert.equal(plausiblePanel({ height: 20, width: 122 }), null);
+  assert.equal(plausiblePanel(null), null);
+});
+
+test('only pieces with finite positive sizes are kept', () => {
+  const kept = usablePieces([piece(50, 40), piece(NaN, 40), piece(50, 0), piece(Infinity, 3), piece(-2, 3), piece(12, 8, 3)]);
+  assert.deepEqual(kept, [piece(50, 40), piece(12, 8, 3)]);
 });
 
 test('the waiting and "already read" texts exist in both languages, with the links', () => {

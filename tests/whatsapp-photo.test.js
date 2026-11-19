@@ -89,7 +89,7 @@ test('a first photo : "je lis", then the summary with the link, and the read is 
   assert.equal(await run(), 'handled');
   assert.deepEqual(state.reserveCalls, [{ waId: WA, cap: 300 }]);
   assert.deepEqual(state.mediaCalls, ['M1']);
-  assert.deepEqual(state.readCalls, [{ dataUrl: 'data:image/jpeg;base64,AAA', options: { readPanel: true } }]);
+  assert.deepEqual(state.readCalls, [{ dataUrl: 'data:image/jpeg;base64,AAA', options: { readPanel: true, timeoutMs: 30000 } }]);
   assert.deepEqual(state.delivered.map((d) => d.kind), ['photo_reading', 'photo_result']);
   assert.equal(state.delivered[0].text, PHOTO_COPY.reading.fr);
   assert.ok(state.delivered[1].text.endsWith(photoLink('k7m2qx9dab')));
@@ -168,34 +168,107 @@ test('a reservation that throws : hint', async () => {
   assert.equal(state.delivered.length, 0);
 });
 
-test('a download refused : the read is failed, hint', async () => {
+/** After "je lis", a failure is always answered: the failed-read text, never the (cooldown-bound) hint. */
+const answeredAsFailed = () => {
+  assert.deepEqual(state.delivered.map((d) => d.kind), ['photo_reading', 'photo_failed']);
+  assert.equal(state.delivered[1].text, PHOTO_COPY.unreadable.fr);
+  assert.deepEqual(state.failed, ['r1']);
+};
+
+test('a download refused : the read is failed and answered as such', async () => {
   reset();
   state.media = { ok: false, reason: 'lookup_refused', status: 400 };
-  assert.equal(await run(), 'hint');
-  assert.deepEqual(state.failed, ['r1']);
+  assert.equal(await run(), 'handled');
+  answeredAsFailed();
   assert.equal(state.readCalls.length, 0);
   assert.equal(state.completed.length, 0);
 });
 
 for (const read of [{ status: 'unreadable' }, { status: 'error', rateLimited: false, httpStatus: 502 }, { status: 'unavailable' }]) {
-  test(`a read ${read.status} : failed, hint`, async () => {
+  test(`a read ${read.status} : failed and answered as such`, async () => {
     reset();
     state.read = read;
-    assert.equal(await run(), 'hint');
-    assert.deepEqual(state.failed, ['r1']);
+    assert.equal(await run(), 'handled');
+    answeredAsFailed();
     assert.equal(state.completed.length, 0);
   });
 }
 
-test('a reader that throws : failed, hint', async () => {
+test('a reader that throws : failed and answered as such', async () => {
   reset();
   state.readError = new Error('boom');
   const original = console.error;
   console.error = () => {};
   try {
-    assert.equal(await run(), 'hint');
+    assert.equal(await run(), 'handled');
   } finally {
     console.error = original;
   }
-  assert.deepEqual(state.failed, ['r1']);
+  answeredAsFailed();
+});
+
+test('a list over 300 pieces is not planned: failed and answered, no summary', async () => {
+  reset();
+  state.read = { status: 'ok', pieces: [{ name: '', height: 50, width: 40, quantity: 301 }], sheet: null };
+  assert.equal(await run(), 'handled');
+  answeredAsFailed();
+  assert.equal(state.completed.length, 0);
+});
+
+test('lines without a usable size are dropped; none left : failed and answered', async () => {
+  reset();
+  state.read = { status: 'ok', pieces: [{ name: '', height: NaN, width: 40, quantity: 1 }, { name: '', height: 50, width: 40, quantity: 2 }], sheet: null };
+  await run();
+  assert.deepEqual(state.completed[0].pieces, [{ name: '', height: 50, width: 40, quantity: 2 }]);
+  assert.doesNotMatch(state.delivered[1].text, /NaN/);
+  reset();
+  state.read = { status: 'ok', pieces: [{ name: '', height: NaN, width: 40, quantity: 1 }], sheet: null };
+  assert.equal(await run(), 'handled');
+  answeredAsFailed();
+});
+
+test('nothing fits the panel : failed and answered, never "0 panneau"', async () => {
+  reset();
+  state.read = { status: 'ok', pieces: [{ name: '', height: 300, width: 300, quantity: 1 }], sheet: null };
+  assert.equal(await run(), 'handled');
+  answeredAsFailed();
+});
+
+test('a panel read in mm or out of range falls back to the default panel', async () => {
+  reset();
+  state.read = { status: 'ok', pieces: [{ name: '', height: 50, width: 40, quantity: 2 }], sheet: { height: 2800, width: 2070 } };
+  await run();
+  assert.deepEqual(state.completed[0].summary.sheet, { height: 278, width: 208 });
+  assert.equal(state.completed[0].sheet, null);
+});
+
+test('once the read is stored, a failing result message never turns it into a failure', async () => {
+  reset();
+  const original = console.error;
+  console.error = () => {};
+  let outcome;
+  try {
+    outcome = await handlePhoto({
+      db: {},
+      config: CONFIG,
+      event: event(),
+      lang: 'fr',
+      now: NOW,
+      deliver: async (text, kind) => {
+        if (kind === 'photo_result') throw new Error('outbound record failed');
+        state.delivered.push({ text, kind });
+        return true;
+      },
+    });
+  } finally {
+    console.error = original;
+  }
+  assert.equal(outcome, 'handled');
+  assert.equal(state.completed.length, 1);
+  assert.deepEqual(state.failed, []);
+});
+
+test('the failed-read text exists in both languages and offers the atelier', () => {
+  const { ATELIER_LINK } = loadTsModule('src/lib/whatsapp/copy.ts');
+  for (const lang of ['fr', 'ar']) assert.ok(PHOTO_COPY.unreadable[lang].includes(ATELIER_LINK));
 });

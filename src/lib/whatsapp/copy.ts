@@ -178,12 +178,20 @@ ${PACK_LINES_AR}
 export const PHOTO_COPY: {
   /** Sent as soon as the read starts: it takes 10 to 20 seconds. */
   reading: Record<Lang, string>;
+  /** After "je lis", the read failed: always sent, so the prospect is never left with "je lis" alone. */
+  unreadable: Record<Lang, string>;
   /** A number whose photo was already read: its link while valid, and the atelier for the next ones. */
   already: (lang: Lang, link: string | null) => string;
 } = {
   reading: {
     fr: '📸 Je lis votre fiche… (10 à 20 secondes)',
     ar: '📸 كنقرا الورقة ديالك… (10 حتى 20 ثانية)',
+  },
+  unreadable: {
+    fr: `Je n'ai pas réussi à lire cette fiche 😕 Envoyez une photo plus nette, bien à plat et en entier, ou prenez-la directement dans l'atelier :
+👉 ${ATELIER_LINK}`,
+    ar: `ما قدرتش نقرا هاد الورقة 😕 صيفط صورة واضحة، مسطحة وكاملة، ولا صوّرها مباشرة فالورشة:
+👉 ${ATELIER_LINK}`,
   },
   already: (lang, link) => {
     if (lang === 'ar') {

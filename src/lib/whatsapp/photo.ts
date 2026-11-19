@@ -20,11 +20,19 @@ import { PHOTO_COPY, type Lang } from '@/lib/whatsapp/copy';
 import { completePhotoRead, failPhotoRead, newPhotoCode, reservePhotoRead } from '@/lib/whatsapp/photo-store';
 import { fetchMediaDataUrl } from '@/lib/whatsapp/media';
 import { readCutList } from '@/lib/vision/read-cut-list';
-import { photoLink, photoResultText, summarizeCutList } from '@/lib/whatsapp/photo-summary';
+import { photoLink, photoResultText, plausiblePanel, summarizeCutList, usablePieces } from '@/lib/whatsapp/photo-summary';
 import { countBotMessages } from '@/lib/whatsapp/store';
 
 export type PhotoOutcome = 'handled' | 'hint' | 'silent';
-export type PhotoMessageKind = 'photo_reading' | 'photo_result' | 'photo_already';
+export type PhotoMessageKind = 'photo_reading' | 'photo_result' | 'photo_already' | 'photo_failed';
+
+/**
+ * Time budget inside the webhook's 60 s: the media requests have 10 s each
+ * (media.ts), the model 30 s, and the plan is bounded by the piece count.
+ */
+const READ_TIMEOUT_MS = 30_000;
+/** Above this many pieces (quantities expanded) the plan would take too long here: the atelier does it. */
+export const MAX_BOT_PIECES = 300;
 
 /** One "already read" answer per number in this window, however many photos follow. */
 const ALREADY_COOLDOWN_MS = 10 * 60 * 1000;
@@ -61,6 +69,9 @@ export async function handlePhoto(input: {
   if (reservation.status !== 'reserved') return 'hint';
 
   const readId = reservation.id;
+  let announced = false;
+  // Frees the number. Once "je lis" went out the prospect gets the failed-read
+  // text (never the hint, whose cooldown could leave "je lis" unanswered).
   const fail = async (reason: string): Promise<PhotoOutcome> => {
     console.log('[whatsapp] photo read failed', reason);
     try {
@@ -68,25 +79,48 @@ export async function handlePhoto(input: {
     } catch (error) {
       console.error('[whatsapp] could not mark the photo read failed', describe(error));
     }
-    return 'hint';
+    if (!announced) return 'hint';
+    try {
+      await deliver(PHOTO_COPY.unreadable[lang], 'photo_failed');
+    } catch (error) {
+      console.error('[whatsapp] could not send the failed-read text', describe(error));
+    }
+    return 'handled';
   };
 
+  let result: { text: string };
   try {
     await deliver(PHOTO_COPY.reading[lang], 'photo_reading');
+    announced = true;
 
     const media = await fetchMediaDataUrl(config, event.mediaId);
     if (!media.ok) return await fail(`media ${media.reason} ${media.status ?? ''}`.trim());
 
-    const read = await readCutList(media.dataUrl, { readPanel: true });
+    const read = await readCutList(media.dataUrl, { readPanel: true, timeoutMs: READ_TIMEOUT_MS });
     if (read.status !== 'ok') return await fail(`read ${read.status}`);
 
-    const summary = summarizeCutList(read.pieces, read.sheet);
+    // The reader's numbers are not trusted blindly: no line without a usable
+    // size, no panel outside a plausible range, no plan too big for the budget.
+    const pieces = usablePieces(read.pieces);
+    if (pieces.length === 0) return await fail('no usable line');
+    if (pieces.reduce((sum, p) => sum + p.quantity, 0) > MAX_BOT_PIECES) return await fail('too many pieces');
+    const sheet = plausiblePanel(read.sheet);
+
+    const summary = summarizeCutList(pieces, sheet);
+    if (summary.sheetsUsed === 0) return await fail('nothing fits the panel');
     const code = newPhotoCode();
-    await completePhotoRead(db, readId, { code, pieces: read.pieces, sheet: read.sheet, summary, now });
-    await deliver(photoResultText(lang, summary, read.pieces, photoLink(code)), 'photo_result');
-    return 'handled';
+    await completePhotoRead(db, readId, { code, pieces, sheet, summary, now });
+    result = { text: photoResultText(lang, summary, pieces, photoLink(code)) };
   } catch (error) {
     console.error('[whatsapp] photo read threw', describe(error));
     return await fail('threw');
   }
+
+  // The read is stored and the number served: a failing send is logged, never undone.
+  try {
+    await deliver(result.text, 'photo_result');
+  } catch (error) {
+    console.error('[whatsapp] could not send the photo result', describe(error));
+  }
+  return 'handled';
 }

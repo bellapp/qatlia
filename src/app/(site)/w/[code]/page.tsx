@@ -1,3 +1,4 @@
+import { headers } from 'next/headers';
 import { loadPhotoLink } from '@/lib/whatsapp/photo-link';
 import { OpenInAtelier } from './OpenInAtelier';
 import { PhotoLinkExpired } from './PhotoLinkExpired';
@@ -10,6 +11,6 @@ export const dynamic = 'force-dynamic';
  * on the URL are recorded by ClientShell before the atelier opens.
  */
 export default async function PhotoLinkPage({ params }: { params: { code: string } }) {
-  const draft = await loadPhotoLink(params.code);
+  const draft = await loadPhotoLink(params.code, headers().get('user-agent'));
   return draft ? <OpenInAtelier draft={draft} /> : <PhotoLinkExpired />;
 }

@@ -4,6 +4,7 @@ import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useLocale } from '@/components/LocaleProvider';
 import { writeAtelierDraft } from '@/lib/atelier-draft';
+import { readStoredDisplayUnit } from '@/lib/units';
 import { photoDraftToAtelierDraft } from '@/lib/whatsapp/photo-summary';
 import type { PhotoDraft } from '@/lib/whatsapp/photo-store';
 
@@ -13,7 +14,9 @@ export function OpenInAtelier({ draft }: { draft: PhotoDraft }) {
   const { t } = useLocale();
   useEffect(() => {
     try {
-      writeAtelierDraft(window.sessionStorage, photoDraftToAtelierDraft(draft, Date.now()));
+      // The visitor's own unit preference, as the atelier would read it.
+      const unit = readStoredDisplayUnit(window.localStorage);
+      writeAtelierDraft(window.sessionStorage, photoDraftToAtelierDraft(draft, Date.now(), unit));
     } catch {
       // Storage blocked: the atelier opens empty rather than not at all.
     }

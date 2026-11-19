@@ -79,7 +79,23 @@ interface CurrentRow {
   created_at: string;
 }
 
+/**
+ * Erases what expired reads still hold, so nothing outlives its 7 days even
+ * when its link is never opened again. Runs with each reservation; a failure
+ * is logged and never blocks the photo at hand.
+ */
+async function purgeExpired(db: SupabaseClient, now: Date): Promise<void> {
+  const { error } = await db
+    .from(TABLE)
+    .update({ pieces: null, sheet: null, summary: null })
+    .lt('expires_at', now.toISOString())
+    .not('pieces', 'is', null);
+  if (error && isMissingTable(error)) throw new PhotoTableMissing();
+  if (error) console.error('[whatsapp] photo purge failed', error.code ?? 'no code');
+}
+
 async function reserve(db: SupabaseClient, waId: string, now: Date, dailyCap: number): Promise<Reservation> {
+  await purgeExpired(db, now);
   const current = await db
     .from(TABLE)
     .select('id, status, code, expires_at, created_at')
@@ -166,8 +182,15 @@ interface DraftRow {
 /**
  * The pieces and the panel a link opens; 'expired' once its 7 days are over
  * (its content is then purged); null for an unknown code or a missing table.
+ * `markOpened: false` (a link preview fetch) leaves `opened_at` as it is.
  */
-export async function openPhotoDraft(db: SupabaseClient, code: string, now: Date): Promise<PhotoDraft | 'expired' | null> {
+export async function openPhotoDraft(
+  db: SupabaseClient,
+  code: string,
+  now: Date,
+  options: { markOpened?: boolean } = {},
+): Promise<PhotoDraft | 'expired' | null> {
+  const markOpened = options.markOpened ?? true;
   try {
     const found = await db.from(TABLE).select('id, pieces, summary, expires_at, opened_at').eq('code', code).maybeSingle();
     check(found.error, 'open');
@@ -184,7 +207,7 @@ export async function openPhotoDraft(db: SupabaseClient, code: string, now: Date
       return 'expired';
     }
 
-    if (row.opened_at === null) {
+    if (markOpened && row.opened_at === null) {
       const opened = await db.from(TABLE).update({ opened_at: now.toISOString() }).eq('id', row.id).is('opened_at', null);
       check(opened.error, 'opened');
     }

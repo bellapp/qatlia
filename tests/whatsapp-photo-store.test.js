@@ -29,7 +29,10 @@ function seed(fake, { current = [], failures = [], today = [], inserted = { id: 
   };
 }
 const ids = (n) => Array.from({ length: n }, (_, i) => ({ id: `x${i}` }));
-const updates = (fake) => fake.ops(TABLE, 'update').map(([row]) => row);
+/** The updates other than the purge of expired reads every reservation runs. */
+const PURGE = { pieces: null, sheet: null, summary: null };
+const updates = (fake) => fake.ops(TABLE, 'update').map(([row]) => row).filter((row) => JSON.stringify(row) !== JSON.stringify(PURGE));
+const purges = (fake) => fake.state.fromCalls.filter((c) => has(c, 'update', PURGE));
 const inserts = (fake) => fake.ops(TABLE, 'insert').map(([row]) => row);
 
 test('a first photo is reserved as a reading row', async () => {
@@ -162,7 +165,7 @@ test('an expired link : expired, and its content is purged', async () => {
   const fake = createFakeSupabase();
   fake.state.tables[TABLE] = (call) => (has(call, 'update') ? null : row({ expires_at: new Date(NOW.getTime() - MIN).toISOString() }));
   assert.equal(await openPhotoDraft(fake.client, 'abcdefghjk', NOW), 'expired');
-  assert.deepEqual(updates(fake), [{ pieces: null, sheet: null, summary: null }]);
+  assert.deepEqual(fake.ops(TABLE, 'update').map(([r]) => r), [PURGE]);
   fake.state.tables[TABLE] = (call) => (has(call, 'update') ? null : row({ pieces: null, summary: null }));
   assert.equal(await openPhotoDraft(fake.client, 'abcdefghjk', NOW), 'expired');
 });
@@ -184,4 +187,35 @@ test('codes are 10 characters of the unambiguous alphabet, and do not repeat', (
     codes.add(code);
   }
   assert.equal(codes.size, 1000);
+});
+
+test('every reservation purges the content of expired reads, so it does not outlive its 7 days', async () => {
+  const fake = createFakeSupabase();
+  seed(fake);
+  await reservePhotoRead(fake.client, WA, NOW, 300);
+  const [purge] = purges(fake);
+  assert.ok(purge, 'a purge update');
+  assert.ok(has(purge, 'lt', 'expires_at', NOW.toISOString()));
+  assert.ok(has(purge, 'not', 'pieces', 'is', null));
+});
+
+test('a failing purge does not block the reservation', async () => {
+  const fake = createFakeSupabase();
+  seed(fake);
+  fake.state.tableErrors[TABLE] = (call) => (has(call, 'update', PURGE) ? { code: 'XX000', message: 'down' } : null);
+  const original = console.error;
+  console.error = () => {};
+  try {
+    assert.equal((await reservePhotoRead(fake.client, WA, NOW, 300)).status, 'reserved');
+  } finally {
+    console.error = original;
+  }
+});
+
+test('opening without markOpened (a link preview) leaves opened_at alone', async () => {
+  const fake = createFakeSupabase();
+  fake.state.tables[TABLE] = (call) => (has(call, 'update') ? null : row());
+  const draft = await openPhotoDraft(fake.client, 'abcdefghjk', NOW, { markOpened: false });
+  assert.equal(draft.pieces.length, 1);
+  assert.equal(updates(fake).length, 0);
 });

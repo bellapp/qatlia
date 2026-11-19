@@ -11,7 +11,7 @@ Le bot répond aux messages WhatsApp reçus sur le numéro de QatliA (06 00 93 7
 - les vocaux, vidéos, documents, localisations et contacts sont passés à un humain ;
 - le bot répond en français ou en arabe selon la langue du prospect. Un premier contact venu de la publicité reçoit la darija par défaut, comme la pub : le message que WhatsApp pré-remplit (« Bonjour ! Puis-je en savoir plus… ») suit la langue du téléphone et ne dit rien de la personne. Le bot passe au français dès que la personne écrit en français ;
 - une personne déjà accueillie qui revient par la publicité reçoit de nouveau le menu à boutons (pas une présentation écrite par l'IA) ;
-- une photo de fiche de débit est **lue par le bot**, une seule fois par numéro (voir « Lecture photo ») : il répond le nombre de pièces, de panneaux et la chute, avec un lien qui ouvre l'atelier sur ces pièces. Une photo illisible, ou une lecture impossible (plafond atteint, lecture coupée), reçoit le lien direct de l'atelier (`qatlia.ma/atelier`) ;
+- une photo de fiche de débit est **lue par le bot**, une seule fois par numéro (voir « Lecture photo ») : il répond le nombre de pièces, de panneaux et la chute, avec un lien qui ouvre l'atelier sur ces pièces. Une photo que le bot n'arrive pas à lire reçoit un message qui demande une photo plus nette, avec le lien de l'atelier ; quand la lecture n'est pas possible (plafond atteint, lecture coupée), la photo reçoit le lien direct de l'atelier (`qatlia.ma/atelier`) ;
 - **en coexistence, le bot ne répond qu'aux personnes venues de la publicité** (Click-to-WhatsApp). Les clients existants qui écrivent à la ligne de support continuent de n'avoir que vous comme interlocuteur. Avec `WHATSAPP_BOT_SCOPE=all`, le bot répond à tout le monde ;
 - **chaque passage à un humain** (vocal, choix 3, réponse envoyée depuis l'app, question hors des informations de QatliA) fait taire le bot pour ce contact pendant 24 h.
 
@@ -118,6 +118,9 @@ Règles :
 
 - **une lecture réussie par numéro, définitivement**. Les photos suivantes reçoivent le lien de la première fiche et l'invitation à continuer dans l'atelier ;
 - une lecture ratée (photo illisible, pas une fiche) libère le numéro, jusqu'à 3 échecs par numéro sur 24 h ;
+- garde-fous : 10 s par requête Meta, 30 s pour la lecture IA, 300 pièces au plus (au-delà, la fiche se fait dans l'atelier) ; une ligne sans cote lisible est ignorée, un format de panneau hors 30–400 cm est remplacé par le panneau par défaut ;
+- « liens ouverts » ne compte pas l'aperçu que WhatsApp génère en recevant le message ;
+- le contenu des lectures expirées est effacé à chaque nouvelle lecture, même si le lien n'est jamais rouvert ;
 - plafond global : `WHATSAPP_PHOTO_DAILY_CAP` lectures sur 24 h (réussies ou non, chacune coûte un appel IA) ;
 - **la photo n'est jamais stockée**. Les pièces, le panneau et le résumé sont gardés 7 jours derrière le code, puis effacés ; la ligne reste pour la règle « une photo par numéro ».
 

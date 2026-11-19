@@ -165,7 +165,15 @@ function normalizePiece(p: RawPiece): ReadPiece {
   };
 }
 
-export async function readCutList(imageDataUrl: string, options: { readPanel?: boolean } = {}): Promise<ReadResult> {
+/**
+ * `timeoutMs` (the bot only) puts a deadline on the model call; running out
+ * of time is then an 'error' result. The site passes none, so its request and
+ * its failures stay exactly as they were.
+ */
+export async function readCutList(
+  imageDataUrl: string,
+  options: { readPanel?: boolean; timeoutMs?: number } = {},
+): Promise<ReadResult> {
   const openrouterKey = process.env.OPENROUTER_API_KEY;
   const openaiKey = process.env.OPENAI_API_KEY;
   const apiKey = openrouterKey || openaiKey;
@@ -178,7 +186,7 @@ export async function readCutList(imageDataUrl: string, options: { readPanel?: b
   const model = isUsingOpenRouter ? process.env.OPENROUTER_MODEL || 'google/gemini-3.7-flash' : 'gpt-4o-mini';
   const systemPrompt = options.readPanel ? SYSTEM_PROMPT + PANEL_INSTRUCTION : SYSTEM_PROMPT;
 
-  const res = await fetch(endpoint, {
+  const request: RequestInit = {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -209,12 +217,24 @@ export async function readCutList(imageDataUrl: string, options: { readPanel?: b
         },
       ],
     }),
-  });
+  };
+  if (options.timeoutMs) request.signal = AbortSignal.timeout(options.timeoutMs);
+
+  let res: Response;
+  try {
+    res = await fetch(endpoint, request);
+  } catch (error) {
+    const name = error instanceof Error ? error.name : '';
+    if (options.timeoutMs && (name === 'TimeoutError' || name === 'AbortError')) {
+      return { status: 'error', rateLimited: false, httpStatus: 0 };
+    }
+    throw error;
+  }
 
   if (!res.ok) {
     const errText = await res.text();
     console.error('Vision API error:', errText);
-    return { status: 'error', rateLimited: errText.includes('rate limit') || errText.includes('429') || res.status === 429, httpStatus: res.status };
+    return { status: 'error', rateLimited: errText.includes('rate limit') || errText.includes('429'), httpStatus: res.status };
   }
 
   const data = await res.json();

@@ -14,12 +14,22 @@ export function isPhotoCode(code: unknown): code is string {
   return typeof code === 'string' && PHOTO_CODE.test(code);
 }
 
-export async function loadPhotoLink(code: unknown): Promise<PhotoDraft | null> {
+/**
+ * WhatsApp, Facebook and other apps fetch a link to build its preview as soon
+ * as the message arrives: that fetch is not a prospect opening the link.
+ */
+const LINK_PREVIEW_AGENT = /whatsapp|facebookexternalhit|facebot|bot\b|crawler|spider|preview/i;
+
+export function isLinkPreviewAgent(userAgent: string | null | undefined): boolean {
+  return typeof userAgent === 'string' && LINK_PREVIEW_AGENT.test(userAgent);
+}
+
+export async function loadPhotoLink(code: unknown, userAgent: string | null = null): Promise<PhotoDraft | null> {
   if (!isPhotoCode(code)) return null;
   const db = getAdminDb();
   if (!db) return null;
   try {
-    const draft = await openPhotoDraft(db, code, new Date());
+    const draft = await openPhotoDraft(db, code, new Date(), { markOpened: !isLinkPreviewAgent(userAgent) });
     return draft && draft !== 'expired' ? draft : null;
   } catch (error) {
     console.error('[whatsapp] photo link failed', error instanceof Error ? error.message : 'unknown error');
