@@ -1,5 +1,6 @@
 import { headers } from 'next/headers';
 import { loadPhotoLink } from '@/lib/whatsapp/photo-link';
+import { photoPreviewPlan } from '@/lib/whatsapp/photo-summary';
 import { OpenInAtelier } from './OpenInAtelier';
 import { PhotoLinkExpired } from './PhotoLinkExpired';
 
@@ -12,5 +13,7 @@ export const dynamic = 'force-dynamic';
  */
 export default async function PhotoLinkPage({ params }: { params: { code: string } }) {
   const draft = await loadPhotoLink(params.code, headers().get('user-agent'));
-  return draft ? <OpenInAtelier draft={draft} /> : <PhotoLinkExpired />;
+  if (!draft) return <PhotoLinkExpired />;
+  // The free preview, computed here from the stored pieces (never from the browser).
+  return <OpenInAtelier draft={draft} preview={photoPreviewPlan(draft)} />;
 }

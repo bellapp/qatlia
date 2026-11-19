@@ -7,7 +7,7 @@
  * Pure: no network, no database.
  */
 
-import { DEFAULT_STOCK_SHEET, optimizeCutting2D, type Piece } from '@/lib/cutting/binpacking';
+import { DEFAULT_STOCK_SHEET, optimizeCutting2D, type OptimizationResult, type Piece, type Sheet } from '@/lib/cutting/binpacking';
 import type { ReadPiece, ReadSheet } from '@/lib/vision/read-cut-list';
 import type { PhotoDraft, PhotoSummary } from '@/lib/whatsapp/photo-store';
 import type { AtelierDraft } from '@/lib/atelier-draft';
@@ -113,21 +113,53 @@ export function photoResultText(lang: Lang, summary: PhotoSummary, pieces: ReadP
   return lines.join('\n');
 }
 
+/** The draft's pieces as the atelier holds them; the preview is laid out on these same ids. */
+export function atelierPieces(draft: PhotoDraft): Piece[] {
+  return draft.pieces.map((p, i) => ({ ...p, id: String(i + 1), material: 'mdf', rotatable: true }));
+}
+
+function atelierSheet(draft: PhotoDraft): Sheet {
+  return { ...DEFAULT_STOCK_SHEET, height: draft.sheet.height, width: draft.sheet.width };
+}
+
+/**
+ * The plan a visitor of the link sees before signing up (plan
+ * 2026-11-19-whatsapp-plan-apercu): computed on the server from the pieces the
+ * bot stored, never from what a browser sends, so it cannot be used to plan
+ * another list for free. Signing in runs the normal, paid optimization.
+ */
+export function photoPreviewPlan(draft: PhotoDraft): OptimizationResult {
+  return optimizeCutting2D(atelierPieces(draft), [atelierSheet(draft)]);
+}
+
+/** A job opened from a WhatsApp link and still showing the free preview. */
+export function isPhotoPreview(project: unknown): boolean {
+  return typeof project === 'object' && project !== null && (project as { photoPreview?: unknown }).photoPreview === true;
+}
+
 /**
  * The atelier's own draft (src/lib/atelier-draft.ts) for the pieces of a read
- * photo, on the panel its summary used: the atelier restores it on opening as
- * it restores a job kept while visiting another screen.
+ * photo, on the panel its summary used, with the preview plan when given: the
+ * atelier restores it on opening as it restores a job kept while visiting
+ * another screen, and the marker tells it the plan is only a preview.
  */
-export function photoDraftToAtelierDraft(draft: PhotoDraft, now: number, displayUnit: DisplayUnit = 'cm'): AtelierDraft {
+export function photoDraftToAtelierDraft(
+  draft: PhotoDraft,
+  now: number,
+  displayUnit: DisplayUnit = 'cm',
+  result: OptimizationResult | null = null,
+): AtelierDraft {
   return {
     v: 1,
     project: {
-      pieces: draft.pieces.map((p, i) => ({ ...p, id: String(i + 1), material: 'mdf', rotatable: true })),
-      sheets: [{ ...DEFAULT_STOCK_SHEET, height: draft.sheet.height, width: draft.sheet.width }],
+      pieces: atelierPieces(draft),
+      sheets: [atelierSheet(draft)],
       projectName: 'Fiche WhatsApp',
       // Stated, so the atelier does not take the job for a legacy save (src/lib/units.ts).
       displayUnit,
       canonicalUnit: 'cm',
+      photoPreview: true,
+      ...(result ? { result } : {}),
     },
     plannedPieces: null,
     cutMode: '2d',
