@@ -22,17 +22,29 @@ test.describe('Panel setup page', () => {
     await expect(bar.getByRole('link', { name: 'Configuration des panneaux' })).toHaveAttribute('aria-current', 'page');
   });
 
+  test('a first visit without an account starts from the QatliA catalogue', async ({ page }) => {
+    await page.goto('/panels', { waitUntil: 'domcontentloaded' });
+
+    const list = page.getByRole('list').filter({ hasText: '031 Blanc lisse 18 mm' });
+    await expect(list.getByRole('listitem')).toHaveCount(11);
+    await expect(list.getByRole('listitem').filter({ hasText: 'Rahli' })).toContainText('Ramage vertical');
+    await expect(list.getByRole('listitem').first()).toContainText('530');
+  });
+
   test('a signed-out artisan adds, edits and removes a panel of the device list', async ({ page }) => {
+    // This device already had the catalogue, and its artisan removed it all.
+    await page.addInitScript(() => window.localStorage.setItem('qatlia-panel-catalog-v1', '1'));
     await page.goto('/panels', { waitUntil: 'domcontentloaded' });
     await expect(page.getByText('Cette liste est gardée sur cet appareil.')).toBeVisible();
     await expect(page.getByText('Aucun panneau enregistré.', { exact: false })).toBeVisible();
 
-    await page.getByRole('button', { name: 'Préremplir avec Grand panneau 244 × 122' }).click();
+    await page.getByRole('button', { name: 'Préremplir avec 031 Blanc lisse 18 mm' }).click();
     await page.getByLabel('Nom du panneau').first().fill('MDF blanc atelier');
     await page.getByRole('button', { name: 'Ajouter à ma liste' }).click();
 
     const row = page.getByRole('listitem').filter({ hasText: 'MDF blanc atelier' });
-    await expect(row).toContainText('244.0 × 122.0 cm');
+    await expect(row).toContainText('280.0 × 207.0 cm');
+    await expect(row).toContainText('Blanc lisse / Polaire');
 
     await row.getByRole('button', { name: 'Modifier MDF blanc atelier' }).click();
     await row.getByLabel('Nom du panneau').fill('MDF 19 mm');

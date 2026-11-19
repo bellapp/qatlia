@@ -90,31 +90,33 @@ test('the empty form starts on MDF, vertical grain unticked, nothing typed', () 
   assert.deepEqual(EMPTY_PANEL_FORM, { name: '', height: '', width: '', material: 'mdf', color: '', hasGrain: false, grainOrientation: 'vertical', price: '' });
 });
 
-// The standard sizes fill the add form. Review, 2026-11-17: a second size
-// clicked kept the name of the first, and the list showed a panel named
-// « Grand panneau 244 × 122 » at 122 × 61.
+// The catalogue panels fill the add form (owner request, 2026-11-18): a panel
+// of the catalogue removed from the list is added back in one click. Review,
+// 2026-11-17: a second shortcut clicked kept the name of the first.
 
-const BIG = { id: 'bi-244x122', name: 'Grand panneau 244 × 122', height: 244, width: 122, material: 'mdf', builtIn: true };
-const HALF = { id: 'bi-122x61', name: 'Demi-panneau 122 × 61', height: 122, width: 61, material: 'mdf', builtIn: true };
-const PLY = { id: 'bi-183x122', name: 'Contreplaqué 183 × 122', height: 183, width: 122, material: 'contreplaques', builtIn: true };
+const { catalogPresetsFor } = loadTsModule('src/lib/panel-catalog.ts');
+const [WHITE, GREY] = catalogPresetsFor('MAD');
+const OAK = catalogPresetsFor('MAD').find((p) => p.name.startsWith('Chêne'));
 
-test('a standard size fills the size, the material, and the name while none is typed', () => {
-  const next = applyShortcut(EMPTY_PANEL_FORM, BIG, 'cm');
+test('a catalogue panel fills the whole form while no name is typed', () => {
+  const next = applyShortcut(EMPTY_PANEL_FORM, OAK, 'cm');
 
-  assert.deepEqual([next.name, next.height, next.width, next.material], ['Grand panneau 244 × 122', '244', '122', 'mdf']);
-  assert.equal(applyShortcut(EMPTY_PANEL_FORM, BIG, 'mm').height, '2440');
+  assert.deepEqual(next, {
+    name: 'Chêne 38H / 208 18 mm', height: '280', width: '207', material: 'melamine', color: 'Bois clair naturel', hasGrain: true, grainOrientation: 'vertical', price: '720',
+  });
+  assert.equal(applyShortcut(EMPTY_PANEL_FORM, WHITE, 'mm').height, '2800');
+  assert.equal(applyShortcut(next, WHITE, 'cm').hasGrain, false, 'a plain panel takes the grain off');
 });
 
-test('a second standard size replaces the name the first one gave', () => {
-  const next = applyShortcut(applyShortcut(EMPTY_PANEL_FORM, BIG, 'cm'), HALF, 'cm');
+test('a second catalogue panel replaces the name the first one gave', () => {
+  const next = applyShortcut(applyShortcut(EMPTY_PANEL_FORM, WHITE, 'cm'), GREY, 'cm');
 
-  assert.deepEqual([next.name, next.height, next.width], ['Demi-panneau 122 × 61', '122', '61']);
-  assert.equal(applyShortcut(next, PLY, 'cm').material, 'contreplaques');
+  assert.deepEqual([next.name, next.color, next.price], ['044 Gris perle 18 mm', 'Gris perle / Gris clair', '600']);
 });
 
-test('a name typed by the artisan is never replaced by a standard size', () => {
-  const typed = { ...applyShortcut(EMPTY_PANEL_FORM, BIG, 'cm'), name: 'MDF atelier' };
+test('a name typed by the artisan is never replaced by a catalogue panel', () => {
+  const typed = { ...applyShortcut(EMPTY_PANEL_FORM, WHITE, 'cm'), name: 'Blanc atelier' };
 
-  assert.equal(applyShortcut(typed, HALF, 'cm').name, 'MDF atelier');
-  assert.equal(applyShortcut({ ...EMPTY_PANEL_FORM, name: 'Mon panneau' }, BIG, 'cm').name, 'Mon panneau');
+  assert.equal(applyShortcut(typed, GREY, 'cm').name, 'Blanc atelier');
+  assert.equal(applyShortcut({ ...EMPTY_PANEL_FORM, name: 'Mon panneau' }, OAK, 'cm').name, 'Mon panneau');
 });

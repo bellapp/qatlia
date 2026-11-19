@@ -76,6 +76,7 @@ test('parseWebhook returns a text inbound event with profile name and referral',
       kind: 'text',
       text: 'Salam',
       referral,
+      mediaId: null,
     },
   ]);
 });
@@ -117,6 +118,8 @@ test('parseWebhook maps audio, image and unknown types to kinds', () => {
   );
   assert.equal(image.kind, 'image');
   assert.equal(image.text, 'ma fiche');
+  assert.equal(image.mediaId, 'i1');
+  assert.equal(audio.mediaId, null);
 
   const [other] = parseWebhook(messagesPayload({ type: 'unsupported' }), PHONE_ID);
   assert.equal(other.kind, 'other');

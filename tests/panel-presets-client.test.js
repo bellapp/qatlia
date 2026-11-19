@@ -93,3 +93,78 @@ test('an account that cannot be reached, or answers anything else, is a failure'
     assert.deepEqual(await presets().updateAccountPreset('cloud-1', attributes(OAK)), { ok: false, error: 'FAILED' }, String(status));
   }
 });
+
+// The panel catalogue on a device without an account (owner request,
+// 2026-11-18): copied once into the device list, never again after.
+
+const catalog = () => loadTsModule('src/lib/panel-catalog.ts');
+
+test('a device list gets the catalogue once, priced in the currency shown', () => {
+  deviceList([WHITE]);
+
+  assert.equal(presets().copyCatalogToDeviceOnce('MAD'), true);
+  const stored = JSON.parse(values.get('qatlia-panel-presets'));
+  assert.equal(stored.length, 1 + catalog().PANEL_CATALOG.length);
+  assert.equal(stored[0].id, 'p-1', 'the artisan’s own panels first, untouched');
+  assert.equal(stored[1].name, '031 Blanc lisse 18 mm');
+  assert.equal(stored[1].pricePerSheet, 530);
+  assert.ok(stored.slice(1).every((p) => p.id.startsWith('p-') && !p.builtIn), 'panels of the artisan, ready to change');
+});
+
+test('a device list that had the catalogue never gets it back', () => {
+  deviceList([]);
+  presets().copyCatalogToDeviceOnce('MAD');
+  values.set('qatlia-panel-presets', '[]');
+
+  assert.equal(presets().copyCatalogToDeviceOnce('MAD'), false);
+  assert.equal(values.get('qatlia-panel-presets'), '[]');
+});
+
+test('the device copy skips what is there and stays within the device cap', () => {
+  const many = Array.from({ length: 35 }, (_, i) => ({ id: `p-${i}`, name: `P${i}`, height: 100 + i, width: 50, material: 'mdf' }));
+  deviceList(many);
+
+  presets().copyCatalogToDeviceOnce('EUR');
+
+  const stored = JSON.parse(values.get('qatlia-panel-presets'));
+  assert.equal(stored.length, 40);
+  assert.equal(stored[35].pricePerSheet, 49.07, 'euros for a euro visitor');
+});
+
+// Review, 2026-11-18: signing in after a visit without an account. The device
+// import does not send the catalogue panels the visitor left as they were: a
+// new account gets them from the server copy anyway, and an account that had
+// removed some must not get them back from a new phone. A catalogue panel the
+// visitor changed (name, price…) is theirs, and is sent.
+
+test('the device import leaves out the catalogue panels left untouched, in any currency', async () => {
+  const [white, grey] = catalog().catalogPresetsFor('MAD');
+  const [, , anthracite] = catalog().catalogPresetsFor('EUR');
+  const mine = { ...white, id: 'p-10', name: 'Blanc atelier', pricePerSheet: 500 };
+  deviceList([WHITE, mine, { ...grey, id: 'p-11', builtIn: false }, { ...anthracite, id: 'p-12', builtIn: false }]);
+  const calls = answer(200, { success: true, created: [], duplicates: [], invalid: 0 });
+
+  assert.equal(await presets().importDevicePresetsOnce('user-1'), true);
+
+  assert.deepEqual(JSON.parse(calls[0].init.body).presets.map((p) => p.name), ['MDF blanc', 'Blanc atelier']);
+  assert.ok(values.get('qatlia-panel-presets-imported:user-1'), 'marked as imported');
+});
+
+test('a device holding only the untouched catalogue sends nothing, and is marked as imported', async () => {
+  deviceList(catalog().catalogPresetsFor('MAD').map((p, i) => ({ ...p, id: `p-${i}`, builtIn: false })));
+  const calls = answer(200, { success: true, created: [], duplicates: [], invalid: 0 });
+
+  assert.equal(await presets().importDevicePresetsOnce('user-2'), false);
+  assert.equal(calls.length, 0);
+  assert.ok(values.get('qatlia-panel-presets-imported:user-2'));
+});
+
+test('the catalogue as the device copy stored it is not sent at sign-in', async () => {
+  deviceList([]);
+  presets().copyCatalogToDeviceOnce('EUR');
+  const calls = answer(200, { success: true, created: [], duplicates: [], invalid: 0 });
+
+  await presets().importDevicePresetsOnce('user-3');
+
+  assert.equal(calls.length, 0);
+});

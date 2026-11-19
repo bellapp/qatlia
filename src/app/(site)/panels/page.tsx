@@ -11,7 +11,10 @@ import { LocaleSwitcher, useLocale } from '@/components/LocaleProvider';
 import { PanelForm } from '@/components/panels/PanelForm';
 import { PanelRow } from '@/components/panels/PanelRow';
 import { EMPTY_PANEL_FORM, panelToForm } from '@/lib/panel-form';
-import { BUILT_IN_PRESETS, type NewPanelPreset } from '@/lib/panel-presets';
+import type { NewPanelPreset } from '@/lib/panel-presets';
+import { catalogPresetsFor } from '@/lib/panel-catalog';
+import { useCurrency } from '@/components/currency-store';
+import { DEFAULT_CURRENCY } from '@/lib/currency';
 import { usePanelPresets, type PresetWriteResult } from '@/lib/use-panel-presets';
 import { DEFAULT_DISPLAY_UNIT, readStoredDisplayUnit, writeStoredDisplayUnit, type DisplayUnit } from '@/lib/units';
 
@@ -25,6 +28,7 @@ const CONFIRM_DELETE_MS = 4000;
  */
 export default function PanelsPage() {
   const { t, n } = useLocale();
+  const currency = useCurrency().currency ?? DEFAULT_CURRENCY;
   const { presets, source, signedIn, ready, add, update, remove } = usePanelPresets();
 
   const [userEmail, setUserEmail] = useState<string | null>(null);
@@ -183,7 +187,7 @@ export default function PanelsPage() {
                 busy={adding || locked}
                 error={addError}
                 onSubmit={(preset) => void handleAdd(preset)}
-                shortcuts={BUILT_IN_PRESETS}
+                shortcuts={catalogPresetsFor(currency)}
               />
               {/* Always in the page, so a screen reader hears each change as it happens. */}
               <p role="status" aria-live="polite" className={`mt-3 text-xs font-semibold empty:hidden ${notice.tone === 'success' ? 'text-emerald-700 dark:text-emerald-300' : 'text-red-600 dark:text-red-400'}`}>{notice.where === 'add' ? notice.text : ''}</p>
