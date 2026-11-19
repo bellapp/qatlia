@@ -971,5 +971,11 @@ export const en: Catalog = {
     },
     closeAria: 'Close',
   },
+  photoLink: {
+    opening: 'Opening your cut list…',
+    expiredTitle: 'This link has expired',
+    expiredBody: 'Take a photo of your cut list in the workshop: the AI reads the pieces for you.',
+    openAtelier: 'Open the workshop',
+  },
   legal: legalEn,
 };

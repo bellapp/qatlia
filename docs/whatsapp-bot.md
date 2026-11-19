@@ -11,7 +11,7 @@ Le bot répond aux messages WhatsApp reçus sur le numéro de QatliA (06 00 93 7
 - les vocaux, vidéos, documents, localisations et contacts sont passés à un humain ;
 - le bot répond en français ou en arabe selon la langue du prospect. Un premier contact venu de la publicité reçoit la darija par défaut, comme la pub : le message que WhatsApp pré-remplit (« Bonjour ! Puis-je en savoir plus… ») suit la langue du téléphone et ne dit rien de la personne. Le bot passe au français dès que la personne écrit en français ;
 - une personne déjà accueillie qui revient par la publicité reçoit de nouveau le menu à boutons (pas une présentation écrite par l'IA) ;
-- une photo reçoit le lien direct de l'atelier (`qatlia.ma/atelier`), qui s'ouvre sans compte et garde la photo pendant l'inscription ;
+- une photo de fiche de débit est **lue par le bot**, une seule fois par numéro (voir « Lecture photo ») : il répond le nombre de pièces, de panneaux et la chute, avec un lien qui ouvre l'atelier sur ces pièces. Une photo illisible, ou une lecture impossible (plafond atteint, lecture coupée), reçoit le lien direct de l'atelier (`qatlia.ma/atelier`) ;
 - **en coexistence, le bot ne répond qu'aux personnes venues de la publicité** (Click-to-WhatsApp). Les clients existants qui écrivent à la ligne de support continuent de n'avoir que vous comme interlocuteur. Avec `WHATSAPP_BOT_SCOPE=all`, le bot répond à tout le monde ;
 - **chaque passage à un humain** (vocal, choix 3, réponse envoyée depuis l'app, question hors des informations de QatliA) fait taire le bot pour ce contact pendant 24 h.
 
@@ -62,6 +62,7 @@ Les noms ci-dessous sont exacts. Les valeurs ne doivent jamais être écrites da
 | `OPENROUTER_API_KEY` | Existe déjà (utilisée aussi par le scan) : rien à faire |
 | `YCLOUD_API_KEY` | Facultative. Clé API YCloud (YCloud → Developers → API Keys). Avec `WHATSAPP_FROM_NUMBER`, les réponses du bot partent par YCloud au lieu de l'API Meta : c'est obligatoire quand le numéro a été inscrit par YCloud |
 | `WHATSAPP_FROM_NUMBER` | Facultative. Numéro du bot au format international (`+212726263686`), utilisé comme expéditeur par YCloud |
+| `WHATSAPP_PHOTO_DAILY_CAP` | Facultative. Nombre de photos que le bot peut lire sur 24 h, tous numéros confondus (défaut `300`). `0` coupe la lecture photo : les photos reçoivent alors le lien de l'atelier |
 
 ## Mise en place
 
@@ -101,6 +102,39 @@ Les noms ci-dessous sont exacts. Les valeurs ne doivent jamais être écrites da
   3. Tester ensuite le passage à un humain **en dernier**, chaque fois depuis un numéro neuf (en appuyant de nouveau sur la publicité et en attendant l'accueil), car chaque passage à un humain fait taire le bot pour ce contact pendant 24 h : après l'accueil, un vocal ; puis `3` ; puis, après l'accueil, une réponse envoyée depuis l'app et vérifier que le bot se tait.
 - [ ] **6. Retour arrière immédiat.** Mettre `WHATSAPP_BOT_ENABLED=false` dans Vercel, redéployer, puis réactiver le message d'accueil dans l'app WhatsApp Business.
 - [ ] **7. Où lire les conversations.** Dans Supabase, table `whatsapp_messages`. Une boîte de réception web est hors périmètre de la v1.
+
+## Lecture photo
+
+**Avant de déployer : appliquer `supabase/migrations/019_whatsapp_photo_reads.sql`** dans Supabase (SQL Editor). Sans elle, le bot continue d'envoyer le lien de l'atelier pour chaque photo.
+
+Quand un prospect envoie la photo de sa fiche :
+
+1. le bot répond « 📸 Je lis votre fiche… » ;
+2. il télécharge la photo (API Graph, avec `WHATSAPP_ACCESS_TOKEN`) et la lit avec la même lecture que le scan du site, plus le format du panneau s'il est écrit sur la fiche ;
+3. il calcule le plan sur ce panneau, ou sur le panneau par défaut de l'atelier (278 × 208), et répond : pièces lues, panneaux, chute, panneau utilisé, premières lignes, et le lien `qatlia.ma/w/<code>` ;
+4. le lien ouvre l'atelier avec les pièces et le panneau. Le plan complet et le PDF viennent après l'inscription.
+
+Règles :
+
+- **une lecture réussie par numéro, définitivement**. Les photos suivantes reçoivent le lien de la première fiche et l'invitation à continuer dans l'atelier ;
+- une lecture ratée (photo illisible, pas une fiche) libère le numéro, jusqu'à 3 échecs par numéro sur 24 h ;
+- plafond global : `WHATSAPP_PHOTO_DAILY_CAP` lectures sur 24 h (réussies ou non, chacune coûte un appel IA) ;
+- **la photo n'est jamais stockée**. Les pièces, le panneau et le résumé sont gardés 7 jours derrière le code, puis effacés ; la ligne reste pour la règle « une photo par numéro ».
+
+Suivi :
+
+```sql
+-- lectures des 7 derniers jours, par statut
+select status, count(*) from whatsapp_photo_reads
+where created_at > now() - interval '7 days' group by 1;
+
+-- liens ouverts
+select count(*) filter (where opened_at is not null) as ouverts, count(*) filter (where status = 'ok') as lus
+from whatsapp_photo_reads;
+
+-- inscriptions venues d'une photo (provenance « whatsapp · photo »)
+select count(*) from auth.users where raw_user_meta_data->>'signup_campaign' = 'photo';
+```
 
 ## Suivi
 

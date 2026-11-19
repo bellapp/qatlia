@@ -1070,6 +1070,13 @@ export const fr = {
     },
     closeAria: 'Fermer',
   },
+  // The link the WhatsApp bot sends after reading a photographed cut list (/w/<code>).
+  photoLink: {
+    opening: 'Ouverture de votre fiche…',
+    expiredTitle: 'Ce lien a expiré',
+    expiredBody: 'Prenez votre fiche en photo dans l’atelier : l’IA lit les pièces pour vous.',
+    openAtelier: 'Ouvrir l’atelier',
+  },
   legal: legalFr,
 };
 

@@ -9,7 +9,8 @@
 
 import { DEFAULT_STOCK_SHEET, optimizeCutting2D, type Piece } from '@/lib/cutting/binpacking';
 import type { ReadPiece, ReadSheet } from '@/lib/vision/read-cut-list';
-import type { PhotoSummary } from '@/lib/whatsapp/photo-store';
+import type { PhotoDraft, PhotoSummary } from '@/lib/whatsapp/photo-store';
+import type { AtelierDraft } from '@/lib/atelier-draft';
 import type { Lang } from '@/lib/whatsapp/copy';
 
 /** Lines of the cut list repeated in the reply; the rest is counted. */
@@ -85,4 +86,26 @@ export function photoResultText(lang: Lang, summary: PhotoSummary, pieces: ReadP
     `👉 Voir le plan complet (après inscription gratuite) : ${link}`,
   ];
   return lines.join('\n');
+}
+
+/**
+ * The atelier's own draft (src/lib/atelier-draft.ts) for the pieces of a read
+ * photo, on the panel its summary used: the atelier restores it on opening as
+ * it restores a job kept while visiting another screen.
+ */
+export function photoDraftToAtelierDraft(draft: PhotoDraft, now: number): AtelierDraft {
+  return {
+    v: 1,
+    project: {
+      pieces: draft.pieces.map((p, i) => ({ ...p, id: String(i + 1), material: 'mdf', rotatable: true })),
+      sheets: [{ ...DEFAULT_STOCK_SHEET, height: draft.sheet.height, width: draft.sheet.width }],
+      projectName: 'Fiche WhatsApp',
+    },
+    plannedPieces: null,
+    cutMode: '2d',
+    projectId: null,
+    localProjectId: null,
+    restoredAt: null,
+    keptAt: now,
+  };
 }
