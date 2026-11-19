@@ -112,7 +112,7 @@ Quand un prospect envoie la photo de sa fiche :
 1. le bot répond « 📸 Je lis votre fiche… » ;
 2. il télécharge la photo (API Graph, avec `WHATSAPP_ACCESS_TOKEN`) et la lit avec la même lecture que le scan du site, plus le format du panneau s'il est écrit sur la fiche ;
 3. il calcule le plan sur ce panneau, ou sur le panneau par défaut de l'atelier (278 × 208), et répond : pièces lues, panneaux, chute, panneau utilisé, premières lignes, et le lien `qatlia.ma/w/<code>` ;
-4. le lien ouvre l'atelier avec les pièces, le panneau et **le plan déjà dessiné, en aperçu gratuit** (calculé sur le serveur à partir des pièces stockées). Sans compte, un bandeau invite à s'inscrire ; PDF et devis mènent aussi à l'inscription. **À l'inscription ou à la connexion** (ou si le visiteur est déjà connecté), l'atelier lance tout seul l'optimisation normale : 1 crédit, ré-optimisations gratuites 24 h, PDF disponible. Le lien expire au bout de 24 h.
+4. le lien ouvre l'atelier avec les pièces, le panneau et **le plan déjà dessiné, en aperçu gratuit** (calculé sur le serveur à partir des pièces stockées). Sans compte, un bandeau invite à s'inscrire ; PDF, devis, DXF, PNG et JSON mènent aussi à l'inscription (l'aperçu ne sort jamais en fichier : connecté mais encore en aperçu, par exemple sans crédit, ces boutons relancent l'optimisation payante). Le message du bot annonce « lien valable 24 h ». **À l'inscription ou à la connexion** (ou si le visiteur est déjà connecté), l'atelier lance tout seul l'optimisation normale : 1 crédit, ré-optimisations gratuites 24 h, PDF disponible. Le lien expire au bout de 24 h.
 
 Règles :
 

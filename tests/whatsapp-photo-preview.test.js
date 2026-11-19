@@ -6,7 +6,7 @@ const { loadTsModule } = require('./helpers/load-ts-module');
 // (plan 2026-11-19-whatsapp-plan-apercu, Task 3). Signed in, the atelier runs
 // the normal, paid optimization once; signed out, it shows the sign-up banner.
 
-const { photoPreviewStep } = loadTsModule('src/lib/whatsapp/photo-preview.ts');
+const { photoPreviewStep, previewExportGate } = loadTsModule('src/lib/whatsapp/photo-preview.ts');
 const { buildAtelierDraft } = loadTsModule('src/lib/atelier-draft.ts');
 const { isPhotoPreview } = loadTsModule('src/lib/whatsapp/photo-summary.ts');
 
@@ -25,6 +25,38 @@ test('a preview, signed in : run the paid optimization', () => {
 
 test('a preview, signed out : the sign-up banner', () => {
   assert.equal(photoPreviewStep({ preview: true, signedIn: false }), 'banner');
+});
+
+// Review of the branch: the free preview must never leave the atelier as a
+// file (PDF, quote, DXF, PNG, JSON) before a paid run replaced it, whatever
+// the sign-in state: a signed-in user whose run did not happen (0 credits,
+// network, sign-up confirmed in another tab) still holds only the preview.
+
+test('a paid plan, or a normal job : exports allowed', () => {
+  assert.equal(previewExportGate({ preview: false, signedIn: true }), 'allow');
+  assert.equal(previewExportGate({ preview: false, signedIn: false }), 'allow');
+});
+
+test('the preview, signed out : sign up first (then the paid run)', () => {
+  assert.equal(previewExportGate({ preview: true, signedIn: false }), 'sign-in');
+});
+
+test('the preview, signed in : the paid run instead of the export', () => {
+  assert.equal(previewExportGate({ preview: true, signedIn: true }), 'run');
+});
+
+test('the atelier routes PDF, quote, DXF, PNG and JSON through the preview gate', () => {
+  const fs = require('node:fs');
+  const source = fs.readFileSync('src/app/(site)/atelier/page.tsx', 'utf8');
+  for (const handler of ['handleDownloadPdf', 'handleDownloadDxf', 'handleDownloadPng', 'handleDownloadJson']) {
+    const start = source.indexOf(`const ${handler} = `);
+    assert.notEqual(start, -1, `${handler} exists`);
+    const body = source.slice(start, start + 600);
+    assert.match(body, /previewBlocksExport\(\)/, `${handler} asks the preview gate first`);
+  }
+  // The quote has one opener (tests/atelier-nav.test.js); the gate comes right before it.
+  const opener = source.indexOf('setIsQuotationDialogOpen(true)');
+  assert.match(source.slice(opener - 200, opener), /if \(await previewBlocksExport\(\)\) return;/, 'the quote opens through the gate');
 });
 
 const leaving = (over = {}) => ({

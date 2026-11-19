@@ -189,7 +189,7 @@ test('codes are 10 characters of the unambiguous alphabet, and do not repeat', (
   assert.equal(codes.size, 1000);
 });
 
-test('every reservation purges the content of expired reads, so it does not outlive its 7 days', async () => {
+test('every reservation purges the content of expired reads, so it does not outlive its 24 hours', async () => {
   const fake = createFakeSupabase();
   seed(fake);
   await reservePhotoRead(fake.client, WA, NOW, 300);

@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useLocale } from '@/components/LocaleProvider';
 
-/** A link from the bot that is unknown or past its 7 days. */
+/** A link from the bot that is unknown or past its 24 hours. */
 export function PhotoLinkExpired() {
   const { t } = useLocale();
   return (

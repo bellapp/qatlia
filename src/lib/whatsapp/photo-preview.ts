@@ -14,3 +14,17 @@ export function photoPreviewStep(input: { preview: boolean; signedIn: boolean | 
   if (input.signedIn === null) return 'wait';
   return input.signedIn ? 'run' : 'banner';
 }
+
+export type PreviewExportGate = 'allow' | 'run' | 'sign-in';
+
+/**
+ * Whether a file (PDF, quote, DXF, PNG, JSON) may leave the atelier. The free
+ * preview never does, whatever the sign-in state: signed out, the visitor
+ * signs up first (the paid run follows); signed in but still on the preview
+ * (0 credits, a failed run, a sign-up confirmed in another tab), the paid run
+ * starts instead. Only a successful run clears the preview.
+ */
+export function previewExportGate(input: { preview: boolean; signedIn: boolean }): PreviewExportGate {
+  if (!input.preview) return 'allow';
+  return input.signedIn ? 'run' : 'sign-in';
+}

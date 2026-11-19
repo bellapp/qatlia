@@ -95,7 +95,7 @@ export function photoResultText(lang: Lang, summary: PhotoSummary, pieces: ReadP
       ...(standard ? ['(لوحة عادية، تقدر تبدلها فالورشة)'] : []),
       pieceLines(pieces, lang),
       ...(summary.unplaced > 0 ? [`⚠️ قطع كبر من اللوحة: ${ltr(lang, String(summary.unplaced))}`] : []),
-      `👉 شوف المخطط كامل (من بعد التسجيل فابور): ${link}`,
+      `👉 شوف مخطط التقطيع ديالك (الرابط صالح ${ltr(lang, '24')} ساعة): ${link}`,
     ];
     return lines.join('\n');
   }
@@ -108,7 +108,8 @@ export function photoResultText(lang: Lang, summary: PhotoSummary, pieces: ReadP
     ...(standard ? ['(panneau standard, modifiable dans l\'atelier)'] : []),
     pieceLines(pieces, lang),
     ...(summary.unplaced > 0 ? [`⚠️ ${summary.unplaced} ${unplacedWord} que le panneau`] : []),
-    `👉 Voir le plan complet (après inscription gratuite) : ${link}`,
+    // The link shows the plan at once (preview); it lasts PHOTO_READ_TTL_HOURS.
+    `👉 Voir votre plan de coupe (lien valable 24 h) : ${link}`,
   ];
   return lines.join('\n');
 }

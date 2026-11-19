@@ -77,6 +77,17 @@ test('Arabic reply : labelled figures (no number agreement to get wrong), the si
   }
 });
 
+test('the link line : the plan opens without an account, and the link lasts 24 hours (plan-apercu)', () => {
+  const summary = { pieceCount: 1, lineCount: 1, sheetsUsed: 1, wastePercent: 92, sheet: { height: 278, width: 208 }, unplaced: 0 };
+  const fr = photoResultText('fr', summary, [piece(50, 40)], LINK).split('\n').pop();
+  assert.equal(fr, `👉 Voir votre plan de coupe (lien valable 24 h) : ${LINK}`);
+  const ar = photoResultText('ar', summary, [piece(50, 40)], LINK).split('\n').pop();
+  assert.ok(ar.includes(`${'⁦'}24${'⁩'}`), 'the 24 kept left-to-right');
+  assert.match(ar, /ساعة/);
+  assert.doesNotMatch(ar, /التسجيل/);
+  assert.ok(ar.endsWith(LINK));
+});
+
 test('a panel outside 30–400 cm (read in mm, or nonsense) is not trusted', () => {
   assert.deepEqual(plausiblePanel({ height: 244, width: 122 }), { height: 244, width: 122 });
   assert.equal(plausiblePanel({ height: 2800, width: 2070 }), null);
