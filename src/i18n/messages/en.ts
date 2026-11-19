@@ -197,6 +197,10 @@ export const en: Catalog = {
       newJob: 'New cut list',
       newJobConfirm: 'Clear the unsaved pieces?',
     },
+    photoPreview: {
+      banner: '📄 Create your free account to download the PDF and save your plan.',
+      cta: 'Create my free account',
+    },
     restored: {
       notice: 'Plan saved on {date}. Reopened as saved, with no new run.',
     },

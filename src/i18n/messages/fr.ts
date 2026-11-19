@@ -237,6 +237,10 @@ export const fr = {
       newJob: 'Nouveau débit',
       newJobConfirm: 'Effacer les pièces non enregistrées ?',
     },
+    photoPreview: {
+      banner: '📄 Créez votre compte gratuit pour télécharger le PDF et enregistrer votre plan.',
+      cta: 'Créer mon compte gratuit',
+    },
     restored: {
       notice: 'Plan enregistré le {date}. Rouvert tel quel, sans nouvelle optimisation.',
     },

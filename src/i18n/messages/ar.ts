@@ -198,6 +198,10 @@ export const ar: Catalog = {
       newJob: 'قائمة قطع جديدة',
       newJobConfirm: 'مسح القطع غير المحفوظة؟',
     },
+    photoPreview: {
+      banner: '📄 أنشئ حسابك المجاني لتحميل ملف PDF وحفظ مخططك.',
+      cta: 'أنشئ حسابي المجاني',
+    },
     restored: {
       notice: 'مخطط محفوظ بتاريخ {date}. فُتح كما هو، دون تحسين جديد.',
     },
