@@ -122,7 +122,7 @@ Règles :
 - « liens ouverts » ne compte pas l'aperçu que WhatsApp génère en recevant le message ;
 - le contenu des lectures expirées est effacé à chaque nouvelle lecture, même si le lien n'est jamais rouvert ;
 - plafond global : `WHATSAPP_PHOTO_DAILY_CAP` lectures sur 24 h (réussies ou non, chacune coûte un appel IA) ;
-- **la photo n'est jamais stockée**. Les pièces, le panneau et le résumé sont gardés 7 jours derrière le code, puis effacés ; la ligne reste pour la règle « une photo par numéro ».
+- **la photo n'est jamais stockée**. Les pièces, le panneau et le résumé sont gardés 24 h derrière le code (le lien expire alors), puis effacés ; la ligne reste pour la règle « une photo par numéro ».
 
 Suivi :
 

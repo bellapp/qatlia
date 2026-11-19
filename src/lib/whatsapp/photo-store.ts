@@ -16,7 +16,8 @@ import { randomInt } from 'node:crypto';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { ReadPiece, ReadSheet } from '@/lib/vision/read-cut-list';
 
-export const PHOTO_READ_TTL_DAYS = 7;
+/** A link, and what it holds, last this long: long enough to sign up, short enough not to be passed around. */
+export const PHOTO_READ_TTL_HOURS = 24;
 export const STALE_READING_MS = 2 * 60 * 1000;
 export const MAX_FAILED_READS_PER_DAY = 3;
 
@@ -80,7 +81,7 @@ interface CurrentRow {
 }
 
 /**
- * Erases what expired reads still hold, so nothing outlives its 7 days even
+ * Erases what expired reads still hold, so nothing outlives its 24 hours even
  * when its link is never opened again. Runs with each reservation; a failure
  * is logged and never blocks the photo at hand.
  */
@@ -160,7 +161,7 @@ export async function completePhotoRead(
       pieces: result.pieces,
       sheet: result.sheet,
       summary: result.summary,
-      expires_at: new Date(result.now.getTime() + PHOTO_READ_TTL_DAYS * DAY_MS).toISOString(),
+      expires_at: new Date(result.now.getTime() + PHOTO_READ_TTL_HOURS * 60 * 60 * 1000).toISOString(),
     })
     .eq('id', id);
   check(error, 'complete');
@@ -180,7 +181,7 @@ interface DraftRow {
 }
 
 /**
- * The pieces and the panel a link opens; 'expired' once its 7 days are over
+ * The pieces and the panel a link opens; 'expired' once its 24 hours are over
  * (its content is then purged); null for an unknown code or a missing table.
  * `markOpened: false` (a link preview fetch) leaves `opened_at` as it is.
  */
