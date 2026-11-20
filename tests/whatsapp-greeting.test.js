@@ -8,7 +8,7 @@ const { loadTsModule } = require('./helpers/load-ts-module');
 // which never said that a photo or a voice note can be sent right here.
 
 const load = (rel) => loadTsModule(path.resolve(__dirname, '..', rel));
-const { COPY, DEMO_VIDEO_URL, MENU_BUTTONS, greeting } = load('src/lib/whatsapp/copy.ts');
+const { COPY, DEMO_VIDEO_URL, MENU_BUTTONS, greeting, exampleCaption } = load('src/lib/whatsapp/copy.ts');
 const { decide, resolveLang } = load('src/lib/whatsapp/router.ts');
 
 const NOW = new Date('2026-11-20T16:00:00.000Z');
@@ -95,6 +95,7 @@ test('a first message in Arabic letters gets the darija-only greeting', () => {
       handoff: false,
       greeting: true,
       menu: { buttons: MENU_BUTTONS, fallbackText: expected.plain },
+      exampleCaption: exampleCaption('ar', false),
     });
   }
 });

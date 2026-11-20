@@ -28,6 +28,8 @@ function resetState() {
   Object.assign(state, {
     contacts: new Map(),
     sent: [],
+    images: [],
+    imageResult: () => 'wamid.IMG',
     sendResult: (n) => (n === 1 ? 'wamid.OUT' : `wamid.OUT.${n}`),
     outbound: [],
     storedWamids: new Set(),
@@ -149,6 +151,10 @@ stubModule('@/lib/whatsapp/send', {
     state.sent.push({ to, body, config, buttons });
     return state.sendResult(state.sent.length);
   },
+  sendImage: async (config, to, link, caption) => {
+    state.images.push({ to, link, caption, afterTexts: state.sent.length });
+    return state.imageResult();
+  },
 });
 stubModule('@/lib/whatsapp/photo', {
   handlePhoto: async (input) => {
@@ -164,8 +170,10 @@ stubModule('@/lib/whatsapp/assistant', {
   },
 });
 
-const { COPY, MENU_BUTTONS, greeting } = loadTsModule('src/lib/whatsapp/copy.ts');
+const { COPY, MENU_BUTTONS, greeting, exampleCaption, EXAMPLE_FICHE_URL } = loadTsModule('src/lib/whatsapp/copy.ts');
 // Arabic letters get the darija-only greeting; the ad (referral, pre-filled text) both languages, darija first.
+// The text messages logged, without the example cut list sent after the greeting (tested at the end).
+const textOutbound = () => state.outbound.filter((row) => row.kind !== 'example');
 const GREETING_AR = greeting({ lang: 'ar', bilingual: false, voice: true }).text;
 const GREETING_AD = greeting({ lang: 'ar', bilingual: true, voice: true }).text;
 const { GET, POST, dynamic, maxDuration } = loadTsModule('src/app/api/whatsapp/webhook/route.ts');
@@ -410,7 +418,7 @@ test('a new contact writing in Arabic gets the greeting once and is marked greet
     assert.ok(state.contacts.get(WA_ID).greetedAt instanceof Date);
     assert.equal(handoffUpdates().length, 0);
 
-    assert.deepEqual(state.outbound, [
+    assert.deepEqual(textOutbound(), [
       { waId: WA_ID, wamid: 'wamid.OUT', direction: 'bot', kind: 'fixed', body: GREETING_AR },
     ]);
     assert.equal(state.claims[0].wamid, 'wamid.1');
@@ -573,7 +581,7 @@ test('a failure to record a failed send does not stop the plain-text fallback', 
       state.sent.map((m) => m.body),
       [COPY.greeting, COPY.greetingPlain],
     );
-    assert.deepEqual(state.outbound, [
+    assert.deepEqual(textOutbound(), [
       { waId: WA_ID, wamid: 'wamid.PLAIN', direction: 'bot', kind: 'fixed', body: COPY.greetingPlain },
     ]);
   });
@@ -932,7 +940,7 @@ test('the greeting is sent with the menu buttons; later replies are plain text',
     assert.equal(state.sent.length, 1);
     assert.equal(state.sent[0].body, COPY.greeting);
     assert.deepEqual(state.sent[0].buttons, MENU_BUTTONS);
-    assert.deepEqual(state.outbound, [
+    assert.deepEqual(textOutbound(), [
       { waId: WA_ID, wamid: 'wamid.OUT', direction: 'bot', kind: 'fixed', body: COPY.greeting },
     ]);
 
@@ -955,7 +963,7 @@ test('when the button greeting cannot be sent, the plain-text greeting goes inst
         [COPY.greetingPlain, undefined],
       ],
     );
-    assert.deepEqual(state.outbound, [
+    assert.deepEqual(textOutbound(), [
       { waId: WA_ID, wamid: null, direction: 'bot', kind: 'send_failed', body: COPY.greeting },
       { waId: WA_ID, wamid: 'wamid.PLAIN', direction: 'bot', kind: 'fixed', body: COPY.greetingPlain },
     ]);
@@ -1184,3 +1192,65 @@ test('typed text keeps the assistant default deadline', async () => {
     assert.equal(state.assistantCalls[0].timeoutMs, undefined);
   });
 });
+
+// --- the example cut list after the greeting --------------------------------------
+
+test('after the greeting, a new contact gets the example cut list, captioned in the greeting language', async () => {
+  resetState();
+  await withEnv(CONFIGURED, async () => {
+    const res = await POST(signedPost(messagesPayload([textMessage('wamid.ex1', WA_ID, 'سلام')])));
+    assert.equal(res.status, 200);
+    assert.deepEqual(state.images, [
+      { to: WA_ID, link: EXAMPLE_FICHE_URL, caption: exampleCaption('ar', false), afterTexts: 1 },
+    ]);
+    assert.deepEqual(state.outbound.map((row) => [row.kind, row.body]), [
+      ['fixed', GREETING_AR],
+      ['example', exampleCaption('ar', false)],
+    ]);
+    assert.equal(state.outbound[1].wamid, 'wamid.IMG');
+  });
+});
+
+test('the ad message gets the bilingual caption, darija first', async () => {
+  resetState();
+  await withEnv(CONFIGURED, async () => {
+    await POST(signedPost(messagesPayload([adPrefill('wamid.ex2', WA_ID)])));
+    assert.equal(state.images[0].caption, exampleCaption('ar', true));
+  });
+});
+
+test('no example when the greeting could not be sent', async () => {
+  resetState();
+  state.sendResult = () => null;
+  await withEnv(CONFIGURED, async () => {
+    await POST(signedPost(messagesPayload([textMessage('wamid.ex3', WA_ID, 'سلام')])));
+    assert.equal(state.images.length, 0);
+  });
+});
+
+test('an example that fails is logged as send_failed; the contact stays greeted', async () => {
+  resetState();
+  state.imageResult = () => null;
+  await withEnv(CONFIGURED, async () => {
+    const res = await POST(signedPost(messagesPayload([textMessage('wamid.ex4', WA_ID, 'سلام')])));
+    assert.equal(res.status, 200);
+    assert.deepEqual(state.outbound.at(-1), {
+      waId: WA_ID,
+      wamid: null,
+      direction: 'bot',
+      kind: 'send_failed',
+      body: exampleCaption('ar', false),
+    });
+    assert.ok(state.contacts.get(WA_ID).greetedAt instanceof Date);
+  });
+});
+
+test('a greeted contact tapping a button gets no example', async () => {
+  resetState();
+  state.contacts.set(WA_ID, { waId: WA_ID, lang: 'ar', greetedAt: new Date(Date.now() - 60000), handoffUntil: null });
+  await withEnv(CONFIGURED, async () => {
+    await POST(signedPost(messagesPayload([buttonTap('wamid.ex5', WA_ID, '1')])));
+    assert.equal(state.images.length, 0);
+  });
+});
+

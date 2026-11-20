@@ -259,3 +259,23 @@ export const PHOTO_COPY: {
     return `${first}Les fiches suivantes se lisent dans l'atelier, après votre inscription gratuite :\n👉 ${ATELIER_LINK}`;
   },
 };
+
+/**
+ * A photo of a real cut list, sent right after the greeting: many prospects do
+ * not know what "ورقة القياسات" is, and some send a drawing of the furniture
+ * instead (owner, 20/11/2026). Served from public/ (the middleware skips .jpg);
+ * it carries the sRGB color profile YCloud requires.
+ */
+export const EXAMPLE_FICHE_URL = 'https://qatlia.ma/whatsapp/exemple-fiche.jpg';
+
+const EXAMPLE_CAPTION: Record<Lang, string> = {
+  ar: '📸 بحال هادي: لائحة البياسات (الطول × العرض × العدد). صوّرها بالتيليفون وصيفطها ليا هنا.',
+  fr: '📸 Comme celle-ci : la liste des pièces (longueur × largeur × nombre). Prenez-la en photo avec votre téléphone et envoyez-la-moi ici.',
+};
+
+/** The example's caption, in the greeting's languages: the contact's first when both. */
+export function exampleCaption(lang: Lang, bilingual: boolean): string {
+  if (!bilingual) return EXAMPLE_CAPTION[lang];
+  const other: Lang = lang === 'ar' ? 'fr' : 'ar';
+  return `${EXAMPLE_CAPTION[lang]}\n${EXAMPLE_CAPTION[other]}`;
+}

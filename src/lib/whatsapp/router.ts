@@ -7,7 +7,7 @@
  */
 
 import type { HandoffMode } from '@/lib/whatsapp/config';
-import { COPY, MENU_BUTTONS, greeting, type Lang, type MenuButton } from '@/lib/whatsapp/copy';
+import { COPY, MENU_BUTTONS, exampleCaption, greeting, type Lang, type MenuButton } from '@/lib/whatsapp/copy';
 import type { InboundEvent } from '@/lib/whatsapp/payload';
 
 export const HANDOFF_HOURS = 24;
@@ -29,7 +29,8 @@ export interface Menu {
 export type Decision =
   | { action: 'silent' }
   /** `greeting`: the first-contact greeting, which only one delivery of a burst may send (claimGreeting). */
-  | { action: 'send'; text: string; markGreeted: boolean; handoff: boolean; menu?: Menu; greeting?: true }
+  /** `exampleCaption`: once the text is out, the example cut list (EXAMPLE_FICHE_URL) goes with this caption. */
+  | { action: 'send'; text: string; markGreeted: boolean; handoff: boolean; menu?: Menu; greeting?: true; exampleCaption?: string }
   | { action: 'assistant' }
   /** A photo: the webhook tries to read it as a cut list (src/lib/whatsapp/photo.ts). */
   | { action: 'photo' }
@@ -158,11 +159,8 @@ export function decide(input: {
   // 4. First contact: the menu comes as buttons, so one tap is enough to answer.
   // Arabic letters say the reader reads Arabic; anything else gets both languages.
   if (contact.greetedAt === null) {
-    const { text, plain } = greeting({
-      lang,
-      bilingual: !(event.text !== null && ARABIC_LETTER.test(event.text)),
-      voice: input.voiceEnabled === true,
-    });
+    const bilingual = !(event.text !== null && ARABIC_LETTER.test(event.text));
+    const { text, plain } = greeting({ lang, bilingual, voice: input.voiceEnabled === true });
     return {
       action: 'send',
       text,
@@ -170,6 +168,8 @@ export function decide(input: {
       handoff: false,
       greeting: true,
       menu: { buttons: MENU_BUTTONS, fallbackText: plain },
+      // Then a photo of a real cut list, so "ورقة القياسات" is not a guess.
+      exampleCaption: exampleCaption(lang, bilingual),
     };
   }
 

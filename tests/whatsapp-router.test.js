@@ -6,7 +6,7 @@ const { loadTsModule } = require('./helpers/load-ts-module');
 const PROJECT_ROOT = path.resolve(__dirname, '..');
 const load = (rel) => loadTsModule(path.join(PROJECT_ROOT, rel));
 
-const { COPY, DEMO_VIDEO_URL, MENU_BUTTONS, MENU_BUTTON_TITLE_MAX, greeting } = load('src/lib/whatsapp/copy.ts');
+const { COPY, DEMO_VIDEO_URL, MENU_BUTTONS, MENU_BUTTON_TITLE_MAX, greeting, exampleCaption } = load('src/lib/whatsapp/copy.ts');
 const { detectLang, menuChoice, decide, HANDOFF_HOURS, MAX_ASSISTANT_REPLIES_PER_DAY } = load(
   'src/lib/whatsapp/router.ts',
 );
@@ -63,6 +63,7 @@ test('new contact gets the greeting and is marked greeted', () => {
     handoff: false,
     greeting: true,
     menu: { buttons: MENU_BUTTONS, fallbackText: expected.plain },
+    exampleCaption: exampleCaption('fr', true),
   });
 });
 

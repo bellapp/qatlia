@@ -15,11 +15,11 @@ import { getSupabaseAdminConfig } from '@/lib/billing/config';
 import { getWhatsAppConfig, type WhatsAppConfig } from '@/lib/whatsapp/config';
 import { verifySignature } from '@/lib/whatsapp/signature';
 import { parseWebhook, type EchoEvent, type InboundEvent } from '@/lib/whatsapp/payload';
-import { COPY, type Lang, type MenuButton } from '@/lib/whatsapp/copy';
+import { COPY, EXAMPLE_FICHE_URL, type Lang, type MenuButton } from '@/lib/whatsapp/copy';
 import { HANDOFF_HOURS, decide, detectLang, resolveLang, type Decision } from '@/lib/whatsapp/router';
 import { assistantBudgetMs, hearVoice } from '@/lib/whatsapp/voice';
 import { HISTORY_MESSAGES, askAssistant } from '@/lib/whatsapp/assistant';
-import { sendButtons, sendText } from '@/lib/whatsapp/send';
+import { sendButtons, sendImage, sendText } from '@/lib/whatsapp/send';
 import { handlePhoto, type PhotoMessageKind } from '@/lib/whatsapp/photo';
 import {
   SEND_FAILED_KIND,
@@ -80,6 +80,19 @@ async function deliver(
   }
   await recordOutbound(db, { waId, wamid, direction: 'bot', kind, body });
   return true;
+}
+
+/**
+ * The example cut list after the greeting. Best effort: the greeting is out and
+ * the contact greeted, so a failure is only logged, never thrown.
+ */
+async function deliverExample(db: SupabaseClient, config: WhatsAppConfig, waId: string, caption: string): Promise<void> {
+  try {
+    const wamid = await sendImage(config, waId, EXAMPLE_FICHE_URL, caption);
+    await recordOutbound(db, { waId, wamid, direction: 'bot', kind: wamid === null ? SEND_FAILED_KIND : 'example', body: caption });
+  } catch (error) {
+    console.error('[whatsapp] could not send the example cut list', describeError(error));
+  }
 }
 
 /** A message the business sent from the phone itself: log it, and in coexistence mode let the human lead. */
@@ -199,6 +212,7 @@ async function handleInbound(db: SupabaseClient, config: WhatsAppConfig, event: 
     if (decision.markGreeted && !greetingClaimed) patch.greetedAt = now;
     if (decision.handoff) patch.handoffUntil = handoffDeadline(now);
     if (Object.keys(patch).length > 0) await updateContact(db, waId, patch);
+    if (decision.exampleCaption) await deliverExample(db, config, waId, decision.exampleCaption);
     return;
   }
 
