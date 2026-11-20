@@ -14,13 +14,18 @@ export function ClientShell({ children, pinnedLocale }: { children: React.ReactN
   useEffect(() => {
     recordBrowserVisit(window.location.search);
     const clean = withoutTracking(window.location.pathname, window.location.search, window.location.hash);
-    if (clean !== null) {
+    if (clean === null) return;
+    // One tick later: the App Router patches replaceState in its own effect,
+    // which runs after this one. With a null state it then keeps its internal
+    // history state and moves its own URL too, so the tags do not come back.
+    const timer = window.setTimeout(() => {
       try {
-        window.history.replaceState(window.history.state, '', clean);
+        window.history.replaceState(null, '', clean);
       } catch {
         // The address keeps its tags; nothing else depends on them.
       }
-    }
+    }, 0);
+    return () => window.clearTimeout(timer);
   }, []);
 
   return (

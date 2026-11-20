@@ -95,6 +95,10 @@ test('the shell records every visit through recordBrowserVisit, then cleans the 
   const source = fs.readFileSync(path.resolve(__dirname, '..', 'src/components/ClientShell.tsx'), 'utf8');
   assert.match(source, /recordBrowserVisit\(window\.location\.search\)/);
   assert.match(source, /withoutTracking\(/);
-  assert.match(source, /history\.replaceState\(/);
   assert.ok(source.indexOf('recordBrowserVisit(') < source.indexOf('history.replaceState('), 'recorded before cleaned');
+  // Next 14.2 patches replaceState in the router's own effect, which runs after
+  // this child's: one tick later, and with a null state, Next copies its
+  // internal history state and moves its own URL too (no tag coming back).
+  assert.match(source, /setTimeout\(\(\) => \{[\s\S]*window\.history\.replaceState\(null, '', clean\)/);
+  assert.doesNotMatch(source, /replaceState\(window\.history\.state/);
 });
