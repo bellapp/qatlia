@@ -14,17 +14,20 @@ export type Lang = 'fr' | 'ar';
 
 export const DEMO_VIDEO_URL = 'https://youtu.be/dQE_PzXUAR0';
 
-/** Tags every site link the bot sends, so a sign-up can be traced back to WhatsApp (see src/lib/acquisition.ts). */
-export const WHATSAPP_TRACKING = 'utm_source=whatsapp';
-
+/**
+ * Short links: each redirects to its page with `utm_source=whatsapp`
+ * (next.config.mjs), so a sign-up is still traced back to WhatsApp
+ * (src/lib/acquisition.ts) while the prospect never reads the tag; the site
+ * then drops it from the address bar (src/components/ClientShell.tsx).
+ */
 /** The site in the reader's language: the darija texts open the Arabic landing page. */
 export const SITE_LINKS: Record<Lang, string> = {
-  fr: `https://qatlia.ma/?${WHATSAPP_TRACKING}`,
-  ar: `https://qatlia.ma/ar?${WHATSAPP_TRACKING}`,
+  fr: 'https://qatlia.ma/wa',
+  ar: 'https://qatlia.ma/wa/ar',
 };
 
 /** The workshop opens without an account: the photo is kept and read right after sign-up. */
-export const ATELIER_LINK = `https://qatlia.ma/atelier?${WHATSAPP_TRACKING}`;
+export const ATELIER_LINK = 'https://qatlia.ma/wa/atelier';
 
 const SUPPORT_URL = supportWhatsAppUrl();
 
