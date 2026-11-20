@@ -6,11 +6,13 @@ Ce document est destiné au propriétaire. Il décrit ce qu'il faut faire côté
 
 Le bot répond aux messages WhatsApp reçus sur le numéro de QatliA (06 00 93 75 23) :
 
+- un nouveau contact reçoit un **accueil court** qui commence par la seule chose à faire : « envoyez-moi ici la photo de votre fiche de débit », puis « ou envoyez un vocal » (cette ligne disparaît si les vocaux sont coupés), le lien de la démo et les 3 boutons. Un premier message écrit en lettres arabes (y compris le message arabe pré-rempli par la pub) reçoit l'accueil en darija seulement ; tout autre premier message reçoit les deux langues, celle du contact en premier. L'accueil précédent, long et sans cette invitation, faisait partir 59 % des prospects de la pub sans une seconde réponse (80 conversations, 14-20/11/2026) ;
+
 - les choix 1, 2 et 3 reçoivent des réponses fixes (les mêmes textes que les réponses rapides) ;
 - le texte libre est traité par l'IA, qui s'appuie uniquement sur les informations du code de QatliA (prix, offres, FAQ) ;
 - un **vocal est écouté** : le bot le transcrit et y répond comme à un texte tapé (voir « Messages vocaux ») ;
 - les vidéos, documents, localisations et contacts sont passés à un humain ;
-- le bot répond en français ou en arabe selon la langue du prospect. Un premier contact venu de la publicité reçoit la darija par défaut, comme la pub : le message que WhatsApp pré-remplit (« Bonjour ! Puis-je en savoir plus… ») suit la langue du téléphone et ne dit rien de la personne. Le bot passe au français dès que la personne écrit en français ;
+- le bot répond en français ou en arabe selon la langue du prospect. Un premier contact venu de la publicité reçoit la darija par défaut, comme la pub : le message que WhatsApp pré-remplit (« Bonjour ! Puis-je en savoir plus… ») suit la langue du téléphone et ne dit rien de la personne. Le message pré-rempli en arabe, lui, vient d'un téléphone en arabe : il met la darija, même pour un contact connu en français. Le bot passe au français dès que la personne écrit en français ;
 - une personne déjà accueillie qui revient par la publicité reçoit de nouveau le menu à boutons (pas une présentation écrite par l'IA) ;
 - une photo de fiche de débit est **lue par le bot**, une seule fois par numéro (voir « Lecture photo ») : il répond le nombre de pièces, de panneaux et la chute, avec un lien qui ouvre l'atelier sur ces pièces. Une photo que le bot n'arrive pas à lire reçoit un message qui demande une photo plus nette, avec le lien de l'atelier ; quand la lecture n'est pas possible (plafond atteint, lecture coupée), la photo reçoit le lien direct de l'atelier (`qatlia.ma/wa/atelier`) ;
 - **en coexistence, le bot ne répond qu'aux personnes venues de la publicité** (Click-to-WhatsApp). Les clients existants qui écrivent à la ligne de support continuent de n'avoir que vous comme interlocuteur. Avec `WHATSAPP_BOT_SCOPE=all`, le bot répond à tout le monde ;

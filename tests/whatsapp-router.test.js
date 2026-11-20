@@ -6,7 +6,7 @@ const { loadTsModule } = require('./helpers/load-ts-module');
 const PROJECT_ROOT = path.resolve(__dirname, '..');
 const load = (rel) => loadTsModule(path.join(PROJECT_ROOT, rel));
 
-const { COPY, DEMO_VIDEO_URL, MENU_BUTTONS, MENU_BUTTON_TITLE_MAX } = load('src/lib/whatsapp/copy.ts');
+const { COPY, DEMO_VIDEO_URL, MENU_BUTTONS, MENU_BUTTON_TITLE_MAX, greeting } = load('src/lib/whatsapp/copy.ts');
 const { detectLang, menuChoice, decide, HANDOFF_HOURS, MAX_ASSISTANT_REPLIES_PER_DAY } = load(
   'src/lib/whatsapp/router.ts',
 );
@@ -54,12 +54,15 @@ test('new contact gets the greeting and is marked greeted', () => {
     event: { text: 'Bonjour ! Puis-je en savoir plus à ce sujet ?' },
     contact: { greetedAt: null },
   });
+  // The French pre-filled text says nothing sure about the reader: both languages (see whatsapp-greeting.test.js).
+  const expected = greeting({ lang: 'fr', bilingual: true, voice: false });
   assert.deepEqual(d, {
     action: 'send',
-    text: COPY.greeting,
+    text: expected.text,
     markGreeted: true,
     handoff: false,
-    menu: { buttons: MENU_BUTTONS, fallbackText: COPY.greetingPlain },
+    greeting: true,
+    menu: { buttons: MENU_BUTTONS, fallbackText: expected.plain },
   });
 });
 
@@ -101,7 +104,8 @@ test('spelled menu choices route to the right fixed reply', () => {
 });
 
 test('the demo video link comes before the site link', () => {
-  for (const text of [COPY.howItWorks.fr, COPY.howItWorks.ar, COPY.greeting, COPY.greetingPlain]) {
+  // The greeting carries the demo as its only link (whatsapp-greeting.test.js).
+  for (const text of [COPY.howItWorks.fr, COPY.howItWorks.ar]) {
     assert.ok(text.indexOf(DEMO_VIDEO_URL) !== -1);
     assert.ok(text.indexOf(DEMO_VIDEO_URL) < text.indexOf('https://qatlia.ma'));
   }
@@ -221,7 +225,7 @@ test('voice on : video, document, location and contacts still get mediaHandoff',
 test('voice on : during a human handoff a voice note is silent, a first contact gets the greeting first', () => {
   const handoffUntil = new Date(NOW.getTime() + 60 * 60 * 1000);
   assert.deepEqual(run({ event: { kind: 'audio', text: null }, contact: { handoffUntil }, voiceEnabled: true }), { action: 'silent' });
-  assert.equal(run({ event: { kind: 'audio', text: null }, contact: { greetedAt: null }, voiceEnabled: true }).text, COPY.greeting);
+  assert.equal(run({ event: { kind: 'audio', text: null }, contact: { greetedAt: null }, voiceEnabled: true }).text, greeting({ lang: 'fr', bilingual: true, voice: true }).text);
 });
 
 test('voice on : the daily assistant cap applies to voice notes too', () => {
@@ -388,7 +392,6 @@ test('the bot links are short WhatsApp links (tagged by their redirect), and the
   const { SITE_LINKS, ATELIER_LINK } = load('src/lib/whatsapp/copy.ts');
   assert.equal(SITE_LINKS.fr, 'https://qatlia.ma/wa');
   assert.equal(SITE_LINKS.ar, 'https://qatlia.ma/wa/ar');
-  assert.ok(COPY.greeting.includes(SITE_LINKS.fr) && COPY.greeting.includes(SITE_LINKS.ar));
   assert.ok(COPY.pricing.ar.includes(SITE_LINKS.ar));
   assert.ok(COPY.howItWorks.ar.includes(SITE_LINKS.ar));
   // A photo is answered with the workshop, which opens without an account.

@@ -54,19 +54,74 @@ export const MENU_BUTTONS: readonly MenuButton[] = [
   { id: '3', title: 'Conseiller · مستشار' },
 ];
 
-const GREETING_INTRO_FR = `Bonjour 👋 Merci pour votre intérêt !
-QatliA optimise la découpe de vos panneaux : prenez en photo votre fiche de mesure et recevez le plan de coupe en PDF en quelques secondes.
-🎥 Démo en 1 min : ${DEMO_VIDEO_URL}
-👉 Essai gratuit : ${SITE_LINKS.fr}`;
+/**
+ * The greeting opens on the one thing to do right here: send the photo of the
+ * cut list (the bot reads it, src/lib/whatsapp/photo.ts), or a voice note when
+ * they are heard. In the 80 ad conversations of 14-20/11/2026, 59 % left after
+ * a long greeting that only pointed at the site.
+ */
+const GREETING_INVITE: Record<Lang, { hello: string; photo: string; voice: string }> = {
+  ar: {
+    hello: 'مرحبا بيك فـ QatliA 👋',
+    photo: '📸 صيفط ليا هنا تصويرة ورقة القياسات ديالك، ونرجع ليك مخطط التقطيع فثواني.',
+    voice: '🎤 ولا صيفط ليا أوديو وسولني اللي بغيتي.',
+  },
+  fr: {
+    hello: 'Bonjour, bienvenue chez QatliA 👋',
+    photo: '📸 Envoyez-moi ici la photo de votre fiche de débit : je vous renvoie le plan de coupe en quelques secondes.',
+    voice: '🎤 Ou posez votre question par message vocal.',
+  },
+};
 
-const GREETING_INTRO_AR = `مرحبا 👋 QatliA كيعطيك مخطط تقطيع الألواح من صورة ورقة القياسات فثواني.
-👉 جرّب مجانا: ${SITE_LINKS.ar}`;
+const GREETING_DEMO: Record<Lang, string> = {
+  ar: `🎥 شوف كيفاش كيخدم: ${DEMO_VIDEO_URL}`,
+  fr: `🎥 Démo en 1 min : ${DEMO_VIDEO_URL}`,
+};
+const GREETING_DEMO_BOTH = `🎥 Démo · كيفاش كيخدم : ${DEMO_VIDEO_URL}`;
+
+const GREETING_BUTTONS: Record<Lang, string> = {
+  ar: 'ولا ختار من التحت 👇',
+  fr: 'Ou choisissez ci-dessous 👇',
+};
+const GREETING_TYPED: Record<Lang, string> = {
+  ar: 'ولا جاوب بـ 1 / 2 / 3:\n1️⃣ كيفاش كيخدم\n2️⃣ الأثمنة\n3️⃣ مستشار',
+  fr: 'Ou répondez :\n1️⃣ Comment ça marche\n2️⃣ Tarifs\n3️⃣ Parler à un conseiller',
+};
+const GREETING_TYPED_BOTH = `1️⃣ Comment ça marche · كيفاش كيخدم
+2️⃣ Tarifs · الأثمنة
+3️⃣ Conseiller · مستشار
+Répondez 1, 2 ou 3 · جاوب بـ 1 / 2 / 3`;
+
+/**
+ * The first-contact greeting. `bilingual` when the first message says nothing
+ * sure about the reader (the French pre-filled text follows the phone, and many
+ * darija speakers have a French phone): both languages, the contact's first.
+ * `text` goes with the MENU_BUTTONS; `plain` is its typed 1/2/3 version.
+ */
+export function greeting(input: { lang: Lang; bilingual: boolean; voice: boolean }): { text: string; plain: string } {
+  const invite = (lang: Lang): string => {
+    const { hello, photo, voice } = GREETING_INVITE[lang];
+    return [hello, photo, ...(input.voice ? [voice] : [])].join('\n');
+  };
+  if (!input.bilingual) {
+    const head = `${invite(input.lang)}\n${GREETING_DEMO[input.lang]}`;
+    return { text: `${head}\n${GREETING_BUTTONS[input.lang]}`, plain: `${head}\n${GREETING_TYPED[input.lang]}` };
+  }
+  const other: Lang = input.lang === 'ar' ? 'fr' : 'ar';
+  const head = `${invite(input.lang)}\n\n${invite(other)}\n\n${GREETING_DEMO_BOTH}`;
+  return {
+    text: `${head}\n👇 ${GREETING_BUTTONS.fr.replace(' 👇', '')} · ${GREETING_BUTTONS.ar.replace(' 👇', '')}`,
+    plain: `${head}\n${GREETING_TYPED_BOTH}`,
+  };
+}
+
+const DEFAULT_GREETING = greeting({ lang: 'fr', bilingual: true, voice: true });
 
 const MENU_AGAIN_FR = 'Re-bonjour 👋 Choisissez ci-dessous 👇 ou posez directement votre question ✍️';
 const MENU_AGAIN_AR = 'مرحبا بيك مرة أخرى 👋 ختار من التحت 👇 ولا سول سؤالك مباشرة';
 
 export const COPY: {
-  /** First-contact message, sent with the MENU_BUTTONS under it. */
+  /** The bilingual first-contact greeting, French first (see greeting() for every variant), sent with the MENU_BUTTONS. */
   greeting: string;
   /** The same greeting as plain text with a typed 1/2/3 menu, used when the button message cannot be sent. */
   greetingPlain: string;
@@ -84,21 +139,9 @@ export const COPY: {
   voiceUnclear: Record<Lang, string>;
   fallback: Record<Lang, string>;
 } = {
-  greeting: `${GREETING_INTRO_FR}
-Choisissez ci-dessous 👇 ou posez directement votre question ✍️
+  greeting: DEFAULT_GREETING.text,
 
-${GREETING_INTRO_AR}
-ختار من التحت 👇 ولا سول سؤالك مباشرة`,
-
-  greetingPlain: `${GREETING_INTRO_FR}
-Répondez :
-1️⃣ Comment ça marche
-2️⃣ Tarifs
-3️⃣ Parler à un conseiller
-Ou posez directement votre question ✍️
-
-${GREETING_INTRO_AR}
-جاوب بـ 1 / 2 / 3 ولا سول سؤالك مباشرة`,
+  greetingPlain: DEFAULT_GREETING.plain,
 
   menuAgain: `${MENU_AGAIN_FR}
 
@@ -118,13 +161,17 @@ ${DEMO_VIDEO_URL}
 
 1. Créez votre compte sur ${SITE_LINKS.fr}
 2. Prenez en photo votre fiche de mesure
-3. Lancez l'optimisation, et vous obtenez le plan de coupe et le PDF pour l'atelier.`,
+3. Lancez l'optimisation, et vous obtenez le plan de coupe et le PDF pour l'atelier.
+
+📸 Ou envoyez-moi directement ici la photo de votre fiche : je la lis pour vous.`,
     ar: `شوف كيفاش كيخدم فدقيقة 🎥
 ${DEMO_VIDEO_URL}
 
 1. دير حساب فـ ${SITE_LINKS.ar}
 2. صوّر ورقة القياسات
-3. ضغط على التحسين، وغادي يعطيك مخطط التقطيع وتقرير PDF للورشة.`,
+3. ضغط على التحسين، وغادي يعطيك مخطط التقطيع وتقرير PDF للورشة.
+
+📸 ولا صيفط ليا التصويرة ديال الورقة هنا مباشرة ونقراها ليك.`,
   },
 
   pricing: {

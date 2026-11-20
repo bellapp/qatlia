@@ -169,7 +169,7 @@ async function handleInbound(db: SupabaseClient, config: WhatsAppConfig, event: 
 
   // Meta delivers a burst concurrently: only the delivery that wins the conditional write greets.
   let greetingClaimed = false;
-  if (decision.action === 'send' && decision.text === COPY.greeting) {
+  if (decision.action === 'send' && decision.greeting === true) {
     if (await claimGreeting(db, waId, now)) {
       greetingClaimed = true;
     } else {
