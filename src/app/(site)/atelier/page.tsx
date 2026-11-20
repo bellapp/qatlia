@@ -2557,7 +2557,7 @@ const commitPanelName = () => {
                       <svg
                         data-testid="cut-plan-svg"
                         viewBox={`0 0 ${activeSheet.width} ${activeSheet.height}`}
-                        className="block w-full rounded-xl"
+                        className="block w-full"
                         style={{
                           aspectRatio: `${activeSheet.width} / ${activeSheet.height}`,
                           filter: 'drop-shadow(0 4px 6px rgba(0,0,0,0.4))',
@@ -2591,7 +2591,7 @@ const commitPanelName = () => {
 
                         <rect x="0" y="0" width={activeSheet.width} height={activeSheet.height}
                           fill={isDark ? 'url(#sheetBgD)' : 'url(#sheetBgL)'}
-                          stroke={isDark ? '#4A5568' : '#94A3B8'} strokeWidth={isDark ? 1 : 1.5} rx="0.5" />
+                          stroke={isDark ? '#4A5568' : '#94A3B8'} strokeWidth={isDark ? 1 : 1.5} />
 
                         {/* Panel grain (ramage): wavy lines OVER the sheet background,
                             UNDER the pieces — shows the stock veining direction.
@@ -2636,7 +2636,7 @@ const commitPanelName = () => {
                                 </linearGradient>
                               </defs>
                               <rect x={p.x} y={p.y} width={p.width} height={p.height} fill={`url(#${gradId})`}
-                                stroke={isDark ? '#050A14' : '#334155'} strokeWidth={Math.max(0.4, (options.kerfWidth||3)/10)} rx="0.3" />
+                                stroke={isDark ? '#050A14' : '#334155'} strokeWidth={Math.max(0.4, (options.kerfWidth||3)/10)} />
                               {options.showLabels && (<>
                                 <text x={p.x+p.width/2} y={p.y+p.height/2-(minSide>=20?3:0)} textAnchor="middle" dominantBaseline="central"
                                   fill={isDark ? '#050A14' : '#1E293B'} fontSize={Math.min(5.5,Math.max(2.5,minSide/12))}
