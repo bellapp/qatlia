@@ -49,6 +49,11 @@ function resetState() {
     clientArgs: null,
     photoCalls: [],
     photoOutcome: 'hint',
+    voiceCalls: [],
+    voiceResult: () => ({ status: 'heard', text: 'شحال الثمن؟' }),
+    voiceCount: 1,
+    inboundCounts: [],
+    inboundBodies: [],
   });
 }
 resetState();
@@ -114,6 +119,20 @@ stubModule('@/lib/whatsapp/store', {
     return [{ direction: 'bot', body: 'Bonjour' }];
   },
   countAssistantReplies: async () => state.assistantCount,
+  countInboundMessages: async (db, waId, kind, since) => {
+    state.inboundCounts.push({ waId, kind, since });
+    return state.voiceCount;
+  },
+  setInboundBody: async (db, wamid, body) => {
+    assert.equal(db, DB);
+    state.inboundBodies.push({ wamid, body });
+  },
+});
+stubModule('@/lib/whatsapp/voice', {
+  hearVoice: async (input) => {
+    state.voiceCalls.push(input);
+    return state.voiceResult(input);
+  },
 });
 stubModule('@/lib/whatsapp/send', {
   sendText: async (config, to, body) => {
@@ -153,6 +172,8 @@ const ENV_KEYS = [
   'WHATSAPP_BOT_SCOPE',
   'WHATSAPP_BOT_MODEL',
   'WHATSAPP_PHOTO_DAILY_CAP',
+  'WHATSAPP_VOICE_ENABLED',
+  'WHATSAPP_VOICE_MODEL',
   'OPENROUTER_API_KEY',
   'OPENROUTER_MODEL',
   'NEXT_PUBLIC_SUPABASE_URL',
@@ -1009,5 +1030,103 @@ test('the pre-filled text that loses the greeting race gets no answer of its own
     await POST(signedPost(messagesPayload([adPrefill('wamid.ad6', WA_ID)])));
     assert.equal(state.sent.length, 0);
     assert.equal(state.assistantCalls.length, 0);
+  });
+});
+
+// --- voice notes (plan 2026-11-20-whatsapp-vocal) ------------------------------
+
+const voiceMessage = (id, from) => ({ from, id, type: 'audio', audio: { id: `media-${id}`, mime_type: 'audio/ogg; codecs=opus', voice: true } });
+const greetedFr = () => state.contacts.set(WA_ID, { waId: WA_ID, lang: 'fr', greetedAt: new Date(Date.now() - 60 * 1000), handoffUntil: null });
+
+test('a voice note is heard, its transcript stored on the inbound row, and answered by the assistant like a text', async () => {
+  resetState();
+  greetedFr();
+  state.voiceResult = () => ({ status: 'heard', text: 'Salam, combien coûte un crédit ?' });
+  state.assistantResult = () => ({ reply: 'Un crédit par analyse.', handoff: false });
+  await withEnv(CONFIGURED, async () => {
+    await POST(signedPost(messagesPayload([voiceMessage('wamid.V1', WA_ID)])));
+    assert.equal(state.claims[0].kind, 'audio');
+    assert.equal(state.voiceCalls.length, 1);
+    const call = state.voiceCalls[0];
+    assert.equal(call.event.mediaId, 'media-wamid.V1');
+    assert.equal(call.config.voiceModel, 'google/gemini-3.7-flash');
+    // The cap counts this number's voice notes.
+    await call.countVoices(new Date('2026-11-19T12:00:00Z'));
+    assert.deepEqual(state.inboundCounts.map((c) => [c.waId, c.kind]), [[WA_ID, 'audio']]);
+
+    assert.deepEqual(state.inboundBodies, [{ wamid: 'wamid.V1', body: 'Salam, combien coûte un crédit ?' }]);
+    assert.equal(state.assistantCalls.length, 1);
+    assert.equal(state.assistantCalls[0].message, 'Salam, combien coûte un crédit ?');
+    assert.deepEqual(state.historyCalls, [{ waId: WA_ID, limit: 10, excludeWamid: 'wamid.V1' }]);
+    assert.deepEqual(state.sent.map((m) => m.body), ['Un crédit par analyse.']);
+    assert.equal(state.outbound[0].kind, 'assistant');
+    assert.equal(handoffUpdates().length, 0);
+  });
+});
+
+test('a darija voice note switches the contact to Arabic before the answer', async () => {
+  resetState();
+  greetedFr();
+  state.voiceResult = () => ({ status: 'heard', text: 'شحال الثمن ديال الكريدي؟' });
+  await withEnv(CONFIGURED, async () => {
+    await quietly(() => POST(signedPost(messagesPayload([voiceMessage('wamid.V2', WA_ID)]))));
+    assert.ok(state.updates.some((u) => u.patch.lang === 'ar'), 'lang stored as ar');
+    // No assistant answer here: the fallback goes out in the new language.
+    assert.equal(state.sent[0].body, COPY.fallback.ar);
+  });
+});
+
+test('a voice note the bot could not hear gets voiceUnclear and the advisor hand-off, nothing sent to the assistant', async () => {
+  resetState();
+  greetedFr();
+  state.voiceResult = () => ({ status: 'unheard', reason: 'empty' });
+  await withEnv(CONFIGURED, async () => {
+    await POST(signedPost(messagesPayload([voiceMessage('wamid.V3', WA_ID)])));
+    assert.equal(state.assistantCalls.length, 0);
+    assert.equal(state.inboundBodies.length, 0);
+    assert.deepEqual(state.sent.map((m) => m.body), [COPY.voiceUnclear.fr]);
+    assert.equal(state.outbound[0].kind, 'fixed');
+    assert.ok(handoffUpdates()[0].patch.handoffUntil instanceof Date, 'coexistence : a human takes over');
+  });
+  resetState();
+  greetedFr();
+  state.voiceResult = () => ({ status: 'unheard', reason: 'daily_cap' });
+  await withEnv({ ...CONFIGURED, WHATSAPP_HANDOFF_MODE: 'redirect' }, async () => {
+    await POST(signedPost(messagesPayload([voiceMessage('wamid.V4', WA_ID)])));
+    assert.deepEqual(state.sent.map((m) => m.body), [`${COPY.voiceUnclear.fr}\n\n${COPY.redirect.fr}`]);
+    assert.equal(handoffUpdates().length, 0);
+  });
+});
+
+test('voice off (WHATSAPP_VOICE_ENABLED=false) or no OpenRouter key : the old mediaHandoff, nothing heard', async () => {
+  for (const env of [{ ...CONFIGURED, WHATSAPP_VOICE_ENABLED: 'false' }, { ...CONFIGURED, OPENROUTER_API_KEY: undefined }]) {
+    resetState();
+    greetedFr();
+    await withEnv(env, async () => {
+      await POST(signedPost(messagesPayload([voiceMessage('wamid.V5', WA_ID)])));
+      assert.equal(state.voiceCalls.length, 0);
+      assert.deepEqual(state.sent.map((m) => m.body), [COPY.mediaHandoff.fr]);
+    });
+  }
+});
+
+test('a replayed voice note is not heard twice', async () => {
+  resetState();
+  greetedFr();
+  state.claimResult = () => false;
+  await withEnv(CONFIGURED, async () => {
+    await POST(signedPost(messagesPayload([voiceMessage('wamid.V6', WA_ID)])));
+    assert.equal(state.voiceCalls.length, 0);
+    assert.equal(state.sent.length, 0);
+  });
+});
+
+test('a voice note while a human has the conversation : silent, not heard', async () => {
+  resetState();
+  state.contacts.set(WA_ID, { waId: WA_ID, lang: 'fr', greetedAt: new Date(), handoffUntil: new Date(Date.now() + 3600 * 1000) });
+  await withEnv(CONFIGURED, async () => {
+    await POST(signedPost(messagesPayload([voiceMessage('wamid.V7', WA_ID)])));
+    assert.equal(state.voiceCalls.length, 0);
+    assert.equal(state.sent.length, 0);
   });
 });

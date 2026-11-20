@@ -8,12 +8,13 @@ Le bot répond aux messages WhatsApp reçus sur le numéro de QatliA (06 00 93 7
 
 - les choix 1, 2 et 3 reçoivent des réponses fixes (les mêmes textes que les réponses rapides) ;
 - le texte libre est traité par l'IA, qui s'appuie uniquement sur les informations du code de QatliA (prix, offres, FAQ) ;
-- les vocaux, vidéos, documents, localisations et contacts sont passés à un humain ;
+- un **vocal est écouté** : le bot le transcrit et y répond comme à un texte tapé (voir « Messages vocaux ») ;
+- les vidéos, documents, localisations et contacts sont passés à un humain ;
 - le bot répond en français ou en arabe selon la langue du prospect. Un premier contact venu de la publicité reçoit la darija par défaut, comme la pub : le message que WhatsApp pré-remplit (« Bonjour ! Puis-je en savoir plus… ») suit la langue du téléphone et ne dit rien de la personne. Le bot passe au français dès que la personne écrit en français ;
 - une personne déjà accueillie qui revient par la publicité reçoit de nouveau le menu à boutons (pas une présentation écrite par l'IA) ;
 - une photo de fiche de débit est **lue par le bot**, une seule fois par numéro (voir « Lecture photo ») : il répond le nombre de pièces, de panneaux et la chute, avec un lien qui ouvre l'atelier sur ces pièces. Une photo que le bot n'arrive pas à lire reçoit un message qui demande une photo plus nette, avec le lien de l'atelier ; quand la lecture n'est pas possible (plafond atteint, lecture coupée), la photo reçoit le lien direct de l'atelier (`qatlia.ma/atelier`) ;
 - **en coexistence, le bot ne répond qu'aux personnes venues de la publicité** (Click-to-WhatsApp). Les clients existants qui écrivent à la ligne de support continuent de n'avoir que vous comme interlocuteur. Avec `WHATSAPP_BOT_SCOPE=all`, le bot répond à tout le monde ;
-- **chaque passage à un humain** (vocal, choix 3, réponse envoyée depuis l'app, question hors des informations de QatliA) fait taire le bot pour ce contact pendant 24 h.
+- **chaque passage à un humain** (vocal que le bot n'a pas compris, choix 3, réponse envoyée depuis l'app, question hors des informations de QatliA) fait taire le bot pour ce contact pendant 24 h.
 
 Le bot peut être éteint à tout moment avec la variable `WHATSAPP_BOT_ENABLED` : tant qu'elle n'est pas égale à `true`, il enregistre les messages entrants mais n'envoie rien.
 
@@ -63,6 +64,8 @@ Les noms ci-dessous sont exacts. Les valeurs ne doivent jamais être écrites da
 | `YCLOUD_API_KEY` | Facultative. Clé API YCloud (YCloud → Developers → API Keys). Avec `WHATSAPP_FROM_NUMBER`, les réponses du bot partent par YCloud au lieu de l'API Meta : c'est obligatoire quand le numéro a été inscrit par YCloud |
 | `WHATSAPP_FROM_NUMBER` | Facultative. Numéro du bot au format international (`+212726263686`), utilisé comme expéditeur par YCloud |
 | `WHATSAPP_PHOTO_DAILY_CAP` | Facultative. Nombre de photos que le bot peut lire sur 24 h, tous numéros confondus (défaut `300`). `0` coupe la lecture photo : les photos reçoivent alors le lien de l'atelier |
+| `WHATSAPP_VOICE_ENABLED` | Facultative. `false` coupe l'écoute des vocaux : ils reçoivent de nouveau « Je ne peux pas encore ouvrir ce type de message… » et passent à un humain. Allumée par défaut (il faut aussi `OPENROUTER_API_KEY`) |
+| `WHATSAPP_VOICE_MODEL` | Facultative. Modèle OpenRouter qui transcrit les vocaux (défaut `google/gemini-3.7-flash`). Il doit comprendre l'audio ; il est séparé de `WHATSAPP_BOT_MODEL` pour cette raison |
 
 ## Mise en place
 
@@ -137,6 +140,28 @@ from whatsapp_photo_reads;
 
 -- inscriptions venues d'une photo (provenance « whatsapp · photo »)
 select count(*) from auth.users where raw_user_meta_data->>'signup_campaign' = 'photo';
+```
+
+## Messages vocaux
+
+Quand un prospect envoie un vocal (après l'accueil, comme un texte) :
+
+1. le bot le télécharge (API Graph, comme les photos) : notes vocales WhatsApp (Ogg/Opus), MP3 ou AAC, 1 Mo au plus (environ 8 minutes) ;
+2. Gemini le transcrit mot pour mot par OpenRouter (`WHATSAPP_VOICE_MODEL`) : darija et arabe en lettres arabes, français en lettres latines ;
+3. la transcription est enregistrée comme texte du message dans `whatsapp_messages`, la langue du contact suit celle du vocal, et l'assistant répond exactement comme à une question tapée (mêmes informations, même plafond de 20 réponses par jour, même passage au conseiller).
+
+Si le bot n'a pas pu l'écouter (format non pris, fichier trop long, silence, erreur, plus de 10 vocaux du même numéro sur 24 h), il répond « Je n'ai pas bien compris votre message vocal 🙏 Écrivez-moi votre question en quelques mots, ou un conseiller vous répond très vite. » et passe la main à un humain, comme avant.
+
+**Le vocal n'est jamais stocké** : seule sa transcription l'est. Les logs Vercel ne contiennent qu'un code de raison (`[whatsapp] voice: not heard (empty)`, `… OpenRouter answered 400`), jamais le contenu ni le numéro.
+
+Premier test après le déploiement : ouvrir les logs Vercel en direct (ils ne sont gardés que quelques minutes), envoyer un vocal depuis un numéro déjà accueilli, et vérifier la réponse. Si un code `OpenRouter answered 4xx` apparaît, le modèle ne prend pas ce format : mettre `WHATSAPP_VOICE_ENABLED=false` le temps de corriger.
+
+Suivi :
+
+```sql
+-- vocaux des 7 derniers jours : transcrits (body rempli) ou non
+select count(*) filter (where body is not null) as transcrits, count(*) as recus
+from whatsapp_messages where kind = 'audio' and direction = 'user' and created_at > now() - interval '7 days';
 ```
 
 ## Suivi

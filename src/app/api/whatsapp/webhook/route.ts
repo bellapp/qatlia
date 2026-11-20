@@ -16,7 +16,8 @@ import { getWhatsAppConfig, type WhatsAppConfig } from '@/lib/whatsapp/config';
 import { verifySignature } from '@/lib/whatsapp/signature';
 import { parseWebhook, type EchoEvent, type InboundEvent } from '@/lib/whatsapp/payload';
 import { COPY, type Lang, type MenuButton } from '@/lib/whatsapp/copy';
-import { HANDOFF_HOURS, decide, resolveLang, type Decision } from '@/lib/whatsapp/router';
+import { HANDOFF_HOURS, decide, detectLang, resolveLang, type Decision } from '@/lib/whatsapp/router';
+import { hearVoice } from '@/lib/whatsapp/voice';
 import { HISTORY_MESSAGES, askAssistant } from '@/lib/whatsapp/assistant';
 import { sendButtons, sendText } from '@/lib/whatsapp/send';
 import { handlePhoto, type PhotoMessageKind } from '@/lib/whatsapp/photo';
@@ -27,9 +28,11 @@ import {
   claimInbound,
   countAssistantReplies,
   countBotMessages,
+  countInboundMessages,
   recentHistory,
   recordOutbound,
   releaseGreeting,
+  setInboundBody,
   updateContact,
   upsertContact,
 } from '@/lib/whatsapp/store';
@@ -153,7 +156,15 @@ async function handleInbound(db: SupabaseClient, config: WhatsAppConfig, event: 
 
   const assistantRepliesLast24h = await countAssistantReplies(db, waId, new Date(now.getTime() - DAY_MS));
   const decideFor = (state: typeof contact): Decision =>
-    decide({ event, contact: state, now, assistantRepliesLast24h, handoffMode: config.handoffMode });
+    decide({
+      event,
+      contact: state,
+      now,
+      assistantRepliesLast24h,
+      handoffMode: config.handoffMode,
+      // Without a key nothing can be heard: the old "write to me" reply.
+      voiceEnabled: config.voiceEnabled && config.openrouterKey !== null,
+    });
   let decision = decideFor(contact);
 
   // Meta delivers a burst concurrently: only the delivery that wins the conditional write greets.
@@ -191,13 +202,63 @@ async function handleInbound(db: SupabaseClient, config: WhatsAppConfig, event: 
     return;
   }
 
+  if (decision.action === 'voice') {
+    await handleVoiceMessage(db, config, event, contact.lang, now);
+    return;
+  }
+
   // decision.action === 'assistant'
+  await answerWithAssistant(db, config, { waId, wamid: event.wamid, message: event.text ?? '', lang, now });
+}
+
+/**
+ * A voice note: heard (src/lib/whatsapp/voice.ts), its transcript is stored as
+ * the text of the inbound message and answered exactly like a typed one, in
+ * the language it was said in. Not heard: the "write it" reply, with the same
+ * hand-off to the advisor as any media the bot cannot read.
+ */
+async function handleVoiceMessage(
+  db: SupabaseClient,
+  config: WhatsAppConfig,
+  event: InboundEvent,
+  storedLang: Lang,
+  now: Date,
+): Promise<void> {
+  const { waId } = event;
+  const heard = await hearVoice({
+    config,
+    event,
+    now,
+    countVoices: (since) => countInboundMessages(db, waId, 'audio', since),
+  });
+
+  if (heard.status === 'unheard') {
+    const redirect = config.handoffMode === 'redirect';
+    const text = redirect ? `${COPY.voiceUnclear[storedLang]}\n\n${COPY.redirect[storedLang]}` : COPY.voiceUnclear[storedLang];
+    if (!(await deliver(db, config, waId, text, 'fixed'))) return;
+    if (!redirect) await updateContact(db, waId, { handoffUntil: handoffDeadline(now) });
+    return;
+  }
+
+  await setInboundBody(db, event.wamid, heard.text);
+  const lang = detectLang(heard.text, storedLang);
+  if (lang !== storedLang) await updateContact(db, waId, { lang });
+  await answerWithAssistant(db, config, { waId, wamid: event.wamid, message: heard.text, lang, now });
+}
+
+/** The assistant's answer to a free-text question (typed, or a transcribed voice note). */
+async function answerWithAssistant(
+  db: SupabaseClient,
+  config: WhatsAppConfig,
+  input: { waId: string; wamid: string; message: string; lang: Lang; now: Date },
+): Promise<void> {
+  const { waId, lang, now } = input;
   const redirect = config.handoffMode === 'redirect';
-  const history = await recentHistory(db, waId, HISTORY_MESSAGES, event.wamid);
+  const history = await recentHistory(db, waId, HISTORY_MESSAGES, input.wamid);
   const answer = config.openrouterKey
     ? await askAssistant({
         history,
-        message: event.text ?? '',
+        message: input.message,
         model: config.model,
         apiKey: config.openrouterKey,
         handoffMode: config.handoffMode,
