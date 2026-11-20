@@ -33,13 +33,14 @@ const inbound = (overrides = {}) => ({
   ...overrides,
 });
 
-const run = ({ event = {}, contact: c = {}, assistantRepliesLast24h = 0, handoffMode = 'coexistence' } = {}) =>
+const run = ({ event = {}, contact: c = {}, assistantRepliesLast24h = 0, handoffMode = 'coexistence', voiceEnabled } = {}) =>
   decide({
     event: inbound(event),
     contact: contact(c),
     now: NOW,
     assistantRepliesLast24h,
     handoffMode,
+    ...(voiceEnabled === undefined ? {} : { voiceEnabled }),
   });
 
 test('constants', () => {
@@ -203,6 +204,44 @@ test('audio, video, document, location, contacts: mediaHandoff', () => {
   }
 });
 
+// Voice notes (plan 2026-11-20-whatsapp-vocal): heard like a typed question
+// when the voice is on; off (or not passed), the old mediaHandoff above.
+
+test('voice on : a voice note goes to the voice action, like a text to the assistant', () => {
+  assert.deepEqual(run({ event: { kind: 'audio', text: null }, voiceEnabled: true }), { action: 'voice' });
+  assert.deepEqual(run({ event: { kind: 'audio', text: null }, voiceEnabled: false }).text, COPY.mediaHandoff.fr);
+});
+
+test('voice on : video, document, location and contacts still get mediaHandoff', () => {
+  for (const kind of ['video', 'document', 'location', 'contacts']) {
+    assert.equal(run({ event: { kind, text: null }, voiceEnabled: true }).text, COPY.mediaHandoff.fr, kind);
+  }
+});
+
+test('voice on : during a human handoff a voice note is silent, a first contact gets the greeting first', () => {
+  const handoffUntil = new Date(NOW.getTime() + 60 * 60 * 1000);
+  assert.deepEqual(run({ event: { kind: 'audio', text: null }, contact: { handoffUntil }, voiceEnabled: true }), { action: 'silent' });
+  assert.equal(run({ event: { kind: 'audio', text: null }, contact: { greetedAt: null }, voiceEnabled: true }).text, COPY.greeting);
+});
+
+test('voice on : the daily assistant cap applies to voice notes too', () => {
+  assert.deepEqual(run({ event: { kind: 'audio', text: null }, voiceEnabled: true, assistantRepliesLast24h: 20 }), {
+    action: 'send',
+    text: COPY.advisor.fr,
+    markGreeted: false,
+    handoff: true,
+  });
+});
+
+test('mediaHandoff no longer promises to listen; voiceUnclear asks to write, in both languages', () => {
+  assert.doesNotMatch(COPY.mediaHandoff.fr, /écouter/);
+  assert.doesNotMatch(COPY.mediaHandoff.ar, /نسمع/);
+  assert.match(COPY.voiceUnclear.fr, /vocal/);
+  assert.match(COPY.voiceUnclear.fr, /conseiller/);
+  assert.match(COPY.voiceUnclear.ar, /مستشار/);
+  assert.ok(!/[A-Za-z]/.test(COPY.voiceUnclear.ar), 'the darija text has no Latin letters');
+});
+
 test('daily assistant cap sends the advisor text and hands off', () => {
   assert.deepEqual(run({ assistantRepliesLast24h: 20 }), {
     action: 'send',
@@ -233,7 +272,7 @@ test('detectLang', () => {
 test('every fixed reply exists in both languages and is non-empty', () => {
   assert.ok(COPY.greeting.length > 0);
   assert.ok(COPY.greetingPlain.length > 0);
-  for (const key of ['howItWorks', 'pricing', 'advisor', 'redirect', 'imageHint', 'mediaHandoff', 'fallback']) {
+  for (const key of ['howItWorks', 'pricing', 'advisor', 'redirect', 'imageHint', 'mediaHandoff', 'voiceUnclear', 'fallback']) {
     for (const lang of ['fr', 'ar']) {
       assert.ok(typeof COPY[key][lang] === 'string' && COPY[key][lang].length > 0, `${key}.${lang}`);
     }
@@ -241,7 +280,7 @@ test('every fixed reply exists in both languages and is non-empty', () => {
 });
 
 test('no fixed reply mentions a bank card', () => {
-  const keys = ['howItWorks', 'pricing', 'advisor', 'redirect', 'imageHint', 'mediaHandoff', 'fallback'];
+  const keys = ['howItWorks', 'pricing', 'advisor', 'redirect', 'imageHint', 'mediaHandoff', 'voiceUnclear', 'fallback'];
   const texts = [COPY.greeting, COPY.greetingPlain, ...keys.flatMap((key) => [COPY[key].fr, COPY[key].ar])];
   for (const text of texts) {
     assert.ok(!/carte|بطاقة|كارت/i.test(text), text.slice(0, 60));

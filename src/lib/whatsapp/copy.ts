@@ -77,6 +77,8 @@ export const COPY: {
   redirect: Record<Lang, string>;
   imageHint: Record<Lang, string>;
   mediaHandoff: Record<Lang, string>;
+  /** A voice note the bot could not hear (download, format, transcription, daily cap). */
+  voiceUnclear: Record<Lang, string>;
   fallback: Record<Lang, string>;
 } = {
   greeting: `${GREETING_INTRO_FR}
@@ -161,8 +163,13 @@ ${PACK_LINES_AR}
   },
 
   mediaHandoff: {
-    fr: `Je ne peux pas encore écouter ni ouvrir ce type de message. Écrivez-moi votre question, ou un conseiller vous répond très vite.`,
-    ar: `مازال ما نقدرش نسمع ولا نحل هاد النوع ديال الرسائل. كتب ليا سؤالك، ولا مستشار غادي يجاوبك قريب.`,
+    fr: `Je ne peux pas encore ouvrir ce type de message. Écrivez-moi votre question, ou un conseiller vous répond très vite.`,
+    ar: `مازال ما نقدرش نحل هاد النوع ديال الرسائل. كتب ليا سؤالك، ولا مستشار غادي يجاوبك قريب.`,
+  },
+
+  voiceUnclear: {
+    fr: `Je n'ai pas bien compris votre message vocal 🙏 Écrivez-moi votre question en quelques mots, ou un conseiller vous répond très vite.`,
+    ar: `ما فهمتش مزيان الأوديو ديالك 🙏 كتب ليا سؤالك بشي كلمات، ولا مستشار غادي يجاوبك قريب.`,
   },
 
   fallback: {

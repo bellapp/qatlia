@@ -119,7 +119,10 @@ test('parseWebhook maps audio, image and unknown types to kinds', () => {
   assert.equal(image.kind, 'image');
   assert.equal(image.text, 'ma fiche');
   assert.equal(image.mediaId, 'i1');
-  assert.equal(audio.mediaId, null);
+  // A voice note is downloaded and transcribed (plan 2026-11-20-whatsapp-vocal).
+  assert.equal(audio.mediaId, 'a1');
+  const [document] = parseWebhook(messagesPayload({ type: 'document', document: { id: 'd1' } }), PHONE_ID);
+  assert.equal(document.mediaId, null);
 
   const [other] = parseWebhook(messagesPayload({ type: 'unsupported' }), PHONE_ID);
   assert.equal(other.kind, 'other');

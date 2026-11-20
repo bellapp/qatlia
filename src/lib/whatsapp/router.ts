@@ -31,7 +31,9 @@ export type Decision =
   | { action: 'send'; text: string; markGreeted: boolean; handoff: boolean; menu?: Menu }
   | { action: 'assistant' }
   /** A photo: the webhook tries to read it as a cut list (src/lib/whatsapp/photo.ts). */
-  | { action: 'photo' };
+  | { action: 'photo' }
+  /** A voice note: the webhook transcribes it and answers it like a text (src/lib/whatsapp/voice.ts). */
+  | { action: 'voice' };
 
 const ARABIC_LETTER = /[؀-ۿ]/;
 const LATIN_LETTERS = /[A-Za-zÀ-ÖØ-öø-ÿ]/g;
@@ -109,6 +111,8 @@ export function decide(input: {
   now: Date;
   assistantRepliesLast24h: number;
   handoffMode: HandoffMode;
+  /** Voice notes are transcribed (WHATSAPP_VOICE_ENABLED and an OpenRouter key); off, they get mediaHandoff. */
+  voiceEnabled?: boolean;
 }): Decision {
   const { event, contact, now, assistantRepliesLast24h, handoffMode } = input;
   const lang = contact.lang;
@@ -168,6 +172,12 @@ export function decide(input: {
       handoff: false,
       menu: { buttons: MENU_BUTTONS, fallbackText: COPY.menuAgainPlain },
     };
+  }
+
+  // 6. A voice note is a question said rather than typed: the same cap as a text.
+  if (event.kind === 'audio' && input.voiceEnabled === true) {
+    if (assistantRepliesLast24h >= MAX_ASSISTANT_REPLIES_PER_DAY) return toAdvisor(COPY.advisor[lang], false);
+    return { action: 'voice' };
   }
 
   // 7. Media the bot cannot read.
