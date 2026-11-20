@@ -268,7 +268,8 @@ test('once the read is stored, a failing result message never turns it into a fa
   assert.deepEqual(state.failed, []);
 });
 
-test('the failed-read text exists in both languages and offers the atelier', () => {
-  const { ATELIER_LINK } = loadTsModule('src/lib/whatsapp/copy.ts');
-  for (const lang of ['fr', 'ar']) assert.ok(PHOTO_COPY.unreadable[lang].includes(ATELIER_LINK));
+test('the failed-read text exists in both languages and asks for a new photo here', () => {
+  // A failed read frees the number (failPhotoRead): the next photo is read again.
+  assert.match(PHOTO_COPY.unreadable.fr, /renvoyez-la-moi ici/);
+  assert.match(PHOTO_COPY.unreadable.ar, /صيفطها ليا هنا/);
 });
