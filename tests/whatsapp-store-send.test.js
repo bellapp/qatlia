@@ -334,6 +334,40 @@ test('recentHistory keeps bot rows whose wamid is null and skips rows without te
   ]);
 });
 
+// --- voice notes (plan 2026-11-20-whatsapp-vocal) ------------------------------
+
+test('countInboundMessages counts the contact own rows of a kind since the given instant', async () => {
+  const { countInboundMessages } = load('src/lib/whatsapp/store.ts');
+  const db = fakeDb(() => ok(null, { count: 3 }));
+  const since = new Date('2026-11-19T12:00:00.000Z');
+  assert.equal(await countInboundMessages(db, '1', 'audio', since), 3);
+  const q = db.queries[0];
+  assert.equal(q.table, 'whatsapp_messages');
+  assert.deepEqual(q.filters, [
+    ['eq', 'wa_id', '1'],
+    ['eq', 'direction', 'user'],
+    ['eq', 'kind', 'audio'],
+    ['gte', 'created_at', '2026-11-19T12:00:00.000Z'],
+  ]);
+  assert.deepEqual(q.options, { count: 'exact', head: true });
+  assert.equal(await countInboundMessages(fakeDb(() => ok(null, { count: null })), '1', 'audio', since), 0);
+  await assert.rejects(() => countInboundMessages(fakeDb(() => fail('XX000')), '1', 'audio', since));
+});
+
+test('setInboundBody writes the transcript on the inbound row only', async () => {
+  const { setInboundBody } = load('src/lib/whatsapp/store.ts');
+  const db = fakeDb(() => ok());
+  await setInboundBody(db, 'wamid.V1', 'Salam');
+  const q = db.queries[0];
+  assert.equal(q.op, 'update');
+  assert.deepEqual(q.payload, { body: 'Salam' });
+  assert.deepEqual(q.filters, [
+    ['eq', 'wamid', 'wamid.V1'],
+    ['eq', 'direction', 'user'],
+  ]);
+  await assert.rejects(() => setInboundBody(fakeDb(() => fail('XX000')), 'wamid.V1', 'Salam'));
+});
+
 // --- countAssistantReplies -------------------------------------------------
 
 test('countAssistantReplies counts bot assistant rows since the given instant', async () => {

@@ -83,6 +83,45 @@ test('an image type the reader does not take : bad_type', async () => {
   assert.equal(calls.length, 1);
 });
 
+// Voice notes (plan 2026-11-20-whatsapp-vocal): the same download, for the
+// audio types Gemini takes, with a smaller limit.
+const { MAX_VOICE_BYTES } = loadTsModule('src/lib/whatsapp/media.ts');
+
+test('audio : a WhatsApp voice note (ogg, codecs parameter) comes back with its plain type', async () => {
+  const { impl } = stubFetch({ lookup: okLookup({ mime_type: 'audio/ogg; codecs=opus' }), download: okDownload() });
+  assert.deepEqual(await fetchMediaDataUrl(CONFIG, 'MEDIA1', impl, 'audio'), {
+    ok: true,
+    mimeType: 'audio/ogg',
+    bytes: 3,
+    dataUrl: `data:audio/ogg;base64,${BYTES.toString('base64')}`,
+  });
+  for (const type of ['audio/mpeg', 'audio/aac']) {
+    const other = stubFetch({ lookup: okLookup({ mime_type: type }), download: okDownload() });
+    assert.equal((await fetchMediaDataUrl(CONFIG, 'MEDIA1', other.impl, 'audio')).mimeType, type);
+  }
+});
+
+test('audio : a type Gemini does not take (amr, mp4), or an image, is bad_type without download', async () => {
+  for (const type of ['audio/amr', 'audio/mp4', 'image/jpeg']) {
+    const { impl, calls } = stubFetch({ lookup: okLookup({ mime_type: type }), download: okDownload() });
+    assert.deepEqual(await fetchMediaDataUrl(CONFIG, 'MEDIA1', impl, 'audio'), { ok: false, reason: 'bad_type' });
+    assert.equal(calls.length, 1);
+  }
+});
+
+test('images stay the default : a voice note asked as an image is bad_type', async () => {
+  const { impl } = stubFetch({ lookup: okLookup({ mime_type: 'audio/ogg' }), download: okDownload() });
+  assert.deepEqual(await fetchMediaDataUrl(CONFIG, 'MEDIA1', impl), { ok: false, reason: 'bad_type' });
+});
+
+test('audio : above 1 MB (a long recording, a forwarded song) is too_large', async () => {
+  assert.equal(MAX_VOICE_BYTES, 1024 * 1024);
+  const announced = stubFetch({ lookup: okLookup({ mime_type: 'audio/ogg', file_size: MAX_VOICE_BYTES + 1 }), download: okDownload() });
+  assert.deepEqual(await fetchMediaDataUrl(CONFIG, 'MEDIA1', announced.impl, 'audio'), { ok: false, reason: 'too_large' });
+  const actual = stubFetch({ lookup: okLookup({ mime_type: 'audio/ogg' }), download: okDownload(Buffer.alloc(MAX_VOICE_BYTES + 1)) });
+  assert.deepEqual(await fetchMediaDataUrl(CONFIG, 'MEDIA1', actual.impl, 'audio'), { ok: false, reason: 'too_large' });
+});
+
 test('the limit is 5 MB', () => {
   assert.equal(MAX_MEDIA_BYTES, 5 * 1024 * 1024);
 });

@@ -36,6 +36,10 @@ export interface WhatsAppConfig {
   ycloud: YCloudConfig | null;
   /** Photos of cut lists the bot may read per 24 hours, all numbers together; 0 turns the reading off. */
   photoDailyCap: number;
+  /** Voice notes are transcribed and answered; `WHATSAPP_VOICE_ENABLED=false` brings back the old "write to me" reply. */
+  voiceEnabled: boolean;
+  /** Its own model: the text model of the bot may not take audio. */
+  voiceModel: string;
 }
 
 const DEFAULT_PHOTO_DAILY_CAP = 300;
@@ -48,6 +52,7 @@ function readPhotoDailyCap(env: Env): number {
 
 const DEFAULT_GRAPH_VERSION = 'v23.0';
 const DEFAULT_MODEL = 'google/gemini-3.7-flash';
+const DEFAULT_VOICE_MODEL = 'google/gemini-3.7-flash';
 
 type Env = Record<string, string | undefined>;
 
@@ -106,5 +111,7 @@ export function getWhatsAppConfig(env: Env = process.env): WhatsAppConfig | null
     openrouterKey: read(env, 'OPENROUTER_API_KEY'),
     ycloud: readYCloud(env),
     photoDailyCap: readPhotoDailyCap(env),
+    voiceEnabled: env.WHATSAPP_VOICE_ENABLED?.trim().toLowerCase() !== 'false',
+    voiceModel: read(env, 'WHATSAPP_VOICE_MODEL') ?? DEFAULT_VOICE_MODEL,
   };
 }

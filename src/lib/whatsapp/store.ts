@@ -255,6 +255,28 @@ export async function countBotMessages(db: SupabaseClient, waId: string, kind: s
   return count ?? 0;
 }
 
+/** Number of messages of the given kind this contact sent since `since` (the one being handled included). */
+export async function countInboundMessages(db: SupabaseClient, waId: string, kind: string, since: Date): Promise<number> {
+  const { count, error } = await db
+    .from(MESSAGES)
+    .select('id', { count: 'exact', head: true })
+    .eq('wa_id', waId)
+    .eq('direction', 'user')
+    .eq('kind', kind)
+    .gte('created_at', since.toISOString());
+  if (error) raise(error, `count inbound ${kind} messages`);
+  return count ?? 0;
+}
+
+/**
+ * Writes the text of an inbound message stored without one: the transcript of
+ * a voice note, so the assistant reads it in the history like a typed message.
+ */
+export async function setInboundBody(db: SupabaseClient, wamid: string, body: string): Promise<void> {
+  const { error } = await db.from(MESSAGES).update({ body }).eq('wamid', wamid).eq('direction', 'user');
+  if (error) raise(error, 'set inbound body');
+}
+
 /** Number of assistant (free-form AI) replies sent to this contact since `since`. */
 export function countAssistantReplies(db: SupabaseClient, waId: string, since: Date): Promise<number> {
   return countBotMessages(db, waId, 'assistant', since);
