@@ -164,7 +164,10 @@ stubModule('@/lib/whatsapp/assistant', {
   },
 });
 
-const { COPY, MENU_BUTTONS } = loadTsModule('src/lib/whatsapp/copy.ts');
+const { COPY, MENU_BUTTONS, greeting } = loadTsModule('src/lib/whatsapp/copy.ts');
+// Arabic letters get the darija-only greeting; the ad (referral, pre-filled text) both languages, darija first.
+const GREETING_AR = greeting({ lang: 'ar', bilingual: false, voice: true }).text;
+const GREETING_AD = greeting({ lang: 'ar', bilingual: true, voice: true }).text;
 const { GET, POST, dynamic, maxDuration } = loadTsModule('src/app/api/whatsapp/webhook/route.ts');
 
 const ENV_KEYS = [
@@ -396,7 +399,7 @@ test('a new contact writing in Arabic gets the greeting once and is marked greet
 
     assert.equal(state.sent.length, 1);
     assert.equal(state.sent[0].to, WA_ID);
-    assert.equal(state.sent[0].body, COPY.greeting);
+    assert.equal(state.sent[0].body, GREETING_AR);
     assert.equal(state.sent[0].config.phoneNumberId, PHONE_NUMBER_ID);
 
     assert.ok(
@@ -408,7 +411,7 @@ test('a new contact writing in Arabic gets the greeting once and is marked greet
     assert.equal(handoffUpdates().length, 0);
 
     assert.deepEqual(state.outbound, [
-      { waId: WA_ID, wamid: 'wamid.OUT', direction: 'bot', kind: 'fixed', body: COPY.greeting },
+      { waId: WA_ID, wamid: 'wamid.OUT', direction: 'bot', kind: 'fixed', body: GREETING_AR },
     ]);
     assert.equal(state.claims[0].wamid, 'wamid.1');
     assert.deepEqual(state.clientArgs[2], { auth: { persistSession: false, autoRefreshToken: false } });
@@ -647,7 +650,7 @@ test('coexistence + scope ads: a new contact whose first message carries the ad 
   await withEnv({ ...CONFIGURED, WHATSAPP_BOT_SCOPE: 'ads' }, async () => {
     await POST(signedPost(messagesPayload([withReferral(textMessage('wamid.a1', WA_ID, 'Bonjour'))])));
     assert.equal(state.sent.length, 1);
-    assert.equal(state.sent[0].body, COPY.greeting);
+    assert.equal(state.sent[0].body, GREETING_AD);
   });
 });
 
@@ -988,7 +991,7 @@ test('a first contact through the ad is answered in darija, whatever the pre-fil
   resetState();
   await withEnv(CONFIGURED, async () => {
     await POST(signedPost(messagesPayload([adPrefill('wamid.ad1', WA_ID)])));
-    assert.equal(state.sent[0].body, COPY.greeting);
+    assert.equal(state.sent[0].body, GREETING_AD);
     assert.deepEqual(langUpdates(), ['ar']);
 
     await POST(signedPost(messagesPayload([buttonTap('wamid.ad2', WA_ID, '2')])));

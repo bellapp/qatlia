@@ -7,7 +7,7 @@
  */
 
 import type { HandoffMode } from '@/lib/whatsapp/config';
-import { COPY, MENU_BUTTONS, type Lang, type MenuButton } from '@/lib/whatsapp/copy';
+import { COPY, MENU_BUTTONS, greeting, type Lang, type MenuButton } from '@/lib/whatsapp/copy';
 import type { InboundEvent } from '@/lib/whatsapp/payload';
 
 export const HANDOFF_HOURS = 24;
@@ -28,7 +28,8 @@ export interface Menu {
 
 export type Decision =
   | { action: 'silent' }
-  | { action: 'send'; text: string; markGreeted: boolean; handoff: boolean; menu?: Menu }
+  /** `greeting`: the first-contact greeting, which only one delivery of a burst may send (claimGreeting). */
+  | { action: 'send'; text: string; markGreeted: boolean; handoff: boolean; menu?: Menu; greeting?: true }
   | { action: 'assistant' }
   /** A photo: the webhook tries to read it as a cut list (src/lib/whatsapp/photo.ts). */
   | { action: 'photo' }
@@ -70,15 +71,19 @@ export function isAdPrefill(event: Pick<InboundEvent, 'kind' | 'text' | 'referra
 export const AD_DEFAULT_LANG: Lang = 'ar';
 
 /**
- * The language to answer in. A pre-filled ad message says nothing about the
- * person (see AD_PREFILLS): it sets the ad's language on a first contact and
- * leaves a known contact's language alone. Anything typed is detected.
+ * The language to answer in. A French or English pre-filled ad message says
+ * nothing about the person (see AD_PREFILLS): it sets the ad's language on a
+ * first contact and leaves a known contact's language alone. The Arabic one
+ * comes from an Arabic phone, so it reads Arabic: darija. Anything typed is detected.
  */
 export function resolveLang(
   event: Pick<InboundEvent, 'kind' | 'text' | 'referral'>,
   contact: Pick<ContactState, 'lang' | 'greetedAt'>,
 ): Lang {
-  if (isAdPrefill(event)) return contact.greetedAt === null ? AD_DEFAULT_LANG : contact.lang;
+  if (isAdPrefill(event)) {
+    if (event.text && ARABIC_LETTER.test(event.text)) return 'ar';
+    return contact.greetedAt === null ? AD_DEFAULT_LANG : contact.lang;
+  }
   return detectLang(event.text, contact.lang);
 }
 
@@ -151,13 +156,20 @@ export function decide(input: {
   if (event.kind === 'image') return { action: 'photo' };
 
   // 4. First contact: the menu comes as buttons, so one tap is enough to answer.
+  // Arabic letters say the reader reads Arabic; anything else gets both languages.
   if (contact.greetedAt === null) {
+    const { text, plain } = greeting({
+      lang,
+      bilingual: !(event.text !== null && ARABIC_LETTER.test(event.text)),
+      voice: input.voiceEnabled === true,
+    });
     return {
       action: 'send',
-      text: COPY.greeting,
+      text,
       markGreeted: true,
       handoff: false,
-      menu: { buttons: MENU_BUTTONS, fallbackText: COPY.greetingPlain },
+      greeting: true,
+      menu: { buttons: MENU_BUTTONS, fallbackText: plain },
     };
   }
 
