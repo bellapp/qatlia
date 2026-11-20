@@ -12,9 +12,9 @@
 
 ## Global Constraints
 
-- Accepted audio: `audio/ogg`, `audio/mpeg`, `audio/mp4`, `audio/aac` (MIME parameters such as `; codecs=opus` ignored), at most 1 MB.
+- Accepted audio: `audio/ogg`, `audio/mpeg`, `audio/aac` (no `audio/mp4`: not listed by Gemini; MIME parameters such as `; codecs=opus` ignored), at most 1 MB.
 - `MAX_VOICES_PER_DAY = 10` per number (inbound `audio` rows in 24 h, the current one included).
-- Transcription timeout 20 s; transcript capped at `MAX_INBOUND_CHARS` (1000).
+- Transcription timeout 15 s, Graph 5 s per request, assistant gets what is left of 35 s (assistantBudgetMs); transcript capped at `MAX_INBOUND_CHARS` (1000).
 - Model `WHATSAPP_VOICE_MODEL`, default `google/gemini-3.7-flash`.
 - No content in logs. Full suite: only the 10 baseline failures.
 

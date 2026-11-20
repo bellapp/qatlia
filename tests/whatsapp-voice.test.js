@@ -103,7 +103,7 @@ test('an OpenRouter error, a network failure or the deadline : error, with a rea
     }),
   );
   assert.deepEqual(slow.value, { status: 'error', reason: 'request_failed' });
-  assert.equal(VOICE_TIMEOUT_MS, 20000);
+  assert.equal(VOICE_TIMEOUT_MS, 15000);
 });
 
 test('the finish reason is logged when the answer is unusable', async () => {
@@ -218,4 +218,68 @@ test('voice : on by default with the Gemini flash model; WHATSAPP_VOICE_ENABLED=
   const own = getWhatsAppConfig({ ...ENV, WHATSAPP_BOT_MODEL: 'some/text-only-model', WHATSAPP_VOICE_MODEL: 'google/gemini-other' });
   assert.equal(own.voiceModel, 'google/gemini-other');
   assert.equal(getWhatsAppConfig({ ...ENV, WHATSAPP_BOT_MODEL: 'some/text-only-model' }).voiceModel, 'google/gemini-3.7-flash');
+});
+
+// --- review fixes ----------------------------------------------------------------
+
+const { assistantBudgetMs, VOICE_MEDIA_TIMEOUT_MS } = loadTsModule('src/lib/whatsapp/voice.ts');
+
+test('the transcript is asked as plain text: a long note cut by the token limit is still heard, and the cut is logged', async () => {
+  const { impl, calls } = openrouter(() => answer('Salam, bghit nsowel 3la les panneaux dyal', 'length'));
+  const { value, logged } = await quietly(() => transcribeVoice({ audioBase64: AUDIO, format: 'ogg', apiKey: 'k', model: 'm', fetchImpl: impl }));
+  assert.deepEqual(value, { status: 'ok', text: 'Salam, bghit nsowel 3la les panneaux dyal' });
+  assert.ok(logged.some((line) => line.includes('length')));
+  assert.ok(calls[0].body.max_tokens >= 4000, 'room for reasoning tokens');
+  const prompt = calls[0].body.messages[0].content.find((p) => p.type === 'text').text;
+  assert.doesNotMatch(prompt, /JSON/);
+});
+
+test('a JSON object cut in the middle keeps the text it had', async () => {
+  const { impl } = openrouter(() => answer('{"text": "Bonjour, je voudrais savoir le prix', 'length'));
+  const { value } = await quietly(() => transcribeVoice({ audioBase64: AUDIO, format: 'ogg', apiKey: 'k', model: 'm', fetchImpl: impl }));
+  assert.deepEqual(value, { status: 'ok', text: 'Bonjour, je voudrais savoir le prix' });
+});
+
+test('a label for non-speech ([musique], (silence)) is empty, not a question', async () => {
+  for (const content of ['[musique]', '(silence)', '[bruit] (inaudible)']) {
+    const { impl } = openrouter(() => answer(content));
+    assert.deepEqual(await transcribeVoice({ audioBase64: AUDIO, format: 'ogg', apiKey: 'k', model: 'm', fetchImpl: impl }), { status: 'empty' }, content);
+  }
+});
+
+test('a failing count does not stop the hearing (the assistant cap still bounds the cost)', async () => {
+  const net = everything();
+  const { value } = await quietly(() =>
+    hearVoice({ config: CONFIG, event: EVENT, now: NOW, countVoices: async () => { throw new Error('db down'); }, fetchImpl: net.impl }),
+  );
+  assert.equal(value.status, 'heard');
+});
+
+test('the 60-second route budget: shorter media and transcription deadlines, and the assistant gets only what is left', () => {
+  assert.equal(VOICE_MEDIA_TIMEOUT_MS, 5000);
+  assert.equal(VOICE_TIMEOUT_MS, 15000);
+  assert.equal(assistantBudgetMs(1000), 15000);
+  assert.equal(assistantBudgetMs(25000), 10000);
+  assert.equal(assistantBudgetMs(31500), null, 'not enough left: the fallback goes out instead');
+});
+
+test('the audio download uses the shorter deadline', async () => {
+  const signals = [];
+  const net = everything();
+  const impl = async (url, init) => {
+    signals.push(init?.signal);
+    return net.impl(url, init);
+  };
+  const realTimeout = AbortSignal.timeout;
+  const asked = [];
+  AbortSignal.timeout = (ms) => {
+    asked.push(ms);
+    return realTimeout.call(AbortSignal, ms);
+  };
+  try {
+    await hearVoice({ config: CONFIG, event: EVENT, now: NOW, countVoices: counter(1), fetchImpl: impl });
+  } finally {
+    AbortSignal.timeout = realTimeout;
+  }
+  assert.deepEqual(asked, [5000, 5000]);
 });

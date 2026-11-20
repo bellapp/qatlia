@@ -17,7 +17,7 @@ import { verifySignature } from '@/lib/whatsapp/signature';
 import { parseWebhook, type EchoEvent, type InboundEvent } from '@/lib/whatsapp/payload';
 import { COPY, type Lang, type MenuButton } from '@/lib/whatsapp/copy';
 import { HANDOFF_HOURS, decide, detectLang, resolveLang, type Decision } from '@/lib/whatsapp/router';
-import { hearVoice } from '@/lib/whatsapp/voice';
+import { assistantBudgetMs, hearVoice } from '@/lib/whatsapp/voice';
 import { HISTORY_MESSAGES, askAssistant } from '@/lib/whatsapp/assistant';
 import { sendButtons, sendText } from '@/lib/whatsapp/send';
 import { handlePhoto, type PhotoMessageKind } from '@/lib/whatsapp/photo';
@@ -240,30 +240,59 @@ async function handleVoiceMessage(
     return;
   }
 
-  await setInboundBody(db, event.wamid, heard.text);
+  // Both writes help later answers; neither may cost this one.
+  try {
+    await setInboundBody(db, event.wamid, heard.text);
+  } catch (error) {
+    console.error('[whatsapp] voice: could not store the transcript', describeError(error));
+  }
   const lang = detectLang(heard.text, storedLang);
-  if (lang !== storedLang) await updateContact(db, waId, { lang });
-  await answerWithAssistant(db, config, { waId, wamid: event.wamid, message: heard.text, lang, now });
+  if (lang !== storedLang) {
+    try {
+      await updateContact(db, waId, { lang });
+    } catch (error) {
+      console.error('[whatsapp] voice: could not store the language', describeError(error));
+    }
+  }
+  await answerWithAssistant(db, config, {
+    waId,
+    wamid: event.wamid,
+    message: heard.text,
+    lang,
+    now,
+    // Whatever hearing took comes off the assistant's time (60 s route budget).
+    timeoutMs: assistantBudgetMs(Date.now() - now.getTime()),
+  });
 }
 
 /** The assistant's answer to a free-text question (typed, or a transcribed voice note). */
 async function answerWithAssistant(
   db: SupabaseClient,
   config: WhatsAppConfig,
-  input: { waId: string; wamid: string; message: string; lang: Lang; now: Date },
+  input: {
+    waId: string;
+    wamid: string;
+    message: string;
+    lang: Lang;
+    now: Date;
+    /** Omitted: the assistant's own deadline. `null`: no time left, the fallback goes out. */
+    timeoutMs?: number | null;
+  },
 ): Promise<void> {
   const { waId, lang, now } = input;
   const redirect = config.handoffMode === 'redirect';
   const history = await recentHistory(db, waId, HISTORY_MESSAGES, input.wamid);
-  const answer = config.openrouterKey
-    ? await askAssistant({
-        history,
-        message: input.message,
-        model: config.model,
-        apiKey: config.openrouterKey,
-        handoffMode: config.handoffMode,
-      })
-    : null;
+  const answer =
+    config.openrouterKey && input.timeoutMs !== null
+      ? await askAssistant({
+          history,
+          message: input.message,
+          model: config.model,
+          apiKey: config.openrouterKey,
+          handoffMode: config.handoffMode,
+          ...(input.timeoutMs !== undefined ? { timeoutMs: input.timeoutMs } : {}),
+        })
+      : null;
 
   if (!answer) {
     const text = redirect ? `${COPY.fallback[lang]}\n\n${COPY.redirect[lang]}` : COPY.fallback[lang];

@@ -54,6 +54,9 @@ function resetState() {
     voiceCount: 1,
     inboundCounts: [],
     inboundBodies: [],
+    setBodyError: null,
+    updateError: null,
+    budget: () => 15000,
   });
 }
 resetState();
@@ -110,6 +113,7 @@ stubModule('@/lib/whatsapp/store', {
     return state.imageHintCount;
   },
   updateContact: async (db, waId, patch) => {
+    if (state.updateError) throw state.updateError;
     state.updates.push({ waId, patch });
     const contact = state.contacts.get(waId);
     if (contact) Object.assign(contact, patch);
@@ -125,10 +129,12 @@ stubModule('@/lib/whatsapp/store', {
   },
   setInboundBody: async (db, wamid, body) => {
     assert.equal(db, DB);
+    if (state.setBodyError) throw state.setBodyError;
     state.inboundBodies.push({ wamid, body });
   },
 });
 stubModule('@/lib/whatsapp/voice', {
+  assistantBudgetMs: (elapsed) => state.budget(elapsed),
   hearVoice: async (input) => {
     state.voiceCalls.push(input);
     return state.voiceResult(input);
@@ -1128,5 +1134,50 @@ test('a voice note while a human has the conversation : silent, not heard', asyn
     await POST(signedPost(messagesPayload([voiceMessage('wamid.V7', WA_ID)])));
     assert.equal(state.voiceCalls.length, 0);
     assert.equal(state.sent.length, 0);
+  });
+});
+
+test('a store error after a heard note does not leave the prospect without an answer', async () => {
+  resetState();
+  greetedFr();
+  state.voiceResult = () => ({ status: 'heard', text: 'شحال الثمن؟' });
+  state.assistantResult = () => ({ reply: 'جواب', handoff: false });
+  state.setBodyError = new Error('db down');
+  state.updateError = new Error('db down');
+  await withEnv(CONFIGURED, async () => {
+    await quietly(() => POST(signedPost(messagesPayload([voiceMessage('wamid.V8', WA_ID)]))));
+    assert.deepEqual(state.sent.map((m) => m.body), ['جواب']);
+    assert.equal(state.assistantCalls[0].message, 'شحال الثمن؟');
+  });
+});
+
+test('the assistant gets the time left after hearing; with too little left, the fallback goes out', async () => {
+  resetState();
+  greetedFr();
+  state.voiceResult = () => ({ status: 'heard', text: 'Combien ?' });
+  state.assistantResult = () => ({ reply: 'Réponse', handoff: false });
+  state.budget = () => 9000;
+  await withEnv(CONFIGURED, async () => {
+    await POST(signedPost(messagesPayload([voiceMessage('wamid.V9', WA_ID)])));
+    assert.equal(state.assistantCalls[0].timeoutMs, 9000);
+  });
+  resetState();
+  greetedFr();
+  state.voiceResult = () => ({ status: 'heard', text: 'Combien ?' });
+  state.budget = () => null;
+  await withEnv(CONFIGURED, async () => {
+    await POST(signedPost(messagesPayload([voiceMessage('wamid.V10', WA_ID)])));
+    assert.equal(state.assistantCalls.length, 0);
+    assert.deepEqual(state.sent.map((m) => m.body), [COPY.fallback.fr]);
+  });
+});
+
+test('typed text keeps the assistant default deadline', async () => {
+  resetState();
+  greetedFr();
+  state.assistantResult = () => ({ reply: 'ok', handoff: false });
+  await withEnv(CONFIGURED, async () => {
+    await POST(signedPost(messagesPayload([textMessage('wamid.T1', WA_ID, 'Vous livrez ?')])));
+    assert.equal(state.assistantCalls[0].timeoutMs, undefined);
   });
 });

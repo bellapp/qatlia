@@ -14,7 +14,28 @@ import type { InboundEvent } from '@/lib/whatsapp/payload';
 
 /** Voice notes heard per number in 24 hours; more get the "write it" reply. */
 export const MAX_VOICES_PER_DAY = 10;
-export const VOICE_TIMEOUT_MS = 20_000;
+/**
+ * The webhook has 60 s (route maxDuration) for the download, the
+ * transcription, the assistant and the send (up to 20 s with its retry):
+ * 5 + 5 + 15 s to hear, then the assistant gets what is left of
+ * VOICE_ANSWER_BUDGET_MS (assistantBudgetMs).
+ */
+export const VOICE_TIMEOUT_MS = 15_000;
+export const VOICE_MEDIA_TIMEOUT_MS = 5_000;
+const VOICE_ANSWER_BUDGET_MS = 35_000;
+const ASSISTANT_MAX_MS = 15_000;
+const ASSISTANT_MIN_MS = 4_000;
+
+/**
+ * How long the assistant may take once the note is heard, `elapsedMs` after
+ * the message came in; `null` when too little is left, and the webhook sends
+ * its fallback instead of risking a reply cut by the platform.
+ */
+export function assistantBudgetMs(elapsedMs: number): number | null {
+  const left = VOICE_ANSWER_BUDGET_MS - elapsedMs;
+  if (left < ASSISTANT_MIN_MS) return null;
+  return Math.min(ASSISTANT_MAX_MS, left);
+}
 
 const OPENROUTER_URL = 'https://openrouter.ai/api/v1/chat/completions';
 const SITE_URL = 'https://qatlia.ma';
@@ -30,8 +51,8 @@ const AUDIO_FORMATS: Record<string, string> = {
 const TRANSCRIBE_PROMPT = `Transcris mot pour mot ce message vocal WhatsApp. La personne parle darija marocaine, arabe ou français, souvent mélangés.
 - Écris la darija et l'arabe en lettres arabes, le français en lettres latines, comme la personne les dit.
 - Ne réponds pas au message, ne le traduis pas, ne le résume pas, n'ajoute aucun commentaire.
-- S'il n'y a pas de parole compréhensible (silence, bruit, musique), renvoie un texte vide.
-Réponds uniquement avec un objet JSON {"text": "..."}.`;
+- S'il n'y a pas de parole compréhensible (silence, bruit, musique), ne renvoie rien.
+Réponds uniquement avec la transcription, sans introduction ni guillemets.`;
 
 export type TranscribeResult = { status: 'ok'; text: string } | { status: 'empty' } | { status: 'error'; reason: string };
 
@@ -40,7 +61,14 @@ export type HearResult = { status: 'heard'; text: string } | { status: 'unheard'
 /** No Latin or Arabic letter and no digit (silence, "...", an emoji): nothing to answer. */
 const hasWords = (text: string) => /[A-Za-zÀ-ÖØ-öø-ÿ0-9ء-ي٠-٩ٱ-ۓ]/.test(text);
 
-/** The transcript from a JSON object (fenced or not), or the plain text the model gave instead. */
+/** Only labels such as « [musique] » or « (silence) »: no speech. */
+const withoutLabels = (text: string) => text.replace(/\[[^\]]*\]|\([^)]*\)/g, '');
+
+/**
+ * The transcript, asked as plain text: a note cut by the token limit is then
+ * still usable. A JSON object the model may give anyway is read too, even cut
+ * in the middle (its text so far is kept).
+ */
 function readTranscript(content: string): string {
   const cleaned = content
     .trim()
@@ -52,7 +80,13 @@ function readTranscript(content: string): string {
     const parsed = JSON.parse(cleaned) as { text?: unknown };
     return typeof parsed?.text === 'string' ? parsed.text.trim() : '';
   } catch {
-    return '';
+    const cut = /"text"\s*:\s*"((?:[^"\\]|\\.)*)/.exec(cleaned);
+    if (!cut) return '';
+    try {
+      return (JSON.parse(`"${cut[1].replace(/\\$/, '')}"`) as string).trim();
+    } catch {
+      return cut[1].trim();
+    }
   }
 }
 
@@ -88,7 +122,8 @@ export async function transcribeVoice(input: {
             ],
           },
         ],
-        max_tokens: 1000,
+        // Reasoning tokens count against this limit (the photo reader hit it, see read-cut-list.ts).
+        max_tokens: 4000,
         temperature: 0,
       }),
       signal: controller.signal,
@@ -108,8 +143,9 @@ export async function transcribeVoice(input: {
       return { status: 'error', reason: 'unusable' };
     }
 
+    if (choice?.finish_reason === 'length') console.error('[whatsapp] voice: transcription cut (finish_reason=length)');
     const text = readTranscript(content);
-    if (!hasWords(text)) return { status: 'empty' };
+    if (!hasWords(withoutLabels(text))) return { status: 'empty' };
     return { status: 'ok', text: text.slice(0, MAX_INBOUND_CHARS) };
   } catch (error) {
     const name = error instanceof Error ? error.name : 'unknown';
@@ -140,9 +176,16 @@ export async function hearVoice(input: {
   if (!config.openrouterKey) return unheard('no_key');
   if (!event.mediaId) return unheard('no_media');
 
-  if ((await input.countVoices(new Date(input.now.getTime() - DAY_MS))) > MAX_VOICES_PER_DAY) return unheard('daily_cap');
+  let voicesToday = 0;
+  try {
+    voicesToday = await input.countVoices(new Date(input.now.getTime() - DAY_MS));
+  } catch {
+    // Heard anyway: the assistant's daily cap still bounds the cost.
+    console.error('[whatsapp] voice: daily count failed');
+  }
+  if (voicesToday > MAX_VOICES_PER_DAY) return unheard('daily_cap');
 
-  const media = await fetchMediaDataUrl(config, event.mediaId, input.fetchImpl, 'audio');
+  const media = await fetchMediaDataUrl(config, event.mediaId, input.fetchImpl, 'audio', VOICE_MEDIA_TIMEOUT_MS);
   if (!media.ok) return unheard(`media_${media.reason}`, media.status);
   const format = AUDIO_FORMATS[media.mimeType];
   if (!format) return unheard('media_bad_type');

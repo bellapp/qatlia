@@ -39,6 +39,8 @@ export async function fetchMediaDataUrl(
   mediaId: string,
   fetchImpl: typeof fetch = fetch,
   kind: MediaKind = 'image',
+  /** Per Meta request; a voice note asks less, its route also waits for two model calls. */
+  timeoutMs: number = MEDIA_TIMEOUT_MS,
 ): Promise<MediaResult> {
   const { types, maxBytes } = ACCEPTED[kind];
   const headers = { Authorization: `Bearer ${config.accessToken}` };
@@ -47,7 +49,7 @@ export async function fetchMediaDataUrl(
   try {
     lookup = await fetchImpl(`https://graph.facebook.com/${config.graphVersion}/${encodeURIComponent(mediaId)}`, {
       headers,
-      signal: AbortSignal.timeout(MEDIA_TIMEOUT_MS),
+      signal: AbortSignal.timeout(timeoutMs),
     });
   } catch {
     return { ok: false, reason: 'lookup_failed' };
@@ -71,7 +73,7 @@ export async function fetchMediaDataUrl(
 
   let buffer: ArrayBuffer;
   try {
-    const download = await fetchImpl(info.url, { headers, signal: AbortSignal.timeout(MEDIA_TIMEOUT_MS) });
+    const download = await fetchImpl(info.url, { headers, signal: AbortSignal.timeout(timeoutMs) });
     if (!download.ok) return { ok: false, reason: 'download_failed', status: download.status };
     buffer = await download.arrayBuffer();
   } catch {
