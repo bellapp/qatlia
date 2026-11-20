@@ -1,5 +1,5 @@
 /**
- * Sends a text message, or a text with reply buttons, through the Meta Graph
+ * Sends a text message, a text with reply buttons, or an image, through the Meta Graph
  * API or through YCloud.
  *
  * YCloud is used when it is configured: the bot number was onboarded with it,
@@ -23,7 +23,7 @@ const SEND_TIMEOUT_MS = 10000;
 export const SEND_RETRY_DELAY_MS = 500;
 const YCLOUD_SEND_URL = 'https://api.ycloud.com/v2/whatsapp/messages/sendDirectly';
 
-type Message = { body: string; buttons?: readonly MenuButton[] };
+type Message = { body: string; buttons?: readonly MenuButton[] } | { image: { link: string; caption: string } };
 
 /** One attempt: the message id, or whether trying again is safe. */
 type Attempt = { id: string } | { id: null; retry: boolean };
@@ -41,6 +41,8 @@ function retryableStatus(status: number): boolean {
 
 /** The type-specific part of a send request. Both APIs share the interactive shape; only the link preview flag differs. */
 function content(message: Message, previewKey: 'preview_url' | 'previewUrl'): Record<string, unknown> {
+  // An image by link: both APIs take the same shape.
+  if ('image' in message) return { type: 'image', image: { link: message.image.link, caption: message.image.caption } };
   if (!message.buttons) return { type: 'text', text: { body: message.body, [previewKey]: true } };
   return {
     type: 'interactive',
@@ -177,4 +179,15 @@ export async function sendButtons(
   fetchImpl: typeof fetch = fetch,
 ): Promise<string | null> {
   return send(config, to, { body, buttons }, fetchImpl);
+}
+
+/** Sends the image at the public `link` with its caption. Returns the message id, or `null` on any failure. */
+export async function sendImage(
+  config: WhatsAppConfig,
+  to: string,
+  link: string,
+  caption: string,
+  fetchImpl: typeof fetch = fetch,
+): Promise<string | null> {
+  return send(config, to, { image: { link, caption } }, fetchImpl);
 }
