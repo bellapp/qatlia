@@ -384,10 +384,10 @@ test('an ad message from a greeted contact gets the menu again, unless it is the
   );
 });
 
-test('the bot links are tagged for WhatsApp, and the darija texts open the Arabic site', () => {
+test('the bot links are short WhatsApp links (tagged by their redirect), and the darija texts open the Arabic site', () => {
   const { SITE_LINKS, ATELIER_LINK } = load('src/lib/whatsapp/copy.ts');
-  assert.equal(SITE_LINKS.fr, 'https://qatlia.ma/?utm_source=whatsapp');
-  assert.equal(SITE_LINKS.ar, 'https://qatlia.ma/ar?utm_source=whatsapp');
+  assert.equal(SITE_LINKS.fr, 'https://qatlia.ma/wa');
+  assert.equal(SITE_LINKS.ar, 'https://qatlia.ma/wa/ar');
   assert.ok(COPY.greeting.includes(SITE_LINKS.fr) && COPY.greeting.includes(SITE_LINKS.ar));
   assert.ok(COPY.pricing.ar.includes(SITE_LINKS.ar));
   assert.ok(COPY.howItWorks.ar.includes(SITE_LINKS.ar));

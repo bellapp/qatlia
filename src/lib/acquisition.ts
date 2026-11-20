@@ -91,6 +91,46 @@ export function rememberAcquisition(storage: StorageLike, search: string, now: n
   }
 }
 
+/**
+ * The URL to show once a visit is recorded: the same page without its utm
+ * tags (other parameters and the hash kept), or null when it has none.
+ */
+export function withoutTracking(pathname: string, search: string, hash: string): string | null {
+  const params = new URLSearchParams(search);
+  const tracked = Object.keys(TAGS).filter((param) => params.has(param));
+  if (tracked.length === 0) return null;
+  for (const param of tracked) params.delete(param);
+  const rest = params.toString();
+  return `${pathname}${rest ? `?${rest}` : ''}${hash}`;
+}
+
+/**
+ * Records a visit's tags (first touch wins) and hands the cookie copy of the
+ * remembered visit, which reaches /auth/callback for a Google sign-up.
+ */
+export function recordVisit(
+  storage: StorageLike,
+  search: string,
+  now: number,
+  secure: boolean,
+  setCookie: (cookie: string) => void,
+): void {
+  rememberAcquisition(storage, search, now);
+  const visit = loadAcquisition(storage, now);
+  if (visit) setCookie(acquisitionCookie(visit, now, secure));
+}
+
+/** recordVisit for the current browser; a blocked storage leaves the visit untracked. */
+export function recordBrowserVisit(search: string): void {
+  try {
+    recordVisit(window.localStorage, search, Date.now(), window.location.protocol === 'https:', (cookie) => {
+      document.cookie = cookie;
+    });
+  } catch {
+    // localStorage blocked: the visit goes untracked.
+  }
+}
+
 /** The user_metadata fields to add at sign-up: empty when no tagged visit is remembered. */
 export function signupMetadata(storage: StorageLike, now: number): Acquisition['tags'] {
   return loadAcquisition(storage, now)?.tags ?? {};

@@ -17,8 +17,14 @@ import type { DisplayUnit } from '@/lib/units';
 /** Lines of the cut list repeated in the reply; the rest is counted. */
 const SHOWN_LINES = 5;
 
+/**
+ * The provenance of a visitor who opens a photo link: the page records it
+ * itself (OpenInAtelier), so the link carries no tag the prospect would read.
+ */
+export const PHOTO_LINK_TRACKING = '?utm_source=whatsapp&utm_medium=bot&utm_campaign=photo';
+
 export function photoLink(code: string): string {
-  return `https://qatlia.ma/w/${code}?utm_source=whatsapp&utm_medium=bot&utm_campaign=photo`;
+  return `https://qatlia.ma/w/${code}`;
 }
 
 /** The panel a summary is computed on: the one stated on the sheet, or the atelier's default. */

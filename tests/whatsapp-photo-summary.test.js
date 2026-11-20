@@ -10,9 +10,9 @@ const { summarizeCutList, photoLink, photoResultText, plausiblePanel, usablePiec
 const { PHOTO_COPY, ATELIER_LINK } = loadTsModule('src/lib/whatsapp/copy.ts');
 
 const piece = (height, width, quantity = 1, name = '') => ({ name, height, width, quantity });
-const LINK = 'https://qatlia.ma/w/k7m2qx9dab?utm_source=whatsapp&utm_medium=bot&utm_campaign=photo';
+const LINK = 'https://qatlia.ma/w/k7m2qx9dab';
 
-test('the link carries the code and the photo campaign', () => {
+test('the link carries the code only (the page records the photo campaign itself)', () => {
   assert.equal(photoLink('k7m2qx9dab'), LINK);
 });
 
