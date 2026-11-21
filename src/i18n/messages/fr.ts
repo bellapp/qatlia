@@ -687,6 +687,8 @@ export const fr = {
     perk: 'Historique cloud + {count} crédits Vision à l’inscription',
     google: 'Continuer avec Google',
     googleRedirect: 'Redirection Google…',
+    googleHint: 'En un clic, sans mot de passe ni e-mail à confirmer.',
+    useEmail: 'Utiliser mon adresse e-mail',
     googleError: 'Erreur lors de la connexion Google',
     genericError: 'Une erreur est survenue',
     /**

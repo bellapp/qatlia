@@ -628,6 +628,8 @@ export const ar: Catalog = {
     perk: 'سجل سحابي + {count} أرصدة Vision عند التسجيل',
     google: 'المتابعة بحساب Google',
     googleRedirect: 'إعادة التوجيه إلى Google…',
+    googleHint: 'بنقرة واحدة، بلا كلمة مرور وبلا تأكيد البريد الإلكتروني.',
+    useEmail: 'استعمال بريدي الإلكتروني',
     googleError: 'فشل تسجيل الدخول عبر Google',
     genericError: 'حدث خطأ ما',
     errors: {

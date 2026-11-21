@@ -627,6 +627,8 @@ export const en: Catalog = {
     perk: 'Cloud history + {count} Vision credits on sign-up',
     google: 'Continue with Google',
     googleRedirect: 'Redirecting to Google…',
+    googleHint: 'One tap, no password, no email to confirm.',
+    useEmail: 'Use my email address',
     googleError: 'Google sign-in failed',
     genericError: 'Something went wrong',
     errors: {
