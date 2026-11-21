@@ -138,6 +138,14 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   const { t } = useLocale();
   const keys = PURPOSE_KEYS[purpose];
   const [isLogin, setIsLogin] = useState(initialMode === 'login');
+  /**
+   * Signing up with Google needs no password and no email to confirm, so it is
+   * the way in: the email form stays folded until asked for. Most email
+   * sign-ups never came back from the confirmation email (owner, 21/11/2026).
+   * Signing in shows the form, for the accounts made with an email.
+   */
+  const [emailOpen, setEmailOpen] = useState(false);
+  const showEmailForm = isLogin || emailOpen;
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -299,17 +307,31 @@ export const AuthModal: React.FC<AuthModalProps> = ({
           type="button"
           onClick={handleOAuthGoogle}
           disabled={oauthLoading || loading}
-          className="w-full py-3 px-4 rounded-xl bg-white dark:bg-studio-field hover:bg-slate-100 dark:hover:bg-studio-border dark:hover:bg-studio-border text-slate-900 dark:text-white font-semibold text-sm flex items-center justify-center gap-3 disabled:opacity-50"
+          className="w-full py-3.5 px-4 rounded-xl bg-white dark:bg-studio-field hover:bg-slate-100 dark:hover:bg-studio-border border-2 border-brand-400 shadow-sm text-slate-900 dark:text-white font-black text-base flex items-center justify-center gap-3 disabled:opacity-50"
         >
           <GoogleMark />
           {oauthLoading ? t('auth.googleRedirect') : t('auth.google')}
         </button>
+        {!isLogin && <p className="-mt-3 text-center text-xs text-slate-600 dark:text-slate-400">{t('auth.googleHint')}</p>}
 
+        {!showEmailForm && (
+          <button
+            type="button"
+            onClick={() => setEmailOpen(true)}
+            className="w-full text-center text-sm text-slate-600 dark:text-slate-400 underline underline-offset-4"
+          >
+            {t('auth.useEmail')}
+          </button>
+        )}
+
+        {showEmailForm && (
         <div className="relative flex items-center">
           <div className="border-t border-studio-border w-full" />
           <span className="px-3 text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 bg-studio-panel">{t('auth.orEmail')}</span>
         </div>
+        )}
 
+        {showEmailForm && (
         <form onSubmit={handleAuth} className="space-y-3">
           {!isLogin && (
             <div className="relative">
@@ -387,6 +409,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
             <ArrowRight className="w-4 h-4 rtl:-scale-x-100" aria-hidden="true" />
           </button>
         </form>
+        )}
 
         <button
           type="button"
