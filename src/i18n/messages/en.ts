@@ -238,6 +238,8 @@ export const en: Catalog = {
       visionUnavailable: 'Photo analysis is temporarily unavailable. Try again in a moment.',
       creditLedgerUnavailable: 'The credit ledger is unavailable. Try again in a moment.',
       insufficientCredits: 'Your credit balance is empty. Top up your account to analyze another photo.',
+      // Inside the Play Store app, which sells nothing.
+      insufficientCreditsApp: 'Your credit balance is empty.',
       aiRateLimit: 'The service is temporarily saturated. Please try again in a moment.',
       aiServiceError: 'Analysis error. Please try again with a sharper photo.',
       aiParseError: 'No readable measurement was detected. Check that the photo is sharp and well framed.',
@@ -880,6 +882,8 @@ export const en: Catalog = {
     passwordUpdated: 'Password updated.',
     currencyTitle: 'Currency',
     currencyHint: 'Your packs, costings, quotes and PDFs use this currency. It was chosen from your country; you can change it. Prices you have saved are not converted.',
+    // Inside the Play Store app, which sells nothing.
+    currencyHintApp: 'Your costings, quotes and PDFs use this currency. It was chosen from your country; you can change it. Prices you have saved are not converted.',
     errors: {
       tooShort: '{min} characters minimum.',
       mismatch: 'The passwords do not match.',

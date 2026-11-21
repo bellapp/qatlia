@@ -279,6 +279,8 @@ export const fr = {
       visionUnavailable: 'L’analyse photo est momentanément indisponible. Réessayez dans un instant.',
       creditLedgerUnavailable: 'Le décompte des crédits est indisponible. Réessayez dans un instant.',
       insufficientCredits: 'Votre solde de crédits est épuisé. Rechargez votre compte pour analyser une nouvelle photo.',
+      // Inside the Play Store app, which sells nothing.
+      insufficientCreditsApp: 'Votre solde de crédits est épuisé.',
       aiRateLimit: 'Service temporairement saturé. Veuillez réessayer dans un instant.',
       aiServiceError: 'Erreur d’analyse. Veuillez réessayer avec une photo plus nette.',
       aiParseError: 'Aucune mesure lisible n’a été détectée. Vérifiez que la photo est nette et bien cadrée.',
@@ -969,6 +971,8 @@ export const fr = {
     passwordUpdated: 'Mot de passe mis à jour.',
     currencyTitle: 'Devise',
     currencyHint: 'Vos packs, chiffrages, devis et PDF sont dans cette devise. Elle a été choisie selon votre pays ; vous pouvez la changer. Les prix que vous avez enregistrés ne sont pas convertis.',
+    // Inside the Play Store app, which sells nothing.
+    currencyHintApp: 'Vos chiffrages, devis et PDF sont dans cette devise. Elle a été choisie selon votre pays ; vous pouvez la changer. Les prix que vous avez enregistrés ne sont pas convertis.',
     errors: {
       tooShort: '{min} caractères minimum.',
       mismatch: 'Les mots de passe ne correspondent pas.',

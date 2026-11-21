@@ -9,6 +9,7 @@ import { forgetAtelierDraft } from '@/lib/atelier-draft';
 import { ArrowLeft, ArrowRight, Coins, KeyRound, LogOut, Receipt, Shield, Zap } from 'lucide-react';
 import { AccountMenu } from '@/components/AccountMenu';
 import { useStoreApp } from '@/components/useStoreApp';
+import { storeAppCopyKey } from '@/lib/store-app';
 import { QatlIALogo } from '@/components/QatlIALogo';
 import { LocaleSwitcher, useLocale } from '@/components/LocaleProvider';
 import { CurrencySwitcher } from '@/components/CurrencySwitcher';
@@ -197,7 +198,7 @@ export default function AccountPage() {
             </div>
             <CurrencySwitcher />
           </div>
-          <p className="text-xs text-slate-600 dark:text-slate-400">{t('accountPage.currencyHint')}</p>
+          <p className="text-xs text-slate-600 dark:text-slate-400">{t(storeAppCopyKey('accountPage.currencyHint', inApp))}</p>
         </section>
 
         <section id="password"className="p-5 rounded-2xl bg-studio-panel/70 border border-studio-border space-y-4">

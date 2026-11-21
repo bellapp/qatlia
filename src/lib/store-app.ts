@@ -13,6 +13,8 @@
  * component, a layout and a plain Node test.
  */
 
+import type { TranslationKey } from '@/i18n';
+
 /** The Android application id, as Google Play knows it. */
 export const STORE_APP_PACKAGE = 'com.qatlia.app';
 
@@ -71,3 +73,18 @@ var on=s===v||new URLSearchParams(window.location.search).get(${JSON.stringify(S
 )};if(!on)return;try{window.sessionStorage.setItem(k,v);}catch(e){}
 var d=document.documentElement;d.setAttribute('data-app',v);
 var p=window.location.pathname.replace(/\\/+$/,'')||'/';if(Object.prototype.hasOwnProperty.call(r,p)){d.setAttribute('data-app-leaving','');window.location.replace(r[p]);}}catch(e){}})();`;
+
+/**
+ * Messages whose site wording invites the reader to pay, and the wording the
+ * app shows instead: the vision error says the balance is empty without
+ * « Rechargez votre compte », the currency hint leaves out the packs.
+ */
+const STORE_APP_COPY: Partial<Record<TranslationKey, TranslationKey>> = {
+  'atelier.visionError.insufficientCredits': 'atelier.visionError.insufficientCreditsApp',
+  'accountPage.currencyHint': 'accountPage.currencyHintApp',
+};
+
+/** The key to show: the app's wording inside the app, the site's otherwise. */
+export function storeAppCopyKey(key: TranslationKey, inApp: boolean): TranslationKey {
+  return (inApp && STORE_APP_COPY[key]) || key;
+}

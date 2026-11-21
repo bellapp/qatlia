@@ -79,6 +79,7 @@ import { ScanViewer, useScanViewer } from '@/components/ScanViewer';
 import { EmptyState } from '@/components/EmptyState';
 import { AccountMenu } from '@/components/AccountMenu';
 import { useStoreApp } from '@/components/useStoreApp';
+import { storeAppCopyKey } from '@/lib/store-app';
 import { WorkspaceNav } from '@/components/WorkspaceNav';
 import { QatlIALogo } from '@/components/QatlIALogo';
 import { ThemeToggle } from '@/components/ThemeToggle';
@@ -2027,7 +2028,7 @@ const commitPanelName = () => {
             {visionError && (
               <div role="alert" className="flex items-center gap-3 p-3 rounded-xl bg-rose-500/10 border border-rose-500/20">
                 <AlertTriangle className="w-4 h-4 text-rose-400 shrink-0" />
-                <span className="text-xs text-rose-300 font-medium">{t(visionError, { max: MAX_SCAN_SHEETS })}</span>
+                <span className="text-xs text-rose-300 font-medium">{t(storeAppCopyKey(visionError, inApp), { max: MAX_SCAN_SHEETS })}</span>
               </div>
             )}
 

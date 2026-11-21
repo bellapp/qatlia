@@ -71,3 +71,34 @@ test('support, the balance history and the free credits stay', () => {
   assert.ok(support > 0 && !/data-sells/.test(tagAround(menu, support)));
   assert.equal(/data-sells/.test(tagAround(menu, menu.indexOf('href="/account#credits"'))), false);
 });
+
+const { loadTsModule } = require('./helpers/load-ts-module');
+
+test('in the app, two messages lose their invitation to pay, in every locale', () => {
+  const { storeAppCopyKey } = loadTsModule(path.join(ROOT, 'src/lib/store-app.ts'));
+  assert.equal(storeAppCopyKey('atelier.visionError.insufficientCredits', true), 'atelier.visionError.insufficientCreditsApp');
+  assert.equal(storeAppCopyKey('accountPage.currencyHint', true), 'accountPage.currencyHintApp');
+  assert.equal(storeAppCopyKey('atelier.visionError.insufficientCredits', false), 'atelier.visionError.insufficientCredits');
+  assert.equal(storeAppCopyKey('atelier.visionError.network', true), 'atelier.visionError.network');
+
+  const load = (locale) => loadTsModule(path.join(ROOT, `src/i18n/messages/${locale}.ts`))[locale];
+  const [fr, en, ar] = ['fr', 'en', 'ar'].map(load);
+  assert.equal(fr.atelier.visionError.insufficientCreditsApp, 'Votre solde de crédits est épuisé.');
+  assert.equal(en.atelier.visionError.insufficientCreditsApp, 'Your credit balance is empty.');
+  assert.equal(ar.atelier.visionError.insufficientCreditsApp, 'نفد رصيدك.');
+  assert.equal(
+    fr.accountPage.currencyHintApp,
+    'Vos chiffrages, devis et PDF sont dans cette devise. Elle a été choisie selon votre pays ; vous pouvez la changer. Les prix que vous avez enregistrés ne sont pas convertis.'
+  );
+  assert.equal(
+    en.accountPage.currencyHintApp,
+    'Your costings, quotes and PDFs use this currency. It was chosen from your country; you can change it. Prices you have saved are not converted.'
+  );
+  assert.equal(
+    ar.accountPage.currencyHintApp,
+    'تقديراتك وعروض الأسعار وملفات PDF بهذه العملة. اختيرت حسب بلدك، ويمكنك تغييرها. الأسعار التي حفظتها لا تُحوَّل.'
+  );
+
+  assert.match(read('src/app/(site)/atelier/page.tsx'), /t\(storeAppCopyKey\(visionError, inApp\), \{ max: MAX_SCAN_SHEETS \}\)/);
+  assert.match(read('src/app/(site)/account/page.tsx'), /t\(storeAppCopyKey\('accountPage\.currencyHint', inApp\)\)/);
+});
