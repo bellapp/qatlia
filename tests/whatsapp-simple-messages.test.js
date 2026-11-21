@@ -9,7 +9,7 @@ const { loadTsModule } = require('./helpers/load-ts-module');
 // simplest one: send the photo of the cut list right here.
 
 const load = (rel) => loadTsModule(path.resolve(__dirname, '..', rel));
-const { COPY, PHOTO_COPY, DEMO_VIDEO_URL, SITE_LINKS } = load('src/lib/whatsapp/copy.ts');
+const { COPY, PHOTO_COPY, DEMO_VIDEO_URLS, SITE_LINKS } = load('src/lib/whatsapp/copy.ts');
 const { buildSystemPrompt } = load('src/lib/whatsapp/assistant.ts');
 const { CREDIT_PACKS } = load('src/lib/billing/catalog.ts');
 const { SIGNUP_FREE_CREDITS, VISION_CREDIT_COST } = load('src/lib/billing/policy.ts');
@@ -40,8 +40,9 @@ test('the short fixed replies fit in a few lines', () => {
 test('"how it works" is the photo sent here, then the demo: no account steps, no site link', () => {
   assert.match(lines(COPY.howItWorks.fr)[1], /📸 .*envoyez-la-moi ici/);
   assert.match(lines(COPY.howItWorks.ar)[1], /📸 .*صيفطها ليا هنا/);
-  for (const text of [COPY.howItWorks.fr, COPY.howItWorks.ar]) {
-    assert.deepEqual(text.match(/https?:\/\/\S+/g), [DEMO_VIDEO_URL]);
+  // The darija reader gets the darija explanation, the French reader the French demo.
+  for (const lang of ['fr', 'ar']) {
+    assert.deepEqual(COPY.howItWorks[lang].match(/https?:\/\/\S+/g), [DEMO_VIDEO_URLS[lang]]);
   }
 });
 

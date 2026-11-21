@@ -6,7 +6,7 @@ const { loadTsModule } = require('./helpers/load-ts-module');
 const PROJECT_ROOT = path.resolve(__dirname, '..');
 const load = (rel) => loadTsModule(path.join(PROJECT_ROOT, rel));
 
-const { COPY, DEMO_VIDEO_URL, MENU_BUTTONS, MENU_BUTTON_TITLE_MAX, greeting, exampleCaption } = load('src/lib/whatsapp/copy.ts');
+const { COPY, DEMO_VIDEO_URLS, MENU_BUTTONS, MENU_BUTTON_TITLE_MAX, greeting, exampleCaption } = load('src/lib/whatsapp/copy.ts');
 const { detectLang, menuChoice, decide, HANDOFF_HOURS, MAX_ASSISTANT_REPLIES_PER_DAY } = load(
   'src/lib/whatsapp/router.ts',
 );
@@ -46,7 +46,10 @@ const run = ({ event = {}, contact: c = {}, assistantRepliesLast24h = 0, handoff
 test('constants', () => {
   assert.equal(HANDOFF_HOURS, 24);
   assert.equal(MAX_ASSISTANT_REPLIES_PER_DAY, 20);
-  assert.equal(DEMO_VIDEO_URL, 'https://youtu.be/dQE_PzXUAR0');
+  assert.deepEqual(DEMO_VIDEO_URLS, {
+    fr: 'https://youtu.be/dQE_PzXUAR0',
+    ar: 'https://youtube.com/shorts/rAjcW-1Wylk',
+  });
 });
 
 test('new contact gets the greeting and is marked greeted', () => {
@@ -107,9 +110,9 @@ test('spelled menu choices route to the right fixed reply', () => {
 test('the demo video link comes before the site link', () => {
   // The greeting carries the demo as its only link (whatsapp-greeting.test.js).
   // "How it works" now carries the demo as its only link (whatsapp-simple-messages.test.js).
-  for (const text of [COPY.howItWorks.fr, COPY.howItWorks.ar]) {
-    assert.ok(text.indexOf(DEMO_VIDEO_URL) !== -1);
-    assert.ok(!text.includes('https://qatlia.ma'));
+  for (const lang of ['fr', 'ar']) {
+    assert.ok(COPY.howItWorks[lang].indexOf(DEMO_VIDEO_URLS[lang]) !== -1);
+    assert.ok(!COPY.howItWorks[lang].includes('https://qatlia.ma'));
   }
 });
 
