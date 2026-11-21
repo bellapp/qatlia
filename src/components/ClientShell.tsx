@@ -3,6 +3,7 @@
 import React, { useEffect } from 'react';
 import { ThemeProvider } from '@/components/ThemeProvider';
 import { PwaShell } from '@/components/PwaShell';
+import { StoreAppGuard } from '@/components/StoreAppGuard';
 import { LocaleProvider } from '@/components/LocaleProvider';
 import { recordBrowserVisit, withoutTracking } from '@/lib/acquisition';
 import type { Locale } from '@/i18n';
@@ -31,7 +32,9 @@ export function ClientShell({ children, pinnedLocale }: { children: React.ReactN
   return (
     <LocaleProvider pinnedLocale={pinnedLocale}>
       <ThemeProvider>
-        <PwaShell>{children}</PwaShell>
+        <PwaShell>
+          <StoreAppGuard>{children}</StoreAppGuard>
+        </PwaShell>
       </ThemeProvider>
     </LocaleProvider>
   );

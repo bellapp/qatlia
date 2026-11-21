@@ -239,6 +239,8 @@ export const ar: Catalog = {
       visionUnavailable: 'تحليل الصور غير متاح مؤقتاً. أعد المحاولة بعد قليل.',
       creditLedgerUnavailable: 'حساب الأرصدة غير متاح حالياً. أعد المحاولة بعد قليل.',
       insufficientCredits: 'نفد رصيدك. اشحن حسابك لتحليل صورة جديدة.',
+      // Inside the Play Store app, which sells nothing.
+      insufficientCreditsApp: 'نفد رصيدك.',
       aiRateLimit: 'الخدمة مزدحمة مؤقتاً. أعد المحاولة بعد قليل.',
       aiServiceError: 'خطأ في التحليل. أعد المحاولة بصورة أوضح.',
       aiParseError: 'لم يتم التعرّف على أي قياس مقروء. تأكد من وضوح الصورة وحسن تأطيرها.',
@@ -880,6 +882,8 @@ export const ar: Catalog = {
     passwordUpdated: 'تم تحديث كلمة المرور.',
     currencyTitle: 'العملة',
     currencyHint: 'باقاتك وتقديراتك وعروض الأسعار وملفات PDF بهذه العملة. اختيرت حسب بلدك، ويمكنك تغييرها. الأسعار التي حفظتها لا تُحوَّل.',
+    // Inside the Play Store app, which sells nothing.
+    currencyHintApp: 'تقديراتك وعروض الأسعار وملفات PDF بهذه العملة. اختيرت حسب بلدك، ويمكنك تغييرها. الأسعار التي حفظتها لا تُحوَّل.',
     errors: {
       tooShort: '{min} أحرف على الأقل.',
       mismatch: 'كلمتا المرور غير متطابقتين.',
