@@ -14,7 +14,10 @@ export const dynamic = 'force-dynamic';
  */
 export function generateMetadata({ params }: { params: { code: string } }): Metadata {
   if (!isPhotoCode(params.code)) return {};
-  return { openGraph: { images: [{ url: planImageUrl(params.code) }] } };
+  // A page openGraph replaces the layout's whole: title and description are restated.
+  const title = 'QatliA · مخطط التقطيع · Plan de coupe';
+  const description = 'مخطط التقطيع ديال الورقة اللي صيفطتي · Le plan de coupe de votre fiche de débit';
+  return { openGraph: { title, description, siteName: 'QatliA', images: [{ url: planImageUrl(params.code) }] } };
 }
 
 /**

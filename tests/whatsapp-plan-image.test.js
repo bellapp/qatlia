@@ -63,6 +63,20 @@ test('the layout carries no measure: only boxes, the panel count and the brand',
   assert.equal(layout.badge, `1 / ${layout.sheetCount}`);
 });
 
+test('the picture is tried only while the webhook has time left for the text answer', () => {
+  const { pictureCheckMs, PICTURE_DEADLINE_MS } = load('src/lib/whatsapp/plan-image.ts');
+  assert.equal(PICTURE_DEADLINE_MS, 45000);
+  assert.equal(pictureCheckMs(0), 8000);
+  assert.equal(pictureCheckMs(30000), 8000);
+  assert.equal(pictureCheckMs(40000), 5000);
+  assert.equal(pictureCheckMs(43500), null, 'under 2 s left: text');
+  assert.equal(pictureCheckMs(60000), null);
+  assert.equal(pictureCheckMs(Number.NaN), null);
+  const route = fs.readFileSync(path.join(ROOT, 'src/app/api/whatsapp/webhook/route.ts'), 'utf8');
+  assert.match(route, /pictureCheckMs\(Date\.now\(\) - startedAt\.getTime\(\)\)/);
+  assert.match(route, /deliverPicture\(db, config, waId, link, caption, kind, now\)/);
+});
+
 test('no panel, no layout', () => {
   assert.equal(planImageLayout({ sheetsUsed: 0, sheets: [] }), null);
 });

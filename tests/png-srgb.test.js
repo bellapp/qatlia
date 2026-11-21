@@ -1,6 +1,8 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const zlib = require('node:zlib');
+const fs = require('node:fs');
+const path = require('node:path');
 const { loadTsModule } = require('./helpers/load-ts-module');
 
 // YCloud refuses an image without an embedded color profile ("An embedded
@@ -56,30 +58,25 @@ test('crc32 is the PNG checksum', () => {
   assert.equal(crc32(Buffer.from('123456789', 'latin1')), 0xcbf43926);
 });
 
-test('the sRGB profile is a well-formed ICC v2 display profile', () => {
+/** The ICC profile inside the example cut list, whose sends YCloud delivers (21 of 21 on 21/11/2026). */
+function exampleProfile() {
+  const jpeg = fs.readFileSync(path.join(__dirname, '..', 'public/whatsapp/exemple-fiche.jpg'));
+  for (let at = 2; jpeg[at] === 0xff && jpeg[at + 1] !== 0xda; at += 2 + jpeg.readUInt16BE(at + 2)) {
+    if (jpeg[at + 1] === 0xe2 && jpeg.toString('latin1', at + 4, at + 16) === 'ICC_PROFILE\0') {
+      return jpeg.subarray(at + 18, at + 2 + jpeg.readUInt16BE(at + 2));
+    }
+  }
+  return null;
+}
+
+test('the sRGB profile is the one the delivered example image carries', () => {
   const icc = srgbIccProfile();
   assert.equal(u32(icc, 0), icc.length, 'size field');
-  assert.equal(u32(icc, 8), 0x02100000, 'version 2.1');
   assert.equal(ascii(icc, 12), 'mntr');
   assert.equal(ascii(icc, 16), 'RGB ');
-  assert.equal(ascii(icc, 20), 'XYZ ');
   assert.equal(ascii(icc, 36), 'acsp');
-  const count = u32(icc, 128);
-  const tags = [];
-  for (let i = 0; i < count; i++) {
-    const at = 132 + i * 12;
-    tags.push({ sig: ascii(icc, at), offset: u32(icc, at + 4), size: u32(icc, at + 8) });
-  }
-  assert.deepEqual(tags.map((t) => t.sig).sort(), ['bTRC', 'bXYZ', 'cprt', 'desc', 'gTRC', 'gXYZ', 'rTRC', 'rXYZ', 'wtpt']);
-  for (const t of tags) {
-    assert.equal(t.offset % 4, 0, `${t.sig} is 4-byte aligned`);
-    assert.ok(t.offset + t.size <= icc.length, `${t.sig} lies inside the profile`);
-  }
-  const type = (sig) => ascii(icc, tags.find((t) => t.sig === sig).offset);
-  assert.equal(type('desc'), 'desc');
-  assert.equal(type('rXYZ'), 'XYZ ');
-  assert.equal(type('rTRC'), 'curv');
   assert.match(Buffer.from(icc).toString('latin1'), /sRGB/);
+  assert.deepEqual(new Uint8Array(icc), new Uint8Array(exampleProfile()));
 });
 
 test('withSrgbProfile puts the profile right after IHDR and leaves the image as is', () => {

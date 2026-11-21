@@ -48,6 +48,22 @@ export interface PlanImageLayout {
   badge: string;
 }
 
+/**
+ * The webhook may run 60 s. Reading a photo can take ~50 s (two media requests
+ * of 10 s, 30 s for the reader); past PICTURE_DEADLINE_MS the picture is not
+ * tried, so the text answer still has time to go out.
+ */
+export const PICTURE_DEADLINE_MS = 45_000;
+const PICTURE_CHECK_MS = 8_000;
+const PICTURE_CHECK_MIN_MS = 2_000;
+
+/** How long the webhook may spend fetching the picture `elapsedMs` into the message; null: send the text. */
+export function pictureCheckMs(elapsedMs: number): number | null {
+  const left = PICTURE_DEADLINE_MS - elapsedMs;
+  if (!(left >= PICTURE_CHECK_MIN_MS)) return null;
+  return Math.min(PICTURE_CHECK_MS, left);
+}
+
 export function planImageUrl(code: string): string {
   return `https://qatlia.ma/w/${code}/plan.png`;
 }

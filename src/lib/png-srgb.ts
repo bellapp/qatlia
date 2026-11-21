@@ -3,13 +3,14 @@
  *
  * YCloud refuses an image message without an embedded color profile ("An
  * embedded color profile is required", docs.ycloud.com, image messages). The
- * plan image (src/app/(site)/w/[code]/plan.png) is rendered without one, so a
- * small ICC v2 sRGB profile is built here and inserted as an iCCP chunk.
+ * plan image (src/app/(site)/w/[code]/plan.png) is rendered without one, so the
+ * sRGB profile of the example cut list, which YCloud delivers, goes in as an iCCP chunk.
  *
  * Server-only (node:zlib). Pure otherwise.
  */
 
 import { deflateSync } from 'node:zlib';
+import { SRGB_ICC_BASE64 } from '@/lib/srgb-icc';
 
 const PNG_SIGNATURE = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a];
 
@@ -32,9 +33,6 @@ export function crc32(bytes: Uint8Array): number {
 
 class Writer {
   private bytes: number[] = [];
-  get length(): number {
-    return this.bytes.length;
-  }
   u8(value: number): this {
     this.bytes.push(value & 0xff);
     return this;
@@ -49,89 +47,16 @@ class Writer {
     for (const char of text) this.u8(char.charCodeAt(0));
     return this;
   }
-  zeros(count: number): this {
-    for (let i = 0; i < count; i++) this.u8(0);
-    return this;
-  }
-  /** Pads with zeros to a multiple of 4, as ICC tag data must start aligned. */
-  align(): this {
-    while (this.bytes.length % 4 !== 0) this.u8(0);
-    return this;
-  }
-  raw(other: Writer): this {
-    this.bytes.push(...other.bytes);
-    return this;
-  }
   done(): Uint8Array {
     return Uint8Array.from(this.bytes);
   }
 }
 
-/** ICC s15Fixed16Number. */
-const s15 = (value: number) => Math.round(value * 65536) >>> 0;
-
-const xyz = (x: number, y: number, z: number) => new Writer().ascii('XYZ ').zeros(4).u32(s15(x)).u32(s15(y)).u32(s15(z));
-
 let profile: Uint8Array | null = null;
 
-/**
- * A minimal ICC v2 sRGB display profile: the sRGB primaries adapted to D50
- * (as in the reference sRGB profiles) and a 2.2 gamma curve, close enough to
- * the sRGB curve for a drawing of flat colors.
- */
+/** The sRGB profile the example cut list already carries (src/lib/srgb-icc.ts). */
 export function srgbIccProfile(): Uint8Array {
-  if (profile) return profile;
-
-  const description = 'sRGB';
-  const desc = new Writer()
-    .ascii('desc')
-    .zeros(4)
-    .u32(description.length + 1)
-    .ascii(description)
-    .u8(0)
-    .zeros(4 + 4) // Unicode language code and count
-    .zeros(2 + 1 + 67); // ScriptCode code, count and the fixed 67 bytes
-  const cprt = new Writer().ascii('text').zeros(4).ascii('No copyright, use freely').u8(0);
-  const trc = new Writer().ascii('curv').zeros(4).u32(1).u16(Math.round(2.2 * 256));
-
-  const blocks: Array<{ sigs: string[]; data: Writer }> = [
-    { sigs: ['desc'], data: desc },
-    { sigs: ['cprt'], data: cprt },
-    { sigs: ['wtpt'], data: xyz(0.9642, 1, 0.8249) },
-    { sigs: ['rXYZ'], data: xyz(0.4360747, 0.2225045, 0.0139322) },
-    { sigs: ['gXYZ'], data: xyz(0.3850649, 0.7168786, 0.0971045) },
-    { sigs: ['bXYZ'], data: xyz(0.1430804, 0.0606169, 0.7141733) },
-    // One curve shared by the three channels.
-    { sigs: ['rTRC', 'gTRC', 'bTRC'], data: trc },
-  ];
-  const tagCount = blocks.reduce((sum, block) => sum + block.sigs.length, 0);
-
-  const table = new Writer().u32(tagCount);
-  const data = new Writer();
-  let offset = 128 + 4 + tagCount * 12;
-  for (const block of blocks) {
-    for (const sig of block.sigs) table.ascii(sig).u32(offset).u32(block.data.length);
-    data.raw(block.data).align();
-    offset = 128 + 4 + tagCount * 12 + data.length;
-  }
-
-  const size = 128 + table.length + data.length;
-  const header = new Writer()
-    .u32(size)
-    .zeros(4) // preferred CMM
-    .u32(0x02100000) // version 2.1
-    .ascii('mntr')
-    .ascii('RGB ')
-    .ascii('XYZ ')
-    .u16(2026).u16(1).u16(1).u16(0).u16(0).u16(0)
-    .ascii('acsp')
-    .zeros(4 + 4 + 4 + 4 + 8) // platform, flags, manufacturer, model, attributes
-    .u32(0) // perceptual
-    .u32(s15(0.9642)).u32(s15(1)).u32(s15(0.8249)) // D50
-    .zeros(4) // creator
-    .zeros(44); // profile id and reserved, to 128 bytes
-
-  profile = new Writer().raw(header).raw(table).raw(data).done();
+  if (!profile) profile = Uint8Array.from(Buffer.from(SRGB_ICC_BASE64, 'base64'));
   return profile;
 }
 
