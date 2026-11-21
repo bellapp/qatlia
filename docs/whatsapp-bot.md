@@ -6,6 +6,7 @@ Ce document est destiné au propriétaire. Il décrit ce qu'il faut faire côté
 
 Le bot répond aux messages WhatsApp reçus sur le numéro de QatliA (06 00 93 75 23) :
 
+- tous les messages sont écrits pour des artisans peu à l'aise avec la technologie : quelques lignes, des mots de tous les jours (« صوّرها بالتيليفون », jamais « سكانيها », « optimisation » ni « PDF »), une seule chose à faire, et cette chose est le plus souvent d'envoyer la photo de la fiche ici. L'assistant suit les mêmes règles et ne donne le lien du site que pour l'inscription, le compte, l'achat ou les prix ;
 - un nouveau contact reçoit un **accueil court** qui commence par la seule chose à faire : « envoyez-moi ici la photo de votre fiche de débit », puis « ou envoyez un vocal » (cette ligne disparaît si les vocaux sont coupés), le lien de la démo et les 3 boutons. Un premier message écrit en lettres arabes (y compris le message arabe pré-rempli par la pub) reçoit l'accueil en darija seulement ; tout autre premier message reçoit les deux langues, celle du contact en premier. L'accueil précédent, long et sans cette invitation, faisait partir 59 % des prospects de la pub sans une seconde réponse (80 conversations, 14-20/11/2026) ;
 
 - les choix 1, 2 et 3 reçoivent des réponses fixes (les mêmes textes que les réponses rapides) ;

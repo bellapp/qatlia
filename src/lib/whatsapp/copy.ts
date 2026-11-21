@@ -7,7 +7,7 @@
  */
 
 import { CREDIT_PACKS, formatMAD } from '@/lib/billing/catalog';
-import { ANALYSIS_WINDOW_HOURS, MAX_SCANS_PER_ANALYSIS, SIGNUP_FREE_CREDITS, VISION_CREDIT_COST } from '@/lib/billing/policy';
+import { SIGNUP_FREE_CREDITS, VISION_CREDIT_COST } from '@/lib/billing/policy';
 import { supportWhatsAppUrl } from '@/lib/support';
 
 export type Lang = 'fr' | 'ar';
@@ -117,8 +117,8 @@ export function greeting(input: { lang: Lang; bilingual: boolean; voice: boolean
 
 const DEFAULT_GREETING = greeting({ lang: 'fr', bilingual: true, voice: true });
 
-const MENU_AGAIN_FR = 'Re-bonjour 👋 Choisissez ci-dessous 👇 ou posez directement votre question ✍️';
-const MENU_AGAIN_AR = 'مرحبا بيك مرة أخرى 👋 ختار من التحت 👇 ولا سول سؤالك مباشرة';
+const MENU_AGAIN_FR = 'Re-bonjour 👋 Envoyez-moi la photo de votre fiche 📸, ou choisissez ci-dessous 👇';
+const MENU_AGAIN_AR = 'مرحبا بيك مرة أخرى 👋 صيفط ليا تصويرة الورقة 📸، ولا ختار من التحت 👇';
 
 export const COPY: {
   /** The bilingual first-contact greeting, French first (see greeting() for every variant), sent with the MENU_BUTTONS. */
@@ -155,39 +155,31 @@ ${MENU_AGAIN_AR}`,
 ${MENU_AGAIN_AR}
 جاوب بـ 1 / 2 / 3`,
 
+  // Written for carpenters not at ease with technology: one thing to do, in
+  // everyday words (tests/whatsapp-simple-messages.test.js).
   howItWorks: {
-    fr: `Voici comment ça marche en 1 minute 🎥
-${DEMO_VIDEO_URL}
-
-1. Créez votre compte sur ${SITE_LINKS.fr}
-2. Prenez en photo votre fiche de mesure
-3. Lancez l'optimisation, et vous obtenez le plan de coupe et le PDF pour l'atelier.
-
-📸 Ou envoyez-moi directement ici la photo de votre fiche : je la lis pour vous.`,
-    ar: `شوف كيفاش كيخدم فدقيقة 🎥
-${DEMO_VIDEO_URL}
-
-1. دير حساب فـ ${SITE_LINKS.ar}
-2. صوّر ورقة القياسات
-3. ضغط على التحسين، وغادي يعطيك مخطط التقطيع وتقرير PDF للورشة.
-
-📸 ولا صيفط ليا التصويرة ديال الورقة هنا مباشرة ونقراها ليك.`,
+    fr: `C'est simple 👇
+📸 Prenez en photo votre fiche de débit avec votre téléphone et envoyez-la-moi ici.
+✅ Je vous renvoie le plan de coupe : combien de panneaux, et comment les couper.
+🎥 Vidéo d'1 minute : ${DEMO_VIDEO_URL}`,
+    ar: `ساهلة 👇
+📸 صوّر ورقة القياسات ديالك بالتيليفون وصيفطها ليا هنا.
+✅ نرجع ليك مخطط التقطيع: شحال من بانو وكيفاش تقطعهم.
+🎥 فيديو ديال دقيقة: ${DEMO_VIDEO_URL}`,
   },
 
   pricing: {
-    fr: `💰 Tarifs QatliA
-🎁 ${SIGNUP_FREE_CREDITS} crédits gratuits à l'inscription pour essayer.
-${VISION_CREDIT_COST} crédit = 1 analyse complète (photo de la fiche, jusqu'à ${MAX_SCANS_PER_ANALYSIS} photos si elle tient sur plusieurs feuilles, + plan de coupe).
-Recalculs de la même liste gratuits pendant ${ANALYSIS_WINDOW_HOURS} h, exports PDF gratuits.
+    fr: `💰 Tarifs
+🎁 ${SIGNUP_FREE_CREDITS} crédits gratuits à l'inscription.
+${VISION_CREDIT_COST} crédit = 1 fiche lue + son plan de coupe.
 
 Packs, sans abonnement :
 ${PACK_LINES_FR}
 
 👉 ${SITE_LINKS.fr}`,
-    ar: `💰 الأثمنة ديال QatliA
-🎁 ${SIGNUP_FREE_CREDITS} كريدي مجانا ملي كتسجل باش تجرب.
-${VISION_CREDIT_COST} كريدي = تحليل كامل (صورة الورقة، حتى ${MAX_SCANS_PER_ANALYSIS} صور إلا كانت فعدة أوراق، + مخطط التقطيع).
-إعادة الحساب فنفس اللائحة مجانية لمدة ${ANALYSIS_WINDOW_HOURS} ساعة، وملفات PDF مجانية.
+    ar: `💰 الأثمنة
+🎁 ${SIGNUP_FREE_CREDITS} كريدي مجانا ملي كتسجل.
+${VISION_CREDIT_COST} كريدي = ورقة وحدة كتقرا + مخطط التقطيع ديالها.
 
 الباقات، بلا اشتراك:
 ${PACK_LINES_AR}
@@ -196,8 +188,8 @@ ${PACK_LINES_AR}
   },
 
   advisor: {
-    fr: `Avec plaisir ! Un conseiller vous répond très vite. En attendant, dites-nous ce que vous fabriquez (cuisines, placards, meubles…) et quels panneaux vous utilisez.`,
-    ar: `مرحبا! مستشار غادي يجاوبك قريب. قول لينا شنو كتصاوب (كوزينات، بلاكارات، أثاث…) وشنو نوع الألواح اللي كتخدم بيها.`,
+    fr: `Avec plaisir ! Un conseiller vous répond très vite 🙏 Dites-nous ce que vous fabriquez (cuisines, placards…), par écrit ou en vocal.`,
+    ar: `مرحبا! مستشار غادي يجاوبك قريب 🙏 قول لينا شنو كتصاوب (كوزينات، بلاكارات…)، بالكتابة ولا بأوديو.`,
   },
 
   redirect: {
@@ -206,20 +198,20 @@ ${PACK_LINES_AR}
   },
 
   imageHint: {
-    fr: `Merci pour la photo ! Pour obtenir le plan de coupe, ouvrez l'atelier et prenez votre fiche de mesure en photo : l'IA lit les pièces pour vous. Vous créez ensuite votre compte gratuit (${SIGNUP_FREE_CREDITS} crédits offerts) : la photo prise dans l'atelier est gardée pendant l'inscription.
+    fr: `Merci pour la photo ! Pour avoir le plan de coupe, ouvrez ce lien et reprenez dedans la photo de votre fiche 👇
 👉 ${ATELIER_LINK}`,
-    ar: `شكرا على الصورة! باش تاخد مخطط التقطيع، حل الورشة وصوّر ورقة القياسات، والذكاء الاصطناعي غادي يقرا القطع. من بعد دير حساب مجاني (${SIGNUP_FREE_CREDITS} كريدي فابور)، والصورة اللي صورتي فالورشة كتبقى محفوظة.
+    ar: `شكرا على الصورة! باش تاخد مخطط التقطيع، حل هاد الرابط وعاود صوّر فيه الورقة ديالك 👇
 👉 ${ATELIER_LINK}`,
   },
 
   mediaHandoff: {
-    fr: `Je ne peux pas encore ouvrir ce type de message. Écrivez-moi votre question, ou un conseiller vous répond très vite.`,
-    ar: `مازال ما نقدرش نحل هاد النوع ديال الرسائل. كتب ليا سؤالك، ولا مستشار غادي يجاوبك قريب.`,
+    fr: `Je ne peux pas ouvrir ce message 🙏 Envoyez-moi plutôt la photo de votre fiche de débit, ou écrivez-moi. Un conseiller peut aussi vous répondre.`,
+    ar: `ما قدرتش نحل هاد الرسالة 🙏 صيفط ليا تصويرة ورقة القياسات، ولا كتب ليا. ومستشار يقدر يجاوبك حتى هو.`,
   },
 
   voiceUnclear: {
-    fr: `Je n'ai pas bien compris votre message vocal 🙏 Écrivez-moi votre question en quelques mots, ou un conseiller vous répond très vite.`,
-    ar: `ما فهمتش مزيان الأوديو ديالك 🙏 كتب ليا سؤالك بشي كلمات، ولا مستشار غادي يجاوبك قريب.`,
+    fr: `Je n'ai pas bien entendu votre vocal 🙏 Envoyez-moi la photo de votre fiche de débit, ou un conseiller vous répond très vite.`,
+    ar: `ما سمعتش مزيان الأوديو ديالك 🙏 صيفط ليا تصويرة ورقة القياسات، ولا مستشار غادي يجاوبك قريب.`,
   },
 
   fallback: {
@@ -247,10 +239,8 @@ export const PHOTO_COPY: {
     ar: '📸 كنقرا الورقة ديالك… (10 حتى 20 ثانية)',
   },
   unreadable: {
-    fr: `Je n'ai pas réussi à lire cette fiche 😕 Envoyez une photo plus nette, bien à plat et en entier, ou prenez-la directement dans l'atelier :
-👉 ${ATELIER_LINK}`,
-    ar: `ما قدرتش نقرا هاد الورقة 😕 صيفط صورة واضحة، مسطحة وكاملة، ولا صوّرها مباشرة فالورشة:
-👉 ${ATELIER_LINK}`,
+    fr: `Je n'ai pas réussi à lire cette fiche 😕 Reprenez la photo de près, bien à plat, avec toute la feuille, et renvoyez-la-moi ici.`,
+    ar: `ما قدرتش نقرا هاد الورقة 😕 عاود صوّرها من قريب، مسطحة وكاملة، وعاود صيفطها ليا هنا.`,
   },
   already: (lang, link) => {
     if (lang === 'ar') {
