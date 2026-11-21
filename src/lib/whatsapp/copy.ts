@@ -12,14 +12,8 @@ import { supportWhatsAppUrl } from '@/lib/support';
 
 export type Lang = 'fr' | 'ar';
 
-/**
- * The video in the reader's language: the 1-minute French demo, and a simple
- * explanation in darija for the darija texts.
- */
-export const DEMO_VIDEO_URLS: Record<Lang, string> = {
-  fr: 'https://youtu.be/dQE_PzXUAR0',
-  ar: 'https://youtube.com/shorts/rAjcW-1Wylk',
-};
+/** The explanation video, in darija: sent to every reader for now, French included. */
+export const DEMO_VIDEO_URL = 'https://youtu.be/rAjcW-1Wylk';
 
 /**
  * Short links: each redirects to its page with `utm_source=whatsapp`
@@ -81,11 +75,10 @@ const GREETING_INVITE: Record<Lang, { hello: string; photo: string; voice: strin
 };
 
 const GREETING_DEMO: Record<Lang, string> = {
-  ar: `🎥 شوف كيفاش كيخدم: ${DEMO_VIDEO_URLS.ar}`,
-  fr: `🎥 Démo en 1 min : ${DEMO_VIDEO_URLS.fr}`,
+  ar: `🎥 شوف كيفاش كيخدم: ${DEMO_VIDEO_URL}`,
+  fr: `🎥 Démo en darija : ${DEMO_VIDEO_URL}`,
 };
-/** One link only, so WhatsApp shows one preview: the video in the contact's language. */
-const greetingDemoBoth = (lang: Lang): string => `🎥 Démo · كيفاش كيخدم : ${DEMO_VIDEO_URLS[lang]}`;
+const GREETING_DEMO_BOTH = `🎥 Vidéo · كيفاش كيخدم : ${DEMO_VIDEO_URL}`;
 
 const GREETING_BUTTONS: Record<Lang, string> = {
   ar: 'ولا ختار من التحت 👇',
@@ -116,7 +109,7 @@ export function greeting(input: { lang: Lang; bilingual: boolean; voice: boolean
     return { text: `${head}\n${GREETING_BUTTONS[input.lang]}`, plain: `${head}\n${GREETING_TYPED[input.lang]}` };
   }
   const other: Lang = input.lang === 'ar' ? 'fr' : 'ar';
-  const head = `${invite(input.lang)}\n\n${invite(other)}\n\n${greetingDemoBoth(input.lang)}`;
+  const head = `${invite(input.lang)}\n\n${invite(other)}\n\n${GREETING_DEMO_BOTH}`;
   return {
     text: `${head}\n👇 ${GREETING_BUTTONS.fr.replace(' 👇', '')} · ${GREETING_BUTTONS.ar.replace(' 👇', '')}`,
     plain: `${head}\n${GREETING_TYPED_BOTH}`,
@@ -169,11 +162,11 @@ ${MENU_AGAIN_AR}
     fr: `C'est simple 👇
 📸 Prenez en photo votre fiche de débit avec votre téléphone et envoyez-la-moi ici.
 ✅ Je vous renvoie le plan de coupe : combien de panneaux, et comment les couper.
-🎥 Vidéo d'1 minute : ${DEMO_VIDEO_URLS.fr}`,
+🎥 Vidéo d'explication (en darija) : ${DEMO_VIDEO_URL}`,
     ar: `ساهلة 👇
 📸 صوّر ورقة القياسات ديالك بالتيليفون وصيفطها ليا هنا.
 ✅ نرجع ليك مخطط التقطيع: شحال من بانو وكيفاش تقطعهم.
-🎥 شوف الفيديو بالدارجة: ${DEMO_VIDEO_URLS.ar}`,
+🎥 شوف الفيديو بالدارجة: ${DEMO_VIDEO_URL}`,
   },
 
   pricing: {

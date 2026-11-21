@@ -15,7 +15,7 @@ import { ANALYSIS_WINDOW_HOURS, MAX_SCANS_PER_ANALYSIS, SIGNUP_FREE_CREDITS, VIS
 import { fr } from '@/i18n/messages/fr';
 import { supportWhatsAppUrl } from '@/lib/support';
 import type { HandoffMode } from '@/lib/whatsapp/config';
-import { DEMO_VIDEO_URLS, SITE_LINKS } from '@/lib/whatsapp/copy';
+import { DEMO_VIDEO_URL, SITE_LINKS } from '@/lib/whatsapp/copy';
 
 export const MAX_REPLY_CHARS = 700;
 export const HISTORY_MESSAGES = 10;
@@ -66,9 +66,7 @@ ${packs}
 - Pour acheter : se connecter sur ${SITE_URL}, ouvrir le menu du compte, puis « Acheter des crédits ».
 - La personne peut envoyer ici même, dans WhatsApp, la photo de sa fiche de débit (la liste des pièces à couper) : le bot la lit et lui renvoie le nombre de pièces, de panneaux, la chute et un lien pour voir son plan de coupe. C'est la façon la plus simple d'essayer.
 - La personne peut aussi poser ses questions par message vocal : le bot l'écoute.
-- Vidéo de démonstration en français (1 min) : ${DEMO_VIDEO_URLS.fr}
-- Vidéo d'explication en darija : ${DEMO_VIDEO_URLS.ar}
-- Quand tu donnes une vidéo, donne celle de la langue de la personne : la vidéo en darija si elle écrit en arabe ou en darija, la vidéo en français sinon.
+- Vidéo d'explication (en darija) : ${DEMO_VIDEO_URL}
 ${redirect ? `- Contact humain (WhatsApp) : ${supportWhatsAppUrl()}
 ` : ''}
 QUESTIONS FRÉQUENTES :

@@ -8,7 +8,7 @@ const { loadTsModule } = require('./helpers/load-ts-module');
 // which never said that a photo or a voice note can be sent right here.
 
 const load = (rel) => loadTsModule(path.resolve(__dirname, '..', rel));
-const { COPY, DEMO_VIDEO_URLS, MENU_BUTTONS, greeting, exampleCaption } = load('src/lib/whatsapp/copy.ts');
+const { COPY, DEMO_VIDEO_URL, MENU_BUTTONS, greeting, exampleCaption } = load('src/lib/whatsapp/copy.ts');
 const { decide, resolveLang } = load('src/lib/whatsapp/router.ts');
 
 const NOW = new Date('2026-11-20T16:00:00.000Z');
@@ -49,12 +49,12 @@ test('the bilingual greeting puts the contact language first', () => {
   assert.ok(frFirst.indexOf('Envoyez-moi ici') < frFirst.indexOf('صيفط ليا هنا'));
 });
 
-test('the greeting is short: one link, the demo video in the contact language, and no site link to compete with the photo', () => {
+test('the greeting is short: one link, the demo video, and no site link to compete with the photo', () => {
   for (const lang of ['ar', 'fr']) {
     for (const bilingual of [true, false]) {
       const { text, plain } = greeting({ lang, bilingual, voice: true });
       for (const body of [text, plain]) {
-        assert.deepEqual(body.match(/https?:\/\/\S+/g), [DEMO_VIDEO_URLS[lang]], `${lang} ${bilingual}`);
+        assert.deepEqual(body.match(/https?:\/\/\S+/g), [DEMO_VIDEO_URL], `${lang} ${bilingual}`);
       }
       assert.ok([...text].length <= (bilingual ? 480 : 260), `${lang} ${bilingual}: ${[...text].length}`);
     }
