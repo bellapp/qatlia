@@ -85,3 +85,7 @@ input[type="number"]::-webkit-outer-spin-button {
 input[type="number"] {
   -moz-appearance: textfield;
 }
+/* Play Store app (set by storeAppInitScript before the first paint): nothing
+   that sells is shown, and a page being left for another stays blank. */
+html[data-app] [data-sells] { display: none !important; }
+html[data-app-leaving] body { visibility: hidden; }
