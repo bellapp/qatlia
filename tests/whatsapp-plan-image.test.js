@@ -103,7 +103,7 @@ test('the caption keeps the counts and the link, drops the list of pieces', () =
 
 // --- The photo flow sends the picture, the text only when the picture fails ---
 
-const sent = { images: [], texts: [], imageOk: true };
+const sent = { images: [], texts: [], imageOk: true, pieces: null };
 stubModule('@/lib/whatsapp/photo-store', {
   reservePhotoRead: async () => ({ status: 'reserved', id: 'r1' }),
   completePhotoRead: async () => {},
@@ -114,7 +114,7 @@ stubModule('@/lib/whatsapp/media', {
   fetchMediaDataUrl: async () => ({ ok: true, dataUrl: 'data:image/jpeg;base64,AAA', mimeType: 'image/jpeg', bytes: 3 }),
 });
 stubModule('@/lib/vision/read-cut-list', {
-  readCutList: async () => ({ status: 'ok', pieces: PIECES, sheet: null }),
+  readCutList: async () => ({ status: 'ok', pieces: sent.pieces ?? PIECES, sheet: null }),
 });
 stubModule('@/lib/whatsapp/store', { countBotMessages: async () => 0 });
 const { handlePhoto } = load('src/lib/whatsapp/photo.ts');
@@ -149,6 +149,19 @@ test('a read photo is answered with the plan picture and its caption', async () 
   assert.equal(sent.images[0].caption, photoResultCaption('ar', summarizeCutList(PIECES, null), 'https://qatlia.ma/w/k7m2qx9dab'));
 });
 
+test('a list too long for the bot to plan gets no picture, only its text', async () => {
+  sent.imageOk = true;
+  sent.pieces = [{ name: '', height: 50, width: 40, quantity: 451 }];
+  try {
+    await run('ar');
+  } finally {
+    sent.pieces = null;
+  }
+  assert.equal(sent.images.length, 0);
+  assert.deepEqual(sent.texts.map((t) => t.kind), ['photo_reading', 'photo_result']);
+  assert.match(sent.texts[1].text, /لائحة كبيرة/);
+});
+
 test('when the picture cannot go out, the text answer goes instead', async () => {
   sent.imageOk = false;
   await run('fr');
@@ -164,6 +177,7 @@ test('the image route never counts as an opening, and stamps the sRGB profile', 
   assert.match(source, /markOpened: false/);
   assert.match(source, /isPhotoCode\(/);
   assert.match(source, /withSrgbProfile\(/);
+  assert.match(source, /previewPlanFor\(draft\)/, 'no plan drawn for a list over 450 pieces');
   assert.match(source, /'Content-Type': 'image\/png'/);
   assert.match(source, /'Cache-Control': 'no-store'/);
   assert.match(source, /status: 404/);

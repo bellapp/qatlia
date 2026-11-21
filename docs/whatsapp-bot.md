@@ -117,7 +117,7 @@ Quand un prospect envoie la photo de sa fiche :
 
 1. le bot répond « 📸 Je lis votre fiche… » ;
 2. il télécharge la photo (API Graph, avec `WHATSAPP_ACCESS_TOKEN`) et la lit avec la même lecture que le scan du site, plus le format du panneau s'il est écrit sur la fiche ;
-3. il calcule le plan sur ce panneau, ou sur le panneau par défaut de l'atelier (278 × 208), et répond par **une image du plan** (`qatlia.ma/w/<code>/plan.png`) :
+3. il calcule le plan sur ce panneau, ou sur le panneau par défaut de l'atelier (278 × 208), et répond par **une image du plan** (`qatlia.ma/w/<code>/plan.png`). Une liste de plus de 450 pièces reçoit seulement le texte « grande liste », voir plus bas :
    - l'image montre le premier panneau, ses pièces en couleur, **sans aucune cote**, avec « 1 / N » et QatliA ;
    - la légende donne les pièces lues, les panneaux, la chute et le panneau utilisé, puis « 👆 Voici le début de votre plan… » avec le lien `qatlia.ma/w/<code>` ;
    - avant l'envoi, la route du webhook télécharge l'image (8 s au plus). Si elle n'est pas dessinée, ou si YCloud la refuse, le bot envoie l'ancienne réponse texte (avec les premières lignes) ;
@@ -128,7 +128,11 @@ Règles :
 
 - **une lecture réussie par numéro, définitivement**. Les photos suivantes reçoivent le lien de la première fiche et l'invitation à continuer dans l'atelier ;
 - une lecture ratée (photo illisible, pas une fiche) libère le numéro, jusqu'à 3 échecs par numéro sur 24 h ;
-- garde-fous : 10 s par requête Meta, 30 s pour la lecture IA, 300 pièces au plus (au-delà, la fiche se fait dans l'atelier) ; une ligne sans cote lisible est ignorée, un format de panneau hors 30–400 cm est remplacé par le panneau par défaut ;
+- garde-fous : 10 s par requête Meta, 30 s pour la lecture IA ; une ligne sans cote lisible est ignorée, un format de panneau hors 30–400 cm est remplacé par le panneau par défaut ;
+- taille de la liste (nombre de pièces, quantités comprises) :
+  - **jusqu'à 450 pièces**, le bot calcule le plan comme décrit plus haut ;
+  - **de 451 à 900**, le bot enregistre la liste et répond « ✅ N pièces lues… grande liste » avec le lien, **sans plan**. Le calcul ne tiendrait pas dans les 60 s du webhook (environ 1,5 s pour 319 pièces, 20 s pour 640, 40 s pour 960). Le lien ouvre l'atelier sur les pièces, sans aperçu, et l'atelier calcule le plan après l'inscription ;
+  - **au-delà de 900**, le bot donne le nombre de pièces lues et renvoie vers l'atelier, sans jamais dire « illisible ». Avant le 21/11/2026, la limite était de 300 et ces listes recevaient « je n'ai pas réussi à lire » ;
 - « liens ouverts » ne compte pas l'aperçu que WhatsApp génère en recevant le message ;
 - le contenu des lectures expirées est effacé à chaque nouvelle lecture, même si le lien n'est jamais rouvert ;
 - plafond global : `WHATSAPP_PHOTO_DAILY_CAP` lectures sur 24 h (réussies ou non, chacune coûte un appel IA) ;

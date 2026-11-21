@@ -12,7 +12,7 @@ import { getAdminDb } from '@/lib/admin/db';
 import { withSrgbProfile } from '@/lib/png-srgb';
 import { isPhotoCode } from '@/lib/whatsapp/photo-link';
 import { openPhotoDraft } from '@/lib/whatsapp/photo-store';
-import { photoPreviewPlan } from '@/lib/whatsapp/photo-summary';
+import { previewPlanFor } from '@/lib/whatsapp/photo-summary';
 import { planImageLayout } from '@/lib/whatsapp/plan-image';
 import { PlanImage } from '@/lib/whatsapp/plan-image-view';
 
@@ -29,7 +29,9 @@ export async function GET(_request: Request, { params }: { params: { code: strin
   try {
     const draft = await openPhotoDraft(db, params.code, new Date(), { markOpened: false });
     if (!draft || draft === 'expired') return notFound();
-    const layout = planImageLayout(photoPreviewPlan(draft));
+    // None for a list over BOT_PLAN_MAX_PIECES: too long to plan in a request.
+    const plan = previewPlanFor(draft);
+    const layout = plan ? planImageLayout(plan) : null;
     if (!layout) return notFound();
 
     const rendered = new ImageResponse(PlanImage({ layout }), { width: layout.width, height: layout.height });

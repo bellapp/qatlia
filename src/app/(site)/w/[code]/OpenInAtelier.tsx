@@ -11,7 +11,7 @@ import type { PhotoDraft } from '@/lib/whatsapp/photo-store';
 import type { OptimizationResult } from '@/lib/cutting/binpacking';
 
 /** Hands the pieces to the atelier through its own draft, then opens it. */
-export function OpenInAtelier({ draft, preview }: { draft: PhotoDraft; preview: OptimizationResult }) {
+export function OpenInAtelier({ draft, preview }: { draft: PhotoDraft; preview: OptimizationResult | null }) {
   const router = useRouter();
   const { t } = useLocale();
   useEffect(() => {

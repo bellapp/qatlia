@@ -2,7 +2,7 @@ import type { Metadata } from 'next';
 import { headers } from 'next/headers';
 import { isPhotoCode, loadPhotoLink } from '@/lib/whatsapp/photo-link';
 import { planImageUrl } from '@/lib/whatsapp/plan-image';
-import { photoPreviewPlan } from '@/lib/whatsapp/photo-summary';
+import { previewPlanFor } from '@/lib/whatsapp/photo-summary';
 import { OpenInAtelier } from './OpenInAtelier';
 import { PhotoLinkExpired } from './PhotoLinkExpired';
 
@@ -28,6 +28,7 @@ export function generateMetadata({ params }: { params: { code: string } }): Meta
 export default async function PhotoLinkPage({ params }: { params: { code: string } }) {
   const draft = await loadPhotoLink(params.code, headers().get('user-agent'));
   if (!draft) return <PhotoLinkExpired />;
-  // The free preview, computed here from the stored pieces (never from the browser).
-  return <OpenInAtelier draft={draft} preview={photoPreviewPlan(draft)} />;
+  // The free preview, computed here from the stored pieces (never from the browser);
+  // none for a list too long to plan here: the atelier plans it after sign-up.
+  return <OpenInAtelier draft={draft} preview={previewPlanFor(draft)} />;
 }
