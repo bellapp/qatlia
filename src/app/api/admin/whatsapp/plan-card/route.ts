@@ -6,7 +6,7 @@ import { getWhatsAppConfig } from '@/lib/whatsapp/config';
 import { isPhotoCode } from '@/lib/whatsapp/photo-link';
 import { photoLink } from '@/lib/whatsapp/photo-summary';
 import { planImageUrl } from '@/lib/whatsapp/plan-image';
-import { sendPlanCard } from '@/lib/whatsapp/send';
+import { sendImage, sendPlanCard } from '@/lib/whatsapp/send';
 import { recordOutbound } from '@/lib/whatsapp/store';
 
 export const dynamic = 'force-dynamic';
@@ -29,6 +29,11 @@ const CardSchema = z.object({
   body: z.string().trim().min(1).max(1024),
   button: z.string().trim().min(1).max(20).default('شوف المخطط كامل'),
   to: z.string().regex(/^\d{8,15}$/).optional(),
+  // WhatsApp refused the plan picture of the first card ("(#131053) Media
+  // upload error", 21/11/2026): another picture of the site to try in its
+  // place, and the bare picture with the link in its caption as a way round.
+  image: z.string().startsWith('https://qatlia.ma/').max(300).optional(),
+  as: z.enum(['card', 'image']).default('card'),
 });
 
 export async function POST(req: Request) {
@@ -45,7 +50,7 @@ export async function POST(req: Request) {
   if (!parsed.success || !isPhotoCode(parsed.data.code)) {
     return NextResponse.json({ error: 'INVALID_DATA' }, { status: 400 });
   }
-  const { code, body, button, to } = parsed.data;
+  const { code, body, button, to, as } = parsed.data;
 
   const db = getAdminDb();
   const config = getWhatsAppConfig();
@@ -64,7 +69,7 @@ export async function POST(req: Request) {
 
   // Draw the picture first, so the CDN holds it when WhatsApp downloads it
   // (PICTURE_CACHE): fetched cold, it took too long and WhatsApp gave up.
-  const image = planImageUrl(code);
+  const image = parsed.data.image ?? planImageUrl(code);
   try {
     const check = await fetch(image, { signal: AbortSignal.timeout(20_000) });
     await check.arrayBuffer();
@@ -74,12 +79,15 @@ export async function POST(req: Request) {
   }
 
   const waId = to ?? read.wa_id;
-  const wamid = await sendPlanCard(config, waId, { image, body, button, url: photoLink(code) });
+  const url = photoLink(code);
+  const wamid = as === 'image'
+    ? await sendImage(config, waId, image, `${body}\n${url}`)
+    : await sendPlanCard(config, waId, { image, body, button, url });
   if (wamid === null) return NextResponse.json({ error: 'SEND_FAILED' }, { status: 502 });
 
   // Logged like the bot's own answers, on the number that sent the sheet only.
   if (waId === read.wa_id) {
-    await recordOutbound(db, { waId, wamid, direction: 'bot', kind: 'photo_result_card', body });
+    await recordOutbound(db, { waId, wamid, direction: 'bot', kind: as === 'image' ? 'photo_result' : 'photo_result_card', body });
   }
   return NextResponse.json({ ok: true, wamid });
 }
