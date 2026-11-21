@@ -20,7 +20,16 @@ import { PHOTO_COPY, type Lang } from '@/lib/whatsapp/copy';
 import { completePhotoRead, failPhotoRead, newPhotoCode, reservePhotoRead } from '@/lib/whatsapp/photo-store';
 import { fetchMediaDataUrl } from '@/lib/whatsapp/media';
 import { readCutList } from '@/lib/vision/read-cut-list';
-import { photoLink, photoResultText, plausiblePanel, summarizeCutList, usablePieces } from '@/lib/whatsapp/photo-summary';
+import {
+  BOT_PLAN_MAX_PIECES,
+  bigListText,
+  listSummary,
+  photoLink,
+  photoResultText,
+  plausiblePanel,
+  summarizeCutList,
+  usablePieces,
+} from '@/lib/whatsapp/photo-summary';
 import { countBotMessages } from '@/lib/whatsapp/store';
 
 export type PhotoOutcome = 'handled' | 'hint' | 'silent';
@@ -31,8 +40,12 @@ export type PhotoMessageKind = 'photo_reading' | 'photo_result' | 'photo_already
  * (media.ts), the model 30 s, and the plan is bounded by the piece count.
  */
 const READ_TIMEOUT_MS = 30_000;
-/** Above this many pieces (quantities expanded) the plan would take too long here: the atelier does it. */
-export const MAX_BOT_PIECES = 300;
+/**
+ * Above this many pieces (quantities expanded) the bot does not take the list:
+ * the reader is not trusted that far, and the atelier reads it. Raised from 300
+ * to 900 by the owner (21/11/2026); the plan itself stops at BOT_PLAN_MAX_PIECES.
+ */
+export const MAX_BOT_PIECES = 900;
 
 /** One "already read" answer per number in this window, however many photos follow. */
 const ALREADY_COOLDOWN_MS = 10 * 60 * 1000;
@@ -72,7 +85,7 @@ export async function handlePhoto(input: {
   let announced = false;
   // Frees the number. Once "je lis" went out the prospect gets the failed-read
   // text (never the hint, whose cooldown could leave "je lis" unanswered).
-  const fail = async (reason: string): Promise<PhotoOutcome> => {
+  const fail = async (reason: string, text: string = PHOTO_COPY.unreadable[lang]): Promise<PhotoOutcome> => {
     console.log('[whatsapp] photo read failed', reason);
     try {
       await failPhotoRead(db, readId);
@@ -81,7 +94,7 @@ export async function handlePhoto(input: {
     }
     if (!announced) return 'hint';
     try {
-      await deliver(PHOTO_COPY.unreadable[lang], 'photo_failed');
+      await deliver(text, 'photo_failed');
     } catch (error) {
       console.error('[whatsapp] could not send the failed-read text', describe(error));
     }
@@ -103,14 +116,21 @@ export async function handlePhoto(input: {
     // size, no panel outside a plausible range, no plan too big for the budget.
     const pieces = usablePieces(read.pieces);
     if (pieces.length === 0) return await fail('no usable line');
-    if (pieces.reduce((sum, p) => sum + p.quantity, 0) > MAX_BOT_PIECES) return await fail('too many pieces');
+    const pieceCount = pieces.reduce((sum, p) => sum + p.quantity, 0);
+    // Read, but too long for WhatsApp: say so, never "unreadable" (21/11/2026).
+    if (pieceCount > MAX_BOT_PIECES) return await fail('too many pieces', PHOTO_COPY.tooBig(lang, pieceCount));
     const sheet = plausiblePanel(read.sheet);
 
-    const summary = summarizeCutList(pieces, sheet);
-    if (summary.sheetsUsed === 0) return await fail('nothing fits the panel');
+    // Over BOT_PLAN_MAX_PIECES the plan would not fit in the webhook's time:
+    // the list is stored and linked, and the atelier plans it after sign-up.
+    const planned = pieceCount <= BOT_PLAN_MAX_PIECES;
+    const summary = planned ? summarizeCutList(pieces, sheet) : listSummary(pieces, sheet);
+    if (planned && summary.sheetsUsed === 0) return await fail('nothing fits the panel');
     const code = newPhotoCode();
     await completePhotoRead(db, readId, { code, pieces, sheet, summary, now });
-    result = { text: photoResultText(lang, summary, pieces, photoLink(code)) };
+    result = {
+      text: planned ? photoResultText(lang, summary, pieces, photoLink(code)) : bigListText(lang, summary, photoLink(code)),
+    };
   } catch (error) {
     console.error('[whatsapp] photo read threw', describe(error));
     return await fail('threw');

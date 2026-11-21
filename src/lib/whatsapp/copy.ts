@@ -239,6 +239,8 @@ export const PHOTO_COPY: {
   unreadable: Record<Lang, string>;
   /** A number whose photo was already read: its link while valid, and the atelier for the next ones. */
   already: (lang: Lang, link: string | null) => string;
+  /** A list read but over the bot's limit (MAX_BOT_PIECES): it was read, so never the unreadable text. */
+  tooBig: (lang: Lang, pieceCount: number) => string;
 } = {
   reading: {
     fr: '📸 Je lis votre fiche… (10 à 20 secondes)',
@@ -258,6 +260,10 @@ export const PHOTO_COPY: {
     const first = link ? `Votre première fiche est déjà lue 👉 ${link}\n` : '';
     return `${first}Les fiches suivantes se lisent dans l'atelier, après votre inscription gratuite :\n👉 ${ATELIER_LINK}`;
   },
+  tooBig: (lang, pieceCount) =>
+    lang === 'ar'
+      ? `✅ قريت الورقة ديالك: ${pieceCount} قطعة. هادي بزاف على الواتساب: صوّرها فالورشة ويتوجد المخطط ديالها كامل:\n👉 ${ATELIER_LINK}`
+      : `✅ J'ai lu votre fiche : ${pieceCount} pièces. C'est trop pour WhatsApp : prenez-la en photo dans l'atelier, le plan s'y fait en entier :\n👉 ${ATELIER_LINK}`,
 };
 
 /**

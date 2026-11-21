@@ -207,11 +207,15 @@ test('a reader that throws : failed and answered as such', async () => {
   answeredAsFailed();
 });
 
-test('a list over 300 pieces is not planned: failed and answered, no summary', async () => {
+// Raised from 300 to 900 pieces (owner, 21/11/2026), and answered with the
+// count rather than the unreadable text: tests/whatsapp-photo-big-list.test.js.
+test('a list over 900 pieces is not taken: freed and answered with its count, no summary', async () => {
   reset();
-  state.read = { status: 'ok', pieces: [{ name: '', height: 50, width: 40, quantity: 301 }], sheet: null };
+  state.read = { status: 'ok', pieces: [{ name: '', height: 50, width: 40, quantity: 901 }], sheet: null };
   assert.equal(await run(), 'handled');
-  answeredAsFailed();
+  assert.deepEqual(state.failed, ['r1']);
+  assert.deepEqual(state.delivered.map((d) => d.kind), ['photo_reading', 'photo_failed']);
+  assert.equal(state.delivered[1].text, PHOTO_COPY.tooBig('fr', 901));
   assert.equal(state.completed.length, 0);
 });
 

@@ -48,6 +48,28 @@ export function usablePieces(pieces: ReadPiece[]): ReadPiece[] {
   return pieces.filter((p) => positive(p.height) && positive(p.width) && positive(p.quantity));
 }
 
+/**
+ * The most pieces (quantities expanded) the bot and the link page plan. The plan
+ * of 319 pieces takes ~1.5 s, of 480 ~5 s, of 640 ~20 s, of 960 ~40 s (21/11/2026):
+ * over this, it would not fit in the webhook's 60 s after the read, and the
+ * atelier plans the list after sign-up (its normal, paid optimization).
+ */
+export const BOT_PLAN_MAX_PIECES = 450;
+
+const pieceTotal = (pieces: Array<{ quantity: number }>) => pieces.reduce((sum, p) => sum + p.quantity, 0);
+
+/** The counts of a list too long to plan here: no panel count, no waste. */
+export function listSummary(pieces: ReadPiece[], sheet: ReadSheet | null): PhotoSummary {
+  return {
+    pieceCount: pieceTotal(pieces),
+    lineCount: pieces.length,
+    sheetsUsed: 0,
+    wastePercent: 0,
+    sheet: panelFor(sheet),
+    unplaced: 0,
+  };
+}
+
 export function summarizeCutList(pieces: ReadPiece[], sheet: ReadSheet | null): PhotoSummary {
   const panel = panelFor(sheet);
   const result = optimizeCutting2D(
@@ -120,6 +142,25 @@ export function photoResultText(lang: Lang, summary: PhotoSummary, pieces: ReadP
   return lines.join('\n');
 }
 
+/**
+ * The answer for a list over BOT_PLAN_MAX_PIECES: what was read and the link,
+ * which opens the atelier on the pieces; the plan is made there.
+ */
+export function bigListText(lang: Lang, summary: PhotoSummary, link: string): string {
+  if (lang === 'ar') {
+    return [
+      `✅ القطع اللي تقرات: ${ltr(lang, String(summary.pieceCount))} (${ltr(lang, String(summary.lineCount))} سطر)`,
+      'هادي لائحة كبيرة: المخطط ديالها كيتوجد فالورشة.',
+      `👉 حلها هنا (الرابط صالح ${ltr(lang, '24')} ساعة): ${link}`,
+    ].join('\n');
+  }
+  return [
+    `✅ ${summary.pieceCount} pièces lues (${summary.lineCount} lignes)`,
+    "C'est une grande liste : son plan de coupe se fait dans l'atelier.",
+    `👉 Ouvrez-la ici (lien valable 24 h) : ${link}`,
+  ].join('\n');
+}
+
 /** The draft's pieces as the atelier holds them; the preview is laid out on these same ids. */
 export function atelierPieces(draft: PhotoDraft): Piece[] {
   return draft.pieces.map((p, i) => ({ ...p, id: String(i + 1), material: 'mdf', rotatable: true }));
@@ -137,6 +178,11 @@ function atelierSheet(draft: PhotoDraft): Sheet {
  */
 export function photoPreviewPlan(draft: PhotoDraft): OptimizationResult {
   return optimizeCutting2D(atelierPieces(draft), [atelierSheet(draft)]);
+}
+
+/** The free preview for the link page, or null for a list over BOT_PLAN_MAX_PIECES (the atelier plans it). */
+export function previewPlanFor(draft: PhotoDraft): OptimizationResult | null {
+  return pieceTotal(draft.pieces) <= BOT_PLAN_MAX_PIECES ? photoPreviewPlan(draft) : null;
 }
 
 /** A job opened from a WhatsApp link and still showing the free preview. */
