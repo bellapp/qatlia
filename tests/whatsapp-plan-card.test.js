@@ -98,3 +98,20 @@ test('the back office can send the plan card of a read, signed in as admin only'
   assert.match(source, /recordOutbound\(/);
   assert.match(source, /'expired'/, 'never a card for an expired link');
 });
+
+// The first card was refused with a bare "YCloud HTTP 400" (21/11/2026): the
+// log now says why, from YCloud's error body, and never echoes the key.
+test('a YCloud refusal logs its error code and message, never the API key', async () => {
+  const lines = [];
+  const errors = test.mock.method(console, 'error', (...args) => lines.push(args.join(' ')));
+  const body = { error: { status: 400, code: 'INVALID_ARGUMENT', message: 'interactive.action.parameters is invalid', whatsappApiError: { code: 100, message: 'Invalid parameter' } } };
+  const f = fakeFetch(() => new Response(JSON.stringify(body), { status: 400 }));
+  assert.equal(await sendPlanCard(YCLOUD_CONFIG, '1', CARD, f), null);
+  errors.mock.restore();
+  const line = lines.join('\n');
+  assert.match(line, /YCloud HTTP 400/);
+  assert.match(line, /INVALID_ARGUMENT/);
+  assert.match(line, /interactive\.action\.parameters is invalid/);
+  assert.match(line, /100 Invalid parameter/);
+  assert.doesNotMatch(line, /YC-SECRET-KEY/);
+});

@@ -133,6 +133,28 @@ async function sendViaMeta(
   }
 }
 
+/**
+ * Why YCloud refused a message: the code and message of its error body, and
+ * WhatsApp's own when YCloud relays it. Only those fields, cut short: the body
+ * is never logged whole.
+ */
+async function ycloudErrorDetail(res: Response): Promise<string> {
+  try {
+    const json = (await res.json()) as {
+      error?: { code?: unknown; message?: unknown; whatsappApiError?: { code?: unknown; message?: unknown } };
+    };
+    const text = (value: unknown) => (typeof value === 'string' || typeof value === 'number' ? String(value).slice(0, 200) : '');
+    const error = json?.error;
+    const parts = [text(error?.code), text(error?.message)];
+    const whatsapp = error?.whatsappApiError;
+    if (whatsapp) parts.push(`WhatsApp ${text(whatsapp.code)} ${text(whatsapp.message)}`.trim());
+    const detail = parts.filter(Boolean).join(' · ');
+    return detail ? `: ${detail}` : '';
+  } catch {
+    return '';
+  }
+}
+
 async function sendViaYCloud(
   ycloud: YCloudConfig,
   to: string,
@@ -155,7 +177,7 @@ async function sendViaYCloud(
     });
 
     if (!res.ok) {
-      console.error(`[whatsapp] send failed (YCloud HTTP ${res.status})`);
+      console.error(`[whatsapp] send failed (YCloud HTTP ${res.status}${await ycloudErrorDetail(res)})`);
       return failed(retryableStatus(res.status));
     }
 
