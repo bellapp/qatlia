@@ -62,8 +62,19 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'expired' }, { status: 410 });
   }
 
+  // Draw the picture first, so the CDN holds it when WhatsApp downloads it
+  // (PICTURE_CACHE): fetched cold, it took too long and WhatsApp gave up.
+  const image = planImageUrl(code);
+  try {
+    const check = await fetch(image, { signal: AbortSignal.timeout(20_000) });
+    await check.arrayBuffer();
+    if (!check.ok) return NextResponse.json({ error: 'PICTURE_NOT_DRAWN' }, { status: 502 });
+  } catch {
+    return NextResponse.json({ error: 'PICTURE_NOT_DRAWN' }, { status: 502 });
+  }
+
   const waId = to ?? read.wa_id;
-  const wamid = await sendPlanCard(config, waId, { image: planImageUrl(code), body, button, url: photoLink(code) });
+  const wamid = await sendPlanCard(config, waId, { image, body, button, url: photoLink(code) });
   if (wamid === null) return NextResponse.json({ error: 'SEND_FAILED' }, { status: 502 });
 
   // Logged like the bot's own answers, on the number that sent the sheet only.
