@@ -73,7 +73,7 @@ test('the card text keeps the counts, points at the picture, and leaves the link
   const fr = photoResultCard('fr', summary, link);
   assert.equal(ar.url, link);
   assert.equal(fr.url, link);
-  assert.equal(ar.image, 'https://qatlia.ma/w/k7m2qx9dab/plan.png');
+  assert.equal(ar.image, 'https://qatlia.ma/w/k7m2qx9dab/plan.jpg');
   assert.equal(ar.button, 'شوف المخطط كامل');
   assert.equal(fr.button, 'Voir le plan complet');
   assert.match(ar.body, /^✅ القطع اللي تقرات/);

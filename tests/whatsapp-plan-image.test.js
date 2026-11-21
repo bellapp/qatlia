@@ -24,7 +24,7 @@ const PIECES = [
 const draft = { pieces: PIECES, sheet: { height: 278, width: 208 } };
 
 test('the image link sits under the plan link, on the site', () => {
-  assert.equal(planImageUrl('k7m2qx9dab'), 'https://qatlia.ma/w/k7m2qx9dab/plan.png');
+  assert.equal(planImageUrl('k7m2qx9dab'), 'https://qatlia.ma/w/k7m2qx9dab/plan.jpg');
 });
 
 test('the layout draws the first panel only, to scale, every piece inside it', () => {
@@ -260,7 +260,7 @@ test('a read photo is answered with the plan picture and its caption', async () 
   assert.equal(await run('ar'), 'handled');
   assert.deepEqual(sent.texts.map((t) => t.kind), ['photo_reading']);
   assert.equal(sent.images.length, 1);
-  assert.equal(sent.images[0].link, 'https://qatlia.ma/w/k7m2qx9dab/plan.png');
+  assert.equal(sent.images[0].link, 'https://qatlia.ma/w/k7m2qx9dab/plan.jpg');
   assert.equal(sent.images[0].kind, 'photo_result');
   assert.equal(sent.images[0].caption, photoResultCaption('ar', summarizeCutList(PIECES, null), 'https://qatlia.ma/w/k7m2qx9dab'));
   // The picture goes with its button to the link (owner, 21/11/2026: "l'image cliquable").
@@ -304,6 +304,21 @@ test('the image route never counts as an opening, and stamps the sRGB profile', 
   assert.match(source, /'Cache-Control': PICTURE_CACHE/);
   const { PICTURE_CACHE } = load('src/lib/whatsapp/plan-image.ts');
   assert.equal(PICTURE_CACHE, 'public, max-age=0, s-maxage=3600');
+  assert.match(source, /status: 404/);
+});
+
+// WhatsApp never delivered the PNG, in a card or alone, while the example
+// JPEG goes through (21/11/2026): the bot sends plan.jpg, the same drawing
+// made a JPEG with the sRGB profile (src/lib/jpeg-srgb.ts).
+test('plan.jpg is the same picture as a JPEG, cached the same way, never an opening', () => {
+  const source = fs.readFileSync(path.join(ROOT, 'src/app/(site)/w/[code]/plan.jpg/route.ts'), 'utf8');
+  assert.match(source, /markOpened: false/);
+  assert.match(source, /isPhotoCode\(/);
+  assert.match(source, /pngToJpeg\(/);
+  assert.match(source, /previewPlanFor\(draft\)/);
+  assert.match(source, /'Content-Type': 'image\/jpeg'/);
+  assert.match(source, /'Cache-Control': PICTURE_CACHE/);
+  assert.match(source, /'Cache-Control': 'no-store'/);
   assert.match(source, /status: 404/);
 });
 

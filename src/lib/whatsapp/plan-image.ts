@@ -139,7 +139,8 @@ export function pictureCheckMs(elapsedMs: number): number | null {
 export const PICTURE_CACHE = 'public, max-age=0, s-maxage=3600';
 
 export function planImageUrl(code: string): string {
-  return `https://qatlia.ma/w/${code}/plan.png`;
+  // The JPEG: WhatsApp never delivered the PNG (21/11/2026).
+  return `https://qatlia.ma/w/${code}/plan.jpg`;
 }
 
 const round = (value: number) => Math.round(value * 10) / 10;
