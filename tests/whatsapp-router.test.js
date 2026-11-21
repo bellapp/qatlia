@@ -106,20 +106,20 @@ test('spelled menu choices route to the right fixed reply', () => {
 
 test('the demo video link comes before the site link', () => {
   // The greeting carries the demo as its only link (whatsapp-greeting.test.js).
+  // "How it works" now carries the demo as its only link (whatsapp-simple-messages.test.js).
   for (const text of [COPY.howItWorks.fr, COPY.howItWorks.ar]) {
     assert.ok(text.indexOf(DEMO_VIDEO_URL) !== -1);
-    assert.ok(text.indexOf(DEMO_VIDEO_URL) < text.indexOf('https://qatlia.ma'));
+    assert.ok(!text.includes('https://qatlia.ma'));
   }
 });
 
-test('the pricing copy derives its free-recalculation window from the policy and speaks of the same list', () => {
+test('the pricing reply leaves the free-recalculation detail to the assistant, which still knows it', () => {
+  // Kept short for carpenters not at ease with technology (whatsapp-simple-messages.test.js).
   const { ANALYSIS_WINDOW_HOURS } = load('src/lib/billing/policy.ts');
-  assert.ok(COPY.pricing.fr.includes(`${ANALYSIS_WINDOW_HOURS} h`));
-  assert.ok(COPY.pricing.fr.includes('la même liste'));
+  const { buildSystemPrompt } = load('src/lib/whatsapp/assistant.ts');
   assert.ok(!COPY.pricing.fr.includes('même projet'));
-  assert.ok(COPY.pricing.ar.includes(`${ANALYSIS_WINDOW_HOURS} ساعة`));
-  assert.ok(COPY.pricing.ar.includes('نفس اللائحة'));
   assert.ok(!COPY.pricing.ar.includes('نفس المشروع'));
+  assert.ok(buildSystemPrompt('redirect').includes(`pendant ${ANALYSIS_WINDOW_HOURS} h`));
 });
 
 test('redirect texts are the literal wa.me message', () => {
@@ -301,8 +301,8 @@ test('the pricing reply lists every pack, the signup gift and the cost of an ana
   }
   assert.ok(COPY.pricing.fr.includes(`${SIGNUP_FREE_CREDITS} crédits gratuits`));
   assert.ok(COPY.pricing.ar.includes(`${SIGNUP_FREE_CREDITS} كريدي مجانا`));
-  assert.ok(COPY.pricing.fr.includes(`${VISION_CREDIT_COST} crédit = 1 analyse complète`));
-  assert.ok(COPY.pricing.ar.includes(`${VISION_CREDIT_COST} كريدي = تحليل كامل`));
+  assert.ok(COPY.pricing.fr.includes(`${VISION_CREDIT_COST} crédit = 1 fiche lue`));
+  assert.ok(COPY.pricing.ar.includes(`${VISION_CREDIT_COST} كريدي = ورقة وحدة كتقرا`));
 });
 
 test('the menu buttons are the three menu choices, with titles WhatsApp accepts', () => {
@@ -394,7 +394,6 @@ test('the bot links are short WhatsApp links (tagged by their redirect), and the
   assert.equal(SITE_LINKS.fr, 'https://qatlia.ma/wa');
   assert.equal(SITE_LINKS.ar, 'https://qatlia.ma/wa/ar');
   assert.ok(COPY.pricing.ar.includes(SITE_LINKS.ar));
-  assert.ok(COPY.howItWorks.ar.includes(SITE_LINKS.ar));
   // A photo is answered with the workshop, which opens without an account.
   assert.ok(COPY.imageHint.fr.includes(ATELIER_LINK));
   assert.ok(COPY.imageHint.ar.includes(ATELIER_LINK));
