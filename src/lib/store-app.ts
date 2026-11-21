@@ -26,6 +26,13 @@ export const STORE_APP_VALUE = 'android';
 export const STORE_APP_STORAGE_KEY = 'qatlia-store-app';
 
 /**
+ * Window property the head script also sets. When a hydration error makes React
+ * client-render <html>, it drops every attribute the script put there; this
+ * flag keeps the answer for the rest of the page.
+ */
+export const STORE_APP_WINDOW_FLAG = '__qatliaStoreApp';
+
+/**
  * Pages that sell, and where the app goes instead: the purchase pages lead to
  * the account (balance and movements), the landings with their prices to the
  * atelier.
@@ -56,23 +63,27 @@ export function detectStoreApp(input: { search: string; referrer: string; stored
 
 /** What the head script decided for this document; false on the server. */
 export function isStoreAppDocument(): boolean {
-  if (typeof document === 'undefined') return false;
+  if (typeof window === 'undefined' || typeof document === 'undefined') return false;
+  if ((window as unknown as Record<string, unknown>)[STORE_APP_WINDOW_FLAG] === STORE_APP_VALUE) return true;
   return document.documentElement.getAttribute('data-app') === STORE_APP_VALUE;
 }
 
 /**
  * Runs first in <body>, before anything paints: marks <html data-app="android">
  * so the stylesheet hides what sells, and leaves a purchase or landing page at
- * once. Same rules as detectStoreApp and storeAppRedirect, in ES5.
+ * once. Same rules as detectStoreApp and storeAppRedirect, in ES5. When the tab
+ * cannot remember the mode, the page it leaves for carries the parameter.
  */
 export const storeAppInitScript = `(function(){try{var k=${JSON.stringify(STORE_APP_STORAGE_KEY)};var v=${JSON.stringify(
   STORE_APP_VALUE
 )};var r=${JSON.stringify(STORE_APP_REDIRECTS)};var s=null;try{s=window.sessionStorage.getItem(k);}catch(e){}
 var on=s===v||new URLSearchParams(window.location.search).get(${JSON.stringify(STORE_APP_PARAM)})===v||String(document.referrer||'').replace(/\\/+$/,'')===${JSON.stringify(
   `android-app://${STORE_APP_PACKAGE}`
-)};if(!on)return;try{window.sessionStorage.setItem(k,v);}catch(e){}
-var d=document.documentElement;d.setAttribute('data-app',v);
-var p=window.location.pathname.replace(/\\/+$/,'')||'/';if(Object.prototype.hasOwnProperty.call(r,p)){d.setAttribute('data-app-leaving','');window.location.replace(r[p]);}}catch(e){}})();`;
+)};if(!on)return;var kept=true;try{window.sessionStorage.setItem(k,v);}catch(e){kept=false;}
+window[${JSON.stringify(STORE_APP_WINDOW_FLAG)}]=v;var d=document.documentElement;d.setAttribute('data-app',v);
+var p=window.location.pathname.replace(/\\/+$/,'')||'/';if(Object.prototype.hasOwnProperty.call(r,p)){d.setAttribute('data-app-leaving','');window.location.replace(r[p]+(kept?'':${JSON.stringify(
+  `?${STORE_APP_PARAM}=${STORE_APP_VALUE}`
+)}));}}catch(e){}})();`;
 
 /**
  * Messages whose site wording invites the reader to pay, and the wording the

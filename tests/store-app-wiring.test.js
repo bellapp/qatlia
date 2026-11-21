@@ -44,3 +44,8 @@ test('the guard sends in-app navigations away and shows nothing meanwhile', () =
   const shell = read('src/components/ClientShell.tsx');
   assert.match(shell, /<StoreAppGuard>\{children\}<\/StoreAppGuard>/);
 });
+
+test('the guard puts the attribute back if React stripped it', () => {
+  const guard = read('src/components/StoreAppGuard.tsx');
+  assert.match(guard, /if \(inApp\) document\.documentElement\.setAttribute\('data-app', STORE_APP_VALUE\);/);
+});

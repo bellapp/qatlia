@@ -3,7 +3,7 @@
 import React, { useEffect } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import { useStoreApp } from '@/components/useStoreApp';
-import { storeAppRedirect } from '@/lib/store-app';
+import { STORE_APP_VALUE, storeAppRedirect } from '@/lib/store-app';
 
 /**
  * In the Play Store app, an in-app navigation to a page that sells (a sign-out
@@ -15,6 +15,12 @@ export function StoreAppGuard({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
   const target = inApp ? storeAppRedirect(pathname ?? '') : null;
+
+  // A hydration error makes React client-render <html> without the attribute
+  // the head script set; put it back so the stylesheet keeps hiding what sells.
+  useEffect(() => {
+    if (inApp) document.documentElement.setAttribute('data-app', STORE_APP_VALUE);
+  }, [inApp, pathname]);
 
   useEffect(() => {
     if (target) router.replace(target);

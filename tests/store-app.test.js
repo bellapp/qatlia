@@ -100,3 +100,34 @@ test('a browser that refuses sessionStorage still gets the mode for this page', 
 test('the mode never reaches a cookie or localStorage', () => {
   assert.equal(/localStorage|cookie/i.test(storeApp.storeAppInitScript), false);
 });
+
+test('the mode survives React stripping the attribute off <html>', () => {
+  // A hydration error makes React client-render <html> and drop every attribute
+  // the head script set; the window flag keeps the answer.
+  const { window } = (() => {
+    const attrs = {};
+    const w = { location: { pathname: '/atelier', search: '?app=android', replace() {} }, sessionStorage: { getItem: () => null, setItem() {} } };
+    const d = { referrer: '', documentElement: { setAttribute: (k, v) => { attrs[k] = v; } } };
+    vm.runInNewContext(storeApp.storeAppInitScript, { window: w, document: d, URLSearchParams });
+    return { window: w };
+  })();
+  assert.equal(window[storeApp.STORE_APP_WINDOW_FLAG], 'android');
+
+  const saved = { window: global.window, document: global.document };
+  try {
+    global.document = { documentElement: { getAttribute: () => null } };
+    global.window = { [storeApp.STORE_APP_WINDOW_FLAG]: 'android' };
+    assert.equal(storeApp.isStoreAppDocument(), true, 'flag set, attribute gone');
+    global.window = {};
+    assert.equal(storeApp.isStoreAppDocument(), false, 'a browser page');
+  } finally {
+    global.window = saved.window;
+    global.document = saved.document;
+  }
+});
+
+test('without sessionStorage, leaving a purchase page keeps the app parameter', () => {
+  const { replaced } = runScript({ url: '/credits?app=android', storageThrows: true });
+  assert.equal(replaced, '/account?app=android');
+  assert.equal(runScript({ url: '/credits?app=android' }).replaced, '/account', 'remembered: clean address');
+});
