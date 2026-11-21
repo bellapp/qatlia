@@ -297,7 +297,13 @@ test('the image route never counts as an opening, and stamps the sRGB profile', 
   assert.match(source, /withSrgbProfile\(/);
   assert.match(source, /previewPlanFor\(draft\)/, 'no plan drawn for a list over 450 pieces');
   assert.match(source, /'Content-Type': 'image\/png'/);
-  assert.match(source, /'Cache-Control': 'no-store'/);
+  assert.match(source, /'Cache-Control': 'no-store'/, 'a 404 or a 503 is never cached');
+  // Drawing the picture takes ~7 s; WhatsApp gave up on it ("(#131053) Media
+  // upload error", 21/11/2026). The CDN keeps it an hour: the webhook's check
+  // draws it once, WhatsApp then gets it at once.
+  assert.match(source, /'Cache-Control': PICTURE_CACHE/);
+  const { PICTURE_CACHE } = load('src/lib/whatsapp/plan-image.ts');
+  assert.equal(PICTURE_CACHE, 'public, max-age=0, s-maxage=3600');
   assert.match(source, /status: 404/);
 });
 

@@ -130,6 +130,14 @@ export function pictureCheckMs(elapsedMs: number): number | null {
   return Math.min(PICTURE_CHECK_MS, left);
 }
 
+/**
+ * The plan picture's cache: drawing it takes ~7 s and WhatsApp gave up on it
+ * ("(#131053) Media upload error", 21/11/2026). Vercel's CDN keeps it an hour:
+ * the webhook's check draws it once, WhatsApp then downloads it at once. A
+ * code's pieces never change, and its link page still expires after 24 h.
+ */
+export const PICTURE_CACHE = 'public, max-age=0, s-maxage=3600';
+
 export function planImageUrl(code: string): string {
   return `https://qatlia.ma/w/${code}/plan.png`;
 }

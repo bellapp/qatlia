@@ -3,6 +3,8 @@
  * panel, no measure), sent by the WhatsApp bot with the link and shown in the
  * link's preview. Same code and same 24 h as the link (src/lib/whatsapp/photo-link.ts).
  *
+ * The CDN keeps the picture an hour (PICTURE_CACHE): drawing it is slow.
+ *
  * Fetching it never counts as opening the link: WhatsApp and YCloud download
  * it, not the prospect. The PNG gets an sRGB profile, which YCloud requires.
  */
@@ -13,7 +15,7 @@ import { withSrgbProfile } from '@/lib/png-srgb';
 import { isPhotoCode } from '@/lib/whatsapp/photo-link';
 import { openPhotoDraft } from '@/lib/whatsapp/photo-store';
 import { previewPlanFor } from '@/lib/whatsapp/photo-summary';
-import { planImageLayout } from '@/lib/whatsapp/plan-image';
+import { PICTURE_CACHE, planImageLayout } from '@/lib/whatsapp/plan-image';
 import { PlanImage } from '@/lib/whatsapp/plan-image-view';
 
 export const dynamic = 'force-dynamic';
@@ -39,7 +41,7 @@ export async function GET(_request: Request, { params }: { params: { code: strin
     const body = new ArrayBuffer(png.byteLength);
     new Uint8Array(body).set(png);
     return new Response(body, {
-      headers: { 'Content-Type': 'image/png', 'Cache-Control': 'no-store', 'Content-Length': String(png.length) },
+      headers: { 'Content-Type': 'image/png', 'Cache-Control': PICTURE_CACHE, 'Content-Length': String(png.length) },
     });
   } catch (error) {
     console.error('[whatsapp] plan picture failed', error instanceof Error ? error.message : 'unknown error');

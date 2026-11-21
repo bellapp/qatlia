@@ -97,6 +97,8 @@ test('the back office can send the plan card of a read, signed in as admin only'
   assert.match(source, /photoLink\(/);
   assert.match(source, /recordOutbound\(/);
   assert.match(source, /'expired'/, 'never a card for an expired link');
+  // The picture is drawn (and cached) before WhatsApp is asked to fetch it.
+  assert.ok(source.indexOf('await fetch(image') < source.indexOf('sendPlanCard(config'), 'picture drawn before the send');
 });
 
 // The first card was refused with a bare "YCloud HTTP 400" (21/11/2026): the
