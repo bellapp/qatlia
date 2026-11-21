@@ -1,15 +1,20 @@
 /**
  * The picture the bot sends after reading a cut list (owner, 21/11/2026): the
- * first panel of the free preview plan, its pieces as colored boxes, each with
- * its line on the sheet and its size (the owner asked for them the same day,
- * after a first version without), "1 / N" and the brand. It shows that the list
- * was understood; the whole plan (all panels, PDF) stays in the app, after
- * sign-up (plan 2026-11-19-whatsapp-plan-apercu).
+ * first panel of the free preview plan, drawn as the atelier draws it (the
+ * owner asked for "the same display as in the application" the same day):
+ * each piece in the atelier's colors with its number (#N) and its size
+ * (« 228.0×9.0 cm »), the offcuts hatched with their size, "1 / N" and the
+ * brand. The whole plan (all panels, PDF) stays in the app, after sign-up
+ * (plan 2026-11-19-whatsapp-plan-apercu).
+ *
+ * The sizes and font rules are the atelier's own (the plan SVG in
+ * src/app/(site)/atelier/page.tsx), in centimetres, scaled to the picture.
  *
  * Pure: the route src/app/(site)/w/[code]/plan.png draws this layout.
  */
 
 import type { OptimizationResult } from '@/lib/cutting/binpacking';
+import { PIECE_COLOR_PALETTE } from '@/lib/pieces/catalog';
 
 export const PLAN_IMAGE_WIDTH = 1080;
 const MARGIN = 60;
@@ -18,20 +23,6 @@ export const PLAN_IMAGE_FOOTER = 130;
 /** Keeps a tall panel on one phone screen. */
 const MAX_PANEL_HEIGHT = 1300;
 
-/** Soft, distinct fills; copies of one line of the list share one. */
-export const PLAN_COLORS: readonly string[] = [
-  '#FDBA74',
-  '#93C5FD',
-  '#86EFAC',
-  '#F9A8D4',
-  '#C4B5FD',
-  '#FDE047',
-  '#67E8F9',
-  '#FCA5A5',
-  '#BEF264',
-  '#D6D3D1',
-];
-
 export interface PlanImageBox {
   left: number;
   top: number;
@@ -39,22 +30,30 @@ export interface PlanImageBox {
   height: number;
 }
 
-/** What a piece shows: its line on the sheet, and its size when there is room. */
-export interface PlanImageLabel {
-  /** The line of the cut list, from 1, as on the prospect's sheet. */
-  line: number;
-  /** "207.5 × 78", as written on the sheet; null when only the line fits. */
+export interface PlanImagePiece extends PlanImageBox {
+  color: string;
+  /** "#12", the piece number the atelier shows. */
+  number: string;
+  numberFont: number;
+  /** « 228.0×9.0 cm » as placed; null on a piece under 10 cm on its short side, as in the atelier. */
   size: string | null;
-  /** Turned a quarter for a piece taller than wide, so the text runs along it. */
-  vertical: boolean;
-  fontSize: number;
+  sizeFont: number;
+}
+
+export interface PlanImageOffcut extends PlanImageBox {
+  /** « 41.0 × 208.0 cm »; null under 14 × 10 cm, as in the atelier. */
+  size: string | null;
+  font: number;
 }
 
 export interface PlanImageLayout {
   width: number;
   height: number;
   panel: PlanImageBox;
-  pieces: Array<PlanImageBox & { color: string; label: PlanImageLabel | null }>;
+  /** Pixels per centimetre: the atelier's strokes are in centimetres too. */
+  scale: number;
+  pieces: PlanImagePiece[];
+  offcuts: PlanImageOffcut[];
   sheetCount: number;
   /** "1 / N": the picture is one panel of N. */
   badge: string;
@@ -81,37 +80,13 @@ export function planImageUrl(code: string): string {
 }
 
 const round = (value: number) => Math.round(value * 10) / 10;
+const clamp = (value: number, min: number, max: number) => Math.min(max, Math.max(min, value));
+/** The atelier's formatDisplayValue in centimetres: one decimal, always. */
+const cm = (value: number) => value.toFixed(1);
 
-/** A piece's size as the prospect wrote it: height × width, one decimal at most. */
-export function pieceSize(height: number, width: number): string {
-  return `${round(height)} × ${round(width)}`;
-}
-
-const MAX_FONT = 34;
-const MIN_FONT = 12;
-/** Average glyph width of the bundled sans font, as a share of its size. */
-const GLYPH = 0.6;
-/** The line's dark pill and the gap after it, in font sizes. */
-const PILL = 1.6;
-
-/**
- * The label of one piece drawn `width` × `height` pixels: its line and size in
- * the largest size that fits (MAX_FONT at most), along the long side; the line
- * alone when the size does not fit in MIN_FONT; nothing when even that does not.
- */
-export function pieceLabel(line: number, size: string, width: number, height: number): PlanImageLabel | null {
-  const vertical = height > width * 1.2;
-  const long = vertical ? height : width;
-  const thick = vertical ? width : height;
-  const lineChars = String(line).length;
-  const fit = (chars: number, pill: number) =>
-    Math.floor(Math.min(MAX_FONT, thick * 0.6, (long - 12) / (chars * GLYPH + pill)));
-
-  const full = fit(lineChars + size.length, PILL);
-  if (full >= MIN_FONT) return { line, size, vertical, fontSize: full };
-  const alone = fit(lineChars, 1);
-  if (alone >= MIN_FONT) return { line, size: null, vertical, fontSize: alone };
-  return null;
+/** The atelier's piece color: its own, or the palette by piece number. */
+export function pieceColor(placed: { color?: string; pieceNumber: number }): string {
+  return placed.color || PIECE_COLOR_PALETTE[(placed.pieceNumber - 1) % PIECE_COLOR_PALETTE.length];
 }
 
 export function planImageLayout(result: Pick<OptimizationResult, 'sheets' | 'sheetsUsed'>): PlanImageLayout | null {
@@ -122,28 +97,41 @@ export function planImageLayout(result: Pick<OptimizationResult, 'sheets' | 'she
   const panelWidth = round(sheet.width * scale);
   const panelHeight = round(sheet.height * scale);
   const panel = { left: round((PLAN_IMAGE_WIDTH - panelWidth) / 2), top: MARGIN, width: panelWidth, height: panelHeight };
+  const box = (item: { x: number; y: number; width: number; height: number }): PlanImageBox => ({
+    left: round(panel.left + item.x * scale),
+    top: round(panel.top + item.y * scale),
+    width: round(item.width * scale),
+    height: round(item.height * scale),
+  });
 
-  const pieces = sheet.pieces.map((placed) => {
-    const width = round(placed.width * scale);
-    const height = round(placed.height * scale);
-    // originalIndex is the line of the list the bot read (atelierPieces keeps its order).
-    const line = (placed.originalIndex ?? placed.pieceNumber - 1) + 1;
+  // Same rules as the atelier's plan, in cm then scaled: "#N" in
+  // min(5.5, max(2.5, side/12)), the size in min(4.5, max(2, side/14)) from 10 cm.
+  const pieces = sheet.pieces.map((placed): PlanImagePiece => {
+    const minSide = Math.min(placed.width, placed.height);
     return {
-      left: round(panel.left + placed.x * scale),
-      top: round(panel.top + placed.y * scale),
-      width,
-      height,
-      color: PLAN_COLORS[(placed.originalIndex ?? placed.pieceNumber) % PLAN_COLORS.length],
-      label: pieceLabel(line, pieceSize(placed.originalHeight, placed.originalWidth), width, height),
+      ...box(placed),
+      color: pieceColor(placed),
+      number: `#${placed.pieceNumber}`,
+      numberFont: round(clamp(minSide / 12, 2.5, 5.5) * scale),
+      size: minSide >= 10 ? `${cm(placed.height)}×${cm(placed.width)} cm` : null,
+      sizeFont: round(clamp(minSide / 14, 2, 4.5) * scale),
     };
   });
+
+  const offcuts = (sheet.offcuts ?? []).map((offcut): PlanImageOffcut => ({
+    ...box(offcut),
+    size: offcut.width >= 14 && offcut.height >= 10 ? `${cm(offcut.height)} × ${cm(offcut.width)} cm` : null,
+    font: round(clamp(Math.min(offcut.width, offcut.height) / 12, 2.2, 4.5) * scale),
+  }));
 
   const sheetCount = Math.max(result.sheetsUsed, result.sheets.length);
   return {
     width: PLAN_IMAGE_WIDTH,
     height: Math.round(panel.top + panelHeight + PLAN_IMAGE_FOOTER),
     panel,
+    scale: round(scale),
     pieces,
+    offcuts,
     sheetCount,
     badge: `1 / ${sheetCount}`,
   };
