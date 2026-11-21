@@ -97,6 +97,12 @@ test('the back office can send the plan card of a read, signed in as admin only'
   assert.match(source, /photoLink\(/);
   assert.match(source, /recordOutbound\(/);
   assert.match(source, /'expired'/, 'never a card for an expired link');
+  // WhatsApp refused the card's picture ("(#131053) Media upload error",
+  // 21/11/2026): the admin can try another picture of the site, or send the
+  // bare picture with the link in its caption.
+  assert.match(source, /image: z\.string\(\)\.startsWith\('https:\/\/qatlia\.ma\/'\)\.max\(300\)\.optional\(\)/);
+  assert.match(source, /as: z\.enum\(\['card', 'image'\]\)\.default\('card'\)/);
+  assert.match(source, /sendImage\(config, waId, image, `\$\{body\}\\n\$\{url\}`\)/);
   // The picture is drawn (and cached) before WhatsApp is asked to fetch it.
   assert.ok(source.indexOf('await fetch(image') < source.indexOf('sendPlanCard(config'), 'picture drawn before the send');
 });
