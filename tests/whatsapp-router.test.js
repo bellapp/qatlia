@@ -46,7 +46,7 @@ const run = ({ event = {}, contact: c = {}, assistantRepliesLast24h = 0, handoff
 test('constants', () => {
   assert.equal(HANDOFF_HOURS, 24);
   assert.equal(MAX_ASSISTANT_REPLIES_PER_DAY, 20);
-  assert.equal(DEMO_VIDEO_URL, 'https://youtu.be/dQE_PzXUAR0');
+  assert.equal(DEMO_VIDEO_URL, 'https://youtu.be/rAjcW-1Wylk');
 });
 
 test('new contact gets the greeting and is marked greeted', () => {

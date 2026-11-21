@@ -53,7 +53,7 @@ test('the system prompt is built from the product facts in code', () => {
     assert.ok(prompt.includes(pack.name), pack.name);
     assert.ok(prompt.includes(formatMAD(pack.priceMAD)), pack.id);
   }
-  assert.ok(prompt.includes('https://youtu.be/dQE_PzXUAR0'));
+  assert.ok(prompt.includes('https://youtu.be/rAjcW-1Wylk'));
   assert.ok(prompt.includes(fr.faq2.a5));
   assert.ok(prompt.includes(fr.hero.subtitle));
   assert.ok(prompt.includes('https://qatlia.ma'));

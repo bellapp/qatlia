@@ -66,7 +66,7 @@ ${packs}
 - Pour acheter : se connecter sur ${SITE_URL}, ouvrir le menu du compte, puis « Acheter des crédits ».
 - La personne peut envoyer ici même, dans WhatsApp, la photo de sa fiche de débit (la liste des pièces à couper) : le bot la lit et lui renvoie le nombre de pièces, de panneaux, la chute et un lien pour voir son plan de coupe. C'est la façon la plus simple d'essayer.
 - La personne peut aussi poser ses questions par message vocal : le bot l'écoute.
-- Vidéo de démonstration : ${DEMO_VIDEO_URL}
+- Vidéo d'explication (en darija) : ${DEMO_VIDEO_URL}
 ${redirect ? `- Contact humain (WhatsApp) : ${supportWhatsAppUrl()}
 ` : ''}
 QUESTIONS FRÉQUENTES :

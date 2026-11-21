@@ -12,7 +12,8 @@ import { supportWhatsAppUrl } from '@/lib/support';
 
 export type Lang = 'fr' | 'ar';
 
-export const DEMO_VIDEO_URL = 'https://youtu.be/dQE_PzXUAR0';
+/** The explanation video, in darija: sent to every reader for now, French included. */
+export const DEMO_VIDEO_URL = 'https://youtu.be/rAjcW-1Wylk';
 
 /**
  * Short links: each redirects to its page with `utm_source=whatsapp`
@@ -75,9 +76,9 @@ const GREETING_INVITE: Record<Lang, { hello: string; photo: string; voice: strin
 
 const GREETING_DEMO: Record<Lang, string> = {
   ar: `🎥 شوف كيفاش كيخدم: ${DEMO_VIDEO_URL}`,
-  fr: `🎥 Démo en 1 min : ${DEMO_VIDEO_URL}`,
+  fr: `🎥 Démo en darija : ${DEMO_VIDEO_URL}`,
 };
-const GREETING_DEMO_BOTH = `🎥 Démo · كيفاش كيخدم : ${DEMO_VIDEO_URL}`;
+const GREETING_DEMO_BOTH = `🎥 Vidéo · كيفاش كيخدم : ${DEMO_VIDEO_URL}`;
 
 const GREETING_BUTTONS: Record<Lang, string> = {
   ar: 'ولا ختار من التحت 👇',
@@ -161,11 +162,11 @@ ${MENU_AGAIN_AR}
     fr: `C'est simple 👇
 📸 Prenez en photo votre fiche de débit avec votre téléphone et envoyez-la-moi ici.
 ✅ Je vous renvoie le plan de coupe : combien de panneaux, et comment les couper.
-🎥 Vidéo d'1 minute : ${DEMO_VIDEO_URL}`,
+🎥 Vidéo d'explication (en darija) : ${DEMO_VIDEO_URL}`,
     ar: `ساهلة 👇
 📸 صوّر ورقة القياسات ديالك بالتيليفون وصيفطها ليا هنا.
 ✅ نرجع ليك مخطط التقطيع: شحال من بانو وكيفاش تقطعهم.
-🎥 فيديو ديال دقيقة: ${DEMO_VIDEO_URL}`,
+🎥 شوف الفيديو بالدارجة: ${DEMO_VIDEO_URL}`,
   },
 
   pricing: {
