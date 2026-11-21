@@ -90,34 +90,50 @@ function pieceLines(pieces: ReadPiece[], lang: Lang): string {
  */
 const ltr = (lang: Lang, text: string) => (lang === 'ar' ? `⁦${text}⁩` : text);
 
-export function photoResultText(lang: Lang, summary: PhotoSummary, pieces: ReadPiece[], link: string): string {
+/** The counts, the panel note and the warning, shared by the text answer and the picture's caption. */
+function resultLines(lang: Lang, summary: PhotoSummary): { head: string; panelNote: string[]; warning: string[] } {
   const panel = `${number(summary.sheet.height, lang)}×${number(summary.sheet.width, lang)}`;
   const standard = isDefaultPanel(summary.sheet);
 
   if (lang === 'ar') {
-    const lines = [
+    return {
       // Labelled figures (« القطع: 14 ») rather than counted nouns: no number agreement to get wrong.
-      `✅ القطع اللي تقرات: ${ltr(lang, String(summary.pieceCount))} · اللوحات: ${ltr(lang, String(summary.sheetsUsed))} (${ltr(lang, panel)}) · الهدر: ${ltr(lang, `${summary.wastePercent}%`)}`,
-      ...(standard ? ['(لوحة عادية، تقدر تبدلها فالورشة)'] : []),
-      pieceLines(pieces, lang),
-      ...(summary.unplaced > 0 ? [`⚠️ قطع كبر من اللوحة: ${ltr(lang, String(summary.unplaced))}`] : []),
-      `👉 شوف مخطط التقطيع ديالك (الرابط صالح ${ltr(lang, '24')} ساعة): ${link}`,
-    ];
-    return lines.join('\n');
+      head: `✅ القطع اللي تقرات: ${ltr(lang, String(summary.pieceCount))} · اللوحات: ${ltr(lang, String(summary.sheetsUsed))} (${ltr(lang, panel)}) · الهدر: ${ltr(lang, `${summary.wastePercent}%`)}`,
+      panelNote: standard ? ['(لوحة عادية، تقدر تبدلها فالورشة)'] : [],
+      warning: summary.unplaced > 0 ? [`⚠️ قطع كبر من اللوحة: ${ltr(lang, String(summary.unplaced))}`] : [],
+    };
   }
 
   const pieceWord = summary.pieceCount > 1 ? 'pièces lues' : 'pièce lue';
   const panelWord = summary.sheetsUsed > 1 ? 'panneaux' : 'panneau';
   const unplacedWord = summary.unplaced > 1 ? 'pièces plus grandes' : 'pièce plus grande';
-  const lines = [
-    `✅ ${summary.pieceCount} ${pieceWord} · ${summary.sheetsUsed} ${panelWord} ${panel} · ${summary.wastePercent} % de chute`,
-    ...(standard ? ['(panneau standard, modifiable dans l\'atelier)'] : []),
-    pieceLines(pieces, lang),
-    ...(summary.unplaced > 0 ? [`⚠️ ${summary.unplaced} ${unplacedWord} que le panneau`] : []),
-    // The link shows the plan at once (preview); it lasts PHOTO_READ_TTL_HOURS.
-    `👉 Voir votre plan de coupe (lien valable 24 h) : ${link}`,
-  ];
-  return lines.join('\n');
+  return {
+    head: `✅ ${summary.pieceCount} ${pieceWord} · ${summary.sheetsUsed} ${panelWord} ${panel} · ${summary.wastePercent} % de chute`,
+    panelNote: standard ? ['(panneau standard, modifiable dans l\'atelier)'] : [],
+    warning: summary.unplaced > 0 ? [`⚠️ ${summary.unplaced} ${unplacedWord} que le panneau`] : [],
+  };
+}
+
+export function photoResultText(lang: Lang, summary: PhotoSummary, pieces: ReadPiece[], link: string): string {
+  const { head, panelNote, warning } = resultLines(lang, summary);
+  // The link shows the plan at once (preview); it lasts PHOTO_READ_TTL_HOURS.
+  const cta = lang === 'ar'
+    ? `👉 شوف مخطط التقطيع ديالك (الرابط صالح ${ltr(lang, '24')} ساعة): ${link}`
+    : `👉 Voir votre plan de coupe (lien valable 24 h) : ${link}`;
+  return [head, ...panelNote, pieceLines(pieces, lang), ...warning, cta].join('\n');
+}
+
+/**
+ * The caption of the plan picture (src/lib/whatsapp/plan-image.ts): the counts
+ * and the link, without the list of pieces. The picture shows one panel and no
+ * measure, so the caption points up at it and on to the whole plan.
+ */
+export function photoResultCaption(lang: Lang, summary: PhotoSummary, link: string): string {
+  const { head, panelNote, warning } = resultLines(lang, summary);
+  const cta = lang === 'ar'
+    ? `👆 هادا طرف من مخطط التقطيع ديالك. شوفو كامل هنا (الرابط صالح ${ltr(lang, '24')} ساعة): ${link}`
+    : `👆 Voici le début de votre plan de coupe. Voyez-le en entier ici (lien valable 24 h) : ${link}`;
+  return [head, ...panelNote, ...warning, cta].join('\n');
 }
 
 /** The draft's pieces as the atelier holds them; the preview is laid out on these same ids. */

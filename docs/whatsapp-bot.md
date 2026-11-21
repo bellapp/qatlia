@@ -117,7 +117,11 @@ Quand un prospect envoie la photo de sa fiche :
 
 1. le bot répond « 📸 Je lis votre fiche… » ;
 2. il télécharge la photo (API Graph, avec `WHATSAPP_ACCESS_TOKEN`) et la lit avec la même lecture que le scan du site, plus le format du panneau s'il est écrit sur la fiche ;
-3. il calcule le plan sur ce panneau, ou sur le panneau par défaut de l'atelier (278 × 208), et répond : pièces lues, panneaux, chute, panneau utilisé, premières lignes, et le lien `qatlia.ma/w/<code>` ;
+3. il calcule le plan sur ce panneau, ou sur le panneau par défaut de l'atelier (278 × 208), et répond par **une image du plan** (`qatlia.ma/w/<code>/plan.png`) :
+   - l'image montre le premier panneau, ses pièces en couleur, **sans aucune cote**, avec « 1 / N » et QatliA ;
+   - la légende donne les pièces lues, les panneaux, la chute et le panneau utilisé, puis « 👆 Voici le début de votre plan… » avec le lien `qatlia.ma/w/<code>` ;
+   - avant l'envoi, la route du webhook télécharge l'image (8 s au plus). Si elle n'est pas dessinée, ou si YCloud la refuse, le bot envoie l'ancienne réponse texte (avec les premières lignes) ;
+   - l'image porte un profil couleur sRGB (`src/lib/png-srgb.ts`), exigé par YCloud ; la télécharger ne compte jamais comme une ouverture du lien. La page du lien la donne aussi comme image d'aperçu (`og:image`) ;
 4. le lien ouvre l'atelier avec les pièces, le panneau et **le plan déjà dessiné, en aperçu gratuit** (calculé sur le serveur à partir des pièces stockées). Sans compte, un bandeau invite à s'inscrire ; PDF, devis, DXF, PNG et JSON mènent aussi à l'inscription (l'aperçu ne sort jamais en fichier : connecté mais encore en aperçu, par exemple sans crédit, ces boutons relancent l'optimisation payante). Le message du bot annonce « lien valable 24 h ». **À l'inscription ou à la connexion** (ou si le visiteur est déjà connecté), l'atelier lance tout seul l'optimisation normale : 1 crédit, ré-optimisations gratuites 24 h, PDF disponible. Le lien expire au bout de 24 h.
 
 Règles :
