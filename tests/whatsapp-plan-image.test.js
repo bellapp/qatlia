@@ -6,10 +6,10 @@ const { loadTsModule } = require('./helpers/load-ts-module');
 const { stubModule } = require('./helpers/stub-module');
 
 // The bot answers a read cut list with a picture of the plan rather than a
-// list of numbers (owner, 21/11/2026): the first panel, drawn as the atelier
-// draws it (owner, same day: "the same display as in the application"),
-// "1 / N"; the caption gives the counts and the link to the whole plan (all
-// panels, PDF), which stays behind sign-up.
+// list of numbers (owner, 21/11/2026): a "screenshot" of the atelier's result
+// screen (owner, same day) with the first panel drawn as the atelier draws it;
+// the caption gives the counts and the link to the whole plan (all panels,
+// PDF), which stays behind sign-up.
 
 const ROOT = path.resolve(__dirname, '..');
 const load = (rel) => loadTsModule(path.join(ROOT, rel));
@@ -125,9 +125,55 @@ test('the offcuts of the panel are drawn with their size from 14 × 10 cm', () =
   });
 });
 
-test('the panel count and the brand stay under the panel', () => {
-  const layout = planImageLayout(photoPreviewPlan(draft));
-  assert.equal(layout.badge, `1 / ${layout.sheetCount}`);
+// « Garde ce format d'envoi sous forme de capture d'écran du résultat »
+// (owner, 21/11/2026, on a screenshot of the atelier): the picture is the
+// atelier's result screen, top to bottom: the cost banner, the panel tabs with
+// their yield, the plan of panel 1, the export buttons. French, as on that screen.
+test('the picture is the atelier result screen: cost banner, panel tabs, plan, exports', () => {
+  const plan = hamoudaPlan();
+  const layout = planImageLayout(plan);
+
+  assert.deepEqual(layout.banner, {
+    label: 'COÛT TOTAL ESTIMÉ',
+    amount: '32 612,83',
+    currency: 'MAD',
+    meta: '641,9 m linéaires de coupe · 47 panneaux',
+  });
+
+  // One chip per panel, "Panneau N" and its yield (100 − waste, rounded, as
+  // SheetTabs), the first one active; as many as the row holds, then "›".
+  const { tabs } = layout;
+  assert.ok(tabs.length >= 4 && tabs.length < plan.sheetsUsed, `${tabs.length} chips`);
+  assert.ok(layout.moreTabs);
+  tabs.forEach((tab, i) => {
+    assert.equal(tab.label, `Panneau ${i + 1}`);
+    assert.equal(tab.yield, Math.max(0, Math.min(100, Math.round(100 - plan.sheets[i].wasteRate))));
+    assert.equal(tab.active, i === 0);
+    assert.ok(tab.left + tab.width <= layout.width - 40, 'every chip fits the row');
+  });
+  assert.equal(tabs[0].yield, 95);
+
+  assert.deepEqual(layout.exports, {
+    files: ['CSV', 'JSON', 'PNG', 'DXF'],
+    pdf: 'Exporter le rapport PDF',
+    quote: 'Devis client',
+  });
+
+  // Top to bottom, inside the picture.
+  assert.ok(layout.bannerBox.top + layout.bannerBox.height <= layout.tabsTop);
+  assert.ok(tabs[0].top + tabs[0].height <= layout.panel.top);
+  assert.ok(layout.panel.top + layout.panel.height <= layout.exportsTop);
+  assert.ok(layout.exportsTop < layout.height);
+});
+
+test('a plan without a price shows a dash, as the atelier does', () => {
+  const plan = { ...hamoudaPlan(), costBreakdown: undefined };
+  assert.equal(planImageLayout(plan).banner.amount, '—');
+  const single = photoPreviewPlan({ pieces: [{ name: '', height: 50, width: 40, quantity: 1 }], sheet: { height: 278, width: 208 } });
+  const layout = planImageLayout(single);
+  assert.match(layout.banner.meta, / · 1 panneau$/);
+  assert.equal(layout.moreTabs, false);
+  assert.equal(layout.tabs.length, 1);
 });
 
 test('the picture is tried only while the webhook has time left for the text answer', () => {

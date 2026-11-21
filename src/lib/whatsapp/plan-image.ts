@@ -1,14 +1,20 @@
 /**
- * The picture the bot sends after reading a cut list (owner, 21/11/2026): the
- * first panel of the free preview plan, drawn as the atelier draws it (the
- * owner asked for "the same display as in the application" the same day):
- * each piece in the atelier's colors with its number (#N) and its size
- * (« 228.0×9.0 cm »), the offcuts hatched with their size, "1 / N" and the
- * brand. The whole plan (all panels, PDF) stays in the app, after sign-up
- * (plan 2026-11-19-whatsapp-plan-apercu).
+ * The picture the bot sends after reading a cut list (owner, 21/11/2026): a
+ * "screenshot" of the atelier's result screen for the free preview plan (the
+ * owner, on a screenshot of the atelier: « garde ce format d'envoi sous forme
+ * de capture d'écran du résultat »). Top to bottom, as in
+ * src/app/(site)/atelier/page.tsx:
+ *  - the cost banner: « COÛT TOTAL ESTIMÉ », the amount, the metres of cut and the panels;
+ *  - the panel tabs (src/components/SheetTabs.tsx): « Panneau N » and its yield, the first active;
+ *  - the plan of panel 1, drawn as the atelier draws it: each piece in its
+ *    line's color with « #N » and « H×W cm », the offcuts hatched with their size;
+ *  - the export buttons (CSV, JSON, PNG, DXF, the PDF report, the client quote).
+ * The whole plan (all panels, the exports) stays in the app, after sign-up
+ * (plan 2026-11-19-whatsapp-plan-apercu). French, as on the owner's screenshot:
+ * the bundled font draws Latin text only.
  *
- * The sizes and font rules are the atelier's own (the plan SVG in
- * src/app/(site)/atelier/page.tsx), in centimetres, scaled to the picture.
+ * The plan's sizes and font rules are the atelier's own, in centimetres,
+ * scaled to the picture.
  *
  * Pure: the route src/app/(site)/w/[code]/plan.png draws this layout.
  */
@@ -17,11 +23,28 @@ import type { OptimizationResult } from '@/lib/cutting/binpacking';
 import { PIECE_COLOR_PALETTE } from '@/lib/pieces/catalog';
 
 export const PLAN_IMAGE_WIDTH = 1080;
-const MARGIN = 60;
-/** The band under the panel, for the brand and "1 / N". */
-export const PLAN_IMAGE_FOOTER = 130;
+/** The page's side margin. */
+const PAD = 40;
+/** Between the banner, the plan card and the exports. */
+const GAP = 28;
+const BANNER_HEIGHT = 250;
+/** The tabs row on top of the plan card. */
+export const PLAN_IMAGE_TABS_HEIGHT = 112;
+const TABS_HEIGHT = PLAN_IMAGE_TABS_HEIGHT;
+const TAB_HEIGHT = 72;
+const TAB_WIDTH = 188;
+const TAB_GAP = 12;
+/** The "‹" and "›" at the ends of the tabs row. */
+const ARROW_WIDTH = 40;
+/** Around the panel, inside the plan card. */
+const PLAN_PAD = 30;
 /** Keeps a tall panel on one phone screen. */
-const MAX_PANEL_HEIGHT = 1300;
+const MAX_PANEL_HEIGHT = 1150;
+const EXPORT_ROW = 84;
+const EXPORT_PDF = 96;
+const EXPORT_GAP = 14;
+/** The brand under the exports. */
+const FOOTER = 90;
 
 export interface PlanImageBox {
   left: number;
@@ -46,17 +69,49 @@ export interface PlanImageOffcut extends PlanImageBox {
   font: number;
 }
 
+/** The atelier's cost banner (atelier.cost.* in src/i18n/messages/fr.ts). */
+export interface PlanImageBanner {
+  label: string;
+  /** « 32 612,83 », or « — » when the plan has no price, as in the atelier. */
+  amount: string;
+  currency: string;
+  /** « 641,9 m linéaires de coupe · 47 panneaux ». */
+  meta: string;
+}
+
+/** One chip of the panel tabs. */
+export interface PlanImageTab extends PlanImageBox {
+  label: string;
+  /** The panel's yield, 0-100, as SheetTabs shows it. */
+  yield: number;
+  active: boolean;
+}
+
+export interface PlanImageExports {
+  files: string[];
+  pdf: string;
+  quote: string;
+}
+
 export interface PlanImageLayout {
   width: number;
   height: number;
+  banner: PlanImageBanner;
+  bannerBox: PlanImageBox;
+  /** The plan card: the tabs row, then the panel. */
+  card: PlanImageBox;
+  tabsTop: number;
+  tabs: PlanImageTab[];
+  /** More panels than the row holds: the row ends on "›", as it scrolls in the atelier. */
+  moreTabs: boolean;
   panel: PlanImageBox;
   /** Pixels per centimetre: the atelier's strokes are in centimetres too. */
   scale: number;
   pieces: PlanImagePiece[];
   offcuts: PlanImageOffcut[];
   sheetCount: number;
-  /** "1 / N": the picture is one panel of N. */
-  badge: string;
+  exportsTop: number;
+  exports: PlanImageExports;
 }
 
 /**
@@ -89,14 +144,67 @@ export function pieceColor(placed: { color?: string; pieceNumber: number }): str
   return placed.color || PIECE_COLOR_PALETTE[(placed.pieceNumber - 1) % PIECE_COLOR_PALETTE.length];
 }
 
-export function planImageLayout(result: Pick<OptimizationResult, 'sheets' | 'sheetsUsed'>): PlanImageLayout | null {
+/** A French figure as the atelier prints it: « 32 612,83 », « 641,9 ». */
+function frenchNumber(value: number, decimals: number, keepZeros: boolean): string {
+  const fixed = value.toFixed(decimals);
+  const [whole, fraction = ''] = fixed.split('.');
+  const grouped = whole.replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
+  const shown = keepZeros ? fraction : fraction.replace(/0+$/, '');
+  return shown ? `${grouped},${shown}` : grouped;
+}
+
+/** Yield of one panel, as SheetTabs (sheetYield) rounds it: 100 minus the waste. */
+function sheetYield(wasteRate: number | undefined): number {
+  const waste = Number.isFinite(wasteRate) ? Number(wasteRate) : 0;
+  return Math.max(0, Math.min(100, Math.round(100 - waste)));
+}
+
+type PlanImageSource = Pick<OptimizationResult, 'sheets' | 'sheetsUsed'> &
+  Partial<Pick<OptimizationResult, 'costBreakdown' | 'totalLinearCutMeters'>>;
+
+export function planImageLayout(result: PlanImageSource): PlanImageLayout | null {
   const sheet = result.sheets[0];
   if (!sheet || sheet.width <= 0 || sheet.height <= 0) return null;
+  const sheetCount = Math.max(result.sheetsUsed, result.sheets.length);
 
-  const scale = Math.min((PLAN_IMAGE_WIDTH - 2 * MARGIN) / sheet.width, MAX_PANEL_HEIGHT / sheet.height);
+  const bannerBox = { left: PAD, top: PAD, width: PLAN_IMAGE_WIDTH - 2 * PAD, height: BANNER_HEIGHT };
+  const cost = result.costBreakdown;
+  const banner: PlanImageBanner = {
+    label: 'COÛT TOTAL ESTIMÉ',
+    amount: cost ? frenchNumber(cost.subtotal, 2, true) : '—',
+    currency: cost?.currency || 'MAD',
+    meta: `${frenchNumber(result.totalLinearCutMeters || 0, 1, false)} m linéaires de coupe · ${sheetCount} ${sheetCount === 1 ? 'panneau' : 'panneaux'}`,
+  };
+
+  // The tabs: as many whole chips as the row holds between its arrows.
+  const tabsTop = bannerBox.top + BANNER_HEIGHT + GAP;
+  const rowLeft = PAD + 16 + ARROW_WIDTH + 8;
+  const rowWidth = PLAN_IMAGE_WIDTH - 2 * rowLeft;
+  const fits = Math.max(1, Math.floor((rowWidth + TAB_GAP) / (TAB_WIDTH + TAB_GAP)));
+  const shown = Math.min(sheetCount, fits);
+  // A full row stretches its chips to the arrow; a short one keeps their width.
+  const tabWidth = sheetCount > shown ? round((rowWidth - TAB_GAP * (shown - 1)) / shown) - 0.1 : TAB_WIDTH;
+  const tabs: PlanImageTab[] = Array.from({ length: shown }, (_, i) => ({
+    left: round(rowLeft + i * (tabWidth + TAB_GAP)),
+    top: tabsTop + (TABS_HEIGHT - TAB_HEIGHT) / 2,
+    width: tabWidth,
+    height: TAB_HEIGHT,
+    label: `Panneau ${i + 1}`,
+    yield: sheetYield(result.sheets[i]?.wasteRate),
+    active: i === 0,
+  }));
+
+  const scale = Math.min((PLAN_IMAGE_WIDTH - 2 * PAD - 2 * PLAN_PAD) / sheet.width, MAX_PANEL_HEIGHT / sheet.height);
   const panelWidth = round(sheet.width * scale);
   const panelHeight = round(sheet.height * scale);
-  const panel = { left: round((PLAN_IMAGE_WIDTH - panelWidth) / 2), top: MARGIN, width: panelWidth, height: panelHeight };
+  const panel = {
+    left: round((PLAN_IMAGE_WIDTH - panelWidth) / 2),
+    top: tabsTop + TABS_HEIGHT + PLAN_PAD,
+    width: panelWidth,
+    height: panelHeight,
+  };
+  const card = { left: PAD, top: tabsTop, width: PLAN_IMAGE_WIDTH - 2 * PAD, height: TABS_HEIGHT + 2 * PLAN_PAD + panelHeight };
+  const exportsTop = round(card.top + card.height + GAP);
   const box = (item: { x: number; y: number; width: number; height: number }): PlanImageBox => ({
     left: round(panel.left + item.x * scale),
     top: round(panel.top + item.y * scale),
@@ -124,15 +232,24 @@ export function planImageLayout(result: Pick<OptimizationResult, 'sheets' | 'she
     font: round(clamp(Math.min(offcut.width, offcut.height) / 12, 2.2, 4.5) * scale),
   }));
 
-  const sheetCount = Math.max(result.sheetsUsed, result.sheets.length);
   return {
     width: PLAN_IMAGE_WIDTH,
-    height: Math.round(panel.top + panelHeight + PLAN_IMAGE_FOOTER),
+    height: Math.round(exportsTop + EXPORT_ROW + EXPORT_GAP + EXPORT_PDF + EXPORT_GAP + EXPORT_ROW + FOOTER),
+    banner,
+    bannerBox,
+    card,
+    tabsTop,
+    tabs,
+    moreTabs: sheetCount > shown,
     panel,
     scale: round(scale),
     pieces,
     offcuts,
     sheetCount,
-    badge: `1 / ${sheetCount}`,
+    exportsTop,
+    exports: { files: ['CSV', 'JSON', 'PNG', 'DXF'], pdf: 'Exporter le rapport PDF', quote: 'Devis client' },
   };
 }
+
+/** The export buttons' rows, from `exportsTop`: the files, the PDF report, the client quote. */
+export const PLAN_IMAGE_EXPORT_ROWS = { files: EXPORT_ROW, pdf: EXPORT_PDF, quote: EXPORT_ROW, gap: EXPORT_GAP } as const;
