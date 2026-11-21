@@ -2,8 +2,9 @@
  * The bot reads a photographed cut list (plan 2026-11-19): once per number,
  * it says it is reading, downloads the photo, reads it with the site's reader
  * (plus the panel size), computes the plan on that panel or the default one,
- * stores the result behind a short code and answers with the summary and the
- * link. The full plan stays in the app, after sign-up.
+ * stores the result behind a short code and answers with a picture of the
+ * plan's first panel, the summary and the link (the summary as text when the
+ * picture cannot go out). The full plan stays in the app, after sign-up.
  *
  * Outcomes for the webhook:
  * - 'handled': this flow sent its answer;
@@ -25,11 +26,13 @@ import {
   bigListText,
   listSummary,
   photoLink,
+  photoResultCaption,
   photoResultText,
   plausiblePanel,
   summarizeCutList,
   usablePieces,
 } from '@/lib/whatsapp/photo-summary';
+import { planImageUrl } from '@/lib/whatsapp/plan-image';
 import { countBotMessages } from '@/lib/whatsapp/store';
 
 export type PhotoOutcome = 'handled' | 'hint' | 'silent';
@@ -59,8 +62,13 @@ export async function handlePhoto(input: {
   lang: Lang;
   now: Date;
   deliver: (text: string, kind: PhotoMessageKind) => Promise<boolean>;
+  /**
+   * Sends the plan picture by link with its caption; false when it could not
+   * go out. Absent, or false, the answer goes as text (photoResultText).
+   */
+  deliverImage?: (link: string, caption: string, kind: PhotoMessageKind) => Promise<boolean>;
 }): Promise<PhotoOutcome> {
-  const { db, config, event, lang, now, deliver } = input;
+  const { db, config, event, lang, now, deliver, deliverImage } = input;
   if (!event.mediaId) return 'hint';
 
   let reservation;
@@ -101,7 +109,7 @@ export async function handlePhoto(input: {
     return 'handled';
   };
 
-  let result: { text: string };
+  let result: { text: string; caption: string; image: string | null };
   try {
     await deliver(PHOTO_COPY.reading[lang], 'photo_reading');
     announced = true;
@@ -130,6 +138,9 @@ export async function handlePhoto(input: {
     await completePhotoRead(db, readId, { code, pieces, sheet, summary, now });
     result = {
       text: planned ? photoResultText(lang, summary, pieces, photoLink(code)) : bigListText(lang, summary, photoLink(code)),
+      // No picture for a list the bot does not plan (over BOT_PLAN_MAX_PIECES).
+      caption: photoResultCaption(lang, summary, photoLink(code)),
+      image: planned ? planImageUrl(code) : null,
     };
   } catch (error) {
     console.error('[whatsapp] photo read threw', describe(error));
@@ -137,6 +148,12 @@ export async function handlePhoto(input: {
   }
 
   // The read is stored and the number served: a failing send is logged, never undone.
+  // The plan picture first (owner, 21/11/2026); the text answer if it cannot go out.
+  try {
+    if (deliverImage && result.image && (await deliverImage(result.image, result.caption, 'photo_result'))) return 'handled';
+  } catch (error) {
+    console.error('[whatsapp] could not send the plan picture', describe(error));
+  }
   try {
     await deliver(result.text, 'photo_result');
   } catch (error) {

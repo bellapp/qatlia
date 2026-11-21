@@ -1,10 +1,24 @@
+import type { Metadata } from 'next';
 import { headers } from 'next/headers';
-import { loadPhotoLink } from '@/lib/whatsapp/photo-link';
+import { isPhotoCode, loadPhotoLink } from '@/lib/whatsapp/photo-link';
+import { planImageUrl } from '@/lib/whatsapp/plan-image';
 import { previewPlanFor } from '@/lib/whatsapp/photo-summary';
 import { OpenInAtelier } from './OpenInAtelier';
 import { PhotoLinkExpired } from './PhotoLinkExpired';
 
 export const dynamic = 'force-dynamic';
+
+/**
+ * The link preview WhatsApp builds shows the plan picture (plan.png): no page
+ * read here, so a preview fetch never touches the link's "opened" mark.
+ */
+export function generateMetadata({ params }: { params: { code: string } }): Metadata {
+  if (!isPhotoCode(params.code)) return {};
+  // A page openGraph replaces the layout's whole: title and description are restated.
+  const title = 'QatliA · مخطط التقطيع · Plan de coupe';
+  const description = 'مخطط التقطيع ديال الورقة اللي صيفطتي · Le plan de coupe de votre fiche de débit';
+  return { openGraph: { title, description, siteName: 'QatliA', images: [{ url: planImageUrl(params.code) }] } };
+}
 
 /**
  * The link the WhatsApp bot sends after reading a photographed cut list

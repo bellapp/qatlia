@@ -21,6 +21,7 @@ import { assistantBudgetMs, hearVoice } from '@/lib/whatsapp/voice';
 import { HISTORY_MESSAGES, askAssistant } from '@/lib/whatsapp/assistant';
 import { sendButtons, sendImage, sendText } from '@/lib/whatsapp/send';
 import { handlePhoto, type PhotoMessageKind } from '@/lib/whatsapp/photo';
+import { pictureCheckMs } from '@/lib/whatsapp/plan-image';
 import {
   SEND_FAILED_KIND,
   WhatsAppTablesMissingError,
@@ -95,6 +96,45 @@ async function deliverExample(db: SupabaseClient, config: WhatsAppConfig, waId: 
   }
 }
 
+/**
+ * The plan picture by link (src/app/(site)/w/[code]/plan.png). YCloud accepts the
+ * message first and downloads the link afterwards, so a picture the site cannot
+ * draw would leave the prospect with nothing: it is fetched here first. False
+ * (not drawn, refused, or too late in the webhook's 60 s: pictureCheckMs) lets
+ * the photo flow send its text answer instead.
+ */
+async function deliverPicture(
+  db: SupabaseClient,
+  config: WhatsAppConfig,
+  waId: string,
+  link: string,
+  caption: string,
+  kind: PhotoMessageKind,
+  startedAt: Date,
+): Promise<boolean> {
+  const checkMs = pictureCheckMs(Date.now() - startedAt.getTime());
+  if (checkMs === null) {
+    console.log('[whatsapp] plan picture skipped: too late, the text answer goes');
+    return false;
+  }
+  try {
+    const check = await fetch(link, { signal: AbortSignal.timeout(checkMs) });
+    const type = check.headers.get('content-type') ?? '';
+    await check.arrayBuffer();
+    if (!check.ok || !type.startsWith('image/png')) {
+      console.error(`[whatsapp] plan picture not drawn (${check.status})`);
+      return false;
+    }
+  } catch (error) {
+    console.error('[whatsapp] plan picture check failed', describeError(error));
+    return false;
+  }
+
+  const wamid = await sendImage(config, waId, link, caption);
+  await recordOutbound(db, { waId, wamid, direction: 'bot', kind: wamid === null ? SEND_FAILED_KIND : kind, body: caption });
+  return wamid !== null;
+}
+
 /** A message the business sent from the phone itself: log it, and in coexistence mode let the human lead. */
 async function handleEcho(db: SupabaseClient, config: WhatsAppConfig, event: EchoEvent): Promise<void> {
   const now = new Date();
@@ -136,6 +176,7 @@ async function handlePhotoMessage(
     lang,
     now,
     deliver: (text, kind) => deliver(db, config, waId, text, kind),
+    deliverImage: (link, caption, kind) => deliverPicture(db, config, waId, link, caption, kind, now),
   });
   if (outcome === 'silent') return;
   if (outcome === 'hint') {
