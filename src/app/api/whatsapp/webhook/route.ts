@@ -19,7 +19,7 @@ import { COPY, EXAMPLE_FICHE_URL, type Lang, type MenuButton } from '@/lib/whats
 import { HANDOFF_HOURS, decide, detectLang, resolveLang, type Decision } from '@/lib/whatsapp/router';
 import { assistantBudgetMs, hearVoice } from '@/lib/whatsapp/voice';
 import { HISTORY_MESSAGES, askAssistant } from '@/lib/whatsapp/assistant';
-import { sendButtons, sendImage, sendText } from '@/lib/whatsapp/send';
+import { sendButtons, sendImage, sendPlanCard, sendText, type PlanCard } from '@/lib/whatsapp/send';
 import { handlePhoto, type PhotoMessageKind } from '@/lib/whatsapp/photo';
 import { pictureCheckMs } from '@/lib/whatsapp/plan-image';
 import {
@@ -111,6 +111,7 @@ async function deliverPicture(
   caption: string,
   kind: PhotoMessageKind,
   startedAt: Date,
+  card: PlanCard,
 ): Promise<boolean> {
   const checkMs = pictureCheckMs(Date.now() - startedAt.getTime());
   if (checkMs === null) {
@@ -130,6 +131,14 @@ async function deliverPicture(
     return false;
   }
 
+  // The picture with its button to the link (owner, 21/11/2026: « l'image
+  // cliquable »); the bare picture with the link in its caption if WhatsApp refuses it.
+  const cardWamid = await sendPlanCard(config, waId, card);
+  if (cardWamid !== null) {
+    await recordOutbound(db, { waId, wamid: cardWamid, direction: 'bot', kind, body: card.body });
+    return true;
+  }
+  console.error('[whatsapp] plan card refused, sending the picture alone');
   const wamid = await sendImage(config, waId, link, caption);
   await recordOutbound(db, { waId, wamid, direction: 'bot', kind: wamid === null ? SEND_FAILED_KIND : kind, body: caption });
   return wamid !== null;
@@ -176,7 +185,7 @@ async function handlePhotoMessage(
     lang,
     now,
     deliver: (text, kind) => deliver(db, config, waId, text, kind),
-    deliverImage: (link, caption, kind) => deliverPicture(db, config, waId, link, caption, kind, now),
+    deliverImage: (link, caption, kind, card) => deliverPicture(db, config, waId, link, caption, kind, now, card),
   });
   if (outcome === 'silent') return;
   if (outcome === 'hint') {

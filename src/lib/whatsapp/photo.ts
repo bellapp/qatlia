@@ -27,12 +27,14 @@ import {
   listSummary,
   photoLink,
   photoResultCaption,
+  photoResultCard,
   photoResultText,
   plausiblePanel,
   summarizeCutList,
   usablePieces,
 } from '@/lib/whatsapp/photo-summary';
 import { planImageUrl } from '@/lib/whatsapp/plan-image';
+import type { PlanCard } from '@/lib/whatsapp/send';
 import { countBotMessages } from '@/lib/whatsapp/store';
 
 export type PhotoOutcome = 'handled' | 'hint' | 'silent';
@@ -63,10 +65,11 @@ export async function handlePhoto(input: {
   now: Date;
   deliver: (text: string, kind: PhotoMessageKind) => Promise<boolean>;
   /**
-   * Sends the plan picture by link with its caption; false when it could not
-   * go out. Absent, or false, the answer goes as text (photoResultText).
+   * Sends the plan picture by link: as `card`, with its button to the link,
+   * or with its caption; false when it could not go out. Absent, or false,
+   * the answer goes as text (photoResultText).
    */
-  deliverImage?: (link: string, caption: string, kind: PhotoMessageKind) => Promise<boolean>;
+  deliverImage?: (link: string, caption: string, kind: PhotoMessageKind, card: PlanCard) => Promise<boolean>;
 }): Promise<PhotoOutcome> {
   const { db, config, event, lang, now, deliver, deliverImage } = input;
   if (!event.mediaId) return 'hint';
@@ -109,7 +112,7 @@ export async function handlePhoto(input: {
     return 'handled';
   };
 
-  let result: { text: string; caption: string; image: string | null };
+  let result: { text: string; caption: string; card: PlanCard; image: string | null };
   try {
     await deliver(PHOTO_COPY.reading[lang], 'photo_reading');
     announced = true;
@@ -140,6 +143,7 @@ export async function handlePhoto(input: {
       text: planned ? photoResultText(lang, summary, pieces, photoLink(code)) : bigListText(lang, summary, photoLink(code)),
       // No picture for a list the bot does not plan (over BOT_PLAN_MAX_PIECES).
       caption: photoResultCaption(lang, summary, photoLink(code)),
+      card: photoResultCard(lang, summary, photoLink(code)),
       image: planned ? planImageUrl(code) : null,
     };
   } catch (error) {
@@ -150,7 +154,7 @@ export async function handlePhoto(input: {
   // The read is stored and the number served: a failing send is logged, never undone.
   // The plan picture first (owner, 21/11/2026); the text answer if it cannot go out.
   try {
-    if (deliverImage && result.image && (await deliverImage(result.image, result.caption, 'photo_result'))) return 'handled';
+    if (deliverImage && result.image && (await deliverImage(result.image, result.caption, 'photo_result', result.card))) return 'handled';
   } catch (error) {
     console.error('[whatsapp] could not send the plan picture', describe(error));
   }

@@ -23,7 +23,25 @@ const SEND_TIMEOUT_MS = 10000;
 export const SEND_RETRY_DELAY_MS = 500;
 const YCLOUD_SEND_URL = 'https://api.ycloud.com/v2/whatsapp/messages/sendDirectly';
 
-type Message = { body: string; buttons?: readonly MenuButton[] } | { image: { link: string; caption: string } };
+/**
+ * A picture with a button under it that opens a link (WhatsApp "cta_url"):
+ * a WhatsApp image opens full screen and never a link (owner, 21/11/2026:
+ * « l'image cliquable pour renvoyer vers le site »).
+ */
+export interface PlanCard {
+  /** Public link of the picture shown on top. */
+  image: string;
+  /** Up to 1024 characters. */
+  body: string;
+  /** The button's label, up to 20 characters. */
+  button: string;
+  url: string;
+}
+
+type Message =
+  | { body: string; buttons?: readonly MenuButton[] }
+  | { image: { link: string; caption: string } }
+  | { card: PlanCard };
 
 /** One attempt: the message id, or whether trying again is safe. */
 type Attempt = { id: string } | { id: null; retry: boolean };
@@ -43,6 +61,18 @@ function retryableStatus(status: number): boolean {
 function content(message: Message, previewKey: 'preview_url' | 'previewUrl'): Record<string, unknown> {
   // An image by link: both APIs take the same shape.
   if ('image' in message) return { type: 'image', image: { link: message.image.link, caption: message.image.caption } };
+  if ('card' in message) {
+    const { card } = message;
+    return {
+      type: 'interactive',
+      interactive: {
+        type: 'cta_url',
+        header: { type: 'image', image: { link: card.image } },
+        body: { text: card.body },
+        action: { name: 'cta_url', parameters: { display_text: card.button, url: card.url } },
+      },
+    };
+  }
   if (!message.buttons) return { type: 'text', text: { body: message.body, [previewKey]: true } };
   return {
     type: 'interactive',
@@ -190,4 +220,14 @@ export async function sendImage(
   fetchImpl: typeof fetch = fetch,
 ): Promise<string | null> {
   return send(config, to, { image: { link, caption } }, fetchImpl);
+}
+
+/** Sends the picture with its button to `card.url`. Returns the message id, or `null` on any failure. */
+export async function sendPlanCard(
+  config: WhatsAppConfig,
+  to: string,
+  card: PlanCard,
+  fetchImpl: typeof fetch = fetch,
+): Promise<string | null> {
+  return send(config, to, { card }, fetchImpl);
 }

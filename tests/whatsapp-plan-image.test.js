@@ -14,7 +14,7 @@ const { stubModule } = require('./helpers/stub-module');
 const ROOT = path.resolve(__dirname, '..');
 const load = (rel) => loadTsModule(path.join(ROOT, rel));
 const { planImageLayout, planImageUrl, PLAN_IMAGE_WIDTH } = load('src/lib/whatsapp/plan-image.ts');
-const { photoResultCaption, photoResultText, summarizeCutList, photoPreviewPlan } = load('src/lib/whatsapp/photo-summary.ts');
+const { photoResultCaption, photoResultCard, photoResultText, summarizeCutList, photoPreviewPlan } = load('src/lib/whatsapp/photo-summary.ts');
 
 const PIECES = [
   { name: 'Côté', height: 200, width: 60, quantity: 2 },
@@ -187,7 +187,10 @@ test('the picture is tried only while the webhook has time left for the text ans
   assert.equal(pictureCheckMs(Number.NaN), null);
   const route = fs.readFileSync(path.join(ROOT, 'src/app/api/whatsapp/webhook/route.ts'), 'utf8');
   assert.match(route, /pictureCheckMs\(Date\.now\(\) - startedAt\.getTime\(\)\)/);
-  assert.match(route, /deliverPicture\(db, config, waId, link, caption, kind, now\)/);
+  assert.match(route, /deliverPicture\(db, config, waId, link, caption, kind, now, card\)/);
+  // The card first, the bare picture if WhatsApp refuses the card.
+  assert.match(route, /sendPlanCard\(config, waId, card\)/);
+  assert.match(route, /sendImage\(config, waId, link, caption\)/);
 });
 
 test('no panel, no layout', () => {
@@ -245,8 +248,8 @@ function run(lang = 'fr') {
       sent.texts.push({ text, kind });
       return true;
     },
-    deliverImage: async (link, caption, kind) => {
-      sent.images.push({ link, caption, kind });
+    deliverImage: async (link, caption, kind, card) => {
+      sent.images.push({ link, caption, kind, card });
       return sent.imageOk;
     },
   });
@@ -260,6 +263,8 @@ test('a read photo is answered with the plan picture and its caption', async () 
   assert.equal(sent.images[0].link, 'https://qatlia.ma/w/k7m2qx9dab/plan.png');
   assert.equal(sent.images[0].kind, 'photo_result');
   assert.equal(sent.images[0].caption, photoResultCaption('ar', summarizeCutList(PIECES, null), 'https://qatlia.ma/w/k7m2qx9dab'));
+  // The picture goes with its button to the link (owner, 21/11/2026: "l'image cliquable").
+  assert.deepEqual(sent.images[0].card, photoResultCard('ar', summarizeCutList(PIECES, null), 'https://qatlia.ma/w/k7m2qx9dab'));
 });
 
 test('a list too long for the bot to plan gets no picture, only its text', async () => {
