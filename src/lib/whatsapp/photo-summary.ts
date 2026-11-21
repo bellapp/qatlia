@@ -13,6 +13,7 @@ import type { PhotoDraft, PhotoSummary } from '@/lib/whatsapp/photo-store';
 import type { AtelierDraft } from '@/lib/atelier-draft';
 import type { Lang } from '@/lib/whatsapp/copy';
 import type { DisplayUnit } from '@/lib/units';
+import { getResolvedPieceColor } from '@/lib/pieces/catalog';
 
 /** Lines of the cut list repeated in the reply; the rest is counted. */
 const SHOWN_LINES = 5;
@@ -179,7 +180,13 @@ export function bigListText(lang: Lang, summary: PhotoSummary, link: string): st
 
 /** The draft's pieces as the atelier holds them; the preview is laid out on these same ids. */
 export function atelierPieces(draft: PhotoDraft): Piece[] {
-  return draft.pieces.map((p, i) => ({ ...p, id: String(i + 1), material: 'mdf', rotatable: true }));
+  return draft.pieces.map((p, i) => {
+    const id = String(i + 1);
+    // The color the atelier gives this line (its row swatch, normalizePiecesWithColors):
+    // without it the plan colored every copy of one line differently (owner, 21/11/2026).
+    const color = getResolvedPieceColor({ id, name: p.name, height: p.height, width: p.width, quantity: p.quantity, index: i });
+    return { ...p, id, material: 'mdf', rotatable: true, color };
+  });
 }
 
 function atelierSheet(draft: PhotoDraft): Sheet {
