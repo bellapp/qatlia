@@ -30,6 +30,8 @@ function resetState() {
     sent: [],
     images: [],
     imageResult: () => 'wamid.IMG',
+    cards: [],
+    cardResult: () => 'wamid.CARD',
     sendResult: (n) => (n === 1 ? 'wamid.OUT' : `wamid.OUT.${n}`),
     outbound: [],
     storedWamids: new Set(),
@@ -154,6 +156,10 @@ stubModule('@/lib/whatsapp/send', {
   sendImage: async (config, to, link, caption) => {
     state.images.push({ to, link, caption, afterTexts: state.sent.length });
     return state.imageResult();
+  },
+  sendPlanCard: async (config, to, card) => {
+    state.cards.push({ to, card });
+    return state.cardResult();
   },
 });
 stubModule('@/lib/whatsapp/photo', {
@@ -854,24 +860,48 @@ async function withFetch(respond, fn) {
   }
 }
 const PICTURE = 'https://qatlia.ma/w/k7m2qx9dab/plan.png';
+const CARD = { image: PICTURE, body: '👆 carte', button: 'Voir le plan complet', url: 'https://qatlia.ma/w/k7m2qx9dab' };
 
-test('the plan picture is checked, then sent by link and recorded as the photo result', async () => {
+test('the plan picture is checked, then sent as a card with its button and recorded as the photo result', async () => {
   resetState();
   state.contacts.set(WA_ID, { waId: WA_ID, lang: 'fr', greetedAt: new Date(), handoffUntil: null });
   state.photoOutcome = 'handled';
-  state.imageResult = () => 'wamid.plan';
+  state.cardResult = () => 'wamid.card';
   await withEnv(CONFIGURED, async () => {
     await POST(signedPost(messagesPayload([imageMessage('wamid.p3', WA_ID)])));
     await withFetch(
       () => new Response(new Uint8Array([0x89, 0x50]), { status: 200, headers: { 'Content-Type': 'image/png' } }),
       async (calls) => {
-        assert.equal(await state.photoCalls[0].deliverImage(PICTURE, '👆 légende', 'photo_result'), true);
+        assert.equal(await state.photoCalls[0].deliverImage(PICTURE, '👆 légende', 'photo_result', CARD), true);
         assert.deepEqual(calls, [PICTURE]);
       },
     );
+    assert.deepEqual(state.cards.map((m) => [m.to, m.card]), [[WA_ID, CARD]]);
+    assert.equal(state.images.length, 0);
+    assert.deepEqual(state.outbound.map((m) => [m.kind, m.wamid, m.body]), [['photo_result', 'wamid.card', '👆 carte']]);
+  });
+});
+
+test('a card WhatsApp refuses falls back to the bare picture with its caption', async () => {
+  resetState();
+  state.contacts.set(WA_ID, { waId: WA_ID, lang: 'fr', greetedAt: new Date(), handoffUntil: null });
+  state.photoOutcome = 'handled';
+  state.cardResult = () => null;
+  state.imageResult = () => 'wamid.plan';
+  const errors = test.mock.method(console, 'error', () => {});
+  await withEnv(CONFIGURED, async () => {
+    await POST(signedPost(messagesPayload([imageMessage('wamid.p6', WA_ID)])));
+    await withFetch(
+      () => new Response(new Uint8Array([0x89, 0x50]), { status: 200, headers: { 'Content-Type': 'image/png' } }),
+      async () => {
+        assert.equal(await state.photoCalls[0].deliverImage(PICTURE, '👆 légende', 'photo_result', CARD), true);
+      },
+    );
+    assert.equal(state.cards.length, 1);
     assert.deepEqual(state.images.map((m) => [m.link, m.caption]), [[PICTURE, '👆 légende']]);
     assert.deepEqual(state.outbound.map((m) => [m.kind, m.wamid, m.body]), [['photo_result', 'wamid.plan', '👆 légende']]);
   });
+  errors.mock.restore();
 });
 
 test('a plan picture the site cannot draw is not sent: the text answer goes instead', async () => {
@@ -889,10 +919,11 @@ test('a plan picture the site cannot draw is not sent: the text answer goes inst
       },
     ]) {
       await withFetch(respond, async () => {
-        assert.equal(await state.photoCalls[0].deliverImage(PICTURE, 'c', 'photo_result'), false);
+        assert.equal(await state.photoCalls[0].deliverImage(PICTURE, 'c', 'photo_result', CARD), false);
       });
     }
     assert.equal(state.images.length, 0);
+    assert.equal(state.cards.length, 0);
   });
   errors.mock.restore();
 });
@@ -901,17 +932,20 @@ test('a plan picture refused by the provider is recorded as a failed send', asyn
   resetState();
   state.contacts.set(WA_ID, { waId: WA_ID, lang: 'fr', greetedAt: new Date(), handoffUntil: null });
   state.photoOutcome = 'handled';
+  state.cardResult = () => null;
   state.imageResult = () => null;
+  const errors = test.mock.method(console, 'error', () => {});
   await withEnv(CONFIGURED, async () => {
     await POST(signedPost(messagesPayload([imageMessage('wamid.p5', WA_ID)])));
     await withFetch(
       () => new Response(new Uint8Array([0x89]), { status: 200, headers: { 'Content-Type': 'image/png' } }),
       async () => {
-        assert.equal(await state.photoCalls[0].deliverImage(PICTURE, 'c', 'photo_result'), false);
+        assert.equal(await state.photoCalls[0].deliverImage(PICTURE, 'c', 'photo_result', CARD), false);
       },
     );
     assert.deepEqual(state.outbound.map((m) => m.kind), ['send_failed']);
   });
+  errors.mock.restore();
 });
 
 test('a photo as the very first message is read: no greeting, the contact is marked greeted', async () => {

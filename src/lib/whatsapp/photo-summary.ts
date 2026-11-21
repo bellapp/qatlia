@@ -159,6 +159,27 @@ export function photoResultCaption(lang: Lang, summary: PhotoSummary, link: stri
   return [head, ...panelNote, ...warning, cta].join('\n');
 }
 
+/** The button under the plan picture (WhatsApp: 20 characters at most). */
+const PLAN_BUTTON: Record<Lang, string> = { ar: 'شوف المخطط كامل', fr: 'Voir le plan complet' };
+
+/**
+ * The plan picture with a button to the link (owner, 21/11/2026: « l'image
+ * cliquable pour renvoyer vers le site »): the caption's counts, a line that
+ * points at the picture, and the link as the button rather than in the text.
+ */
+export function photoResultCard(lang: Lang, summary: PhotoSummary, link: string): {
+  image: string;
+  body: string;
+  button: string;
+  url: string;
+} {
+  const { head, panelNote, warning } = resultLines(lang, summary);
+  const pointer = lang === 'ar'
+    ? `👆 هادا طرف من مخطط التقطيع ديالك. كليكي على «${PLAN_BUTTON.ar}» باش تشوفو كامل (صالح ${ltr(lang, '24')} ساعة).`
+    : `👆 Voici le début de votre plan de coupe. Touchez « ${PLAN_BUTTON.fr} » pour le voir en entier (valable 24 h).`;
+  return { image: `${link}/plan.png`, body: [head, ...panelNote, ...warning, pointer].join('\n'), button: PLAN_BUTTON[lang], url: link };
+}
+
 /**
  * The answer for a list over BOT_PLAN_MAX_PIECES: what was read and the link,
  * which opens the atelier on the pieces; the plan is made there.
