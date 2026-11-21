@@ -124,7 +124,11 @@ Règles :
 
 - **une lecture réussie par numéro, définitivement**. Les photos suivantes reçoivent le lien de la première fiche et l'invitation à continuer dans l'atelier ;
 - une lecture ratée (photo illisible, pas une fiche) libère le numéro, jusqu'à 3 échecs par numéro sur 24 h ;
-- garde-fous : 10 s par requête Meta, 30 s pour la lecture IA, 300 pièces au plus (au-delà, la fiche se fait dans l'atelier) ; une ligne sans cote lisible est ignorée, un format de panneau hors 30–400 cm est remplacé par le panneau par défaut ;
+- garde-fous : 10 s par requête Meta, 30 s pour la lecture IA ; une ligne sans cote lisible est ignorée, un format de panneau hors 30–400 cm est remplacé par le panneau par défaut ;
+- taille de la liste (nombre de pièces, quantités comprises) :
+  - **jusqu'à 450 pièces**, le bot calcule le plan comme décrit plus haut ;
+  - **de 451 à 900**, le bot enregistre la liste et répond « ✅ N pièces lues… grande liste » avec le lien, **sans plan**. Le calcul ne tiendrait pas dans les 60 s du webhook (environ 1,5 s pour 319 pièces, 20 s pour 640, 40 s pour 960). Le lien ouvre l'atelier sur les pièces, sans aperçu, et l'atelier calcule le plan après l'inscription ;
+  - **au-delà de 900**, le bot donne le nombre de pièces lues et renvoie vers l'atelier, sans jamais dire « illisible ». Avant le 21/11/2026, la limite était de 300 et ces listes recevaient « je n'ai pas réussi à lire » ;
 - « liens ouverts » ne compte pas l'aperçu que WhatsApp génère en recevant le message ;
 - le contenu des lectures expirées est effacé à chaque nouvelle lecture, même si le lien n'est jamais rouvert ;
 - plafond global : `WHATSAPP_PHOTO_DAILY_CAP` lectures sur 24 h (réussies ou non, chacune coûte un appel IA) ;
