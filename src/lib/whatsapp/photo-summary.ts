@@ -177,7 +177,7 @@ export function photoResultCard(lang: Lang, summary: PhotoSummary, link: string)
   const pointer = lang === 'ar'
     ? `👆 هادا طرف من مخطط التقطيع ديالك. كليكي على «${PLAN_BUTTON.ar}» باش تشوفو كامل (صالح ${ltr(lang, '24')} ساعة).`
     : `👆 Voici le début de votre plan de coupe. Touchez « ${PLAN_BUTTON.fr} » pour le voir en entier (valable 24 h).`;
-  return { image: `${link}/plan.png`, body: [head, ...panelNote, ...warning, pointer].join('\n'), button: PLAN_BUTTON[lang], url: link };
+  return { image: `${link}/plan.jpg`, body: [head, ...panelNote, ...warning, pointer].join('\n'), button: PLAN_BUTTON[lang], url: link };
 }
 
 /**

@@ -859,7 +859,7 @@ async function withFetch(respond, fn) {
     globalThis.fetch = original;
   }
 }
-const PICTURE = 'https://qatlia.ma/w/k7m2qx9dab/plan.png';
+const PICTURE = 'https://qatlia.ma/w/k7m2qx9dab/plan.jpg';
 const CARD = { image: PICTURE, body: '👆 carte', button: 'Voir le plan complet', url: 'https://qatlia.ma/w/k7m2qx9dab' };
 
 test('the plan picture is checked, then sent as a card with its button and recorded as the photo result', async () => {
@@ -870,7 +870,7 @@ test('the plan picture is checked, then sent as a card with its button and recor
   await withEnv(CONFIGURED, async () => {
     await POST(signedPost(messagesPayload([imageMessage('wamid.p3', WA_ID)])));
     await withFetch(
-      () => new Response(new Uint8Array([0x89, 0x50]), { status: 200, headers: { 'Content-Type': 'image/png' } }),
+      () => new Response(new Uint8Array([0xff, 0xd8]), { status: 200, headers: { 'Content-Type': 'image/jpeg' } }),
       async (calls) => {
         assert.equal(await state.photoCalls[0].deliverImage(PICTURE, '👆 légende', 'photo_result', CARD), true);
         assert.deepEqual(calls, [PICTURE]);

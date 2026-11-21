@@ -122,7 +122,7 @@ async function deliverPicture(
     const check = await fetch(link, { signal: AbortSignal.timeout(checkMs) });
     const type = check.headers.get('content-type') ?? '';
     await check.arrayBuffer();
-    if (!check.ok || !type.startsWith('image/png')) {
+    if (!check.ok || !/^image\/(png|jpeg)/.test(type)) {
       console.error(`[whatsapp] plan picture not drawn (${check.status})`);
       return false;
     }
