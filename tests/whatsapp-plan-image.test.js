@@ -60,10 +60,40 @@ test('each piece is drawn as in the atelier: its color, "#N" and its size in cm'
   const layout = planImageLayout(plan);
   plan.sheets[0].pieces.forEach((placed, i) => {
     const piece = layout.pieces[i];
-    assert.equal(piece.color, PIECE_COLOR_PALETTE[(placed.pieceNumber - 1) % PIECE_COLOR_PALETTE.length]);
+    // The atelier: the piece's own color, the palette by number only without one.
+    assert.equal(piece.color, placed.color || PIECE_COLOR_PALETTE[(placed.pieceNumber - 1) % PIECE_COLOR_PALETTE.length]);
+    assert.ok(placed.color, 'every WhatsApp piece has its line color');
     assert.equal(piece.number, `#${placed.pieceNumber}`);
     assert.equal(piece.size, `${placed.height.toFixed(1)}×${placed.width.toFixed(1)} cm`);
   });
+});
+
+// « Pourquoi différentes couleurs pour le même type de pièce ? » (owner,
+// 21/11/2026): in the atelier every line has one color (the swatch of its row,
+// getResolvedPieceColor) and its copies share it on the plan. The WhatsApp
+// pieces had none, so the plan colored each copy by its number.
+test('every copy of a line wears the color the atelier gives that line', () => {
+  const { getResolvedPieceColor } = load('src/lib/pieces/catalog.ts');
+  const { atelierPieces } = load('src/lib/whatsapp/photo-summary.ts');
+  const sheet = { height: 278, width: 208 };
+  const pieces = atelierPieces({ pieces: HAMOUDA, sheet });
+  pieces.forEach((piece, index) => {
+    assert.equal(
+      piece.color,
+      getResolvedPieceColor({ id: piece.id, name: piece.name, height: piece.height, width: piece.width, quantity: piece.quantity, index }),
+    );
+  });
+  const plan = hamoudaPlan();
+  const layout = planImageLayout(plan);
+  const byLine = new Map();
+  plan.sheets[0].pieces.forEach((placed, i) => {
+    const color = layout.pieces[i].color;
+    assert.equal(color, pieces[placed.originalIndex].color);
+    if (byLine.has(placed.originalIndex)) assert.equal(byLine.get(placed.originalIndex), color, 'one color per line');
+    byLine.set(placed.originalIndex, color);
+  });
+  // The 228 × 9 strips of line 11: all the same color.
+  assert.equal(new Set(layout.pieces.filter((p) => p.size === null).map((p) => p.color)).size, 1);
 });
 
 test('the atelier font rules, scaled: a piece under 10 cm shows its number only', () => {
