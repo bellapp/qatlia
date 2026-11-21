@@ -110,6 +110,8 @@ export function LegalPage({ doc }: { doc: LegalDoc }) {
             <Link
               key={other}
               href={LEGAL_ROUTES[other]}
+              // The refund policy is about paying: hidden in the Play Store app.
+              data-sells={other === 'refund' ? '' : undefined}
               className="font-bold text-amber-700 dark:text-brand-400 hover:underline"
             >
               {t(`legal.nav.${other}` as TranslationKey)}

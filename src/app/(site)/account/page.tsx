@@ -8,6 +8,7 @@ import { clearPendingWork } from '@/lib/pending-work';
 import { forgetAtelierDraft } from '@/lib/atelier-draft';
 import { ArrowLeft, ArrowRight, Coins, KeyRound, LogOut, Receipt, Shield, Zap } from 'lucide-react';
 import { AccountMenu } from '@/components/AccountMenu';
+import { useStoreApp } from '@/components/useStoreApp';
 import { QatlIALogo } from '@/components/QatlIALogo';
 import { LocaleSwitcher, useLocale } from '@/components/LocaleProvider';
 import { CurrencySwitcher } from '@/components/CurrencySwitcher';
@@ -36,6 +37,7 @@ const LEDGER_DATE_OPTIONS: Intl.DateTimeFormatOptions = {
 export default function AccountPage() {
   const router = useRouter();
   const { t, n, locale } = useLocale();
+  const inApp = useStoreApp();
   const [email, setEmail] = useState<string | null>(null);
   // null until the real balance is read from the profile.
   const [credits, setCredits] = useState<number | null>(null);
@@ -126,7 +128,7 @@ export default function AccountPage() {
           <div className="flex items-center gap-2">
             <LocaleSwitcher />
             <Link
-              href="/credits"
+              href={inApp ? '/account#credits' : '/credits'}
               aria-label={`${t('atelier.header.creditsAria')}: ${credits === null ? '—' : n(credits)}`}
               className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-brand-400/10 border border-brand-500/25 text-brand-400 hover:bg-brand-500/15 text-xs font-semibold transition-all"
             >
@@ -152,7 +154,7 @@ export default function AccountPage() {
               <Receipt className="w-4 h-4 text-brand-400" aria-hidden="true" />
               <h2 className="text-sm font-bold text-slate-900 dark:text-white">{t('account.creditsUsage')}</h2>
             </div>
-            <Link href="/credits" className="inline-flex items-center gap-1 text-xs font-semibold text-brand-400 hover:text-brand-400">
+            <Link href="/credits" data-sells="" className="inline-flex items-center gap-1 text-xs font-semibold text-brand-400 hover:text-brand-400">
               {t('accountPage.topUp')}
               <ArrowRight className="w-3 h-3 rtl:-scale-x-100" aria-hidden="true" />
             </Link>

@@ -63,9 +63,11 @@ export function AccountMenu({ email }: AccountMenuProps) {
             <p className="text-xs text-slate-800 dark:text-slate-200 truncate mt-0.5">{email}</p>
           </div>
           {/* Buying is the entry artisans look for, so it comes first and carries
-              the same accent and bolt as the balance badge. */}
+              the same accent and bolt as the balance badge. Hidden in the Play
+              Store app, which sells nothing. */}
           <Link
             href="/credits"
+            data-sells=""
             onClick={() => setOpen(false)}
             className="flex items-center gap-2 mx-1.5 my-1 px-2.5 py-2 rounded-lg bg-brand-400/10 border border-brand-500/25 text-xs font-bold text-brand-400 hover:bg-brand-500/15 transition-colors"
           >

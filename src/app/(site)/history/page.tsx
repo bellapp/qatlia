@@ -11,6 +11,7 @@ import {
 } from 'lucide-react';
 import { readLocalHistory, renameLocalHistoryItem, type LocalHistoryItem } from '@/lib/history';
 import { AccountMenu } from '@/components/AccountMenu';
+import { useStoreApp } from '@/components/useStoreApp';
 import { WorkspaceNav } from '@/components/WorkspaceNav';
 import { QatlIALogo } from '@/components/QatlIALogo';
 import { EmptyState } from '@/components/EmptyState';
@@ -114,6 +115,7 @@ function SkeletonCard() {
 
 export default function HistoryPage() {
   const { t, tn, n, locale } = useLocale();
+  const inApp = useStoreApp();
   const [projects, setProjects] = useState<ProjectHistoryItem[]>([]);
   const [filtered, setFiltered] = useState<ProjectHistoryItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -374,7 +376,7 @@ export default function HistoryPage() {
           <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
             <LocaleSwitcher />
             <Link
-              href="/credits"
+              href={inApp ? '/account#credits' : '/credits'}
               aria-label={`${t('atelier.header.creditsAria')}: ${userCredits === null ? '—' : n(userCredits)}`}
               className="flex items-center gap-1.5 px-2.5 sm:px-3.5 py-2 rounded-xl bg-brand-400/10 border border-brand-500/25 text-brand-400 hover:bg-brand-500/15 text-xs font-semibold transition-all"
             >

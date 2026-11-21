@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { Zap } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { AccountMenu } from '@/components/AccountMenu';
+import { useStoreApp } from '@/components/useStoreApp';
 import { QatlIALogo } from '@/components/QatlIALogo';
 import { WorkspaceNav } from '@/components/WorkspaceNav';
 import { LocaleSwitcher, useLocale } from '@/components/LocaleProvider';
@@ -28,6 +29,7 @@ const CONFIRM_DELETE_MS = 4000;
  */
 export default function PanelsPage() {
   const { t, n } = useLocale();
+  const inApp = useStoreApp();
   const currency = useCurrency().currency ?? DEFAULT_CURRENCY;
   const { presets, source, signedIn, ready, add, update, remove } = usePanelPresets();
 
@@ -139,7 +141,7 @@ export default function PanelsPage() {
           <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
             <LocaleSwitcher />
             <Link
-              href="/credits"
+              href={inApp ? '/account#credits' : '/credits'}
               aria-label={`${t('atelier.header.creditsAria')}: ${userCredits === null ? '—' : n(userCredits)}`}
               className="flex items-center gap-1.5 px-2.5 sm:px-3.5 py-2 rounded-xl bg-brand-400/10 border border-brand-500/25 text-brand-400 hover:bg-brand-500/15 text-xs font-semibold transition-all"
             >
