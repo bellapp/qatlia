@@ -49,6 +49,8 @@ function resetState() {
     assistantCalls: [],
     assistantResult: () => null,
     latestRead: () => null,
+    stored: [],
+    storeResult: () => STORED,
     assistantCount: 0,
     historyCalls: [],
     clientArgs: null,
@@ -161,6 +163,12 @@ stubModule('@/lib/whatsapp/send', {
   sendPlanCard: async (config, to, card) => {
     state.cards.push({ to, card });
     return state.cardResult();
+  },
+});
+stubModule('@/lib/whatsapp/plan-picture-store', {
+  storePlanPicture: async (db, code, bytes) => {
+    state.stored.push({ code, bytes: bytes.length });
+    return state.storeResult();
   },
 });
 stubModule('@/lib/whatsapp/photo-store', {
@@ -900,9 +908,12 @@ async function withFetch(respond, fn) {
   }
 }
 const PICTURE = 'https://qatlia.ma/w/k7m2qx9dab/plan.jpg';
+const STORED = 'https://ref.supabase.co/storage/v1/object/public/whatsapp-plans/k7m2qx9dab.jpg';
 const CARD = { image: PICTURE, body: '👆 carte', button: 'Voir le plan complet', url: 'https://qatlia.ma/w/k7m2qx9dab' };
 
-test('the plan picture is checked, then sent as a card with its button and recorded as the photo result', async () => {
+// The bytes of the check are stored, and the card points at the stored file:
+// WhatsApp gave up on a big list drawn on the fly (22/11/2026).
+test('the plan picture is checked, stored, then sent as a card pointing at the stored file', async () => {
   resetState();
   state.contacts.set(WA_ID, { waId: WA_ID, lang: 'fr', greetedAt: new Date(), handoffUntil: null });
   state.photoOutcome = 'handled';
@@ -916,7 +927,8 @@ test('the plan picture is checked, then sent as a card with its button and recor
         assert.deepEqual(calls, [PICTURE]);
       },
     );
-    assert.deepEqual(state.cards.map((m) => [m.to, m.card]), [[WA_ID, CARD]]);
+    assert.deepEqual(state.stored, [{ code: 'k7m2qx9dab', bytes: 2 }]);
+    assert.deepEqual(state.cards.map((m) => [m.to, m.card]), [[WA_ID, { ...CARD, image: STORED }]]);
     assert.equal(state.images.length, 0);
     assert.deepEqual(state.outbound.map((m) => [m.kind, m.wamid, m.body]), [['photo_result', 'wamid.card', '👆 carte']]);
   });
@@ -925,6 +937,24 @@ test('the plan picture is checked, then sent as a card with its button and recor
 // A refused card ("(#131053) Media upload error": WhatsApp could not fetch the
 // picture in time, 21/11/2026) must not fall back on the bare picture: YCloud
 // accepts it at once, WhatsApp fails it later, and the text never went.
+test('a picture that cannot be stored keeps the site link in the card', async () => {
+  resetState();
+  state.contacts.set(WA_ID, { waId: WA_ID, lang: 'fr', greetedAt: new Date(), handoffUntil: null });
+  state.photoOutcome = 'handled';
+  state.storeResult = () => null;
+  state.cardResult = () => 'wamid.card';
+  await withEnv(CONFIGURED, async () => {
+    await POST(signedPost(messagesPayload([imageMessage('wamid.p7', WA_ID)])));
+    await withFetch(
+      () => new Response(new Uint8Array([0xff, 0xd8]), { status: 200, headers: { 'Content-Type': 'image/jpeg' } }),
+      async () => {
+        assert.equal(await state.photoCalls[0].deliverImage(PICTURE, 'c', 'photo_result', CARD), true);
+      },
+    );
+    assert.deepEqual(state.cards.map((m) => m.card), [CARD]);
+  });
+});
+
 test('a card WhatsApp refuses lets the text answer go, never the bare picture', async () => {
   resetState();
   state.contacts.set(WA_ID, { waId: WA_ID, lang: 'fr', greetedAt: new Date(), handoffUntil: null });

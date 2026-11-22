@@ -120,7 +120,8 @@ export interface PlanImageLayout {
  * tried, so the text answer still has time to go out.
  */
 export const PICTURE_DEADLINE_MS = 45_000;
-const PICTURE_CHECK_MS = 8_000;
+/** A big list takes 7 to 10 s to draw once; the stored file then goes at once (22/11/2026). */
+const PICTURE_CHECK_MS = 15_000;
 const PICTURE_CHECK_MIN_MS = 2_000;
 
 /** How long the webhook may spend fetching the picture `elapsedMs` into the message; null: send the text. */
@@ -137,6 +138,11 @@ export function pictureCheckMs(elapsedMs: number): number | null {
  * code's pieces never change, and its link page still expires after 24 h.
  */
 export const PICTURE_CACHE = 'public, max-age=0, s-maxage=3600';
+
+/** The code in a planImageUrl link, or null for another link. */
+export function planCodeFromImageUrl(link: string): string | null {
+  return /^https:\/\/qatlia\.ma\/w\/([a-z0-9]+)\/plan\.jpg$/.exec(link)?.[1] ?? null;
+}
 
 export function planImageUrl(code: string): string {
   // The JPEG: WhatsApp never delivered the PNG (21/11/2026).

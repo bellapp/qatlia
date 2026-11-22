@@ -23,7 +23,8 @@ import { latestPhotoRead } from '@/lib/whatsapp/photo-store';
 import { photoLink } from '@/lib/whatsapp/photo-summary';
 import { sendButtons, sendImage, sendPlanCard, sendText, type PlanCard } from '@/lib/whatsapp/send';
 import { handlePhoto, type PhotoMessageKind } from '@/lib/whatsapp/photo';
-import { pictureCheckMs } from '@/lib/whatsapp/plan-image';
+import { pictureCheckMs, planCodeFromImageUrl } from '@/lib/whatsapp/plan-image';
+import { storePlanPicture } from '@/lib/whatsapp/plan-picture-store';
 import {
   SEND_FAILED_KIND,
   WhatsAppTablesMissingError,
@@ -121,10 +122,11 @@ async function deliverPicture(
     console.log('[whatsapp] plan picture skipped: too late, the text answer goes');
     return false;
   }
+  let bytes: Uint8Array;
   try {
     const check = await fetch(link, { signal: AbortSignal.timeout(checkMs) });
     const type = check.headers.get('content-type') ?? '';
-    await check.arrayBuffer();
+    bytes = new Uint8Array(await check.arrayBuffer());
     if (!check.ok || !/^image\/(png|jpeg)/.test(type)) {
       console.error(`[whatsapp] plan picture not drawn (${check.status})`);
       return false;
@@ -134,8 +136,15 @@ async function deliverPicture(
     return false;
   }
 
+  // The bytes just drawn, kept as a file: WhatsApp fetches it at once, where a
+  // big list drawn on the fly made it give up (22/11/2026). Not stored: the
+  // card keeps the site's link.
+  const code = planCodeFromImageUrl(link);
+  const stored = code ? await storePlanPicture(db, code, bytes) : null;
+  const sent = stored ? { ...card, image: stored } : card;
+
   // The picture with its button to the link (owner, 21/11/2026: « l'image cliquable »).
-  const cardWamid = await sendPlanCard(config, waId, card);
+  const cardWamid = await sendPlanCard(config, waId, sent);
   if (cardWamid !== null) {
     await recordOutbound(db, { waId, wamid: cardWamid, direction: 'bot', kind, body: card.body });
     return true;
