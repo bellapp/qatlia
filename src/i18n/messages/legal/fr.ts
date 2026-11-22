@@ -131,7 +131,8 @@ export const legalFr = {
           '- Devis : les coordonnées de votre entreprise et celles de votre client que vous saisissez dans un devis enregistré sur un projet.\n' +
           '- Photos de fiches de débit : envoyées pour analyse au moment où vous les soumettez. Quand vous enregistrez le projet, une version réduite de la photo est gardée avec le projet enregistré, pour que vous puissiez la revoir.\n' +
           '- Crédits et paiements : solde, historique des crédits, commandes manuelles (numéro, pack, mode de paiement, statut). Pour un paiement par carte, Creem nous confirme la transaction ; vos données de carte restent chez Creem.\n' +
-          '- Support : les messages que vous nous envoyez par e-mail ou WhatsApp.\n' +
+          '- Support : les messages que vous nous envoyez par e-mail.\n' +
+          '- WhatsApp : votre numéro WhatsApp (ou l’identifiant que WhatsApp nous donne à sa place si vous l’avez masqué derrière un nom d’utilisateur), votre nom de profil, les messages échangés avec notre assistant et notre équipe, et les mesures lues sur les photos de fiches de débit que vous y envoyez. Si vous ouvrez le lien d’une fiche reçu sur WhatsApp puis créez un compte, nous associons ce numéro à votre compte.\n' +
           '- Données techniques : journaux de connexion (adresse IP, navigateur) tenus par nos prestataires pour la sécurité.',
       },
       s3: {
@@ -140,7 +141,8 @@ export const legalFr = {
           '- Vous fournir le service : compte, analyses, plans, exports (exécution du contrat).\n' +
           '- Traiter les paiements et tenir notre comptabilité (obligation légale).\n' +
           '- Protéger le service contre la fraude et les abus (intérêt légitime).\n' +
-          '- Répondre à vos demandes de support.\n\n' +
+          '- Répondre à vos demandes de support.\n' +
+          '- Relier votre compte à votre conversation WhatsApp, pour vous répondre et suivre votre demande (intérêt légitime).\n\n' +
           'Nous ne vendons pas vos données, nous n’affichons pas de publicité et nous n’utilisons pas vos projets pour entraîner un modèle d’intelligence artificielle.',
       },
       s4: {
@@ -152,7 +154,7 @@ export const legalFr = {
           '- OpenRouter, qui transmet vos photos au modèle d’intelligence artificielle chargé de les lire (actuellement Google Gemini) ;\n' +
           '- Google : connexion avec un compte Google, si vous la choisissez ;\n' +
           '- Creem : paiements par carte, en tant que revendeur officiel ;\n' +
-          '- WhatsApp et notre messagerie e-mail : échanges avec le support.\n\n' +
+          '- WhatsApp et YCloud, notre fournisseur WhatsApp, ainsi que notre messagerie e-mail : échanges avec notre assistant et le support.\n\n' +
           'Ces prestataires sont situés en dehors du Maroc (Union européenne, États-Unis). Vos données y sont donc transférées, avec les garanties contractuelles qu’ils proposent.',
       },
       s5: {
@@ -161,7 +163,8 @@ export const legalFr = {
           'QatliA n’utilise que des cookies et un stockage local nécessaires à son fonctionnement :\n' +
           '- cookies de session, pour vous garder connecté ;\n' +
           '- votre langue, votre thème et votre unité d’affichage ;\n' +
-          '- les coordonnées de votre entreprise pour les devis, gardées dans votre navigateur seulement.\n\n' +
+          '- les coordonnées de votre entreprise pour les devis, gardées dans votre navigateur seulement ;\n' +
+          '- la provenance de votre première visite (par exemple un lien reçu sur WhatsApp), gardée 30 jours puis enregistrée avec votre compte si vous vous inscrivez.\n\n' +
           'Aucun cookie publicitaire ni de mesure d’audience. La page de paiement Creem utilise ses propres cookies.',
       },
       s6: {
@@ -170,7 +173,8 @@ export const legalFr = {
           '- Compte, projets et devis : tant que votre compte est ouvert, puis supprimés dans les 30 jours suivant sa fermeture.\n' +
           '- Photos : la version réduite gardée avec un projet enregistré est conservée tant que votre compte est ouvert, puis supprimée avec lui. Une photo analysée sans enregistrer de projet n’est pas conservée.\n' +
           '- Paiements et historique des crédits : pendant la durée imposée par les obligations comptables et fiscales.\n' +
-          '- Messages de support : le temps de traiter votre demande et son suivi.',
+          '- Messages de support : le temps de traiter votre demande et son suivi.\n' +
+          '- WhatsApp : les mesures d’une fiche lue sont effacées après l’expiration de son lien (24 h) ; votre numéro et vos messages sont gardés tant qu’ils servent au support et au suivi, et supprimés sur simple demande.',
       },
       s7: {
         title: 'Sécurité',
