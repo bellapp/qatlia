@@ -28,6 +28,10 @@ const TAGS = {
   utm_source: 'signup_source',
   utm_medium: 'signup_medium',
   utm_campaign: 'signup_campaign',
+  // The code of a WhatsApp photo link (qatlia.ma/w/<code>), which points at the
+  // number in whatsapp_photo_reads: the account is linked to that number
+  // (owner, 22/11/2026). Unlike the source, the last photo link opened wins.
+  utm_content: 'whatsapp_code',
 } as const;
 
 type MetadataKey = (typeof TAGS)[keyof typeof TAGS];
@@ -83,9 +87,13 @@ export function loadAcquisition(storage: StorageLike, now: number): Acquisition 
 /** Remembers this visit's tags, unless an earlier tagged visit is still remembered. Never throws. */
 export function rememberAcquisition(storage: StorageLike, search: string, now: number): void {
   const visit = parseAcquisition(search, now);
-  if (!visit || loadAcquisition(storage, now)) return;
+  if (!visit) return;
+  const remembered = loadAcquisition(storage, now);
+  // First touch keeps the source; a newer WhatsApp photo link still updates the code.
+  if (remembered && !visit.tags.whatsapp_code) return;
+  const next = remembered ? { ...remembered, tags: { ...remembered.tags, whatsapp_code: visit.tags.whatsapp_code } } : visit;
   try {
-    storage.setItem(ACQUISITION_KEY, JSON.stringify(visit));
+    storage.setItem(ACQUISITION_KEY, JSON.stringify(next));
   } catch {
     // Storage full or blocked: the visit simply goes untracked.
   }

@@ -63,7 +63,8 @@ test('the photo link records its own provenance: whatsapp · bot · photo', () =
     signup_campaign: 'photo',
   });
   const source = fs.readFileSync(path.resolve(__dirname, '..', 'src/app/(site)/w/[code]/OpenInAtelier.tsx'), 'utf8');
-  const recorded = source.indexOf('recordBrowserVisit(PHOTO_LINK_TRACKING)');
+  // With the link's code since 22/11/2026: it links the account to the WhatsApp number.
+  const recorded = source.indexOf('recordBrowserVisit(photoLinkTracking(code))');
   assert.notEqual(recorded, -1, 'OpenInAtelier records the photo provenance');
   assert.ok(recorded < source.indexOf("router.replace('/atelier')"), 'before the atelier opens');
 });

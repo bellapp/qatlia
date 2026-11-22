@@ -153,6 +153,12 @@ export interface ClientIdentity {
   /** Source of the tagged visit before sign-up (e.g. "whatsapp"), see src/lib/acquisition.ts. */
   signupSource: string | null;
   signupCampaign: string | null;
+  /**
+   * The WhatsApp number the account came from (« +212… »), or its business-scoped
+   * id for a user with a WhatsApp username: the photo link the visitor opened
+   * before signing up (user_metadata.whatsapp_code → whatsapp_photo_reads).
+   */
+  whatsapp: string | null;
 }
 
 export interface ClientDetail {
@@ -216,6 +222,24 @@ function toLedgerRow(raw: Record<string, unknown>): LedgerRow {
   };
 }
 
+/**
+ * The WhatsApp number behind a photo link code: « +212… », or the
+ * business-scoped id (« MA.1163… ») of a user with a username. Null when there
+ * is no code, no read, or the lookup fails: the page never breaks on it.
+ */
+async function whatsappOf(db: SupabaseClient, code: string | null): Promise<string | null> {
+  if (!code) return null;
+  try {
+    const { data, error } = await db.from('whatsapp_photo_reads').select('wa_id').eq('code', code).maybeSingle();
+    if (error) return null;
+    const waId = str(asRecord(data)?.wa_id);
+    if (!waId) return null;
+    return /^\d+$/.test(waId) ? `+${waId}` : waId;
+  } catch {
+    return null;
+  }
+}
+
 export async function getClientDetail(db: SupabaseClient, userId: string): Promise<ClientDetailResult> {
   if (!isUuid(userId)) return { status: 'not_found' };
 
@@ -276,6 +300,7 @@ export async function getClientDetail(db: SupabaseClient, userId: string): Promi
 
   const appMeta = asRecord(user.app_metadata) ?? {};
   const userMeta = asRecord(user.user_metadata) ?? {};
+  const whatsapp = await whatsappOf(db, str(userMeta.whatsapp_code));
 
   return {
     status: 'ok',
@@ -293,6 +318,7 @@ export async function getClientDetail(db: SupabaseClient, userId: string): Promi
         bannedUntil: str((user as { banned_until?: unknown }).banned_until),
         signupSource: str(userMeta.signup_source),
         signupCampaign: str(userMeta.signup_campaign),
+        whatsapp,
       },
       balance,
       summary: summarizeLedger(ledgerRows, balance),
