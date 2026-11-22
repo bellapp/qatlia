@@ -121,7 +121,8 @@ export const legalEn: LegalCatalog = {
           '- Quotes: your company’s details and your customer’s details that you enter in a quote saved on a project.\n' +
           '- Photos of cut lists: sent for analysis when you submit them. When you save the project, a reduced copy of the photo is kept with the saved project so you can see it again.\n' +
           '- Credits and payments: balance, credit history, manual orders (number, pack, payment method, status). For a card payment, Creem confirms the transaction to us; your card details stay with Creem.\n' +
-          '- Support: the messages you send us by email or WhatsApp.\n' +
+          '- Support: the messages you send us by email.\n' +
+          '- WhatsApp: your WhatsApp number (or the identifier WhatsApp gives us instead if you hid it behind a username), your profile name, the messages exchanged with our assistant and our team, and the measurements read from the cut-list photos you send there. If you open a cut-list link received on WhatsApp and then create an account, we link that number to your account.\n' +
           '- Technical data: connection logs (IP address, browser) kept by our providers for security.',
       },
       s3: {
@@ -130,7 +131,8 @@ export const legalEn: LegalCatalog = {
           '- To provide the service: account, analyses, plans, exports (performance of the contract).\n' +
           '- To process payments and keep our accounts (legal obligation).\n' +
           '- To protect the service against fraud and abuse (legitimate interest).\n' +
-          '- To answer your support requests.\n\n' +
+          '- To answer your support requests.\n' +
+          '- To link your account to your WhatsApp conversation, so we can answer you and follow up on your request (legitimate interest).\n\n' +
           'We do not sell your data, we show no advertising and we do not use your projects to train an AI model.',
       },
       s4: {
@@ -142,7 +144,7 @@ export const legalEn: LegalCatalog = {
           '- OpenRouter, which passes your photos to the AI model that reads them (currently Google Gemini);\n' +
           '- Google: signing in with a Google account, if you choose it;\n' +
           '- Creem: card payments, as authorized reseller;\n' +
-          '- WhatsApp and our email service: conversations with support.\n\n' +
+          '- WhatsApp and YCloud, our WhatsApp provider, and our email service: conversations with our assistant and with support.\n\n' +
           'These providers are located outside Morocco (European Union, United States), so your data is transferred there, under the contractual safeguards they offer.',
       },
       s5: {
@@ -151,7 +153,8 @@ export const legalEn: LegalCatalog = {
           'QatliA only uses the cookies and local storage it needs to work:\n' +
           '- session cookies, to keep you signed in;\n' +
           '- your language, theme and display unit;\n' +
-          '- your company details for quotes, kept in your browser only.\n\n' +
+          '- your company details for quotes, kept in your browser only;\n' +
+          '- where your first visit came from (for instance a link received on WhatsApp), kept for 30 days and then saved with your account if you sign up.\n\n' +
           'No advertising or audience-measurement cookies. The Creem payment page uses its own cookies.',
       },
       s6: {
@@ -160,7 +163,8 @@ export const legalEn: LegalCatalog = {
           '- Account, projects and quotes: while your account is open, then deleted within 30 days of its closure.\n' +
           '- Photos: the reduced copy kept with a saved project stays while your account is open, then is deleted with it. A photo analysed without saving a project is not kept.\n' +
           '- Payments and credit history: for the period required by accounting and tax obligations.\n' +
-          '- Support messages: for as long as it takes to handle your request and its follow-up.',
+          '- Support messages: for as long as it takes to handle your request and its follow-up.\n' +
+          '- WhatsApp: the measurements of a read cut list are erased after its link expires (24 h); your number and your messages are kept while they serve support and follow-up, and deleted on simple request.',
       },
       s7: {
         title: 'Security',
