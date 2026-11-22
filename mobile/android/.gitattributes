@@ -1,0 +1,4 @@
+# Bubblewrap compares twa-manifest.json with manifest-checksum.txt byte for
+# byte: a CRLF checkout would make every build offer to regenerate the project.
+* text=auto eol=lf
+*.bat text eol=crlf
