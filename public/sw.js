@@ -1,6 +1,9 @@
 // Bump CACHE whenever the strategy changes: activate drops every other cache.
-const CACHE = 'qatlia-v2';
-const PRECACHE = ['/', '/atelier', '/auth/login', '/manifest.json'];
+const CACHE = 'qatlia-v3';
+const PRECACHE = ['/', '/atelier', '/auth/login', '/manifest.json', '/offline.html'];
+// Last resort for a page never visited while offline: a « Pas de connexion »
+// screen, not the cached landing with its prices (the Play Store app sells nothing).
+const OFFLINE_PAGE = '/offline.html';
 
 self.addEventListener('install', (e) => {
   e.waitUntil(caches.open(CACHE).then((c) => c.addAll(PRECACHE)));
@@ -42,7 +45,7 @@ self.addEventListener('fetch', (e) => {
     e.respondWith(
       fetch(request)
         .then((res) => putInCache(request, res))
-        .catch(() => caches.match(request).then((cached) => cached || caches.match('/')))
+        .catch(() => caches.match(request).then((cached) => cached || caches.match(OFFLINE_PAGE)))
     );
     return;
   }
