@@ -117,6 +117,27 @@ export default async function ClientPage({ params }: { params: { id: string } })
               ? `${identity.signupSource}${identity.signupCampaign ? ` · ${identity.signupCampaign}` : ''}`
               : '—'}
           </Field>
+          <Field label="WhatsApp">
+            {identity.whatsapp ? (
+              identity.whatsapp.startsWith('+') ? (
+                <a
+                  href={`https://wa.me/${identity.whatsapp.slice(1)}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="font-mono text-emerald-400 hover:underline"
+                >
+                  {identity.whatsapp}
+                </a>
+              ) : (
+                <span>
+                  <span className="font-mono text-[11px]">{identity.whatsapp}</span>
+                  <span className="text-slate-500"> (nom d’utilisateur, numéro masqué)</span>
+                </span>
+              )
+            ) : (
+              '—'
+            )}
+          </Field>
           <Field label="Dernière connexion">
             {formatDateTime(identity.lastSignInAt)}
             {identity.lastSignInAt ? <span className="text-slate-500"> ({formatRelativeDays(identity.lastSignInAt, now)})</span> : null}

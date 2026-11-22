@@ -130,3 +130,37 @@ test('only an account created moments ago, without a source yet, is tagged', () 
   assert.equal(tagsForNewAccount(null, tags, NOW), null);
   assert.equal(tagsForNewAccount({ created_at: 'not a date' }, tags, NOW), null);
 });
+
+// Owner, 22/11/2026: link the account to the WhatsApp number it came from. The
+// photo link qatlia.ma/w/<code> is personal: its code points at the number in
+// whatsapp_photo_reads. The code goes with the sign-up as `whatsapp_code`.
+test('a photo link visit carries its code into the sign-up', () => {
+  const { photoLinkTracking } = loadTsModule('src/lib/whatsapp/photo-summary.ts');
+  const store = memoryStore();
+  rememberAcquisition(store, photoLinkTracking('k7m2qx9dab'), NOW);
+  assert.deepEqual(signupMetadata(store, NOW + 1000), {
+    signup_source: 'whatsapp',
+    signup_medium: 'bot',
+    signup_campaign: 'photo',
+    whatsapp_code: 'k7m2qx9dab',
+  });
+});
+
+test('the source stays the first visit, the WhatsApp code is the last photo link opened', () => {
+  const { photoLinkTracking } = loadTsModule('src/lib/whatsapp/photo-summary.ts');
+  const store = memoryStore();
+  rememberAcquisition(store, '?utm_source=whatsapp&utm_campaign=greeting', NOW);
+  rememberAcquisition(store, photoLinkTracking('k7m2qx9dab'), NOW + 1000);
+  rememberAcquisition(store, photoLinkTracking('abcdefghjk'), NOW + 2000);
+  assert.deepEqual(signupMetadata(store, NOW + 3000), {
+    signup_source: 'whatsapp',
+    signup_campaign: 'greeting',
+    whatsapp_code: 'abcdefghjk',
+  });
+});
+
+test('the Google sign-up cookie carries the WhatsApp code too', () => {
+  const visit = { tags: { signup_source: 'whatsapp', whatsapp_code: 'k7m2qx9dab' }, at: NOW - 1000 };
+  const sent = acquisitionCookie(visit, NOW, true).split(';')[0];
+  assert.deepEqual(parseAcquisitionCookie(sent), { signup_source: 'whatsapp', whatsapp_code: 'k7m2qx9dab' });
+});

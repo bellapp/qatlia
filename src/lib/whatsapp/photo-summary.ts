@@ -24,6 +24,11 @@ const SHOWN_LINES = 5;
  */
 export const PHOTO_LINK_TRACKING = '?utm_source=whatsapp&utm_medium=bot&utm_campaign=photo';
 
+/** The provenance of one photo link, with its code: the account is then linked to the WhatsApp number (22/11/2026). */
+export function photoLinkTracking(code: string): string {
+  return `${PHOTO_LINK_TRACKING}&utm_content=${encodeURIComponent(code)}`;
+}
+
 export function photoLink(code: string): string {
   return `https://qatlia.ma/w/${code}`;
 }

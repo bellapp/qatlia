@@ -223,3 +223,19 @@ test("getClientDetail : la provenance de l'inscription vient de user_metadata", 
   assert.equal(identity.signupSource, 'whatsapp');
   assert.equal(identity.signupCampaign, 'ctwa');
 });
+
+// The account's WhatsApp number (22/11/2026): the code of the photo link the
+// visitor opened before signing up, looked up in whatsapp_photo_reads.
+test('getClientDetail : le numéro WhatsApp vient du lien de fiche ouvert avant l’inscription', async () => {
+  const { client, state } = freshDb();
+  assert.equal((await getClientDetail(client, UUID)).client.identity.whatsapp, null);
+  state.authUser.user_metadata = { signup_source: 'whatsapp', whatsapp_code: 'k7m2qx9dab' };
+  state.tables.whatsapp_photo_reads = { wa_id: '212612345678' };
+  assert.equal((await getClientDetail(client, UUID)).client.identity.whatsapp, '+212612345678');
+  // A user with a WhatsApp username: its business-scoped id.
+  state.tables.whatsapp_photo_reads = { wa_id: 'MA.1163870366035687' };
+  assert.equal((await getClientDetail(client, UUID)).client.identity.whatsapp, 'MA.1163870366035687');
+  // A failing lookup never breaks the page.
+  state.tableErrors = { whatsapp_photo_reads: { code: '42P01', message: 'missing' } };
+  assert.equal((await getClientDetail(client, UUID)).client.identity.whatsapp, null);
+});

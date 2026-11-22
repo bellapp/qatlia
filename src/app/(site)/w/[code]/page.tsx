@@ -30,5 +30,5 @@ export default async function PhotoLinkPage({ params }: { params: { code: string
   if (!draft) return <PhotoLinkExpired />;
   // The free preview, computed here from the stored pieces (never from the browser);
   // none for a list too long to plan here: the atelier plans it after sign-up.
-  return <OpenInAtelier draft={draft} preview={previewPlanFor(draft)} />;
+  return <OpenInAtelier code={params.code} draft={draft} preview={previewPlanFor(draft)} />;
 }
