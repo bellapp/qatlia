@@ -51,8 +51,16 @@ const KNOWN_KINDS: ReadonlySet<string> = new Set([
   'reaction',
 ]);
 
+/**
+ * A user with a WhatsApp username may hide their phone number: Meta then
+ * omits `from` / `contacts[].wa_id` and gives only the business-scoped user
+ * id (BSUID, e.g. "MA.1163870366035687") in `from_user_id` / `contacts[].user_id`.
+ * The bot dropped those messages: 19 prospects of the ad got no answer
+ * (20-22/11/2026). The phone number stays the identity when Meta sends it.
+ */
 const messageSchema = z.object({
-  from: z.string().min(1),
+  from: z.string().min(1).optional(),
+  from_user_id: z.string().min(1).optional(),
   id: z.string().min(1),
   type: z.string().optional(),
   text: z.object({ body: z.string() }).partial().optional(),
@@ -75,7 +83,8 @@ const echoSchema = z.object({
 });
 
 const contactSchema = z.object({
-  wa_id: z.string(),
+  wa_id: z.string().optional(),
+  user_id: z.string().optional(),
   profile: z.object({ name: z.string() }).partial().optional(),
 });
 
@@ -114,6 +123,8 @@ function parseInbound(
   const parsed = messageSchema.safeParse(raw);
   if (!parsed.success) return null;
   const message = parsed.data;
+  const waId = message.from ?? message.from_user_id;
+  if (!waId) return null;
   const type = message.type ?? '';
   const tapped = buttonText(message);
   let kind: InboundKind = KNOWN_KINDS.has(type) ? (type as InboundKind) : 'other';
@@ -127,8 +138,8 @@ function parseInbound(
   return {
     type: 'inbound',
     wamid: message.id,
-    waId: message.from,
-    profileName: profileNames.get(message.from) ?? null,
+    waId,
+    profileName: profileNames.get(waId) ?? null,
     kind,
     text,
     referral: message.referral ?? null,
@@ -170,7 +181,9 @@ export function parseWebhook(body: unknown, phoneNumberId: string): Array<Inboun
         for (const rawContact of value.data.contacts ?? []) {
           const contact = contactSchema.safeParse(rawContact);
           if (contact.success && contact.data.profile?.name) {
-            profileNames.set(contact.data.wa_id, contact.data.profile.name);
+            for (const id of [contact.data.wa_id, contact.data.user_id]) {
+              if (id) profileNames.set(id, contact.data.profile.name);
+            }
           }
         }
         for (const rawMessage of value.data.messages ?? []) {

@@ -684,3 +684,33 @@ test('recentHistory shows an inbound photo as « 📷 photo », other rows witho
     { direction: 'bot', body: 'ok' },
   ]);
 });
+
+// A user known only by its business-scoped id (no phone number, 22/11/2026):
+// YCloud and the Graph API both take it as `recipient`, without `to`.
+test('a business-scoped id is sent as recipient, never as a phone number', async () => {
+  const bsuid = 'MA.1163870366035687';
+  const calls = [];
+  const fetchImpl = async (url, init) => {
+    calls.push(JSON.parse(init.body));
+    return new Response(JSON.stringify({ id: 'yc1', wamid: 'wamid.B', messages: [{ id: 'wamid.G' }] }), { status: 200 });
+  };
+  assert.equal(await sendText(YCLOUD_CONFIG, bsuid, 'hi', fetchImpl), 'wamid.B');
+  assert.equal(calls[0].recipient, bsuid);
+  assert.equal('to' in calls[0], false);
+  assert.equal(await sendText(CONFIG, bsuid, 'hi', fetchImpl), 'wamid.G');
+  assert.equal(calls[1].recipient, bsuid);
+  assert.equal('to' in calls[1], false);
+  // A phone number keeps \`to\`.
+  await sendText(YCLOUD_CONFIG, '212600000000', 'hi', fetchImpl);
+  assert.equal(calls[2].to, '+212600000000');
+  assert.equal('recipient' in calls[2], false);
+});
+
+test('only a country code, a dot and an id read as a business-scoped id', () => {
+  const { isBusinessScopedId } = load('src/lib/whatsapp/send.ts');
+  assert.equal(isBusinessScopedId('MA.1163870366035687'), true);
+  assert.equal(isBusinessScopedId('US.ENT.11815799212886844830'), true);
+  assert.equal(isBusinessScopedId('212600000000'), false);
+  assert.equal(isBusinessScopedId('+212600000000'), false);
+  assert.equal(isBusinessScopedId('MAx123'), false);
+});

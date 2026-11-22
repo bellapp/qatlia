@@ -57,6 +57,14 @@ function retryableStatus(status: number): boolean {
   return status === 429 || status === 503;
 }
 
+/**
+ * A business-scoped user id ("MA.1163870366035687"): a user who hid their phone
+ * number behind a WhatsApp username. Both APIs take it as `recipient`, not `to`.
+ */
+export function isBusinessScopedId(id: string): boolean {
+  return /^[A-Z]{2}\.[A-Za-z0-9.]+$/.test(id);
+}
+
 /** The type-specific part of a send request. Both APIs share the interactive shape; only the link preview flag differs. */
 function content(message: Message, previewKey: 'preview_url' | 'previewUrl'): Record<string, unknown> {
   // An image by link: both APIs take the same shape.
@@ -110,7 +118,7 @@ async function sendViaMeta(
       body: JSON.stringify({
         messaging_product: 'whatsapp',
         recipient_type: 'individual',
-        to,
+        ...(isBusinessScopedId(to) ? { recipient: to } : { to }),
         ...content(message, 'preview_url'),
       }),
       signal: AbortSignal.timeout(SEND_TIMEOUT_MS),
@@ -170,7 +178,7 @@ async function sendViaYCloud(
       },
       body: JSON.stringify({
         from: ycloud.from,
-        to: to.startsWith('+') ? to : `+${to}`,
+        ...(isBusinessScopedId(to) ? { recipient: to } : { to: to.startsWith('+') ? to : `+${to}` }),
         ...content(message, 'previewUrl'),
       }),
       signal: AbortSignal.timeout(SEND_TIMEOUT_MS),
