@@ -269,3 +269,26 @@ test('the system prompt never feeds the model a bank-card promise and forbids br
     assert.ok(prompt.includes('Ne parle jamais de carte bancaire'), mode);
   }
 });
+
+// anas, 21/11/2026: the assistant asked again for a sheet the bot had read.
+// It is told of the read: how many pieces, the link, and not to ask again.
+test('the assistant knows the sheet this number sent was read, and points to its link', async () => {
+  const f = fakeFetch(() => llmResponse('{"reply":"ok","handoff":false}'));
+  await ask(f, { handoffMode: 'coexistence', photoRead: { pieceCount: 44, link: 'https://qatlia.ma/w/k7m2qx9dab' } });
+  const system = f.calls[0].body.messages[0].content;
+  assert.ok(system.startsWith(buildSystemPrompt('coexistence')));
+  assert.match(system, /44 pièces/);
+  assert.match(system, /https:\/\/qatlia\.ma\/w\/k7m2qx9dab/);
+  assert.match(system, /ne lui redemande pas/i);
+  assert.equal(f.calls[0].body.messages.filter((m) => m.role === 'system').length, 1);
+
+  const expired = fakeFetch(() => llmResponse('{"reply":"ok","handoff":false}'));
+  await ask(expired, { handoffMode: 'coexistence', photoRead: { pieceCount: 44, link: null } });
+  const note = expired.calls[0].body.messages[0].content;
+  assert.match(note, /expiré/);
+  assert.doesNotMatch(note, /qatlia\.ma\/w\//);
+
+  const none = fakeFetch(() => llmResponse('{"reply":"ok","handoff":false}'));
+  await ask(none, { handoffMode: 'coexistence' });
+  assert.equal(none.calls[0].body.messages[0].content, buildSystemPrompt('coexistence'));
+});

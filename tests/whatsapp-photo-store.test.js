@@ -228,3 +228,22 @@ test('the 24-hour boundary: a link a minute before its end opens, a minute after
   assert.equal(await openPhotoDraft(fake.client, 'abcdefghjk', NOW), 'expired');
   assert.equal(loadTsModule('src/lib/whatsapp/photo-store.ts').PHOTO_READ_TTL_HOURS, 24);
 });
+
+// The assistant is told of the sheet a number sent (anas, 21/11/2026): the
+// latest read that went through, its piece count, and its code while valid.
+test('latestPhotoRead gives the last read sheet of a number: pieces, and the code while the link is valid', async () => {
+  const { latestPhotoRead } = store;
+  const fake = createFakeSupabase();
+  const row = { code: 'abcdefghjk', expires_at: new Date(NOW.getTime() + MIN).toISOString(), summary: { pieceCount: 44 } };
+  fake.state.tables[TABLE] = [row];
+  assert.deepEqual(await latestPhotoRead(fake.client, WA, NOW), { pieceCount: 44, code: 'abcdefghjk' });
+  const call = fake.state.fromCalls[0];
+  assert.ok(has(call, 'eq', 'wa_id', WA));
+  assert.ok(has(call, 'eq', 'status', 'ok'));
+
+  fake.state.tables[TABLE] = [{ ...row, expires_at: new Date(NOW.getTime() - MIN).toISOString() }];
+  assert.deepEqual(await latestPhotoRead(fake.client, WA, NOW), { pieceCount: 44, code: null });
+
+  fake.state.tables[TABLE] = [];
+  assert.equal(await latestPhotoRead(fake.client, WA, NOW), null);
+});

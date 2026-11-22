@@ -18,7 +18,9 @@ import { parseWebhook, type EchoEvent, type InboundEvent } from '@/lib/whatsapp/
 import { COPY, EXAMPLE_FICHE_URL, type Lang, type MenuButton } from '@/lib/whatsapp/copy';
 import { HANDOFF_HOURS, decide, detectLang, resolveLang, type Decision } from '@/lib/whatsapp/router';
 import { assistantBudgetMs, hearVoice } from '@/lib/whatsapp/voice';
-import { HISTORY_MESSAGES, askAssistant } from '@/lib/whatsapp/assistant';
+import { HISTORY_MESSAGES, askAssistant, type PhotoReadNote } from '@/lib/whatsapp/assistant';
+import { latestPhotoRead } from '@/lib/whatsapp/photo-store';
+import { photoLink } from '@/lib/whatsapp/photo-summary';
 import { sendButtons, sendImage, sendPlanCard, sendText, type PlanCard } from '@/lib/whatsapp/send';
 import { handlePhoto, type PhotoMessageKind } from '@/lib/whatsapp/photo';
 import { pictureCheckMs } from '@/lib/whatsapp/plan-image';
@@ -331,6 +333,21 @@ async function handleVoiceMessage(
   });
 }
 
+/**
+ * The sheet this number sent that the bot read, for the assistant (anas,
+ * 21/11/2026: it asked again for a sheet it had read). A failing lookup only
+ * leaves the note out.
+ */
+async function photoReadFor(db: SupabaseClient, waId: string, now: Date): Promise<PhotoReadNote | null> {
+  try {
+    const read = await latestPhotoRead(db, waId, now);
+    return read ? { pieceCount: read.pieceCount, link: read.code ? photoLink(read.code) : null } : null;
+  } catch (error) {
+    console.error('[whatsapp] latest photo read lookup failed', describeError(error));
+    return null;
+  }
+}
+
 /** The assistant's answer to a free-text question (typed, or a transcribed voice note). */
 async function answerWithAssistant(
   db: SupabaseClient,
@@ -348,6 +365,7 @@ async function answerWithAssistant(
   const { waId, lang, now } = input;
   const redirect = config.handoffMode === 'redirect';
   const history = await recentHistory(db, waId, HISTORY_MESSAGES, input.wamid);
+  const photoRead = await photoReadFor(db, waId, now);
   const answer =
     config.openrouterKey && input.timeoutMs !== null
       ? await askAssistant({
@@ -356,6 +374,7 @@ async function answerWithAssistant(
           model: config.model,
           apiKey: config.openrouterKey,
           handoffMode: config.handoffMode,
+          photoRead,
           ...(input.timeoutMs !== undefined ? { timeoutMs: input.timeoutMs } : {}),
         })
       : null;

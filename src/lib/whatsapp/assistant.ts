@@ -90,6 +90,27 @@ ${redirect ? `- Ne donne le lien de contact humain que si la personne demande ex
 FORMAT DE SORTIE : réponds uniquement avec un objet JSON {"reply": "...", "handoff": true|false}, sans texte autour.`;
 }
 
+/** The sheet this number sent that the bot read (src/lib/whatsapp/photo-store.ts, latestPhotoRead). */
+export interface PhotoReadNote {
+  pieceCount: number;
+  /** The plan's link, or null once it expired. */
+  link: string | null;
+}
+
+/**
+ * Tells the assistant the bot read this person's sheet: it asked again for a
+ * sheet it had read (anas, 21/11/2026). Built from our own row, never from
+ * what the person wrote.
+ */
+export function photoReadNote(read: PhotoReadNote): string {
+  const head = `
+
+CETTE PERSONNE : elle a déjà envoyé ici la photo de sa fiche de débit, et le bot l'a lue (${read.pieceCount} pièces). Ne lui redemande pas sa fiche.`;
+  return read.link
+    ? `${head} Son plan de coupe est ici : ${read.link} (lien valable 24 h après la lecture). Si elle veut voir son plan, renvoie-la vers ce lien ; pour une autre fiche, elle la prend en photo dans l'atelier après l'inscription.`
+    : `${head} Le lien de son plan a expiré : pour revoir son plan ou essayer une autre fiche, elle s'inscrit et prend sa fiche en photo dans l'atelier.`;
+}
+
 /** Tolerant JSON reader: plain JSON, a ```json fence, or the first `{` to the last `}`. */
 function parseAssistantJson(text: string): unknown {
   const cleaned = text
@@ -118,6 +139,8 @@ export async function askAssistant(input: {
   model: string;
   apiKey: string;
   handoffMode: HandoffMode;
+  /** The sheet this number sent that the bot read, if any. */
+  photoRead?: PhotoReadNote | null;
   fetchImpl?: typeof fetch;
   timeoutMs?: number;
 }): Promise<AssistantReply | null> {
@@ -142,7 +165,7 @@ export async function askAssistant(input: {
       body: JSON.stringify({
         model: input.model,
         messages: [
-          { role: 'system', content: buildSystemPrompt(input.handoffMode) },
+          { role: 'system', content: buildSystemPrompt(input.handoffMode) + (input.photoRead ? photoReadNote(input.photoRead) : '') },
           ...history,
           { role: 'user', content: input.message.slice(0, MAX_INBOUND_CHARS) },
         ],

@@ -35,7 +35,7 @@ import {
 } from '@/lib/whatsapp/photo-summary';
 import { planImageUrl } from '@/lib/whatsapp/plan-image';
 import type { PlanCard } from '@/lib/whatsapp/send';
-import { countBotMessages } from '@/lib/whatsapp/store';
+import { countBotMessages, recordOutbound } from '@/lib/whatsapp/store';
 
 export type PhotoOutcome = 'handled' | 'hint' | 'silent';
 export type PhotoMessageKind = 'photo_reading' | 'photo_result' | 'photo_already' | 'photo_failed';
@@ -86,6 +86,18 @@ export async function handlePhoto(input: {
   if (reservation.status === 'already') {
     const since = new Date(now.getTime() - ALREADY_COOLDOWN_MS);
     if ((await countBotMessages(db, event.waId, 'photo_already', since)) > 0) return 'silent';
+    // Photos sent together all pass the check above before any answer is
+    // stored (anas, 20/11/2026: four identical answers in two seconds). The
+    // claim's wamid is unique per number and 10-minute window: one wins.
+    const window = Math.floor(now.getTime() / ALREADY_COOLDOWN_MS);
+    const claimed = await recordOutbound(db, {
+      waId: event.waId,
+      wamid: `claim:photo_already:${event.waId}:${window}`,
+      direction: 'bot',
+      kind: 'photo_already_claim',
+      body: null,
+    });
+    if (!claimed) return 'silent';
     const link = reservation.code ? photoLink(reservation.code) : null;
     await deliver(PHOTO_COPY.already(lang, link), 'photo_already');
     return 'handled';

@@ -218,3 +218,28 @@ export async function openPhotoDraft(
     throw error;
   }
 }
+
+/**
+ * The last sheet this number sent that the bot read: its piece count, and its
+ * code while the link is valid (null once expired). For the assistant, which
+ * asked again for a sheet it had read (anas, 21/11/2026). Null when none was read.
+ */
+export async function latestPhotoRead(
+  db: SupabaseClient,
+  waId: string,
+  now: Date,
+): Promise<{ pieceCount: number; code: string | null } | null> {
+  const found = await db
+    .from(TABLE)
+    .select('code, expires_at, summary')
+    .eq('wa_id', waId)
+    .eq('status', 'ok')
+    .order('created_at', { ascending: false })
+    .limit(1);
+  check(found.error, 'latest read');
+  const row = ((found.data ?? []) as Array<{ code: string | null; expires_at: string | null; summary: { pieceCount?: unknown } | null }>)[0];
+  if (!row) return null;
+  const valid = row.code && row.expires_at && Date.parse(row.expires_at) > now.getTime();
+  const pieceCount = typeof row.summary?.pieceCount === 'number' ? row.summary.pieceCount : 0;
+  return { pieceCount, code: valid ? row.code : null };
+}

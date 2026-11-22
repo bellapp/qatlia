@@ -665,3 +665,22 @@ test('a refused message, a provider failure or a timeout is not sent twice', asy
     assert.equal(fetchImpl.calls.length, 1);
   }
 });
+
+// anas, 21/11/2026: after several photos, the assistant answered « كنتسنى
+// تصويرة الورقة ديالك » (« I am waiting for your sheet »). A photo has no text,
+// so it never reached the assistant's history: it now shows as « 📷 photo ».
+test('recentHistory shows an inbound photo as « 📷 photo », other rows without text stay out', async () => {
+  const rows = [
+    { direction: 'bot', body: 'ok', wamid: 'b', kind: 'assistant' },
+    { direction: 'user', body: null, wamid: 'wamid.IMG', kind: 'image' },
+    { direction: 'user', body: null, wamid: 'wamid.STK', kind: 'sticker' },
+    { direction: 'user', body: 'hello', wamid: 'wamid.B', kind: 'text' },
+  ];
+  const db = fakeDb(() => ok(rows));
+  const history = await recentHistory(db, '1', 10);
+  assert.deepEqual(history, [
+    { direction: 'user', body: 'hello' },
+    { direction: 'user', body: '📷 photo' },
+    { direction: 'bot', body: 'ok' },
+  ]);
+});
