@@ -44,6 +44,15 @@ export const STORE_APP_REDIRECTS: Readonly<Record<string, string>> = {
   '/credits/success': '/account',
 };
 
+/**
+ * Where a sign-out leads. In a browser, the landing. In the app, the landing
+ * would turn into the atelier, which looks the same signed in or out and leaves
+ * the artisan unsure they left: the app shows the sign-in page instead.
+ */
+export function storeAppSignOutPath(inApp: boolean): string {
+  return inApp ? '/auth/login' : '/';
+}
+
 /** Where the app sends a page instead, or null when the page stays. */
 export function storeAppRedirect(pathname: string): string | null {
   const path = pathname.replace(/\/+$/, '') || '/';

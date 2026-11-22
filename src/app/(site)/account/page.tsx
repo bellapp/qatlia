@@ -9,7 +9,7 @@ import { forgetAtelierDraft } from '@/lib/atelier-draft';
 import { ArrowLeft, ArrowRight, Coins, KeyRound, LogOut, Receipt, Shield, Zap } from 'lucide-react';
 import { AccountMenu } from '@/components/AccountMenu';
 import { useStoreApp } from '@/components/useStoreApp';
-import { storeAppCopyKey } from '@/lib/store-app';
+import { isStoreAppDocument, storeAppCopyKey, storeAppSignOutPath } from '@/lib/store-app';
 import { QatlIALogo } from '@/components/QatlIALogo';
 import { LocaleSwitcher, useLocale } from '@/components/LocaleProvider';
 import { CurrencySwitcher } from '@/components/CurrencySwitcher';
@@ -109,7 +109,7 @@ export default function AccountPage() {
     // Work kept for a sign-in must not wait for the next person on a shared computer.
     clearPendingWork(window.localStorage, window.sessionStorage);
     forgetAtelierDraft(window.sessionStorage);
-    router.push('/');
+    router.push(storeAppSignOutPath(isStoreAppDocument()));
     router.refresh();
   };
 

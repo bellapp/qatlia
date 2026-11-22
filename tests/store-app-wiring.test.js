@@ -49,3 +49,12 @@ test('the guard puts the attribute back if React stripped it', () => {
   const guard = read('src/components/StoreAppGuard.tsx');
   assert.match(guard, /if \(inApp\) document\.documentElement\.setAttribute\('data-app', STORE_APP_VALUE\);/);
 });
+
+test('both sign-out buttons go where the store-app rules say', () => {
+  for (const file of ['src/components/AccountMenu.tsx', 'src/app/(site)/account/page.tsx']) {
+    const source = read(file);
+    const handler = source.slice(source.indexOf('const handleLogout'), source.indexOf('router.refresh()', source.indexOf('const handleLogout')));
+    assert.match(handler, /router\.push\(storeAppSignOutPath\(isStoreAppDocument\(\)\)\)/, file);
+    assert.doesNotMatch(handler, /router\.push\('\/'\)/, file);
+  }
+});
