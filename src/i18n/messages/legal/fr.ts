@@ -129,7 +129,7 @@ export const legalFr = {
           '- Compte : adresse e-mail, nom fourni par Google si vous l’utilisez pour vous connecter, langue choisie. Votre mot de passe est géré par notre fournisseur d’authentification et n’est jamais stocké en clair.\n' +
           '- Projets : pièces, dimensions, matériaux, réglages et plans de découpe que vous enregistrez.\n' +
           '- Devis : les coordonnées de votre entreprise et celles de votre client que vous saisissez dans un devis enregistré sur un projet.\n' +
-          '- Photos de fiches de débit : envoyées pour analyse au moment où vous les soumettez. QatliA ne les enregistre pas.\n' +
+          '- Photos de fiches de débit : envoyées pour analyse au moment où vous les soumettez. Quand vous enregistrez le projet, une version réduite de la photo est gardée avec le projet enregistré, pour que vous puissiez la revoir.\n' +
           '- Crédits et paiements : solde, historique des crédits, commandes manuelles (numéro, pack, mode de paiement, statut). Pour un paiement par carte, Creem nous confirme la transaction ; vos données de carte restent chez Creem.\n' +
           '- Support : les messages que vous nous envoyez par e-mail ou WhatsApp.\n' +
           '- Données techniques : journaux de connexion (adresse IP, navigateur) tenus par nos prestataires pour la sécurité.',
@@ -168,7 +168,7 @@ export const legalFr = {
         title: 'Durée de conservation',
         body:
           '- Compte, projets et devis : tant que votre compte est ouvert, puis supprimés dans les 30 jours suivant sa fermeture.\n' +
-          '- Photos : non conservées par QatliA après l’analyse.\n' +
+          '- Photos : la version réduite gardée avec un projet enregistré est conservée tant que votre compte est ouvert, puis supprimée avec lui. Une photo analysée sans enregistrer de projet n’est pas conservée.\n' +
           '- Paiements et historique des crédits : pendant la durée imposée par les obligations comptables et fiscales.\n' +
           '- Messages de support : le temps de traiter votre demande et son suivi.',
       },

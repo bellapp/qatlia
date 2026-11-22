@@ -119,7 +119,7 @@ export const legalEn: LegalCatalog = {
           '- Account: email address, the name provided by Google if you sign in with it, your chosen language. Your password is handled by our authentication provider and is never stored in plain text.\n' +
           '- Projects: the pieces, dimensions, materials, settings and cutting plans you save.\n' +
           '- Quotes: your company’s details and your customer’s details that you enter in a quote saved on a project.\n' +
-          '- Photos of cut lists: sent for analysis when you submit them. QatliA does not store them.\n' +
+          '- Photos of cut lists: sent for analysis when you submit them. When you save the project, a reduced copy of the photo is kept with the saved project so you can see it again.\n' +
           '- Credits and payments: balance, credit history, manual orders (number, pack, payment method, status). For a card payment, Creem confirms the transaction to us; your card details stay with Creem.\n' +
           '- Support: the messages you send us by email or WhatsApp.\n' +
           '- Technical data: connection logs (IP address, browser) kept by our providers for security.',
@@ -158,7 +158,7 @@ export const legalEn: LegalCatalog = {
         title: 'How long we keep it',
         body:
           '- Account, projects and quotes: while your account is open, then deleted within 30 days of its closure.\n' +
-          '- Photos: not kept by QatliA after the analysis.\n' +
+          '- Photos: the reduced copy kept with a saved project stays while your account is open, then is deleted with it. A photo analysed without saving a project is not kept.\n' +
           '- Payments and credit history: for the period required by accounting and tax obligations.\n' +
           '- Support messages: for as long as it takes to handle your request and its follow-up.',
       },

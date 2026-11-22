@@ -27,7 +27,7 @@ export const LEGAL_ROUTES: Record<LegalDoc, string> = {
 };
 
 /** Shown as « Dernière mise à jour ». Bump it with every change of substance. */
-export const LEGAL_UPDATED_AT = '2026-10-30';
+export const LEGAL_UPDATED_AT = '2026-11-22';
 
 /**
  * Days after a payment during which its unused credits can be refunded. Seven
