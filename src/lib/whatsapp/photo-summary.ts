@@ -33,6 +33,31 @@ export function panelFor(sheet: ReadSheet | null): ReadSheet {
   return sheet ?? { height: DEFAULT_STOCK_SHEET.height, width: DEFAULT_STOCK_SHEET.width };
 }
 
+/**
+ * The standard panels, smallest first: the atelier's default, then the 280 × 207
+ * of the panel catalogue (src/lib/panel-catalog.ts).
+ */
+const STANDARD_PANELS: readonly ReadSheet[] = [
+  { height: DEFAULT_STOCK_SHEET.height, width: DEFAULT_STOCK_SHEET.width },
+  { height: 280, width: 207 },
+];
+
+const holds = (panel: ReadSheet, piece: ReadPiece) =>
+  (piece.height <= panel.height && piece.width <= panel.width) || (piece.width <= panel.height && piece.height <= panel.width);
+
+/**
+ * Owner, 22/11/2026: « Si la taille du panneau est spécifiée, c'est bon. Sinon,
+ * on doit prendre la taille des panneaux qui peuvent contenir la taille des
+ * pièces. » The panel written on the sheet; else the first standard panel
+ * every piece fits in (turned if need be); else the default, whose oversize
+ * pieces the answer counts. `fitted` when a larger panel was taken.
+ */
+export function fittingPanel(pieces: ReadPiece[], sheet: ReadSheet | null): { panel: ReadSheet; fitted: boolean } {
+  if (sheet) return { panel: sheet, fitted: false };
+  const index = STANDARD_PANELS.findIndex((panel) => pieces.every((piece) => holds(panel, piece)));
+  return index > 0 ? { panel: STANDARD_PANELS[index], fitted: true } : { panel: panelFor(null), fitted: false };
+}
+
 /** Panel sides the bot believes, in cm. Outside this, the size was misread (mm, a piece line) and the default is used. */
 const PANEL_MIN_CM = 30;
 const PANEL_MAX_CM = 400;
@@ -66,13 +91,14 @@ export function listSummary(pieces: ReadPiece[], sheet: ReadSheet | null): Photo
     lineCount: pieces.length,
     sheetsUsed: 0,
     wastePercent: 0,
-    sheet: panelFor(sheet),
+    sheet: fittingPanel(pieces, sheet).panel,
     unplaced: 0,
+    ...(fittingPanel(pieces, sheet).fitted ? { fitted: true as const } : {}),
   };
 }
 
 export function summarizeCutList(pieces: ReadPiece[], sheet: ReadSheet | null): PhotoSummary {
-  const panel = panelFor(sheet);
+  const { panel, fitted } = fittingPanel(pieces, sheet);
   const result = optimizeCutting2D(
     pieces.map((p, i): Piece => ({ ...p, id: String(i + 1), material: 'mdf', rotatable: true })),
     [{ ...DEFAULT_STOCK_SHEET, height: panel.height, width: panel.width }],
@@ -84,6 +110,7 @@ export function summarizeCutList(pieces: ReadPiece[], sheet: ReadSheet | null): 
     wastePercent: Math.round(result.wastePercentage),
     sheet: panel,
     unplaced: result.unplacedPieces.length,
+    ...(fitted ? { fitted: true as const } : {}),
   };
 }
 
@@ -122,7 +149,9 @@ function resultLines(lang: Lang, summary: PhotoSummary): { head: string; panelNo
     return {
       // Labelled figures (« القطع: 14 ») rather than counted nouns: no number agreement to get wrong.
       head: `✅ القطع اللي تقرات: ${ltr(lang, String(summary.pieceCount))} · اللوحات: ${ltr(lang, String(summary.sheetsUsed))} (${ltr(lang, panel)}) · الهدر: ${ltr(lang, `${summary.wastePercent}%`)}`,
-      panelNote: standard ? ['(لوحة عادية، تقدر تبدلها فالورشة)'] : [],
+      panelNote: summary.fitted
+        ? [`(لوحة ${ltr(lang, panel)} حيت القطع طوال، تقدر تبدلها فالورشة)`]
+        : standard ? ['(لوحة عادية، تقدر تبدلها فالورشة)'] : [],
       warning: summary.unplaced > 0 ? [`⚠️ قطع كبر من اللوحة: ${ltr(lang, String(summary.unplaced))}`] : [],
     };
   }
@@ -132,7 +161,9 @@ function resultLines(lang: Lang, summary: PhotoSummary): { head: string; panelNo
   const unplacedWord = summary.unplaced > 1 ? 'pièces plus grandes' : 'pièce plus grande';
   return {
     head: `✅ ${summary.pieceCount} ${pieceWord} · ${summary.sheetsUsed} ${panelWord} ${panel} · ${summary.wastePercent} % de chute`,
-    panelNote: standard ? ['(panneau standard, modifiable dans l\'atelier)'] : [],
+    panelNote: summary.fitted
+      ? [`(panneau ${panel} choisi pour la longueur des pièces, modifiable dans l'atelier)`]
+      : standard ? ['(panneau standard, modifiable dans l\'atelier)'] : [],
     warning: summary.unplaced > 0 ? [`⚠️ ${summary.unplaced} ${unplacedWord} que le panneau`] : [],
   };
 }
