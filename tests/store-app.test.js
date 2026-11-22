@@ -131,3 +131,9 @@ test('without sessionStorage, leaving a purchase page keeps the app parameter', 
   assert.equal(replaced, '/account?app=android');
   assert.equal(runScript({ url: '/credits?app=android' }).replaced, '/account', 'remembered: clean address');
 });
+
+test('signing out in the app leads to the sign-in page, not to an atelier that looks signed in', () => {
+  assert.equal(storeApp.storeAppSignOutPath(true), '/auth/login');
+  assert.equal(storeApp.storeAppSignOutPath(false), '/', 'a browser keeps the landing');
+  assert.equal(storeApp.storeAppRedirect(storeApp.storeAppSignOutPath(true)), null, 'nothing reroutes it');
+});
