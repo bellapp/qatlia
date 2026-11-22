@@ -293,3 +293,49 @@ test('parseWebhook keeps other interactive replies and malformed taps as other, 
     assert.equal(event.text, null);
   }
 });
+
+// 19 prospects of the ad (20-22/11/2026) never got a word from the bot: all of
+// them had a WhatsApp username, so Meta sent no phone number. `from` and
+// `contacts[].wa_id` are then omitted and the user is only its business-scoped
+// id (BSUID) in `from_user_id` / `contacts[].user_id`. The parser required
+// `from` and dropped those messages without a trace.
+const BSUID = 'MA.1163870366035687';
+function usernamePayload(message) {
+  return {
+    object: 'whatsapp_business_account',
+    entry: [{
+      id: 'waba',
+      changes: [{
+        field: 'messages',
+        value: {
+          messaging_product: 'whatsapp',
+          metadata: { phone_number_id: PHONE_ID, display_phone_number: '212611000000' },
+          contacts: [{ profile: { name: 'Adil', username: 'adilbois' }, user_id: BSUID }],
+          messages: [{ from_user_id: BSUID, id: 'wamid.U1', timestamp: '1700000000', type: 'text', text: { body: 'مرحبا' }, ...message }],
+        },
+      }],
+    }],
+  };
+}
+
+test('a user with a username and no phone number is read by its business-scoped id', () => {
+  const [event] = parseWebhook(usernamePayload({}), PHONE_ID);
+  assert.equal(event.type, 'inbound');
+  assert.equal(event.waId, BSUID);
+  assert.equal(event.profileName, 'Adil');
+  assert.equal(event.text, 'مرحبا');
+});
+
+test('the phone number stays the identity when Meta still sends it with the business-scoped id', () => {
+  const payload = messagesPayload({ from_user_id: BSUID, type: 'text', text: { body: 'salam' } });
+  payload.entry[0].changes[0].value.contacts = [{ wa_id: CUSTOMER, user_id: BSUID, profile: { name: 'Sara' } }];
+  const [event] = parseWebhook(payload, PHONE_ID);
+  assert.equal(event.waId, CUSTOMER);
+  assert.equal(event.profileName, 'Sara');
+});
+
+test('a message with neither a phone number nor a business-scoped id is still dropped', () => {
+  const payload = usernamePayload({});
+  delete payload.entry[0].changes[0].value.messages[0].from_user_id;
+  assert.deepEqual(parseWebhook(payload, PHONE_ID), []);
+});
