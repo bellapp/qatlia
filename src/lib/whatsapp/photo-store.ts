@@ -15,6 +15,7 @@
 import { randomInt } from 'node:crypto';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { ReadPiece, ReadSheet } from '@/lib/vision/read-cut-list';
+import { removePlanPictures } from '@/lib/whatsapp/plan-picture-store';
 
 /** A link, and what it holds, last this long: long enough to sign up, short enough not to be passed around. */
 export const PHOTO_READ_TTL_HOURS = 24;
@@ -86,13 +87,17 @@ interface CurrentRow {
  * is logged and never blocks the photo at hand.
  */
 async function purgeExpired(db: SupabaseClient, now: Date): Promise<void> {
-  const { error } = await db
+  const { data, error } = await db
     .from(TABLE)
     .update({ pieces: null, sheet: null, summary: null })
     .lt('expires_at', now.toISOString())
-    .not('pieces', 'is', null);
+    .not('pieces', 'is', null)
+    .select('code');
   if (error && isMissingTable(error)) throw new PhotoTableMissing();
   if (error) console.error('[whatsapp] photo purge failed', error.code ?? 'no code');
+  // Their stored plan pictures go with them (src/lib/whatsapp/plan-picture-store.ts).
+  const codes = ((data ?? []) as Array<{ code: string | null }>).map((row) => row.code).filter((code): code is string => !!code);
+  await removePlanPictures(db, codes);
 }
 
 async function reserve(db: SupabaseClient, waId: string, now: Date, dailyCap: number): Promise<Reservation> {

@@ -179,8 +179,9 @@ test('a plan without a price shows a dash, as the atelier does', () => {
 test('the picture is tried only while the webhook has time left for the text answer', () => {
   const { pictureCheckMs, PICTURE_DEADLINE_MS } = load('src/lib/whatsapp/plan-image.ts');
   assert.equal(PICTURE_DEADLINE_MS, 45000);
-  assert.equal(pictureCheckMs(0), 8000);
-  assert.equal(pictureCheckMs(30000), 8000);
+  // 15 s: a big list takes 7 to 10 s to draw once (22/11/2026).
+  assert.equal(pictureCheckMs(0), 15000);
+  assert.equal(pictureCheckMs(30000), 15000);
   assert.equal(pictureCheckMs(40000), 5000);
   assert.equal(pictureCheckMs(43500), null, 'under 2 s left: text');
   assert.equal(pictureCheckMs(60000), null);
@@ -189,7 +190,7 @@ test('the picture is tried only while the webhook has time left for the text ans
   assert.match(route, /pictureCheckMs\(Date\.now\(\) - startedAt\.getTime\(\)\)/);
   assert.match(route, /deliverPicture\(db, config, waId, link, caption, kind, now, card\)/);
   // The card, or the text answer: a bare picture can fail after YCloud took it.
-  assert.match(route, /sendPlanCard\(config, waId, card\)/);
+  assert.match(route, /sendPlanCard\(config, waId, sent\)/);
   assert.doesNotMatch(route, /sendImage\(config, waId, link, caption\)/);
 });
 

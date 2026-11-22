@@ -6,6 +6,7 @@ import { getWhatsAppConfig } from '@/lib/whatsapp/config';
 import { isPhotoCode } from '@/lib/whatsapp/photo-link';
 import { photoLink } from '@/lib/whatsapp/photo-summary';
 import { planImageUrl } from '@/lib/whatsapp/plan-image';
+import { storePlanPicture } from '@/lib/whatsapp/plan-picture-store';
 import { sendImage, sendPlanCard } from '@/lib/whatsapp/send';
 import { recordOutbound } from '@/lib/whatsapp/store';
 
@@ -67,16 +68,18 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'expired' }, { status: 410 });
   }
 
-  // Draw the picture first, so the CDN holds it when WhatsApp downloads it
-  // (PICTURE_CACHE): fetched cold, it took too long and WhatsApp gave up.
-  const image = parsed.data.image ?? planImageUrl(code);
+  // Draw the picture first, then keep it as a file (plan-picture-store): drawn
+  // on the fly, a big list took too long and WhatsApp gave up (21/11/2026).
+  let image = parsed.data.image ?? planImageUrl(code);
+  let bytes: Uint8Array;
   try {
     const check = await fetch(image, { signal: AbortSignal.timeout(20_000) });
-    await check.arrayBuffer();
+    bytes = new Uint8Array(await check.arrayBuffer());
     if (!check.ok) return NextResponse.json({ error: 'PICTURE_NOT_DRAWN' }, { status: 502 });
   } catch {
     return NextResponse.json({ error: 'PICTURE_NOT_DRAWN' }, { status: 502 });
   }
+  if (!parsed.data.image) image = (await storePlanPicture(db, code, bytes)) ?? image;
 
   const waId = to ?? read.wa_id;
   const url = photoLink(code);

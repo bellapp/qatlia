@@ -247,3 +247,18 @@ test('latestPhotoRead gives the last read sheet of a number: pieces, and the cod
   fake.state.tables[TABLE] = [];
   assert.equal(await latestPhotoRead(fake.client, WA, NOW), null);
 });
+
+// A stored plan picture (src/lib/whatsapp/plan-picture-store.ts) goes with its
+// read: the purge of expired reads removes the files of their codes.
+test('the purge of expired reads removes their stored plan pictures', async () => {
+  const fake = createFakeSupabase();
+  const removed = [];
+  fake.client.storage = { from: (bucket) => ({ remove: async (paths) => (removed.push({ bucket, paths }), { data: [], error: null }) }) };
+  fake.state.tables[TABLE] = (call) => {
+    if (has(call, 'update', PURGE)) return [{ code: 'abcdefghjk' }, { code: null }];
+    if (has(call, 'insert')) return { id: 'r1' };
+    return [];
+  };
+  await reservePhotoRead(fake.client, WA, NOW, 300);
+  assert.deepEqual(removed, [{ bucket: 'whatsapp-plans', paths: ['abcdefghjk.jpg'] }]);
+});

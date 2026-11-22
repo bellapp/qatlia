@@ -103,6 +103,8 @@ test('the back office can send the plan card of a read, signed in as admin only'
   assert.match(source, /image: z\.string\(\)\.startsWith\('https:\/\/qatlia\.ma\/'\)\.max\(300\)\.optional\(\)/);
   assert.match(source, /as: z\.enum\(\['card', 'image'\]\)\.default\('card'\)/);
   assert.match(source, /sendImage\(config, waId, image, `\$\{body\}\\n\$\{url\}`\)/);
+  // The plan picture is kept as a file before the send (plan-picture-store).
+  assert.match(source, /storePlanPicture\(db, code, bytes\)/);
   // The picture is drawn (and cached) before WhatsApp is asked to fetch it.
   assert.ok(source.indexOf('await fetch(image') < source.indexOf('sendPlanCard(config'), 'picture drawn before the send');
 });
