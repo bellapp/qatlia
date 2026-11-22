@@ -1,0 +1,12 @@
+# Build outputs
+.gradle/
+build/
+app/build/
+local.properties
+*.apk
+*.aab
+*.idsig
+
+# The upload key never goes in the repository (spec 2026-11-14, lot 2)
+*.jks
+*.keystore

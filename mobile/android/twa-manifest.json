@@ -1,0 +1,43 @@
+{
+  "packageId": "com.qatlia.app",
+  "host": "qatlia.ma",
+  "name": "QatliA",
+  "launcherName": "QatliA",
+  "display": "standalone",
+  "themeColor": "#F5A623",
+  "themeColorDark": "#F5A623",
+  "navigationColor": "#060B14",
+  "navigationColorDark": "#060B14",
+  "navigationDividerColor": "#060B14",
+  "navigationDividerColorDark": "#060B14",
+  "backgroundColor": "#060B14",
+  "enableNotifications": false,
+  "startUrl": "/atelier?app=android",
+  "iconUrl": "https://qatlia.ma/icons/icon-512.png",
+  "maskableIconUrl": "https://qatlia.ma/icons/maskable-512.png",
+  "splashScreenFadeOutDuration": 300,
+  "signingKey": {
+    "path": "C:/Users/zbook/.qatlia/android/qatlia-upload.jks",
+    "alias": "upload"
+  },
+  "appVersionCode": 1,
+  "appVersion": "1.0.0",
+  "shortcuts": [],
+  "generatorApp": "bubblewrap-cli",
+  "webManifestUrl": "https://qatlia.ma/manifest.json",
+  "fallbackType": "customtabs",
+  "features": {},
+  "alphaDependencies": {
+    "enabled": false
+  },
+  "enableSiteSettingsShortcut": true,
+  "isChromeOSOnly": false,
+  "isMetaQuest": false,
+  "fullScopeUrl": "https://qatlia.ma/",
+  "minSdkVersion": 24,
+  "orientation": "default",
+  "fingerprints": [],
+  "additionalTrustedOrigins": [],
+  "retainedBundles": [],
+  "appVersionName": "1.0.0"
+}
