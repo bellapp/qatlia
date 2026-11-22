@@ -6,8 +6,10 @@ Le projet est généré par [Bubblewrap](https://github.com/GoogleChromeLabs/bub
 
 ## Prérequis sur le PC
 
-- JDK 17 et le SDK Android d'Android Studio, déclarés dans `~/.bubblewrap/config.json` :
-  `{"jdkPath":"C:/Program Files/Eclipse Adoptium/jdk-17.0.14.7-hotspot","androidSdkPath":"C:/Users/<vous>/AppData/Local/Android/Sdk"}`
+- JDK 17 et le SDK Android d'Android Studio, déclarés dans `~/.bubblewrap/config.json`. Le chemin du JDK ne doit pas contenir d'espace : Bubblewrap lance `java` sans guillemets pour signer, et « C:\Program Files » casse la commande. Un lien suffit :
+  `New-Item -ItemType Junction -Path "$HOME\.qatlia\jdk-17" -Target "C:\Program Files\Eclipse Adoptium\jdk-17.0.14.7-hotspot"`
+  puis `{"jdkPath":"C:/Users/<vous>/.qatlia/jdk-17","androidSdkPath":"C:/Users/<vous>/AppData/Local/Android/Sdk"}`
+- Bubblewrap recopie les mots de passe en clair dans ses messages d'erreur : ne collez jamais la sortie d'une construction ratée sans la relire.
 - Bubblewrap cherche un dossier `bin` à la racine du SDK, absent de celui d'Android Studio. Un lien suffit :
   `mklink /J %LOCALAPPDATA%\Android\Sdk\bin %LOCALAPPDATA%\Android\Sdk\cmdline-tools\latest\bin`
 - Outils de construction `36.1.0` : `sdkmanager "build-tools;36.1.0"`.
