@@ -11,6 +11,10 @@ const path = require('node:path');
 const ROOT = path.resolve(__dirname, '..');
 const SCRIPT = path.join(ROOT, 'mobile/android/scripts/restrict-links.js');
 const MANIFEST = path.join(ROOT, 'mobile/android/app/src/main/AndroidManifest.xml');
+// Read from the signed build with `apksigner verify --print-certs`.
+const UPLOAD_KEY_SHA256 = '7F:F0:F2:42:C1:81:D2:3F:2C:96:04:75:00:75:8A:E0:B4:63:1F:3E:7A:C7:AE:29:DB:76:9E:41:29:3F:E9:12';
+// Play Console → App signing: the statement Google gives for com.qatlia.app.
+const PLAY_SIGNING_KEY_SHA256 = '13:44:2F:67:71:35:5B:F8:0B:47:63:52:41:8C:A1:D1:11:DF:7E:02:AB:A3:E7:27:30:D7:24:EB:85:7E:DC:49';
 
 const BUBBLEWRAP_FILTER = `
             <intent-filter android:autoVerify="true">
@@ -44,6 +48,21 @@ test('running the retouch twice changes nothing', () => {
 test('a manifest without the expected filter is refused, not silently left open', () => {
   const { restrictLinks } = require(SCRIPT);
   assert.throws(() => restrictLinks('<manifest></manifest>'), /intent-filter/);
+});
+
+test('qatlia.ma vouches for the app, so it opens without an address bar', () => {
+  const links = JSON.parse(fs.readFileSync(path.join(ROOT, 'public/.well-known/assetlinks.json'), 'utf8'));
+  assert.equal(links.length, 1);
+  const [{ relation, target }] = links;
+  assert.deepEqual(relation, ['delegate_permission/common.handle_all_urls']);
+  assert.equal(target.namespace, 'android_app');
+  assert.equal(target.package_name, 'com.qatlia.app');
+  // The upload key signs what we send to Play; Play signs what phones install.
+  assert.ok(target.sha256_cert_fingerprints.includes(PLAY_SIGNING_KEY_SHA256), 'Play signing key: the app phones install');
+  assert.ok(target.sha256_cert_fingerprints.includes(UPLOAD_KEY_SHA256), 'upload key');
+  for (const fp of target.sha256_cert_fingerprints) {
+    assert.match(fp, /^([0-9A-F]{2}:){31}[0-9A-F]{2}$/, fp);
+  }
 });
 
 test('the committed Android manifest carries the retouch', () => {

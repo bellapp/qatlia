@@ -1,0 +1,13 @@
+[
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "com.qatlia.app",
+      "sha256_cert_fingerprints": [
+        "13:44:2F:67:71:35:5B:F8:0B:47:63:52:41:8C:A1:D1:11:DF:7E:02:AB:A3:E7:27:30:D7:24:EB:85:7E:DC:49",
+        "7F:F0:F2:42:C1:81:D2:3F:2C:96:04:75:00:75:8A:E0:B4:63:1F:3E:7A:C7:AE:29:DB:76:9E:41:29:3F:E9:12"
+      ]
+    }
+  }
+]
