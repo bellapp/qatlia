@@ -37,6 +37,8 @@ export interface PhotoSummary {
   /** The panel the summary was computed on: the one read on the sheet, or the default. */
   sheet: ReadSheet;
   unplaced: number;
+  /** True when no panel was written and a larger standard one was taken so the pieces fit (fittingPanel). */
+  fitted?: true;
 }
 
 export type Reservation =

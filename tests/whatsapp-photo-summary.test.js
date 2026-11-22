@@ -109,3 +109,39 @@ test('the waiting and "already read" texts exist in both languages, with the lin
     assert.ok(!withoutLink.includes('qatlia.ma/w/') && withoutLink.includes(ATELIER_LINK));
   }
 });
+
+// Owner, 22/11/2026: « Si la taille du panneau est spécifiée, c'est bon. Sinon,
+// on doit prendre la taille des panneaux qui peuvent contenir la taille des
+// pièces. » محمد's sheet: strips of 280 cm, no panel written; on the default
+// 278 × 208 none of them fitted.
+test('no panel on the sheet and pieces too long for 278 × 208: the 280 × 207 format of the catalogue', () => {
+  const pieces = [piece(280, 30, 2), piece(280, 60, 2), piece(280, 10, 8)];
+  const summary = summarizeCutList(pieces, null);
+  assert.deepEqual(summary.sheet, { height: 280, width: 207 });
+  assert.equal(summary.unplaced, 0);
+  assert.equal(summary.fitted, true);
+  const ar = photoResultText('ar', summary, pieces, LINK);
+  assert.match(ar, /لوحة ⁦280×207⁩ حيت القطع طوال/);
+  const fr = photoResultText('fr', summary, pieces, LINK);
+  assert.match(fr, /panneau 280×207 choisi pour la longueur des pièces/);
+  assert.doesNotMatch(fr, /panneau standard/);
+});
+
+test('a panel written on the sheet always wins, even if a piece is longer', () => {
+  const summary = summarizeCutList([piece(250.5, 57), piece(100, 50)], { height: 244, width: 122 });
+  assert.deepEqual(summary.sheet, { height: 244, width: 122 });
+  assert.equal(summary.unplaced, 1);
+  assert.equal(summary.fitted, undefined);
+});
+
+test('pieces no standard panel holds: the default, with the oversize count', () => {
+  const summary = summarizeCutList([piece(320, 50), piece(50, 40)], null);
+  assert.deepEqual(summary.sheet, { height: 278, width: 208 });
+  assert.equal(summary.unplaced, 1);
+  assert.equal(summary.fitted, undefined);
+});
+
+test('a piece fits turned: 210 × 150 needs no other panel than 278 × 208', () => {
+  const summary = summarizeCutList([piece(150, 210)], null);
+  assert.deepEqual(summary.sheet, { height: 278, width: 208 });
+});
