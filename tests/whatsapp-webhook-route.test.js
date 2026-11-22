@@ -882,7 +882,10 @@ test('the plan picture is checked, then sent as a card with its button and recor
   });
 });
 
-test('a card WhatsApp refuses falls back to the bare picture with its caption', async () => {
+// A refused card ("(#131053) Media upload error": WhatsApp could not fetch the
+// picture in time, 21/11/2026) must not fall back on the bare picture: YCloud
+// accepts it at once, WhatsApp fails it later, and the text never went.
+test('a card WhatsApp refuses lets the text answer go, never the bare picture', async () => {
   resetState();
   state.contacts.set(WA_ID, { waId: WA_ID, lang: 'fr', greetedAt: new Date(), handoffUntil: null });
   state.photoOutcome = 'handled';
@@ -894,12 +897,12 @@ test('a card WhatsApp refuses falls back to the bare picture with its caption', 
     await withFetch(
       () => new Response(new Uint8Array([0x89, 0x50]), { status: 200, headers: { 'Content-Type': 'image/png' } }),
       async () => {
-        assert.equal(await state.photoCalls[0].deliverImage(PICTURE, '👆 légende', 'photo_result', CARD), true);
+        assert.equal(await state.photoCalls[0].deliverImage(PICTURE, '👆 légende', 'photo_result', CARD), false);
       },
     );
     assert.equal(state.cards.length, 1);
-    assert.deepEqual(state.images.map((m) => [m.link, m.caption]), [[PICTURE, '👆 légende']]);
-    assert.deepEqual(state.outbound.map((m) => [m.kind, m.wamid, m.body]), [['photo_result', 'wamid.plan', '👆 légende']]);
+    assert.equal(state.images.length, 0, 'no bare picture');
+    assert.deepEqual(state.outbound.map((m) => [m.kind, m.wamid]), [['send_failed', null]]);
   });
   errors.mock.restore();
 });

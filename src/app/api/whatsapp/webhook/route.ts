@@ -108,7 +108,8 @@ async function deliverPicture(
   config: WhatsAppConfig,
   waId: string,
   link: string,
-  caption: string,
+  // The bare picture's caption: unused since a refused card lets the text go.
+  _caption: string,
   kind: PhotoMessageKind,
   startedAt: Date,
   card: PlanCard,
@@ -131,17 +132,18 @@ async function deliverPicture(
     return false;
   }
 
-  // The picture with its button to the link (owner, 21/11/2026: « l'image
-  // cliquable »); the bare picture with the link in its caption if WhatsApp refuses it.
+  // The picture with its button to the link (owner, 21/11/2026: « l'image cliquable »).
   const cardWamid = await sendPlanCard(config, waId, card);
   if (cardWamid !== null) {
     await recordOutbound(db, { waId, wamid: cardWamid, direction: 'bot', kind, body: card.body });
     return true;
   }
-  console.error('[whatsapp] plan card refused, sending the picture alone');
-  const wamid = await sendImage(config, waId, link, caption);
-  await recordOutbound(db, { waId, wamid, direction: 'bot', kind: wamid === null ? SEND_FAILED_KIND : kind, body: caption });
-  return wamid !== null;
+  // Refused ("(#131053) Media upload error" when WhatsApp could not fetch the
+  // picture in time, 21/11/2026): the text answer goes. Not the bare picture:
+  // YCloud takes it at once, WhatsApp fails it later, and the text never went.
+  console.error('[whatsapp] plan card refused, the text answer goes');
+  await recordOutbound(db, { waId, wamid: null, direction: 'bot', kind: SEND_FAILED_KIND, body: card.body });
+  return false;
 }
 
 /** A message the business sent from the phone itself: log it, and in coexistence mode let the human lead. */

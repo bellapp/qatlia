@@ -188,9 +188,9 @@ test('the picture is tried only while the webhook has time left for the text ans
   const route = fs.readFileSync(path.join(ROOT, 'src/app/api/whatsapp/webhook/route.ts'), 'utf8');
   assert.match(route, /pictureCheckMs\(Date\.now\(\) - startedAt\.getTime\(\)\)/);
   assert.match(route, /deliverPicture\(db, config, waId, link, caption, kind, now, card\)/);
-  // The card first, the bare picture if WhatsApp refuses the card.
+  // The card, or the text answer: a bare picture can fail after YCloud took it.
   assert.match(route, /sendPlanCard\(config, waId, card\)/);
-  assert.match(route, /sendImage\(config, waId, link, caption\)/);
+  assert.doesNotMatch(route, /sendImage\(config, waId, link, caption\)/);
 });
 
 test('no panel, no layout', () => {
