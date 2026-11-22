@@ -22,6 +22,8 @@ function reset() {
     readCalls: [],
     alreadyCount: 0,
     countCalls: [],
+    claims: new Set(),
+    claimCalls: [],
     delivered: [],
   });
 }
@@ -58,6 +60,13 @@ stubModule('@/lib/whatsapp/store', {
   countBotMessages: async (db, waId, kind, since) => {
     state.countCalls.push({ kind, since });
     return state.alreadyCount;
+  },
+  // whatsapp_messages.wamid is unique: the first insert of a claim wins.
+  recordOutbound: async (db, row) => {
+    state.claimCalls.push(row);
+    if (state.claims.has(row.wamid)) return false;
+    state.claims.add(row.wamid);
+    return true;
   },
 });
 
@@ -136,6 +145,22 @@ test('a number already served gets its link and the atelier, once per 10 minutes
   state.delivered = [];
   assert.equal(await run(), 'silent');
   assert.equal(state.delivered.length, 0);
+});
+
+// anas, 20/11/2026: five photos at once got four identical « الورقة الأولى
+// ديالك تقرات » in two seconds. Each passed the 10-minute check before any
+// answer was stored; a claim on the unique wamid lets one answer through.
+test('photos arriving together get one "already read" answer, not one each', async () => {
+  reset();
+  state.reservation = { status: 'already', code: 'k7m2qx9dab' };
+  const outcomes = await Promise.all([run(), run(), run(), run(), run()]);
+  assert.equal(state.delivered.length, 1);
+  assert.deepEqual(outcomes.filter((o) => o === 'handled').length, 1);
+  assert.deepEqual(outcomes.filter((o) => o === 'silent').length, 4);
+  const claim = state.claimCalls[0];
+  assert.equal(claim.direction, 'bot');
+  assert.equal(claim.kind, 'photo_already_claim');
+  assert.match(claim.wamid, new RegExp(`^claim:photo_already:${WA}:\\d+$`));
 });
 
 test('an expired first read : the atelier only', async () => {

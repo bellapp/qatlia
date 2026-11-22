@@ -130,6 +130,8 @@ Quand un prospect envoie la photo de sa fiche :
 Règles :
 
 - **une lecture réussie par numéro, définitivement**. Les photos suivantes reçoivent le lien de la première fiche et l'invitation à continuer dans l'atelier ;
+  - une seule réponse « déjà lue » par numéro et par tranche de 10 minutes, même pour plusieurs photos envoyées d'un coup : la réponse est réservée par une ligne `photo_already_claim` (wamid unique `claim:photo_already:<numéro>:<tranche>`) dans `whatsapp_messages`. Avant le 22/11/2026, 5 photos envoyées ensemble recevaient 4 réponses identiques ;
+  - l'assistant sait que la fiche a été lue : il reçoit le nombre de pièces et le lien (ou « expiré »), et ne redemande plus la fiche. Dans son historique, une photo reçue apparaît comme « 📷 photo » ;
 - une lecture ratée (photo illisible, pas une fiche) libère le numéro, jusqu'à 3 échecs par numéro sur 24 h ;
 - garde-fous : 10 s par requête Meta, 30 s pour la lecture IA ; une ligne sans cote lisible est ignorée, un format de panneau hors 30–400 cm est remplacé par le panneau par défaut ;
 - taille de la liste (nombre de pièces, quantités comprises) :

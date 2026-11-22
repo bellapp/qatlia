@@ -232,14 +232,18 @@ export async function recentHistory(
     wamid: string | null;
     kind: string | null;
   }>;
+  // A photo has no text: without a stand-in the assistant never knew one came
+  // (anas, 21/11/2026: « I am waiting for your sheet » after several photos).
+  const text = (row: (typeof rows)[number]) =>
+    row.body || (row.direction === 'user' && row.kind === 'image' ? '📷 photo' : null);
   return rows
     .filter(
       (row) =>
-        row.body && row.kind !== SEND_FAILED_KIND && (excludeWamid === undefined || row.wamid !== excludeWamid),
+        text(row) && row.kind !== SEND_FAILED_KIND && (excludeWamid === undefined || row.wamid !== excludeWamid),
     )
     .slice(0, limit)
     .reverse()
-    .map((row) => ({ direction: row.direction, body: row.body as string }));
+    .map((row) => ({ direction: row.direction, body: text(row) as string }));
 }
 
 /** Number of bot messages of the given kind sent to this contact since `since`. */

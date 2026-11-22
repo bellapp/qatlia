@@ -48,6 +48,7 @@ function resetState() {
     claimError: null,
     assistantCalls: [],
     assistantResult: () => null,
+    latestRead: () => null,
     assistantCount: 0,
     historyCalls: [],
     clientArgs: null,
@@ -161,6 +162,9 @@ stubModule('@/lib/whatsapp/send', {
     state.cards.push({ to, card });
     return state.cardResult();
   },
+});
+stubModule('@/lib/whatsapp/photo-store', {
+  latestPhotoRead: async (db, waId, now) => state.latestRead(waId, now),
 });
 stubModule('@/lib/whatsapp/photo', {
   handlePhoto: async (input) => {
@@ -514,6 +518,42 @@ test('free text answered by the assistant is sent and recorded as an assistant r
     assert.deepEqual(state.assistantCalls[0].history, [{ direction: 'bot', body: 'Bonjour' }]);
     assert.deepEqual(state.historyCalls, [{ waId: WA_ID, limit: 10, excludeWamid: 'wamid.4' }]);
   });
+});
+
+// anas, 21/11/2026: the assistant asked again for a sheet the bot had read.
+test('the assistant is told of the sheet this number sent, and gets nothing when none was read', async () => {
+  resetState();
+  state.contacts.set(WA_ID, { waId: WA_ID, lang: 'ar', greetedAt: new Date(), handoffUntil: null });
+  state.assistantResult = () => ({ reply: 'ok', handoff: false });
+  state.latestRead = () => ({ pieceCount: 44, code: 'k7m2qx9dab' });
+  await withEnv({ ...CONFIGURED, WHATSAPP_BOT_MODEL: 'test/model' }, async () => {
+    await POST(signedPost(messagesPayload([textMessage('wamid.r1', WA_ID, '👍')])));
+    assert.deepEqual(state.assistantCalls[0].photoRead, { pieceCount: 44, link: 'https://qatlia.ma/w/k7m2qx9dab' });
+  });
+
+  resetState();
+  state.contacts.set(WA_ID, { waId: WA_ID, lang: 'ar', greetedAt: new Date(), handoffUntil: null });
+  state.assistantResult = () => ({ reply: 'ok', handoff: false });
+  state.latestRead = () => ({ pieceCount: 44, code: null });
+  await withEnv({ ...CONFIGURED, WHATSAPP_BOT_MODEL: 'test/model' }, async () => {
+    await POST(signedPost(messagesPayload([textMessage('wamid.r2', WA_ID, '👍')])));
+    assert.deepEqual(state.assistantCalls[0].photoRead, { pieceCount: 44, link: null });
+  });
+
+  // A failing lookup never stops the answer.
+  resetState();
+  state.contacts.set(WA_ID, { waId: WA_ID, lang: 'ar', greetedAt: new Date(), handoffUntil: null });
+  state.assistantResult = () => ({ reply: 'ok', handoff: false });
+  state.latestRead = () => {
+    throw new Error('db down');
+  };
+  const errors = test.mock.method(console, 'error', () => {});
+  await withEnv({ ...CONFIGURED, WHATSAPP_BOT_MODEL: 'test/model' }, async () => {
+    await POST(signedPost(messagesPayload([textMessage('wamid.r3', WA_ID, '👍')])));
+    assert.equal(state.assistantCalls[0].photoRead, null);
+    assert.equal(state.sent[0].body, 'ok');
+  });
+  errors.mock.restore();
 });
 
 test('an assistant reply that asks for a human sets the handoff in coexistence mode', async () => {
