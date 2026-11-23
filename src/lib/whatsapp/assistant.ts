@@ -69,7 +69,8 @@ ${packs}
 - Le lien du plan envoyé ici (« شوف المخطط كامل ») ouvre le plan de coupe sur le site. Sur le dessin, chaque pièce a sa couleur, son numéro (#4) et ses dimensions (92 × 58,5 cm) ; les zones hachurées sont les chutes, avec leur taille.
 - Pour télécharger ou imprimer le plan en PDF : ouvrir ce lien, puis créer un compte gratuit (le site le demande) ; le plan est alors recalculé (1 des ${SIGNUP_FREE_CREDITS} crédits gratuits), puis appuyer sur le bouton « تصدير تقرير PDF » (en français « Exporter le rapport PDF ») sous le plan. Le PDF s'imprime depuis le téléphone ou chez un cyber.
 - La fiche d'exemple envoyée avec l'accueil a une colonne à droite pour les chants (السينتة) : □ = 4 côtés, ⊐ = 3 côtés, || = 2 côtés, | = 1 côté. Dans l'atelier du site, QatliA lit cette colonne quand on y photographie la fiche ; le plan envoyé ici ne les montre pas.
-- Sans photo, la personne peut taper ses mesures elle-même dans l'atelier : ${ATELIER_LINK}
+- La personne peut aussi taper ses mesures ici (ex : 180x60x2, une pièce par ligne) : le bot les lit comme une photo et renvoie le plan, une fois par numéro comme la photo. Si tu reçois des mesures, c'est que le bot n'a pas pu en faire un plan (déjà une fiche lue, ou pas de pièce complète).
+- Sans photo, la personne peut aussi taper ses mesures elle-même dans l'atelier : ${ATELIER_LINK}
 - Vidéo d'explication (en darija) : ${DEMO_VIDEO_URL}
 ${redirect ? `- Contact humain (WhatsApp) : ${supportWhatsAppUrl()}
 ` : ''}
@@ -111,7 +112,7 @@ export interface PhotoReadNote {
 export function photoReadNote(read: PhotoReadNote): string {
   const head = `
 
-CETTE PERSONNE : elle a déjà envoyé ici la photo de sa fiche de débit, et le bot l'a lue (${read.pieceCount} pièces). Ne lui redemande pas sa fiche.`;
+CETTE PERSONNE : elle a déjà envoyé ici sa fiche de débit (en photo ou en tapant les mesures), et le bot l'a lue (${read.pieceCount} pièces). Ne lui redemande pas sa fiche.`;
   return read.link
     ? `${head} Son plan de coupe est ici : ${read.link} (lien valable 24 h après la lecture). Si elle veut voir son plan, renvoie-la vers ce lien ; pour une autre fiche, elle la prend en photo dans l'atelier après l'inscription.`
     : `${head} Le lien de son plan a expiré : pour revoir son plan ou essayer une autre fiche, elle s'inscrit et prend sa fiche en photo dans l'atelier.`;

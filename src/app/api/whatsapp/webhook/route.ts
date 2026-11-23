@@ -16,9 +16,18 @@ import { getWhatsAppConfig, type WhatsAppConfig } from '@/lib/whatsapp/config';
 import { verifySignature } from '@/lib/whatsapp/signature';
 import { parseWebhook, type EchoEvent, type InboundEvent } from '@/lib/whatsapp/payload';
 import { COPY, EXAMPLE_FICHE_URL, type Lang, type MenuButton } from '@/lib/whatsapp/copy';
-import { HANDOFF_HOURS, decide, detectLang, resolveLang, typedBeyondPrefill, type Decision } from '@/lib/whatsapp/router';
+import {
+  HANDOFF_HOURS,
+  decide,
+  detectLang,
+  looksLikeMeasurements,
+  resolveLang,
+  typedBeyondPrefill,
+  type Decision,
+} from '@/lib/whatsapp/router';
 import { assistantBudgetMs, hearVoice } from '@/lib/whatsapp/voice';
-import { HISTORY_MESSAGES, askAssistant, type PhotoReadNote } from '@/lib/whatsapp/assistant';
+import { HISTORY_MESSAGES, askAssistant, type HistoryItem, type PhotoReadNote } from '@/lib/whatsapp/assistant';
+import { handleTypedList } from '@/lib/whatsapp/typed-list';
 import { latestPhotoRead } from '@/lib/whatsapp/photo-store';
 import { photoLink } from '@/lib/whatsapp/photo-summary';
 import { sendButtons, sendImage, sendPlanCard, sendText, type PlanCard } from '@/lib/whatsapp/send';
@@ -85,6 +94,23 @@ async function overtaken(db: SupabaseClient, waId: string, wamid: string): Promi
     console.error('[whatsapp] newer message check failed', describeError(error));
     return false;
   }
+}
+
+/** At most this many of the person's messages, sent just before this one, are read with it. */
+const TYPED_MESSAGES_MAX = 6;
+
+/**
+ * This message after the ones the person sent just before it, with no answer
+ * in between: a carpenter gives his doors one message at a time (21/11/2026).
+ */
+function typedMeasurements(history: HistoryItem[], message: string): string {
+  const before: string[] = [];
+  for (let i = history.length - 1; i >= 0 && before.length < TYPED_MESSAGES_MAX - 1; i--) {
+    const item = history[i];
+    if (item.direction !== 'user') break;
+    if (item.body !== '📷 photo') before.unshift(item.body);
+  }
+  return [...before, message].join('\n');
 }
 
 /** Redirect mode: whether the advisor's number already went to this contact lately. Unknown counts as no. */
@@ -407,8 +433,8 @@ async function handleVoiceMessage(
     // Hearing took its time already: no extra wait, only the check for a newer message.
     settleMs: 0,
     overtakenInBatch,
-    // Whatever hearing took comes off the assistant's time (60 s route budget).
-    timeoutMs: assistantBudgetMs(Date.now() - now.getTime()),
+    // Whatever hearing took comes off the typed read's and the assistant's time (60 s route budget).
+    budgeted: true,
   });
 }
 
@@ -441,8 +467,13 @@ async function answerWithAssistant(
     settleMs: number;
     /** A later message of the same delivery takes the answer over. */
     overtakenInBatch: boolean;
-    /** Omitted: the assistant's own deadline. `null`: no time left, the fallback goes out. */
-    timeoutMs?: number | null;
+    /**
+     * A voice note: the typed read and the assistant only get what is left of
+     * the route's time (assistantBudgetMs), measured right before each; with
+     * too little left, the typed read is skipped and the fallback goes out.
+     * Omitted: their own deadlines.
+     */
+    budgeted?: boolean;
   },
 ): Promise<void> {
   const { waId, lang, now } = input;
@@ -450,12 +481,36 @@ async function answerWithAssistant(
   if (input.settleMs > 0) await sleep(input.settleMs);
   if (await overtaken(db, waId, input.wamid)) return;
 
+  const history = await recentHistory(db, waId, HISTORY_MESSAGES, input.wamid);
+
+  // Measurements typed (or said) instead of a photo: read like a sheet, the
+  // plan card goes out. Nothing read: the assistant answers as before.
+  const timeLeft = (): number | null | undefined =>
+    input.budgeted ? assistantBudgetMs(Date.now() - now.getTime()) : undefined;
+
+  const typed = typedMeasurements(history, input.message);
+  const readTimeoutMs = looksLikeMeasurements(typed) ? timeLeft() : null;
+  if (readTimeoutMs !== null) {
+    const outcome = await handleTypedList({
+      db,
+      config,
+      waId,
+      text: typed,
+      lang,
+      now,
+      deliver: (text, kind) => deliver(db, config, waId, text, kind),
+      deliverImage: (link, caption, kind, card) => deliverPicture(db, config, waId, link, caption, kind, now, card),
+      ...(readTimeoutMs !== undefined ? { readTimeoutMs } : {}),
+    });
+    if (outcome !== 'fallback') return;
+  }
+
   const redirect = config.handoffMode === 'redirect';
   const linkSent = redirect && (await advisorLinkSentLately(db, waId, now));
-  const history = await recentHistory(db, waId, HISTORY_MESSAGES, input.wamid);
   const photoRead = await photoReadFor(db, waId, now);
+  const timeoutMs = timeLeft();
   const answer =
-    config.openrouterKey && input.timeoutMs !== null
+    config.openrouterKey && timeoutMs !== null
       ? await askAssistant({
           history,
           message: input.message,
@@ -464,7 +519,7 @@ async function answerWithAssistant(
           handoffMode: config.handoffMode,
           photoRead,
           advisorLinkSent: linkSent,
-          ...(input.timeoutMs !== undefined ? { timeoutMs: input.timeoutMs } : {}),
+          ...(timeoutMs !== undefined ? { timeoutMs } : {}),
         })
       : null;
 

@@ -18,40 +18,23 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import type { WhatsAppConfig } from '@/lib/whatsapp/config';
 import type { InboundEvent } from '@/lib/whatsapp/payload';
 import { PHOTO_COPY, type Lang } from '@/lib/whatsapp/copy';
-import { completePhotoRead, failPhotoRead, newPhotoCode, reservePhotoRead } from '@/lib/whatsapp/photo-store';
+import { failPhotoRead, reservePhotoRead } from '@/lib/whatsapp/photo-store';
 import { fetchMediaDataUrl } from '@/lib/whatsapp/media';
-import { readCutList } from '@/lib/vision/read-cut-list';
-import {
-  BOT_PLAN_MAX_PIECES,
-  bigListText,
-  listSummary,
-  photoLink,
-  photoResultCaption,
-  photoResultCard,
-  photoResultText,
-  plausiblePanel,
-  summarizeCutList,
-  usablePieces,
-} from '@/lib/whatsapp/photo-summary';
-import { planImageUrl } from '@/lib/whatsapp/plan-image';
+import { readCutList, type ReadPiece, type ReadSheet } from '@/lib/vision/read-cut-list';
+import { photoLink } from '@/lib/whatsapp/photo-summary';
+import { MAX_BOT_PIECES, planAndAnswer, type PhotoMessageKind } from '@/lib/whatsapp/plan-answer';
 import type { PlanCard } from '@/lib/whatsapp/send';
 import { countBotMessages, recordOutbound } from '@/lib/whatsapp/store';
 
 export type PhotoOutcome = 'handled' | 'hint' | 'silent';
-export type PhotoMessageKind = 'photo_reading' | 'photo_result' | 'photo_already' | 'photo_failed';
+export { MAX_BOT_PIECES };
+export type { PhotoMessageKind };
 
 /**
  * Time budget inside the webhook's 60 s: the media requests have 10 s each
  * (media.ts), the model 30 s, and the plan is bounded by the piece count.
  */
 const READ_TIMEOUT_MS = 30_000;
-/**
- * Above this many pieces (quantities expanded) the bot does not take the list:
- * the reader is not trusted that far, and the atelier reads it. Raised from 300
- * to 900 by the owner (21/11/2026); the plan itself stops at BOT_PLAN_MAX_PIECES.
- */
-export const MAX_BOT_PIECES = 900;
-
 /** One "already read" answer per number in this window, however many photos follow. */
 const ALREADY_COOLDOWN_MS = 10 * 60 * 1000;
 
@@ -124,7 +107,7 @@ export async function handlePhoto(input: {
     return 'handled';
   };
 
-  let result: { text: string; caption: string; card: PlanCard; image: string | null };
+  let read: { pieces: ReadPiece[]; sheet: ReadSheet | null };
   try {
     await deliver(PHOTO_COPY.reading[lang], 'photo_reading');
     announced = true;
@@ -132,48 +115,13 @@ export async function handlePhoto(input: {
     const media = await fetchMediaDataUrl(config, event.mediaId);
     if (!media.ok) return await fail(`media ${media.reason} ${media.status ?? ''}`.trim());
 
-    const read = await readCutList(media.dataUrl, { readPanel: true, timeoutMs: READ_TIMEOUT_MS });
-    if (read.status !== 'ok') return await fail(`read ${read.status}`);
-
-    // The reader's numbers are not trusted blindly: no line without a usable
-    // size, no panel outside a plausible range, no plan too big for the budget.
-    const pieces = usablePieces(read.pieces);
-    if (pieces.length === 0) return await fail('no usable line');
-    const pieceCount = pieces.reduce((sum, p) => sum + p.quantity, 0);
-    // Read, but too long for WhatsApp: say so, never "unreadable" (21/11/2026).
-    if (pieceCount > MAX_BOT_PIECES) return await fail('too many pieces', PHOTO_COPY.tooBig(lang, pieceCount));
-    const sheet = plausiblePanel(read.sheet);
-
-    // Over BOT_PLAN_MAX_PIECES the plan would not fit in the webhook's time:
-    // the list is stored and linked, and the atelier plans it after sign-up.
-    const planned = pieceCount <= BOT_PLAN_MAX_PIECES;
-    const summary = planned ? summarizeCutList(pieces, sheet) : listSummary(pieces, sheet);
-    if (planned && summary.sheetsUsed === 0) return await fail('nothing fits the panel');
-    const code = newPhotoCode();
-    await completePhotoRead(db, readId, { code, pieces, sheet, summary, now });
-    result = {
-      text: planned ? photoResultText(lang, summary, pieces, photoLink(code)) : bigListText(lang, summary, photoLink(code)),
-      // No picture for a list the bot does not plan (over BOT_PLAN_MAX_PIECES).
-      caption: photoResultCaption(lang, summary, photoLink(code)),
-      card: photoResultCard(lang, summary, photoLink(code)),
-      image: planned ? planImageUrl(code) : null,
-    };
+    const answer = await readCutList(media.dataUrl, { readPanel: true, timeoutMs: READ_TIMEOUT_MS });
+    if (answer.status !== 'ok') return await fail(`read ${answer.status}`);
+    read = answer;
   } catch (error) {
     console.error('[whatsapp] photo read threw', describe(error));
     return await fail('threw');
   }
 
-  // The read is stored and the number served: a failing send is logged, never undone.
-  // The plan picture first (owner, 21/11/2026); the text answer if it cannot go out.
-  try {
-    if (deliverImage && result.image && (await deliverImage(result.image, result.caption, 'photo_result', result.card))) return 'handled';
-  } catch (error) {
-    console.error('[whatsapp] could not send the plan picture', describe(error));
-  }
-  try {
-    await deliver(result.text, 'photo_result');
-  } catch (error) {
-    console.error('[whatsapp] could not send the photo result', describe(error));
-  }
-  return 'handled';
+  return planAndAnswer({ db, readId, read, lang, now, deliver, deliverImage, fail });
 }
