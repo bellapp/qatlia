@@ -20,6 +20,8 @@ function reset() {
     read: { status: 'ok', pieces: [{ name: '', height: 50, width: 40, quantity: 2 }], sheet: null },
     readError: null,
     readCalls: [],
+    kind: null,
+    classifyCalls: [],
     alreadyCount: 0,
     countCalls: [],
     claims: new Set(),
@@ -55,6 +57,10 @@ stubModule('@/lib/vision/read-cut-list', {
     if (state.readError) throw state.readError;
     return state.read;
   },
+  classifyPhoto: async (dataUrl, options) => {
+    state.classifyCalls.push({ dataUrl, options });
+    return state.kind;
+  },
 });
 stubModule('@/lib/whatsapp/store', {
   countBotMessages: async (db, waId, kind, since) => {
@@ -79,8 +85,9 @@ const NOW = new Date('2026-11-19T12:00:00Z');
 const CONFIG = { photoDailyCap: 300, accessToken: 't', graphVersion: 'v23.0' };
 const event = (over = {}) => ({ type: 'inbound', wamid: 'w1', waId: WA, profileName: null, kind: 'image', text: null, referral: null, mediaId: 'M1', ...over });
 
-function run(over = {}, lang = 'fr') {
+function run(over = {}, lang = 'fr', clock) {
   return handlePhoto({
+    ...(clock ? { clock } : {}),
     db: {},
     config: CONFIG,
     event: event(over),
@@ -218,6 +225,71 @@ for (const read of [{ status: 'unreadable' }, { status: 'error', rateLimited: fa
     assert.equal(state.completed.length, 0);
   });
 }
+
+// 23/11/2026: a hand drawing of a kitchen and a photo of a fitted kitchen got
+// « take the photo again »; the prospects resent nothing. A read with no
+// pieces asks what the photo showed; the read is freed so typed pieces can be planned.
+for (const kind of ['drawing', 'furniture']) {
+  for (const lang of ['ar', 'fr']) {
+    test(`a ${kind} instead of a list (${lang}) : the read is freed and the bot asks for the pieces`, async () => {
+      reset();
+      state.read = { status: 'unreadable' };
+      state.kind = kind;
+      assert.equal(await run({}, lang), 'handled');
+      assert.deepEqual(state.classifyCalls, [{ dataUrl: 'data:image/jpeg;base64,AAA', options: { timeoutMs: 8000 } }]);
+      assert.deepEqual(state.delivered.map((d) => d.kind), ['photo_reading', 'photo_failed']);
+      assert.equal(state.delivered[1].text, PHOTO_COPY.notAList[kind][lang]);
+      assert.deepEqual(state.failed, ['r1']);
+    });
+  }
+}
+
+test('a read with no pieces that is not a drawing : the unreadable text, as before', async () => {
+  reset();
+  state.read = { status: 'unreadable' };
+  state.kind = null;
+  await run();
+  assert.equal(state.classifyCalls.length, 1);
+  answeredAsFailed();
+});
+
+test('a read that failed (error, unavailable) or a list read : no classification', async () => {
+  for (const read of [{ status: 'error', rateLimited: false, httpStatus: 502 }, { status: 'unavailable' }, { status: 'ok', pieces: [{ name: '', height: 50, width: 40, quantity: 2 }], sheet: null }]) {
+    reset();
+    state.read = read;
+    state.kind = 'drawing';
+    await run();
+    assert.equal(state.classifyCalls.length, 0, read.status);
+  }
+});
+
+test('a read with no pieces after more than 30 s : no classification, the unreadable text', async () => {
+  reset();
+  state.read = { status: 'unreadable' };
+  state.kind = 'drawing';
+  let t = 0;
+  const clock = () => {
+    const value = t;
+    t += 31_000;
+    return value;
+  };
+  await run({}, 'fr', clock);
+  assert.equal(state.classifyCalls.length, 0);
+  answeredAsFailed();
+});
+
+test('the not-a-list texts ask for the pieces typed in one message, never a new photo', () => {
+  for (const kind of ['drawing', 'furniture']) {
+    assert.match(PHOTO_COPY.notAList[kind].ar, /ميساج واحد/);
+    assert.match(PHOTO_COPY.notAList[kind].ar, /60x40x2/);
+    assert.doesNotMatch(PHOTO_COPY.notAList[kind].ar, /عاود|سكان/);
+    assert.match(PHOTO_COPY.notAList[kind].fr, /un seul message/);
+    assert.match(PHOTO_COPY.notAList[kind].fr, /60x40x2/);
+    assert.doesNotMatch(PHOTO_COPY.notAList[kind].fr, /reprenez|renvoyez/i);
+  }
+  assert.match(PHOTO_COPY.notAList.drawing.ar, /رسم/);
+  assert.match(PHOTO_COPY.notAList.furniture.ar, /تصويرة ديال/);
+});
 
 test('a reader that throws : failed and answered as such', async () => {
   reset();

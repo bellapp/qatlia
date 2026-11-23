@@ -20,7 +20,7 @@ import type { InboundEvent } from '@/lib/whatsapp/payload';
 import { PHOTO_COPY, type Lang } from '@/lib/whatsapp/copy';
 import { failPhotoRead, reservePhotoRead } from '@/lib/whatsapp/photo-store';
 import { fetchMediaDataUrl } from '@/lib/whatsapp/media';
-import { readCutList, type ReadPiece, type ReadSheet } from '@/lib/vision/read-cut-list';
+import { classifyPhoto, readCutList, type ReadPiece, type ReadSheet } from '@/lib/vision/read-cut-list';
 import { photoLink } from '@/lib/whatsapp/photo-summary';
 import { MAX_BOT_PIECES, planAndAnswer, type PhotoMessageKind } from '@/lib/whatsapp/plan-answer';
 import type { PlanCard } from '@/lib/whatsapp/send';
@@ -35,6 +35,13 @@ export type { PhotoMessageKind };
  * (media.ts), the model 30 s, and the plan is bounded by the piece count.
  */
 const READ_TIMEOUT_MS = 30_000;
+/**
+ * A read with no pieces asks what the photo showed (classifyPhoto), with this
+ * deadline, only while no more than CLASSIFY_UNTIL_MS have gone since the
+ * start: the failed reads seen took 5 to 7 s, a slow one keeps its old text.
+ */
+const CLASSIFY_TIMEOUT_MS = 8_000;
+const CLASSIFY_UNTIL_MS = 30_000;
 /** One "already read" answer per number in this window, however many photos follow. */
 const ALREADY_COOLDOWN_MS = 10 * 60 * 1000;
 
@@ -53,8 +60,11 @@ export async function handlePhoto(input: {
    * the answer goes as text (photoResultText).
    */
   deliverImage?: (link: string, caption: string, kind: PhotoMessageKind, card: PlanCard) => Promise<boolean>;
+  /** Milliseconds now; tests move it. */
+  clock?: () => number;
 }): Promise<PhotoOutcome> {
   const { db, config, event, lang, now, deliver, deliverImage } = input;
+  const clock = input.clock ?? Date.now;
   if (!event.mediaId) return 'hint';
 
   let reservation;
@@ -108,6 +118,7 @@ export async function handlePhoto(input: {
   };
 
   let read: { pieces: ReadPiece[]; sheet: ReadSheet | null };
+  const started = clock();
   try {
     await deliver(PHOTO_COPY.reading[lang], 'photo_reading');
     announced = true;
@@ -116,6 +127,11 @@ export async function handlePhoto(input: {
     if (!media.ok) return await fail(`media ${media.reason} ${media.status ?? ''}`.trim());
 
     const answer = await readCutList(media.dataUrl, { readPanel: true, timeoutMs: READ_TIMEOUT_MS });
+    if (answer.status === 'unreadable' && clock() - started <= CLASSIFY_UNTIL_MS) {
+      // A drawing or the furniture itself: say what the bot needs, never "take it again".
+      const kind = await classifyPhoto(media.dataUrl, { timeoutMs: CLASSIFY_TIMEOUT_MS });
+      if (kind) return await fail(`read unreadable, ${kind}`, PHOTO_COPY.notAList[kind][lang]);
+    }
     if (answer.status !== 'ok') return await fail(`read ${answer.status}`);
     read = answer;
   } catch (error) {

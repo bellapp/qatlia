@@ -9,6 +9,7 @@
 import { CREDIT_PACKS, formatMAD } from '@/lib/billing/catalog';
 import { SIGNUP_FREE_CREDITS, VISION_CREDIT_COST } from '@/lib/billing/policy';
 import { supportWhatsAppUrl } from '@/lib/support';
+import type { NotAListKind } from '@/lib/vision/read-cut-list';
 
 export type Lang = 'fr' | 'ar';
 
@@ -243,6 +244,12 @@ export const PHOTO_COPY: {
   reading: Record<Lang, string>;
   /** After "je lis", the read failed: always sent, so the prospect is never left with "je lis" alone. */
   unreadable: Record<Lang, string>;
+  /**
+   * The photo was a drawing of the furniture or the furniture itself, not a
+   * list (23/11/2026: a kitchen sketch, a fitted kitchen, a cupboard, all told
+   * to take the photo again). The pieces typed in one message get the plan.
+   */
+  notAList: Record<NotAListKind, Record<Lang, string>>;
   /** A number whose photo was already read: its link while valid, and the atelier for the next ones. */
   already: (lang: Lang, link: string | null) => string;
   /** A list read but over the bot's limit (MAX_BOT_PIECES): it was read, so never the unreadable text. */
@@ -255,6 +262,24 @@ export const PHOTO_COPY: {
   unreadable: {
     fr: `Je n'ai pas réussi à lire cette fiche 😕 Reprenez la photo de près, bien à plat, avec toute la feuille, et renvoyez-la-moi ici.`,
     ar: `ما قدرتش نقرا هاد الورقة 😕 عاود صوّرها من قريب، مسطحة وكاملة، وعاود صيفطها ليا هنا.`,
+  },
+  notAList: {
+    drawing: {
+      fr: `C'est un dessin du meuble 👍 Pour faire le plan de coupe, il me faut les pièces une par une.
+Tapez-les ici, toutes dans un seul message : longueur x largeur x nombre.
+Exemple : 60x40x2`,
+      ar: `هادا رسم ديال الماوبل 👍 باش نعطيك مخطط التقطيع، خاصني البياسات وحدة بوحدة.
+كتبهم ليا هنا كاملين فـ ميساج واحد: الطول x العرض x العدد.
+مثلا: 60x40x2`,
+    },
+    furniture: {
+      fr: `C'est une photo du meuble 👍 Pour faire le plan de coupe, il me faut les pièces une par une.
+Tapez-les ici, toutes dans un seul message : longueur x largeur x nombre.
+Exemple : 60x40x2`,
+      ar: `هادي تصويرة ديال الماوبل 👍 باش نعطيك مخطط التقطيع، خاصني البياسات وحدة بوحدة.
+كتبهم ليا هنا كاملين فـ ميساج واحد: الطول x العرض x العدد.
+مثلا: 60x40x2`,
+    },
   },
   already: (lang, link) => {
     if (lang === 'ar') {

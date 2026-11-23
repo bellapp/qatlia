@@ -7,6 +7,9 @@
  * `readPanel` (the bot only) appends one instruction asking for the stock
  * panel size when the sheet states one. Without it the request is exactly the
  * site's (pinned by tests/fixtures/vision-request.json).
+ *
+ * `classifyPhoto` (the bot only) is asked only after a read found no pieces:
+ * was the photo a drawing of the furniture, or the furniture itself?
  */
 
 import { isPlaceholder } from '@/lib/billing/config';
@@ -25,6 +28,9 @@ export interface ReadSheet {
   height: number;
   width: number;
 }
+
+/** What the bot's photo showed instead of a list (classifyPhoto). */
+export type NotAListKind = 'drawing' | 'furniture';
 
 export type ReadResult =
   | { status: 'ok'; pieces: ReadPiece[]; sheet: ReadSheet | null }
@@ -314,4 +320,49 @@ export async function readTypedCutList(text: string, options: { timeoutMs?: numb
   const parsed = extractJson(data?.choices?.[0]?.message?.content || '');
   if (!parsed || !Array.isArray(parsed.pieces) || parsed.pieces.length === 0) return { status: 'unreadable' };
   return { status: 'ok', pieces: parsed.pieces.map(normalizePiece), sheet: readSheet(parsed.sheet) };
+}
+
+/**
+ * Asked only after a bot photo read found no pieces (23/11/2026: a hand drawing
+ * of a kitchen, a fitted kitchen, a cupboard were all told « take the photo
+ * again »). A separate call, so the reads that work are left exactly as they
+ * were. Null for a list, or anything else, or on any failure: never a throw.
+ */
+export const CLASSIFY_PROMPT = `Un menuisier a envoyé cette image au lieu de la liste des pièces à couper. Dis ce qu'elle montre.
+- "drawing" : un dessin, un croquis ou un plan de meuble, de cuisine ou de placard (même avec des cotes : longueur totale, largeurs des caissons).
+- "furniture" : la photo d'un meuble, d'une cuisine, d'un placard ou d'une pièce de la maison.
+- "list" : une liste ou un tableau de pièces avec leurs mesures, même mal photographié.
+- "other" : autre chose.
+Retourne STRICTEMENT un objet JSON : {"kind": "drawing"}`;
+
+export async function classifyPhoto(imageDataUrl: string, options: { timeoutMs: number }): Promise<NotAListKind | null> {
+  const chosen = provider();
+  if (!chosen) return null;
+  try {
+    const res = await fetch(chosen.endpoint, {
+      method: 'POST',
+      headers: chosen.headers,
+      signal: AbortSignal.timeout(options.timeoutMs),
+      body: JSON.stringify({
+        model: chosen.model,
+        max_tokens: 300,
+        response_format: { type: 'json_object' },
+        messages: [
+          {
+            role: 'user',
+            content: [
+              { type: 'text', text: CLASSIFY_PROMPT },
+              { type: 'image_url', image_url: { url: imageDataUrl } },
+            ],
+          },
+        ],
+      }),
+    });
+    if (!res.ok) return null;
+    const data = await res.json();
+    const parsed = extractJson(data?.choices?.[0]?.message?.content || '') as { kind?: unknown } | null;
+    return parsed?.kind === 'drawing' || parsed?.kind === 'furniture' ? parsed.kind : null;
+  } catch {
+    return null;
+  }
 }

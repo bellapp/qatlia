@@ -10,7 +10,7 @@ const { loadTsModule } = require('./helpers/load-ts-module');
 const FIXTURE = require('./fixtures/vision-request.json');
 const IMAGE = `data:image/png;base64,${'a'.repeat(64)}`;
 
-const { readCutList } = loadTsModule('src/lib/vision/read-cut-list.ts');
+const { readCutList, classifyPhoto, CLASSIFY_PROMPT } = loadTsModule('src/lib/vision/read-cut-list.ts');
 
 async function read(modelAnswer, options, { env = { OPENROUTER_API_KEY: 'or_real' }, status = 200, rawBody, fetchImpl } = {}) {
   const bodies = [];
@@ -92,6 +92,74 @@ for (const sheet of [{ height: 0, width: 207 }, { height: 'abc', width: 100 }, {
 test('no pieces, or an answer that is not JSON : unreadable', async () => {
   assert.deepEqual((await read(answer({ pieces: [] }))).result, { status: 'unreadable' });
   assert.deepEqual((await read('je ne vois pas de fiche')).result, { status: 'unreadable' });
+});
+
+// 23/11/2026: the bot's photo read is left exactly as it was (the reads that
+// give plans today); what the photo showed is asked in a separate call
+// (classifyPhoto), only after a read with no pieces.
+const PANEL_INSTRUCTION_BEFORE = `
+
+Format du panneau : si la fiche indique le format du panneau à découper (ex : "panneau 280x207", "plaque 244 x 122", "لوحة 280×207"), ajoute au même objet JSON un champ "sheet": { "height": 280, "width": 207 } en centimètres (convertis les millimètres), et ne compte JAMAIS cette ligne comme une pièce. Si la fiche n'indique aucun format de panneau, n'ajoute pas de champ "sheet".`;
+
+test('the bot read sends exactly the request it sent before: the site prompt and the panel instruction', async () => {
+  const { bodies } = await read(answer({ pieces: [{ height: 50, width: 40, quantity: 1 }] }), { readPanel: true });
+  assert.equal(bodies[0].messages[0].content, FIXTURE.system + PANEL_INSTRUCTION_BEFORE);
+  assert.equal(bodies[0].messages[1].content[0].text, FIXTURE.user);
+});
+
+test('a bot read with no pieces stays unreadable, whatever else the model says', async () => {
+  assert.deepEqual((await read(answer({ pieces: [], kind: 'drawing' }), { readPanel: true })).result, { status: 'unreadable' });
+});
+
+async function classify(modelAnswer, { status = 200, fetchImpl, env = { OPENROUTER_API_KEY: 'or_real' } } = {}) {
+  const bodies = [];
+  const keys = ['OPENROUTER_API_KEY', 'OPENAI_API_KEY', 'OPENROUTER_MODEL'];
+  const saved = Object.fromEntries(keys.map((k) => [k, process.env[k]]));
+  for (const k of keys) delete process.env[k];
+  Object.assign(process.env, env);
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = fetchImpl ?? (async (_url, init) => {
+    bodies.push({ ...JSON.parse(init.body), signal: init.signal });
+    return new Response(JSON.stringify({ choices: [{ message: { content: modelAnswer } }] }), { status, headers: { 'Content-Type': 'application/json' } });
+  });
+  try {
+    return { kind: await classifyPhoto(IMAGE, { timeoutMs: 8000 }), bodies };
+  } finally {
+    globalThis.fetch = originalFetch;
+    for (const [k, v] of Object.entries(saved)) {
+      if (v === undefined) delete process.env[k];
+      else process.env[k] = v;
+    }
+  }
+}
+
+test('classifyPhoto sends the image with one question, and a deadline', async () => {
+  const { bodies } = await classify(answer({ kind: 'drawing' }));
+  const body = bodies[0];
+  assert.equal(body.messages.length, 1);
+  assert.equal(body.messages[0].content[0].text, CLASSIFY_PROMPT);
+  assert.match(CLASSIFY_PROMPT, /"drawing"/);
+  assert.match(CLASSIFY_PROMPT, /"furniture"/);
+  assert.match(CLASSIFY_PROMPT, /"list"/);
+  assert.equal(body.messages[0].content[1].image_url.url, IMAGE);
+  assert.ok(body.signal instanceof AbortSignal);
+});
+
+for (const kind of ['drawing', 'furniture']) {
+  test(`classifyPhoto: ${kind}`, async () => {
+    assert.equal((await classify(answer({ kind }))).kind, kind);
+  });
+}
+
+test('classifyPhoto: a list, anything else, a failure or no key give null, never a throw', async () => {
+  assert.equal((await classify(answer({ kind: 'list' }))).kind, null);
+  assert.equal((await classify(answer({ kind: 'other' }))).kind, null);
+  assert.equal((await classify('pas du JSON')).kind, null);
+  assert.equal((await classify(answer({ kind: 'drawing' }), { status: 502 })).kind, null);
+  assert.equal((await classify(null, { fetchImpl: async () => { throw new TypeError('fetch failed'); } })).kind, null);
+  const none = await classify(answer({ kind: 'drawing' }), { env: {} });
+  assert.equal(none.kind, null);
+  assert.equal(none.bodies.length, 0);
 });
 
 test('upstream rate limit, as the site has always told it (the body says so) : error, rateLimited', async () => {

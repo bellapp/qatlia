@@ -83,6 +83,7 @@ RÈGLES :
 - Pour la photo de la fiche, dis « صوّرها بالتيليفون » en darija (jamais « سكاني », « سكانيها » ni « scanner ») et « prenez-la en photo avec votre téléphone » en français.
 - En arabe ou en darija en lettres arabes, appelle toujours les crédits « كريدي » (jamais « رصيد », « نقطة » ni « تجربة ») ; en darija en lettres latines, écris « kridi », jamais de lettres arabes au milieu.
 - Si la personne écrit des mesures de pièces en texte au lieu d'envoyer une photo, ne lui demande jamais de les recopier sur une feuille pour la photographier : dis-lui qu'elle peut les taper directement dans l'atelier, avec le lien de l'atelier ci-dessus.
+- Si la personne montre ou décrit un meuble (placard, cuisine, armoire) ou son dessin au lieu de la liste des pièces : dis-lui que le bot a besoin des pièces une par une, et qu'elle peut les taper ici, toutes dans un seul message (ex : 60x40x2). Ne lui demande pas de les écrire sur une feuille.
 - Ne parle jamais de carte bancaire (ni « sans carte », ni paiement par carte) : si on te demande comment payer, handoff true.
 - Quand la personne veut essayer, demande comment ça marche ou comment faire, propose d'abord d'envoyer ici la photo de sa fiche de débit.
 - Ne donne le lien du site que si la personne parle d'inscription, de compte, d'achat ou de prix, recopié tel quel : ${SITE_LINKS.fr} si tu réponds en français, ${SITE_LINKS.ar} si tu réponds en arabe ou en darija.
@@ -127,6 +128,15 @@ export const ADVISOR_LINK_SENT_NOTE = `
 
 CETTE PERSONNE : elle a déjà reçu le lien du conseiller. Ne le redonne pas et ne dis plus qu'un conseiller va répondre : réponds avec les FAITS, ou dis simplement que tu n'as pas la réponse. Mets handoff à false, sauf si elle demande explicitement un humain.`;
 
+/**
+ * A photo of this person is being read while the assistant answers their
+ * message (Minuisr Aluminium, 23/11/2026: asked for his sheet one second
+ * after his plan went out). Set by the webhook, never from what the person wrote.
+ */
+export const PHOTO_READING_NOTE = `
+
+CETTE PERSONNE : le bot est en train de lire la photo qu'elle vient d'envoyer ; le résultat lui arrive dans quelques secondes, dans un autre message. Ne lui demande pas sa fiche et ne dis pas que tu ne l'as pas reçue : réponds seulement à son message.`;
+
 /** Tolerant JSON reader: plain JSON, a ```json fence, or the first `{` to the last `}`. */
 function parseAssistantJson(text: string): unknown {
   const cleaned = text
@@ -159,6 +169,8 @@ export async function askAssistant(input: {
   photoRead?: PhotoReadNote | null;
   /** Redirect mode: the advisor's number already went to this person (ADVISOR_LINK_SENT_NOTE). */
   advisorLinkSent?: boolean;
+  /** A photo of this person is still being read (PHOTO_READING_NOTE). */
+  photoReading?: boolean;
   fetchImpl?: typeof fetch;
   timeoutMs?: number;
 }): Promise<AssistantReply | null> {
@@ -188,7 +200,8 @@ export async function askAssistant(input: {
             content:
               buildSystemPrompt(input.handoffMode) +
               (input.photoRead ? photoReadNote(input.photoRead) : '') +
-              (input.advisorLinkSent ? ADVISOR_LINK_SENT_NOTE : ''),
+              (input.advisorLinkSent ? ADVISOR_LINK_SENT_NOTE : '') +
+              (input.photoReading ? PHOTO_READING_NOTE : ''),
           },
           ...history,
           { role: 'user', content: input.message.slice(0, MAX_INBOUND_CHARS) },

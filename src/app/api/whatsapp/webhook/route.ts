@@ -27,6 +27,7 @@ import {
 } from '@/lib/whatsapp/router';
 import { withSiteReferral } from '@/lib/whatsapp/site-contact';
 import { assistantBudgetMs, hearVoice } from '@/lib/whatsapp/voice';
+import { waitForPhotoRead } from '@/lib/whatsapp/read-wait';
 import { HISTORY_MESSAGES, askAssistant, type HistoryItem, type PhotoReadNote } from '@/lib/whatsapp/assistant';
 import { handleTypedList } from '@/lib/whatsapp/typed-list';
 import { latestPhotoRead } from '@/lib/whatsapp/photo-store';
@@ -484,15 +485,24 @@ async function answerWithAssistant(
   if (input.settleMs > 0) await sleep(input.settleMs);
   if (await overtaken(db, waId, input.wamid)) return;
 
+  // A photo of this number being read: wait for it, so the assistant knows the
+  // sheet was read (photoReadFor below) instead of asking for it again.
+  const readWait = await waitForPhotoRead(db, waId, now);
+  if (readWait !== 'none' && (await overtaken(db, waId, input.wamid))) return;
+  const photoReading = readWait === 'running';
+
   const history = await recentHistory(db, waId, HISTORY_MESSAGES, input.wamid);
 
   // Measurements typed (or said) instead of a photo: read like a sheet, the
-  // plan card goes out. Nothing read: the assistant answers as before.
+  // plan card goes out. Nothing read: the assistant answers as before. After
+  // a wait, the time left is counted as for a voice note.
+  const budgeted = input.budgeted || readWait !== 'none';
   const timeLeft = (): number | null | undefined =>
-    input.budgeted ? assistantBudgetMs(Date.now() - now.getTime()) : undefined;
+    budgeted ? assistantBudgetMs(Date.now() - now.getTime()) : undefined;
 
   const typed = typedMeasurements(history, input.message);
-  const readTimeoutMs = looksLikeMeasurements(typed) ? timeLeft() : null;
+  // A photo still being read holds the number's read: the typed read would only stay silent.
+  const readTimeoutMs = !photoReading && looksLikeMeasurements(typed) ? timeLeft() : null;
   if (readTimeoutMs !== null) {
     const outcome = await handleTypedList({
       db,
@@ -522,6 +532,7 @@ async function answerWithAssistant(
           handoffMode: config.handoffMode,
           photoRead,
           advisorLinkSent: linkSent,
+          photoReading,
           ...(timeoutMs !== undefined ? { timeoutMs } : {}),
         })
       : null;

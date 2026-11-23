@@ -345,3 +345,22 @@ test('the assistant knows the sheet this number sent was read, and points to its
   await ask(none, { handoffMode: 'coexistence' });
   assert.equal(none.calls[0].body.messages[0].content, buildSystemPrompt('coexistence'));
 });
+
+// Minuisr Aluminium, 23/11/2026: a voice note sent while his photo was being
+// read was answered « صوّر الورقة… وصيفطها ليا هنا », one second after his plan.
+test('a photo still being read: the assistant answers the message and does not ask for the sheet', async () => {
+  const f = fakeFetch(() => llmResponse('{"reply":"ok","handoff":false}'));
+  await ask(f, { handoffMode: 'coexistence', photoReading: true });
+  const system = f.calls[0].body.messages[0].content;
+  assert.ok(system.startsWith(buildSystemPrompt('coexistence')));
+  assert.match(system, /en train de lire/);
+  assert.match(system, /ne lui demande pas sa fiche/i);
+});
+
+// Charaf, 23/11/2026: « بحال هدا بلاكار » with a photo of the cupboard was
+// answered « write the pieces on a sheet and photograph it ».
+test('a person showing a piece of furniture is asked to type its pieces here', () => {
+  const prompt = buildSystemPrompt('redirect');
+  assert.match(prompt, /meuble/);
+  assert.match(prompt, /un seul message/);
+});

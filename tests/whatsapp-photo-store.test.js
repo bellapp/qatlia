@@ -248,6 +248,23 @@ test('latestPhotoRead gives the last read sheet of a number: pieces, and the cod
   assert.equal(await latestPhotoRead(fake.client, WA, NOW), null);
 });
 
+// 23/11/2026: a voice note sent while the photo was being read was answered
+// « take your sheet in photo », one second after the plan went out. The
+// webhook asks whether a read of this number is running before answering.
+test('photoReadRunning: a reading row of this number younger than 2 minutes', async () => {
+  const { photoReadRunning } = store;
+  const fake = createFakeSupabase();
+  fake.state.tables[TABLE] = [{ id: 'r0' }];
+  assert.equal(await photoReadRunning(fake.client, WA, NOW), true);
+  const call = fake.state.fromCalls[0];
+  assert.ok(has(call, 'eq', 'wa_id', WA));
+  assert.ok(has(call, 'eq', 'status', 'reading'));
+  assert.ok(has(call, 'gt', 'created_at', new Date(NOW.getTime() - 2 * MIN).toISOString()));
+
+  fake.state.tables[TABLE] = [];
+  assert.equal(await photoReadRunning(fake.client, WA, NOW), false);
+});
+
 // A stored plan picture (src/lib/whatsapp/plan-picture-store.ts) goes with its
 // read: the purge of expired reads removes the files of their codes.
 test('the purge of expired reads removes their stored plan pictures', async () => {
