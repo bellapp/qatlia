@@ -93,3 +93,21 @@ test('MAD (the currency code) is never translated in either catalog', () => {
     assert.doesNotMatch(source, /درهم مغربي|درهم مغربى/, `${locale} catalog must use the "MAD" code, not a translated currency name, for consistency with the rest of the app`);
   }
 });
+
+test('footerNote names the issuing business, never QatliA', () => {
+  const { quotationCatalogs } = loadCatalog();
+  assert.equal(
+    quotationCatalogs.fr.footerNote('Atelier Karim'),
+    "Devis établi par Atelier Karim — n'engage l'émetteur que jusqu'à sa date de validité."
+  );
+  assert.ok(quotationCatalogs.ar.footerNote('Atelier Karim').includes('عرض سعر صادر عن Atelier Karim'));
+  for (const locale of ['fr', 'ar']) {
+    assert.doesNotMatch(quotationCatalogs[locale].footerNote('Atelier Karim'), /QatliA/);
+  }
+});
+
+test('madeWith is the small QatliA credit in both catalogs', () => {
+  const { quotationCatalogs } = loadCatalog();
+  assert.equal(quotationCatalogs.fr.madeWith, 'Réalisé avec QatliA · qatlia.ma');
+  assert.equal(quotationCatalogs.ar.madeWith, 'أُنجز بواسطة QatliA · qatlia.ma');
+});

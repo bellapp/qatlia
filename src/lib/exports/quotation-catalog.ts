@@ -52,7 +52,10 @@ const fr = {
   totalLabel: 'TOTAL À PAYER (MAD)',
   amountInWordsLabel: 'Arrêté le présent devis à la somme de :',
   notesLabel: 'Notes',
-  footerNote: "Devis établi par QatliA — n'engage l'émetteur que jusqu'à sa date de validité.",
+  // The quotation is the artisan's own document: it names them as the issuer.
+  // QatliA appears only as the small `madeWith` credit under it.
+  footerNote: (companyName: string) => `Devis établi par ${companyName} — n'engage l'émetteur que jusqu'à sa date de validité.`,
+  madeWith: 'Réalisé avec QatliA · qatlia.ma',
   // Panels/pieces detail table (Task 8 remediation — item 1) — rendered only
   // when the request actually carries panels/pieces (see route.ts); never
   // fabricated when the optimizer result carried none.
@@ -103,7 +106,8 @@ const ar: QuotationCatalog = {
   totalLabel: 'المجموع الإجمالي الواجب أداؤه (MAD)',
   amountInWordsLabel: 'أوقفنا هذا العرض عند مبلغ:',
   notesLabel: 'ملاحظات',
-  footerNote: 'عرض سعر صادر عن QatliA — لا يلزم المُصدر إلا إلى غاية تاريخ صلاحيته.',
+  footerNote: (companyName) => `عرض سعر صادر عن ${companyName} — لا يلزم المُصدر إلا إلى غاية تاريخ صلاحيته.`,
+  madeWith: 'أُنجز بواسطة QatliA · qatlia.ma',
   panelsTitle: 'الألواح المستعملة',
   panelsColumnRef: 'المرجع',
   panelsColumnMaterial: 'المادة',

@@ -10,8 +10,6 @@ import {
   computeQuotationDocumentTotals,
   amountInWords,
   AMOUNT_IN_WORDS_MAX_MAD,
-  sanitizeQuoteNumberForFilename,
-  encodeRfc5987Filename,
   type QuotationLocale,
   type QuotationPanelLine,
   type QuotationPieceLine,
@@ -32,6 +30,7 @@ import {
 } from '@/lib/exports/pdf-fonts';
 import { containsArabicScript } from '@/lib/exports/pdf-bidi';
 import { QUOTATION_PDF_LAYOUT } from '@/lib/exports/quotation-pdf-layout';
+import { quotationFileNames, contentDispositionFor } from '@/lib/document-filename';
 import { formatDateTime } from '@/i18n';
 
 /**
@@ -269,14 +268,9 @@ export async function POST(req: Request) {
     // ─── Render ──────────────────────────────────────────────────────────
     const pdfBytes = await renderQuotationPdf(input, totals, logo);
 
-    const asciiQuoteNumber = sanitizeQuoteNumberForFilename(input.quoteNumber);
-    const utf8FileName = `QatliA_Devis_${input.quoteNumber}.pdf`;
-
     const headers: Record<string, string> = {
       'Content-Type': 'application/pdf',
-      'Content-Disposition':
-        `attachment; filename="QatliA_Devis_${asciiQuoteNumber}.pdf"; ` +
-        `filename*=UTF-8''${encodeRfc5987Filename(utf8FileName)}`,
+      'Content-Disposition': contentDispositionFor(quotationFileNames(input.quoteNumber, input.company.name)),
     };
     if (input.projectId) headers['X-Quotation-Project-Saved'] = String(projectSaved === true);
 
@@ -424,6 +418,17 @@ async function renderQuotationPdf(input: QuotationInputData, totals: QuotationTo
   const cellHooks = arabicSafeCellHooks(doc, fontRegistration);
   const drawText = (text: string, x: number, y: number, options?: TextOptionsLight) => {
     drawContentAwareText(doc, fontRegistration, text, x, y, options);
+  };
+  /** Width of `text` as drawText would draw it, in the font and size currently set. */
+  const drawnTextWidth = (text: string) => {
+    const clean = stripBidiControls(text);
+    if (!containsArabicScript(clean) || !fontRegistration.ok) return doc.getTextWidth(clean);
+    // Arabic is drawn in Amiri, shaped: measure it the same way, then restore.
+    const prior = doc.getFont();
+    doc.setFont(AMIRI_FONT_FAMILY, prior.fontStyle);
+    const width = doc.getTextWidth(doc.processArabic(clean));
+    doc.setFont(prior.fontName, prior.fontStyle);
+    return width;
   };
 
   // Reading-start/end anchors: for `fr`, start (where a block's own title
@@ -704,16 +709,72 @@ async function renderQuotationPdf(input: QuotationInputData, totals: QuotationTo
   // contentBottomMm), so stamping it here afterwards can never overlap
   // earlier content — and this is the only place that needs to know the
   // final page count. ───────────────────────────────────────────────────
-  stampHeadersAndFooters(doc, drawText, cat, quoteNumber, startX, startAlign, isRtl);
+  stampHeadersAndFooters(doc, drawText, drawnTextWidth, cat, quoteNumber, company.name, startX, startAlign, isRtl);
 
   return doc.output('arraybuffer');
+}
+
+/** The `madeWith` credit sits this far under the footer note (page bottom is 297, footer note at 288). */
+const MADE_WITH_LINE_OFFSET_MM = 3.5;
+
+/**
+ * An Arabic string with a Latin run in it (the business name in the footer
+ * note, the `QatliA · qatlia.ma` tail of the credit) laid out in a single
+ * draw call comes out in the wrong order: jsPDF runs one bidi pass over the
+ * whole string and the runs end up swapped. So each run is its own segment.
+ * Text with no Arabic in it needs none of this and stays one draw call.
+ */
+function footerNoteSegments(note: string, companyName: string): string[] {
+  const at = companyName ? note.indexOf(companyName) : -1;
+  if (at < 0 || !containsArabicScript(note)) return [note];
+  const before = note.slice(0, at).trimEnd();
+  const after = note.slice(at + companyName.length).trimStart();
+  if (!containsArabicScript(after)) return [before, companyName, after].filter(Boolean);
+  // A dash or full stop at the edge of an Arabic run would be placed on the
+  // wrong side of it (the bidi pass takes a left-to-right base direction), so
+  // each such mark is a segment of its own.
+  const [lead, core, trail] = /^([—–-]?)\s*([\s\S]*?)([.،]?)$/.exec(after)!.slice(1);
+  return [before, companyName, lead, core, trail].filter(Boolean);
+}
+
+function latinTailSegments(text: string): string[] {
+  const latinStart = text.search(/[A-Za-z]/);
+  return latinStart > 0 && containsArabicScript(text) ? [text.slice(0, latinStart).trimEnd(), text.slice(latinStart)] : [text];
+}
+
+/**
+ * Draws `segments` (in reading order, one space between them) as one line
+ * that starts at `startX`: running right from it for `fr`, and running left
+ * from it for `ar`, where the first segment is the rightmost.
+ */
+function drawSegmentedLine(
+  drawText: (text: string, x: number, y: number, options?: TextOptionsLight) => void,
+  drawnTextWidth: (text: string) => number,
+  segments: string[],
+  startX: number,
+  y: number,
+  isRtl: boolean
+): void {
+  // One space between segments, except before a closing full stop or comma.
+  const parts = segments.flatMap((segment, index) =>
+    index === 0 || /^[.,،:;!?؟]+$/.test(segment) ? [segment] : [' ', segment]
+  );
+  const visual = isRtl ? [...parts].reverse() : parts;
+  const widths = visual.map((part) => drawnTextWidth(part));
+  let x = isRtl ? startX - widths.reduce((sum, width) => sum + width, 0) : startX;
+  visual.forEach((part, index) => {
+    drawText(part, x, y);
+    x += widths[index];
+  });
 }
 
 function stampHeadersAndFooters(
   doc: jsPDF,
   drawText: (text: string, x: number, y: number, options?: TextOptionsLight) => void,
+  drawnTextWidth: (text: string) => number,
   cat: QuotationCatalog,
   quoteNumber: string,
+  companyName: string,
   startX: number,
   startAlign: Halign,
   isRtl: boolean
@@ -743,7 +804,8 @@ function stampHeadersAndFooters(
     doc.setFont(BASE_FONT, 'normal');
     doc.setFontSize(7);
     doc.setTextColor(100, 116, 139);
-    drawText(cat.footerNote, startX, footerY, { align: startAlign });
+    drawSegmentedLine(drawText, drawnTextWidth, footerNoteSegments(cat.footerNote(companyName), companyName), startX, footerY, isRtl);
+    drawSegmentedLine(drawText, drawnTextWidth, latinTailSegments(cat.madeWith), startX, footerY + MADE_WITH_LINE_OFFSET_MM, isRtl);
     drawText(cat.pageIndicator(page, totalPages), endX, footerY, { align: endAlign });
   }
 }
