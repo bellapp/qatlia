@@ -23,6 +23,7 @@ import {
 } from '@/lib/quotation';
 import { readStoredCompanyIdentity, writeStoredCompanyIdentity } from '@/lib/quotation-local-store';
 import { resolveQuotationCompany, type Atelier } from '@/lib/atelier';
+import { QuotationCompanyCard } from '@/components/QuotationCompanyCard';
 import { fileNameFromContentDisposition } from '@/lib/document-filename';
 
 const MAX_LOGO_BYTES = 500 * 1024;
@@ -156,6 +157,10 @@ export const QuotationDialog: React.FC<QuotationDialogProps> = ({
   // exported quote then becomes the account's business. We never guess the
   // account is empty — see fetchAccountBusiness.
   const [accountBusinessKnownEmpty, setAccountBusinessKnownEmpty] = useState(false);
+  // True when the company comes from the account: it is then shown as a
+  // read-only card (QuotationCompanyCard), never as fields that could be
+  // mistaken for the client's. Changes happen on the account page.
+  const [companyFromAccount, setCompanyFromAccount] = useState(false);
 
   // Prefill on every open: the artisan's own company identity comes back
   // from local storage (see quotation-local-store.ts) as a fallback only —
@@ -187,8 +192,33 @@ export const QuotationDialog: React.FC<QuotationDialogProps> = ({
     setErrorKey(null);
     setSuccessState(null);
     setAccountBusinessKnownEmpty(false);
+    setCompanyFromAccount(false);
     if (logoInputRef.current) logoInputRef.current.value = '';
     // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen]);
+
+  // « Modifier mon entreprise » opens the account page in another tab: when
+  // the artisan comes back, the business saved there replaces what the open
+  // dialog shows. A failed read changes nothing.
+  useEffect(() => {
+    if (!isOpen) return;
+    let cancelled = false;
+    const refresh = async () => {
+      const { account } = await fetchAccountBusiness();
+      if (cancelled || !account) return;
+      const resolved = resolveQuotationCompany({ account, project: null, local: null });
+      setCompany(resolved.company ?? EMPTY_COMPANY);
+      setCompanyFromAccount(true);
+      setAccountBusinessKnownEmpty(false);
+      setLogoDataUrl(resolved.logoDataUrl);
+      setLogoFileName(undefined);
+      setLogoError(null);
+    };
+    window.addEventListener('focus', refresh);
+    return () => {
+      cancelled = true;
+      window.removeEventListener('focus', refresh);
+    };
   }, [isOpen]);
 
   // Server-owned prefill, once per open: the account's business and, when
@@ -217,6 +247,7 @@ export const QuotationDialog: React.FC<QuotationDialogProps> = ({
         local: readStoredCompanyIdentity(storage),
       });
       setCompany(resolved.company ?? EMPTY_COMPANY);
+      setCompanyFromAccount(resolved.fromAccount);
       if (resolved.logoDataUrl) setLogoDataUrl(resolved.logoDataUrl);
 
       if (!quotation) return;
@@ -472,6 +503,7 @@ export const QuotationDialog: React.FC<QuotationDialogProps> = ({
           <fieldset className="space-y-3">
             <legend className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
               {t('quotation.companySection')}
+              {!companyFromAccount && (
               <a
                 href="/account#entreprise"
                 target="_blank"
@@ -480,7 +512,11 @@ export const QuotationDialog: React.FC<QuotationDialogProps> = ({
               >
                 {t('quotation.editBusiness')}
               </a>
+              )}
             </legend>
+            {companyFromAccount ? (
+              <QuotationCompanyCard company={company} logoDataUrl={logoDataUrl} />
+            ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
                 <label className={labelClass} htmlFor={`${headingId}-company-name`}>{t('quotation.fields.companyName')}</label>
@@ -549,6 +585,7 @@ export const QuotationDialog: React.FC<QuotationDialogProps> = ({
                 />
               </div>
             </div>
+            )}
           </fieldset>
 
           <fieldset className="space-y-3">
@@ -758,6 +795,8 @@ export const QuotationDialog: React.FC<QuotationDialogProps> = ({
             {t('quotation.amountInWords')}
           </label>
 
+          {/* An account business brings its own logo, shown in the card above. */}
+          {!companyFromAccount && (
           <div>
             <label className={labelClass} htmlFor={`${headingId}-logo`}>{t('quotation.logo.label')}</label>
             <p className="text-[11px] text-slate-500 dark:text-slate-400 mb-1.5">{t('quotation.logo.hint')}</p>
@@ -797,6 +836,7 @@ export const QuotationDialog: React.FC<QuotationDialogProps> = ({
               <p role="alert" className="text-[11px] text-rose-400 mt-1">{t(logoError)}</p>
             )}
           </div>
+          )}
 
           <div>
             <label className={labelClass} htmlFor={`${headingId}-notes`}>{t('quotation.fields.notes')}</label>

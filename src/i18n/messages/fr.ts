@@ -1041,6 +1041,7 @@ export const fr = {
     authRequired: 'Connectez-vous pour générer un devis client.',
     companySection: 'Votre entreprise',
     editBusiness: 'Modifier mon entreprise',
+    companyCardHint: 'C’est ce qui sera imprimé en haut du devis.',
     clientSection: 'Client',
     fields: {
       companyName: 'Nom de l’entreprise',
