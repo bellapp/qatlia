@@ -72,8 +72,8 @@ test('a browser visit is left alone, including one opened from another Android a
 test('the purchase and landing pages lead elsewhere, their neighbours do not', () => {
   const cases = {
     '/': '/atelier', '/ar': '/atelier', '/ar/': '/atelier',
-    '/credits': '/account', '/credits/': '/account', '/credits/success': '/account',
-    '/atelier': null, '/account': null, '/credits-old': null, '/refund': null, '/w/abc': null,
+    '/credits': '/account/credits', '/credits/': '/account/credits', '/credits/success': '/account/credits',
+    '/atelier': null, '/account': null, '/account/credits': null, '/credits-old': null, '/refund': null, '/w/abc': null,
   };
   for (const [from, to] of Object.entries(cases)) {
     assert.equal(storeApp.storeAppRedirect(from), to, from);
@@ -82,7 +82,7 @@ test('the purchase and landing pages lead elsewhere, their neighbours do not', (
 
 test('in the app, the script leaves a purchase page before it paints', () => {
   const leaving = runScript({ url: '/credits?pack=artisan&app=android' });
-  assert.equal(leaving.replaced, '/account');
+  assert.equal(leaving.replaced, '/account/credits');
   assert.equal('data-app-leaving' in leaving.attrs, true);
 
   const staying = runScript({ url: '/atelier?app=android' });
@@ -128,8 +128,8 @@ test('the mode survives React stripping the attribute off <html>', () => {
 
 test('without sessionStorage, leaving a purchase page keeps the app parameter', () => {
   const { replaced } = runScript({ url: '/credits?app=android', storageThrows: true });
-  assert.equal(replaced, '/account?app=android');
-  assert.equal(runScript({ url: '/credits?app=android' }).replaced, '/account', 'remembered: clean address');
+  assert.equal(replaced, '/account/credits?app=android');
+  assert.equal(runScript({ url: '/credits?app=android' }).replaced, '/account/credits', 'remembered: clean address');
 });
 
 test('signing out in the app leads to the sign-in page, not to an atelier that looks signed in', () => {

@@ -956,10 +956,7 @@ export const fr = {
   accountPage: {
     eyebrow: 'Compte',
     title: 'Votre espace artisan',
-    topUp: 'Recharger',
     creditsRemaining: 'crédits restants',
-    ledgerShowAll: 'Voir tout ({count})',
-    ledgerShowLess: 'Réduire',
     ledgerAria: 'Mouvements de crédits',
     noMovements:
       'Aucun mouvement pour l’instant. Une analyse complète coûte 1 crédit ; les exports sont gratuits.',

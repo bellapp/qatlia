@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { clearPendingWork } from '@/lib/pending-work';
 import { forgetAtelierDraft } from '@/lib/atelier-draft';
-import { ArrowLeft, ArrowRight, Building2, Coins, KeyRound, LogOut, Receipt, Shield, Zap } from 'lucide-react';
+import { ArrowLeft, Building2, Coins, KeyRound, LogOut, Shield, Zap } from 'lucide-react';
 import { AccountMenu } from '@/components/AccountMenu';
 import { useStoreApp } from '@/components/useStoreApp';
 import { isStoreAppDocument, storeAppCopyKey, storeAppSignOutPath } from '@/lib/store-app';
@@ -15,31 +15,13 @@ import { LocaleSwitcher, useLocale } from '@/components/LocaleProvider';
 import { CurrencySwitcher } from '@/components/CurrencySwitcher';
 import { BusinessIdentityForm } from '@/components/BusinessIdentityForm';
 import { authErrorKey } from '@/components/AuthModal';
-import { formatDateTime } from '@/i18n';
-import { ledgerPreview } from '@/lib/credit-ledger-preview';
-
-interface Tx {
-  id: string;
-  type?: string;
-  amount: number;
-  balance_after?: number;
-  description?: string;
-  created_at: string;
-}
 
 /** Kept in one place: the input constraint and the copy shown when it is not met. */
 const MIN_PASSWORD_LENGTH = 6;
 
-const LEDGER_DATE_OPTIONS: Intl.DateTimeFormatOptions = {
-  day: 'numeric',
-  month: 'short',
-  hour: '2-digit',
-  minute: '2-digit',
-};
-
 export default function AccountPage() {
   const router = useRouter();
-  const { t, n, locale } = useLocale();
+  const { t, n } = useLocale();
   const inApp = useStoreApp();
   const [email, setEmail] = useState<string | null>(null);
   // null until the real balance is read from the profile.
@@ -49,10 +31,6 @@ export default function AccountPage() {
   const [pwdMsg, setPwdMsg] = useState<string | null>(null);
   const [pwdErr, setPwdErr] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
-  const [txs, setTxs] = useState<Tx[]>([]);
-  // A long history must not push the business identity out of sight.
-  const [ledgerExpanded, setLedgerExpanded] = useState(false);
-  const ledger = ledgerPreview(txs, ledgerExpanded);
 
   useEffect(() => {
     async function load() {
@@ -66,17 +44,6 @@ export default function AccountPage() {
       }
       setEmail(user.email || null);
       try { const { data: p } = await supabase.from('profiles').select('credits').eq('id', user.id).single(); if (p && typeof p.credits === 'number') setCredits(p.credits); } catch {/* balance stays unknown rather than being invented */}
-
-      // The server ledger is the only source of movements. The former
-      // localStorage fallback replayed client-invented "Export PDF" debits that
-      // never existed in the database.
-      try {
-        const res = await fetch('/api/credits/history');
-        const data = await res.json();
-        setTxs(Array.isArray(data.transactions) ? data.transactions : []);
-      } catch {
-        setTxs([]);
-      }
     }
     load();
   }, [router]);
@@ -134,7 +101,7 @@ export default function AccountPage() {
           <div className="flex items-center gap-2">
             <LocaleSwitcher />
             <Link
-              href={inApp ? '/account#credits' : '/credits'}
+              href={inApp ? '/account/credits' : '/credits'}
               aria-label={`${t('atelier.header.creditsAria')}: ${credits === null ? '—' : n(credits)}`}
               className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-brand-400/10 border border-brand-500/25 text-brand-400 hover:bg-brand-500/15 text-xs font-semibold transition-all"
             >
@@ -153,60 +120,6 @@ export default function AccountPage() {
           {/* An address is a Latin identifier whatever the page direction is. */}
           <p dir="ltr" className="text-sm text-slate-600 dark:text-slate-400 mt-1 text-start">{email}</p>
         </div>
-
-        <section id="credits" className="p-5 rounded-2xl bg-studio-panel/70 border border-studio-border space-y-4">
-          <div className="flex items-center justify-between gap-3">
-            <div className="flex items-center gap-2">
-              <Receipt className="w-4 h-4 text-brand-400" aria-hidden="true" />
-              <h2 className="text-sm font-bold text-slate-900 dark:text-white">{t('account.creditsUsage')}</h2>
-            </div>
-            <Link href="/credits" data-sells="" className="inline-flex items-center gap-1 text-xs font-semibold text-brand-400 hover:text-brand-400">
-              {t('accountPage.topUp')}
-              <ArrowRight className="w-3 h-3 rtl:-scale-x-100" aria-hidden="true" />
-            </Link>
-          </div>
-          <div className="flex items-end gap-3">
-            <p dir="ltr" className="text-3xl font-black font-mono text-slate-900 dark:text-white">{credits === null ? '—' : n(credits)}</p>
-            <p className="text-xs text-slate-600 dark:text-slate-400 pb-1">{t('accountPage.creditsRemaining')}</p>
-          </div>
-          {txs.length === 0 ? (
-            <p className="text-xs text-slate-500 dark:text-slate-400">{t('accountPage.noMovements')}</p>
-          ) : (
-            <>
-            <ul id="credit-ledger" aria-label={t('accountPage.ledgerAria')} className="divide-y divide-slate-800">
-              {ledger.shown.map((tx) => (
-                <li key={tx.id} className="py-2.5 flex items-center justify-between gap-3 text-xs">
-                  <div>
-                    {/* The description saved in the ledger is the artisan's own
-                        record, so it is shown verbatim; only the fallback for a
-                        row saved without one is localized. */}
-                    <p className="text-slate-800 dark:text-slate-200 font-medium">{tx.description || t(tx.amount < 0 ? 'accountPage.txDebit' : 'accountPage.txCredit')}</p>
-                    <p className="text-slate-500 dark:text-slate-400 font-mono mt-0.5">
-                      {formatDateTime(locale, tx.created_at, LEDGER_DATE_OPTIONS)}
-                    </p>
-                  </div>
-                  <span dir="ltr" className={`font-mono font-bold ${tx.amount < 0 ? 'text-rose-300' : 'text-emerald-400'}`}>
-                    {tx.amount > 0 ? `+${n(tx.amount)}` : n(tx.amount)}
-                  </span>
-                </li>
-              ))}
-            </ul>
-            {(ledger.hidden > 0 || ledgerExpanded) && (
-              <button
-                type="button"
-                aria-expanded={ledgerExpanded}
-                aria-controls="credit-ledger"
-                onClick={() => setLedgerExpanded((v) => !v)}
-                className="text-xs font-semibold text-brand-400 hover:text-brand-500"
-              >
-                {ledgerExpanded
-                  ? t('accountPage.ledgerShowLess')
-                  : t('accountPage.ledgerShowAll', { count: n(txs.length) })}
-              </button>
-            )}
-            </>
-          )}
-        </section>
 
         {/* The business identity printed on the cut plans and quotes. */}
         <section id="entreprise" className="p-5 rounded-2xl bg-studio-panel/70 border border-studio-border space-y-4">

@@ -76,20 +76,21 @@ export function AccountMenu({ email }: AccountMenuProps) {
             {t('account.buyCredits')}
           </Link>
           <Link
+            href="/account/credits"
+            onClick={() => setOpen(false)}
+            className="flex items-center gap-2 px-3 py-2 text-xs text-slate-700 dark:text-slate-300 hover:bg-studio-field/60 transition-colors"
+          >
+            <Receipt className="w-3.5 h-3.5 text-brand-400" />
+            {t('account.creditsUsage')}
+          </Link>
+          <div className="my-1 border-t border-studio-border" />
+          <Link
             href="/account"
             onClick={() => setOpen(false)}
             className="flex items-center gap-2 px-3 py-2 text-xs text-slate-700 dark:text-slate-300 hover:bg-studio-field/60 transition-colors"
           >
             <User className="w-3.5 h-3.5 text-brand-400" />
             {t('account.myAccount')}
-          </Link>
-          <Link
-            href="/account#credits"
-            onClick={() => setOpen(false)}
-            className="flex items-center gap-2 px-3 py-2 text-xs text-slate-700 dark:text-slate-300 hover:bg-studio-field/60 transition-colors"
-          >
-            <Receipt className="w-3.5 h-3.5 text-brand-400" />
-            {t('account.creditsUsage')}
           </Link>
           <Link
             href="/account#password"

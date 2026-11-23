@@ -1806,7 +1806,7 @@ const commitPanelName = () => {
               <OnboardingTour />
               <ThemeToggle />
               <Link
-                href={inApp ? '/account#credits' : '/credits'}
+                href={inApp ? '/account/credits' : '/credits'}
                 aria-label={t('atelier.header.creditsAria')}
                 className="group relative flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-brand-400/10 border border-brand-500/25 text-brand-400 hover:bg-brand-500/15 hover:border-brand-500/40 text-xs font-semibold transition-all"
               >

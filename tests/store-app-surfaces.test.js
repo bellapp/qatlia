@@ -45,12 +45,12 @@ test('every way to the purchase or refund page is hidden or rerouted in the app'
   assert.deepEqual(loose, []);
 });
 
-test('the balance badge of each screen leads to the account in the app', () => {
+test('the balance badge of each screen leads to the credits usage page in the app', () => {
   const screens = ['atelier', 'account', 'history', 'panels'].map((s) => `src/app/(site)/${s}/page.tsx`);
   for (const file of screens) {
     const source = read(file);
     assert.match(source, /const inApp = useStoreApp\(\);/, file);
-    assert.match(source, /href=\{inApp \? '\/account#credits' : '\/credits'\}/, file);
+    assert.match(source, /href=\{inApp \? '\/account\/credits' : '\/credits'\}/, file);
   }
 });
 
@@ -58,8 +58,8 @@ test('the buy entry, the top-up links and the refund link carry the hidden mark'
   const marked = (source, needle) => /data-sells/.test(tagAround(source, source.indexOf(needle)));
   const menu = read('src/components/AccountMenu.tsx');
   assert.ok(marked(menu, 'href="/credits"'), 'account menu: buy credits');
-  const account = read('src/app/(site)/account/page.tsx');
-  assert.ok(marked(account, 'href="/credits" data-sells'), 'account page: top up');
+  const usage = read('src/app/(site)/account/credits/page.tsx');
+  assert.ok(marked(usage, 'href="/credits"'), 'credits usage page: buy credits');
   const atelier = read('src/app/(site)/atelier/page.tsx');
   assert.ok(marked(atelier, '<a href="/credits"'), 'atelier: recharge after an optimisation refused');
   assert.match(read('src/components/LegalPage.tsx'), /data-sells=\{other === 'refund' \? '' : undefined\}/);
@@ -69,7 +69,7 @@ test('support, the balance history and the free credits stay', () => {
   const menu = read('src/components/AccountMenu.tsx');
   const support = menu.indexOf('supportWhatsAppUrl(t(');
   assert.ok(support > 0 && !/data-sells/.test(tagAround(menu, support)));
-  assert.equal(/data-sells/.test(tagAround(menu, menu.indexOf('href="/account#credits"'))), false);
+  assert.equal(/data-sells/.test(tagAround(menu, menu.indexOf('href="/account/credits"'))), false);
 });
 
 const { loadTsModule } = require('./helpers/load-ts-module');

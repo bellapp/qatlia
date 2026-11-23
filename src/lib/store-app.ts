@@ -34,14 +34,14 @@ export const STORE_APP_WINDOW_FLAG = '__qatliaStoreApp';
 
 /**
  * Pages that sell, and where the app goes instead: the purchase pages lead to
- * the account (balance and movements), the landings with their prices to the
+ * the credits usage page (balance and movements), the landings with their prices to the
  * atelier.
  */
 export const STORE_APP_REDIRECTS: Readonly<Record<string, string>> = {
   '/': '/atelier',
   '/ar': '/atelier',
-  '/credits': '/account',
-  '/credits/success': '/account',
+  '/credits': '/account/credits',
+  '/credits/success': '/account/credits',
 };
 
 /**
