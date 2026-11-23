@@ -98,9 +98,9 @@ test('fileNameFromContentDisposition round-trips contentDispositionFor', () => {
 **Interfaces:**
 - Consumes: `Atelier`, `AtelierSchema` (Task 1).
 - Produces (`src/lib/atelier-server.ts`) :
-  - `readAtelier(userId: string): Promise<Atelier | null>` — jamais de throw ; `null` si pas de config admin, erreur Supabase (table absente) ou ligne invalide selon `AtelierSchema`.
-  - `saveAtelier(userId: string, atelier: Atelier): Promise<boolean>` — upsert `onConflict: 'user_id'`, `updated_at: new Date().toISOString()` ; `false` sans config admin ou sur erreur. `logoDataUrl: undefined` **ne touche pas** au logo existant ; `null` l'efface.
-  - `atelierForCurrentRequest(): Promise<Atelier | null>` — utilisateur via `createClient()` de `@/lib/supabase/server`, puis `readAtelier` ; tout throw → `null`.
+  - `readAtelier(userId: string): Promise<Atelier | null>` — jamais de throw ; `null` si pas de config admin, erreur Supabase (table absente) ou partie texte invalide selon `CompanyIdentitySchema`. **Le logo est validé à part** (`LogoDataUrlSchema` puis `validateLogoDataUrl`) : un logo invalide est seulement retiré, l'entreprise reste.
+  - `saveAtelier(userId: string, atelier: Atelier, options?: { createOnly?: boolean }): Promise<boolean>` — upsert `onConflict: 'user_id'`, `updated_at: new Date().toISOString()` ; `createOnly: true` → `ignoreDuplicates: true` (n'écrase jamais une ligne existante) ; `false` sans config admin ou sur erreur. `logoDataUrl: undefined` **ne touche pas** au logo existant ; `null` l'efface.
+  - `atelierForCurrentRequest(): Promise<Atelier | null>` — **vérifie d'abord `getSupabaseAdminConfig()` et renvoie `null` sans créer de client de session** si elle manque (ainsi les tests qui chargent `/api/export-pdf` sans stub ne touchent jamais `cookies()`) ; sinon utilisateur via `createClient()` de `@/lib/supabase/server`, puis `readAtelier` ; tout throw → `null`.
   - Colonnes ↔ champs : `tax_id`↔`taxId`, `logo_data_url`↔`logoDataUrl`, champs vides SQL `NULL` ↔ absents.
 
 - [ ] **Step 1: Write the migration** exactement comme dans la spec (section « Données »), en-tête commenté au format de `017_account_currency.sql` (date, décision utilisateur, « Additive only », requête de vérification). Ne pas toucher `FULL_DATABASE_SETUP.sql` (017 n'y est pas non plus).
@@ -111,7 +111,9 @@ test('fileNameFromContentDisposition round-trips contentDispositionFor', () => {
   - `readAtelier` quand `select` renvoie `{ error: { message: 'relation "ateliers" does not exist' } }` → `null`.
   - toutes les requêtes portent `eq('user_id', <userId>)`.
   - `saveAtelier` avec `logoDataUrl` absent n'inclut pas `logo_data_url` dans l'upsert ; avec `null`, l'inclut à `null`.
-  - `atelierForCurrentRequest` sans utilisateur → `null` ; quand `getUser` throw → `null`.
+  - `saveAtelier(id, a, { createOnly: true })` passe `ignoreDuplicates: true` à l'upsert (le faux client garde la ligne existante intacte).
+  - ligne en base avec un nom valide et `logo_data_url` aux octets corrompus → `readAtelier` renvoie l'entreprise **sans** `logoDataUrl` (pas `null`).
+  - `atelierForCurrentRequest` sans config admin → `null` et `createClient` de `@/lib/supabase/server` jamais appelé ; sans utilisateur → `null` ; quand `getUser` throw → `null`.
 - [ ] **Step 3: Run** `node --test tests/atelier-server.test.js` — Expected: FAIL.
 - [ ] **Step 4: Implement** `src/lib/atelier-server.ts` (client admin créé comme `adminClient()` de src/lib/currency-server.ts).
 - [ ] **Step 5: Run** — Expected: PASS.
@@ -127,7 +129,7 @@ test('fileNameFromContentDisposition round-trips contentDispositionFor', () => {
 
 **Interfaces:**
 - Consumes: `readAtelier`, `saveAtelier` (Task 2), `AtelierSchema` (Task 1), `validateLogoDataUrl`.
-- Produces: `GET` → `200 { atelier: Atelier | null }` | `401 { error: 'AUTH_REQUIRED' }`. `PUT` body `Atelier` → `200 { atelier }` | `400 { error: 'INVALID_DATA' }` | `400 { error: 'INVALID_LOGO' }` | `401` | `413 { error: 'TOO_LARGE' }` | `500 { error: 'SAVE_FAILED' }`. `export const dynamic = 'force-dynamic'`.
+- Produces: `GET` → `200 { atelier: Atelier | null }` | `401 { error: 'AUTH_REQUIRED' }`. `PUT` (query `?createOnly=1` → `saveAtelier(..., { createOnly: true })`) body `Atelier` → `200 { atelier }` | `400 { error: 'INVALID_DATA' }` | `400 { error: 'INVALID_LOGO' }` | `401` | `413 { error: 'TOO_LARGE' }` | `500 { error: 'SAVE_FAILED' }`. `export const dynamic = 'force-dynamic'`.
 
 - [ ] **Step 1: Write the failing tests** (stub `@/lib/supabase/server` et `@/lib/atelier-server`) :
   - GET/PUT sans utilisateur → 401, `saveAtelier` jamais appelé.
@@ -137,6 +139,7 @@ test('fileNameFromContentDisposition round-trips contentDispositionFor', () => {
   - PUT avec un logo PNG dont les octets sont du JPEG → 400 `INVALID_LOGO` (réutiliser les fixtures de `tests/quotation-logo.test.js`).
   - PUT avec un corps texte de plus de 1 000 000 octets → 413 `TOO_LARGE`.
   - `saveAtelier` → `false` → 500 `SAVE_FAILED`.
+  - `PUT /api/atelier?createOnly=1` → `saveAtelier` appelé avec `{ createOnly: true }` ; sans le paramètre → sans.
 - [ ] **Step 2: Run** — Expected: FAIL.
 - [ ] **Step 3: Implement** — PUT lit `await req.text()`, refuse au-delà de 1 000 000 octets, puis `JSON.parse` (échec → `INVALID_DATA`), `AtelierSchema.safeParse`, `validateLogoDataUrl` si `logoDataUrl` est une chaîne.
 - [ ] **Step 4: Run** — Expected: PASS.
@@ -149,7 +152,7 @@ test('fileNameFromContentDisposition round-trips contentDispositionFor', () => {
 **Files:**
 - Modify: `src/app/api/export-pdf/route.ts` (`drawQatliaHeader` ~l.189, `payloadNeedsArabicFont` l.171, boucle des pages l.700-705, nom de fichier l.716-731)
 - Modify: `src/lib/exports/pdf-catalog.ts` (clé `madeWith` en fr/en/ar)
-- Modify: `tests/export-pdf-route.test.js` (stub `@/lib/atelier-server` en tête de fichier, `atelierForCurrentRequest` → `null` par défaut)
+- Aucun stub à ajouter aux tests existants qui chargent la route (`export-pdf-route`, `pdf-artifact`, `pdf-cost-integrity`, `pdf-prose-freshness`, `cost-detail`, `costing`, `i18n-coverage`) : sans `SUPABASE_SERVICE_ROLE_KEY`, `atelierForCurrentRequest` renvoie `null` avant tout `cookies()` (Task 2). Ils doivent tous rester verts **sans modification**.
 - Test: `tests/export-pdf-atelier.test.js`
 
 **Interfaces:**
@@ -164,14 +167,15 @@ test('fileNameFromContentDisposition round-trips contentDispositionFor', () => {
   - entreprise avec un `logoDataUrl` PNG valide → 200 et le PDF contient un objet `/Subtype /Image` ; avec un `logoDataUrl` aux octets invalides → 200, pas d'image.
   - entreprise au nom de 120 caractères → 200 (pas d'exception) ; la largeur mesurée par `doc.getTextWidth` n'est pas testable de l'extérieur : vérifier seulement que le nom du projet est toujours présent.
   - `atelierForCurrentRequest` qui rejette → 200, en-tête QatliA.
-- [ ] **Step 2: Run** `node --test tests/export-pdf-atelier.test.js tests/export-pdf-route.test.js` — Expected: le nouveau FAIL, l'ancien PASS une fois le stub ajouté.
+- [ ] **Step 2: Run** `node --test tests/export-pdf-atelier.test.js` — Expected: FAIL. (Ce nouveau fichier stub `@/lib/atelier-server`.)
 - [ ] **Step 3: Implement**
   - `const atelier = await atelierForCurrentRequest().catch(() => null);` avant la création du doc ; ajouter `atelier?.name ?? ''`, `atelier?.phone ?? ''` aux arguments de `payloadNeedsArabicFont`.
   - Logo : `validateLogoDataUrl` une fois ; invalide → pas de logo.
   - Avec entreprise : à gauche dans le cadre existant (14,10 → 15 mm de haut), logo tenu dans 12×12 mm à x=16, puis nom en gras 9 pt et téléphone 7,5 pt ; le nom est raccourci (ellipsis) pour tenir dans la largeur jusqu'au bloc central (`pW/2 - 40`). Le numéro de page quitte l'en-tête et va dans le pied de page centré à y = hauteur de page − 6 mm, 7 pt gris : `${cat.pageIndicator(i, total)} · ${cat.madeWith}`.
+  - Pages schéma paysage (~l.567-600) : le dessin descend jusqu'à `drawY + (pH - 46)`, cotes comprises. Avec entreprise, réduire `maxDrawH` de 6 mm pour que le dessin et ses cotes s'arrêtent au-dessus du pied de page ; sans entreprise, rien ne change.
   - Sans entreprise : `drawQatliaHeader` inchangé, aucun pied de page.
   - Nom de fichier via `contentDispositionFor(cutPlanFileNames(projectName, atelier?.name))`.
-- [ ] **Step 4: Run** les deux fichiers + `node --test tests/pdf-catalog.test.js tests/pdf-fonts.test.js` — Expected: PASS.
+- [ ] **Step 4: Run** `node --test tests/export-pdf-atelier.test.js tests/export-pdf-route.test.js tests/pdf-artifact.test.js tests/pdf-cost-integrity.test.js tests/pdf-prose-freshness.test.js tests/cost-detail.test.js tests/costing.test.js tests/i18n-coverage.test.js tests/pdf-catalog.test.js tests/pdf-fonts.test.js` — Expected: PASS, sans avoir modifié les fichiers existants.
 - [ ] **Step 5: Commit** `feat(entreprise): le plan de débit porte l'entreprise de l'artisan`.
 
 ---
@@ -181,7 +185,7 @@ test('fileNameFromContentDisposition round-trips contentDispositionFor', () => {
 **Files:**
 - Modify: `src/lib/exports/quotation-catalog.ts` (`footerNote` devient `(companyName: string) => string` ; ajout `madeWith`)
 - Modify: `src/app/api/export-quotation/route.ts` (l.746 bas de page ; l.272-280 nom de fichier)
-- Modify: `tests/quotation-catalog.test.js`, `tests/export-quotation-route.test.js` (attentes de nom de fichier)
+- Modify: `tests/quotation-catalog.test.js`, `tests/export-quotation-route.test.js` (nouvelles attentes). Aujourd'hui aucun test n'affirme `Devis établi par QatliA` ni `QatliA_Devis_` (vérifié par grep) ; `footerNote` n'est utilisé que dans `route.ts:746` — `npx tsc --noEmit` confirme qu'il n'y a pas d'autre appel.
 
 **Interfaces:**
 - Consumes: `quotationFileNames`, `contentDispositionFor` (Task 1).
@@ -244,8 +248,9 @@ test('fileNameFromContentDisposition round-trips contentDispositionFor', () => {
 - Consumes: `resolveQuotationCompany`, `companyOf` (Task 1), `GET`/`PUT /api/atelier` (Task 3).
 
 - [ ] **Step 1: Implement**
-  - À l'ouverture : `Promise.all([fetch('/api/atelier'), projectId ? fetch(`/api/projects/${projectId}`) : null])`, puis `resolveQuotationCompany({ account, project: quotation?.company ?? null, local: readStoredCompanyIdentity(...) })` → `setCompany`, et `setLogoDataUrl` si le logo vient du compte. Le reste du préremplissage projet (client, notes, remise…) est inchangé. Toute erreur réseau → comportement actuel.
-  - Après export réussi : si le compte n'avait pas d'entreprise (`fromAccount === false`), `PUT /api/atelier` avec `{ ...company, logoDataUrl }` (sans attendre, erreurs ignorées).
+  - À l'ouverture : **remplacer** l'effet de préremplissage projet actuel (l.167-196) par un seul effet qui fait `Promise.all([fetch('/api/atelier'), projectId ? fetch(`/api/projects/${projectId}`) : null])`, avec la même garde `cancelled`. Puis `resolveQuotationCompany({ account, project: quotation?.company ?? null, local: readStoredCompanyIdentity(...) })` → `setCompany`, et `setLogoDataUrl` si le logo vient du compte. La ligne `if (quotation.company) setCompany(quotation.company)` **disparaît** : plus aucun autre chemin ne fixe la société depuis le projet. Le reste du préremplissage projet (client, notes, remise…) est repris tel quel. Toute erreur réseau → comportement actuel.
+  - Garder un état `accountBusinessKnownEmpty` : `true` **seulement** si `GET /api/atelier` a répondu 200 avec `atelier: null`. Une erreur, un 401 ou un réseau coupé → `false`.
+  - Après export réussi : si `accountBusinessKnownEmpty`, `PUT /api/atelier?createOnly=1` avec `{ ...company, logoDataUrl }` (sans attendre, erreurs ignorées). Le serveur n'écrase jamais une entreprise existante (Task 2), même si l'état client se trompe.
   - Lien `quotation.editBusiness` → `/account#entreprise`, à côté du titre de la partie société.
 - [ ] **Step 2: Run** `npx tsc --noEmit` et `node --test tests/quotation-*.test.js tests/i18n-*.test.js` — Expected: PASS.
 - [ ] **Step 3: Commit** `feat(entreprise): le devis se pré-remplit avec l'entreprise du compte`.
@@ -255,4 +260,4 @@ test('fileNameFromContentDisposition round-trips contentDispositionFor', () => {
 ### Vérification finale
 
 - [ ] `npm run test:node`, `npx tsc --noEmit`, `npm run lint` dans le worktree ; comparer la liste des échecs à celle de `main` (10 échecs CRLF attendus).
-- [ ] Signaler dans la PR : migration `020_ateliers.sql` à appliquer en production **avant** de tester l'interface ; interface connectée non vérifiable en local (pas de `.env.local` dans le worktree).
+- [ ] Signaler dans la PR : le nom du PDF téléchargé depuis l'atelier passe de `qatlia_rapport_<horodatage>.pdf` à `QatliA_<PROJET>.pdf` même sans entreprise (changement visible) ; migration `020_ateliers.sql` à appliquer en production **avant** de tester l'interface ; interface connectée non vérifiable en local (pas de `.env.local` dans le worktree).
