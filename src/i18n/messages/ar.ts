@@ -939,6 +939,7 @@ export const ar: Catalog = {
     authRequired: 'سجّل الدخول لإنشاء عرض سعر للزبون.',
     companySection: 'مؤسستك',
     editBusiness: 'تعديل مؤسستي',
+    companyCardHint: 'هذا ما سيُطبع في أعلى عرض السعر.',
     clientSection: 'الزبون',
     fields: {
       companyName: 'اسم المؤسسة',

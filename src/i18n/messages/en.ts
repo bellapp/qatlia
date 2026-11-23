@@ -940,6 +940,7 @@ export const en: Catalog = {
     authRequired: 'Sign in to generate a client quote.',
     companySection: 'Your company',
     editBusiness: 'Edit my business',
+    companyCardHint: 'This is what will be printed at the top of the quote.',
     clientSection: 'Client',
     fields: {
       companyName: 'Company name',
