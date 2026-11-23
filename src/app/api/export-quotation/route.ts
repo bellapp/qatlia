@@ -25,6 +25,8 @@ import {
   arabicSafeCellHooks,
   stripBidiControls,
   AMIRI_FONT_FAMILY,
+  measureContentAwareText,
+  latinTailSegments,
   NOT_REGISTERED,
   type FontRegistration,
 } from '@/lib/exports/pdf-fonts';
@@ -421,16 +423,7 @@ async function renderQuotationPdf(input: QuotationInputData, totals: QuotationTo
     drawContentAwareText(doc, fontRegistration, text, x, y, options);
   };
   /** Width of `text` as drawText would draw it, in the font and size currently set. */
-  const drawnTextWidth = (text: string) => {
-    const clean = stripBidiControls(text);
-    if (!containsArabicScript(clean) || !fontRegistration.ok) return doc.getTextWidth(clean);
-    // Arabic is drawn in Amiri, shaped: measure it the same way, then restore.
-    const prior = doc.getFont();
-    doc.setFont(AMIRI_FONT_FAMILY, prior.fontStyle);
-    const width = doc.getTextWidth(doc.processArabic(clean));
-    doc.setFont(prior.fontName, prior.fontStyle);
-    return width;
-  };
+  const drawnTextWidth = (text: string) => measureContentAwareText(doc, fontRegistration, text);
 
   // Reading-start/end anchors: for `fr`, start (where a block's own title
   // sits) is the left margin; for `ar`, start is the right margin — the
@@ -719,11 +712,6 @@ async function renderQuotationPdf(input: QuotationInputData, totals: QuotationTo
 const MADE_WITH_LINE_OFFSET_MM = 3.5;
 /** Least clear space between the footer note and the page indicator. */
 const FOOTER_NOTE_GAP_MM = 4;
-
-function latinTailSegments(text: string): string[] {
-  const latinStart = text.search(/[A-Za-z]/);
-  return latinStart > 0 && containsArabicScript(text) ? [text.slice(0, latinStart).trimEnd(), text.slice(latinStart)] : [text];
-}
 
 /**
  * Draws `segments` (in reading order, one space between them) as one line

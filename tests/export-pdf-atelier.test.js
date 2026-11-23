@@ -250,3 +250,45 @@ test('with a business, the footer follows the real size of each page, including 
     assert.ok(Math.abs(x - (box.w / 2 - lineWidth / 2)) < 1, `page ${page}: footer x=${x}pt is not centred on a ${box.w}pt wide page`);
   }
 });
+
+test('with a business, the header of a portrait overflow page is laid out on that page, not on a 297 mm landscape one', async (t) => {
+  const { jsPDF } = require('jspdf');
+  const placedPieces = Array.from({ length: 70 }, (_, i) => ({
+    pieceNumber: i + 1,
+    name: `P${i + 1}`,
+    sheetIndex: 0,
+    width: 10 + i,
+    height: 20,
+    rotated: false,
+    x: 0,
+    y: 0,
+  }));
+  // Long enough to be shortened: the room it is given depends on the page width.
+  const businessName = 'Menuiserie Benali et Fils '.repeat(6).trim();
+  const POST = routeWith(t, { name: businessName });
+  const res = await POST(makeRequest(baseBody({ result: { ...SMALL_PIECE_RESULT, placedPieces } })));
+  assert.equal(res.status, 200);
+  const raw = await pdfTextOf(res);
+
+  const mediaBoxes = [...raw.matchAll(/\/MediaBox \[0 0 ([\d.]+) ([\d.]+)\]/g)].map((m) => ({ w: Number(m[1]), h: Number(m[2]) }));
+  assert.ok(mediaBoxes[1].h > mediaBoxes[1].w, 'page 2 is a portrait overflow page');
+
+  // The business name is drawn once per page, in page order.
+  const drawn = [...raw.matchAll(/([\d.]+) ([\d.]+) Td\s*\((Menuiserie[^)]*)\) Tj/g)];
+  assert.equal(drawn.length, mediaBoxes.length, 'one business name per page');
+  const measure = new jsPDF({ unit: 'pt' });
+  measure.setFont('helvetica', 'bold');
+  measure.setFontSize(9);
+
+  for (const [pageIndex, match] of drawn.entries()) {
+    const x = Number(match[1]);
+    // The shortened name ends with an ellipsis that the PDF stores as a single byte.
+    const shown = `${match[3].replace(/[^\x20-\x7e]+$/, '')}…`;
+    const right = x + measure.getTextWidth(shown);
+    // It stops short of the project title, which is centred on THIS page.
+    assert.ok(
+      right <= mediaBoxes[pageIndex].w / 2,
+      `page ${pageIndex + 1}: the business name ends at ${right.toFixed(1)}pt, past the centre of a ${mediaBoxes[pageIndex].w}pt wide page`,
+    );
+  }
+});

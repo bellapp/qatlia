@@ -12,11 +12,10 @@ import {
   payloadNeedsArabicFont,
   drawContentAwareText,
   arabicSafeCellHooks,
-  stripBidiControls,
-  AMIRI_FONT_FAMILY,
+  measureContentAwareText,
+  latinTailSegments,
   NOT_REGISTERED,
 } from '@/lib/exports/pdf-fonts';
-import { containsArabicScript } from '@/lib/exports/pdf-bidi';
 import { validateLogoDataUrl } from '@/lib/exports/quotation-logo';
 import { atelierForCurrentRequest } from '@/lib/atelier-server';
 import { contentDispositionFor, cutPlanFileNames } from '@/lib/document-filename';
@@ -203,16 +202,7 @@ export async function POST(req: Request) {
     const today = formatDateTime(locale, new Date(), { day: '2-digit', month: '2-digit', year: 'numeric' });
 
     /** Width of `text` as drawText would draw it, in the font and size currently set. */
-    const drawnTextWidth = (text: string) => {
-      const clean = stripBidiControls(text);
-      if (!containsArabicScript(clean) || !fontRegistration.ok) return doc.getTextWidth(clean);
-      // Arabic is drawn in Amiri, shaped: measure it the same way, then restore.
-      const prior = doc.getFont();
-      doc.setFont(AMIRI_FONT_FAMILY, prior.fontStyle);
-      const width = doc.getTextWidth(doc.processArabic(clean));
-      doc.setFont(prior.fontName, prior.fontStyle);
-      return width;
-    };
+    const drawnTextWidth = (text: string) => measureContentAwareText(doc, fontRegistration, text);
 
     /** `text` shortened with a trailing ellipsis until it fits `maxWidth` (font and size already set). */
     const fitText = (text: string, maxWidth: number) => {
@@ -281,11 +271,7 @@ export async function POST(req: Request) {
       // line stays centred on the page.
       // An Arabic signature carries a Latin tail (`QatliA · qatlia.ma`): it is its
       // own segment too, since an Arabic and a Latin run never lay out correctly together.
-      const latinStart = cat.madeWith.search(/[A-Za-z]/);
-      const signature =
-        latinStart > 0
-          ? [cat.madeWith.slice(0, latinStart).trimEnd(), ' ', cat.madeWith.slice(latinStart)]
-          : [cat.madeWith];
+      const signature = latinTailSegments(cat.madeWith).flatMap((segment, index) => (index === 0 ? [segment] : [' ', segment]));
       const segments = [cat.pageIndicator(pageNum, totalPgs), ' · ', ...signature];
       const visual = locale === 'ar' ? [...segments].reverse() : segments;
       const widths = visual.map((segment) => drawnTextWidth(segment));
@@ -297,7 +283,9 @@ export async function POST(req: Request) {
     };
 
     const drawQatliaHeader = (pageNum: number, totalPgs: number, orientation: 'portrait' | 'landscape') => {
-      const pW = orientation === 'landscape' ? 297 : 210;
+      // A business PDF uses the page's real size: an overflow page can be portrait
+      // after the first one, so the page number says nothing about the orientation.
+      const pW = business ? doc.internal.pageSize.getWidth() : orientation === 'landscape' ? 297 : 210;
       doc.setDrawColor(0, 0, 0);
       doc.setLineWidth(0.3);
       doc.rect(14, 10, pW - 28, 15);

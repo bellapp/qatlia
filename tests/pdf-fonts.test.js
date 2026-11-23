@@ -508,3 +508,22 @@ test('a jsPDF document with the registered Amiri font and drawContentAwareText p
   assert.match(raw, /%PDF-1\./, 'must be a real PDF');
   assert.match(raw, /Amiri/, 'the embedded font\'s PostScript name must appear in the PDF');
 });
+
+test('latinTailSegments splits an Arabic line before its Latin tail and leaves any other text whole', () => {
+  const { latinTailSegments } = loadTsModule('src/lib/exports/pdf-fonts.ts');
+  assert.deepEqual(latinTailSegments('أُنجز بواسطة QatliA · qatlia.ma'), ['أُنجز بواسطة', 'QatliA · qatlia.ma']);
+  assert.deepEqual(latinTailSegments('Réalisé avec QatliA · qatlia.ma'), ['Réalisé avec QatliA · qatlia.ma']);
+  assert.deepEqual(latinTailSegments('نجارة'), ['نجارة']);
+});
+
+test('measureContentAwareText measures plain text as jsPDF does and leaves the font as it found it', () => {
+  const { measureContentAwareText, NOT_REGISTERED } = loadTsModule('src/lib/exports/pdf-fonts.ts');
+  const doc = new jsPDF();
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(9);
+  assert.equal(measureContentAwareText(doc, NOT_REGISTERED, 'Menuiserie'), doc.getTextWidth('Menuiserie'));
+  // Without the embedded font, Arabic is measured in the current font, as it is drawn.
+  assert.equal(measureContentAwareText(doc, NOT_REGISTERED, 'نجارة'), doc.getTextWidth('نجارة'));
+  assert.equal(doc.getFont().fontName, 'helvetica');
+  assert.equal(doc.getFont().fontStyle, 'bold');
+});
