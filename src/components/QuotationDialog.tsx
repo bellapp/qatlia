@@ -22,6 +22,7 @@ import {
   type QuotationPieceLine,
 } from '@/lib/quotation';
 import { readStoredCompanyIdentity, writeStoredCompanyIdentity } from '@/lib/quotation-local-store';
+import { fileNameFromContentDisposition } from '@/lib/document-filename';
 
 const MAX_LOGO_BYTES = 500 * 1024;
 const ACCEPTED_LOGO_TYPES = ['image/png', 'image/jpeg'];
@@ -342,7 +343,7 @@ export const QuotationDialog: React.FC<QuotationDialogProps> = ({
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `qatlia_devis_${sanitizeQuoteNumberForFilename(quoteNumber)}.pdf`;
+      a.download = fileNameFromContentDisposition(res.headers.get('Content-Disposition')) ?? `qatlia_devis_${sanitizeQuoteNumberForFilename(quoteNumber)}.pdf`;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
