@@ -13,6 +13,7 @@ export interface DocumentFileNames {
 
 const DEFAULT_PREFIX = 'QatliA';
 const ASCII_PREFIX_MAX_LENGTH = 40;
+const UTF8_PREFIX_MAX_CODE_POINTS = 40;
 
 /** Both prefixes for a company name, each falling back to `QatliA` when nothing usable survives. */
 function prefixesFor(companyName: string | null | undefined): DocumentFileNames {
@@ -36,10 +37,15 @@ function asciiCompanyPrefix(companyName: string): string {
 
 /** Company name as a UTF-8 file name prefix: spaces become `_`, header/path-breaking characters go. */
 function utf8CompanyPrefix(companyName: string): string {
-  return companyName
-    .trim()
-    .replace(/\s+/g, '_')
-    .replace(/["\\;\r\n/]/g, '');
+  // Capped like the ASCII prefix, by code point so an astral character is never cut in two.
+  return Array.from(
+    companyName
+      .trim()
+      .replace(/\s+/g, '_')
+      .replace(/["\\;\r\n/]/g, ''),
+  )
+    .slice(0, UTF8_PREFIX_MAX_CODE_POINTS)
+    .join('');
 }
 
 /**

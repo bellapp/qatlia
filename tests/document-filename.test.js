@@ -46,6 +46,16 @@ test('company name is capped at 40 ascii characters', () => {
   assert.equal(ascii, `${'A'.repeat(40)}_X.pdf`);
 });
 
+test('the utf8 company part is capped at 40 code points too', () => {
+  const arabic = 'نجارة'.repeat(40); // 200 characters
+  const capped = Array.from(arabic).slice(0, 40).join('');
+  assert.equal(cutPlanFileNames('X', arabic).utf8, `${capped}_X.pdf`);
+  assert.equal(quotationFileNames('DEV-1', arabic).utf8, `${capped}_Devis_DEV-1.pdf`);
+  // Code points, not UTF-16 units: an astral character is never split.
+  const hammers = cutPlanFileNames('X', '\u{1F528}'.repeat(60)).utf8;
+  assert.equal(Array.from(hammers.replace(/_X\.pdf$/, '')).length, 40);
+});
+
 test('an Arabic-only company falls back to QatliA in ascii but keeps the Arabic in utf8', () => {
   const names = cutPlanFileNames('Cuisine', 'نجارة بنعلي');
   assert.equal(names.ascii, 'QatliA_CUISINE.pdf');
