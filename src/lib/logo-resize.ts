@@ -6,6 +6,8 @@
 export const LOGO_MAX_SIDE_PX = 600;
 
 const JPEG_QUALITY = 0.85;
+// The server refuses a logo above 500 KB once decoded; stay safely under it.
+export const LOGO_MAX_BYTES = 450 * 1024;
 // Same bound as LogoDataUrlSchema: a result the server would refuse is refused here.
 const MAX_DATA_URL_LENGTH = Math.ceil(((500 * 1024) / 3) * 4) + 100;
 
@@ -18,6 +20,15 @@ export function fitWithin(width: number, height: number, maxSide: number): { wid
     width: Math.max(1, Math.round(width * scale)),
     height: Math.max(1, Math.round(height * scale)),
   };
+}
+
+/** Pure: the decoded size, in bytes, of a base64 data URL (0 when it is not one). */
+export function dataUrlByteLength(dataUrl: string): number {
+  const comma = dataUrl.indexOf(',');
+  if (!dataUrl.startsWith('data:') || comma === -1) return 0;
+  const payload = dataUrl.slice(comma + 1);
+  const padding = payload.endsWith('==') ? 2 : payload.endsWith('=') ? 1 : 0;
+  return Math.max(0, Math.floor((payload.length * 3) / 4) - padding);
 }
 
 function hasTransparentPixel(context: CanvasRenderingContext2D, width: number, height: number): boolean {
@@ -46,8 +57,9 @@ function decode(file: File): Promise<HTMLImageElement> {
 
 /**
  * Browser only. Returns a PNG data URL when the picture has transparency
- * (a logo cut out on a clear background), a JPEG one otherwise. Rejects when
- * the file is not a readable image or the result is still too large to save.
+ * (a logo cut out on a clear background) unless that is too heavy, then a JPEG
+ * on a white background. Rejects when the file is not a readable image or the
+ * result is still too large to save.
  */
 export async function resizeLogoFile(file: File): Promise<string> {
   const image = await decode(file);
@@ -61,9 +73,19 @@ export async function resizeLogoFile(file: File): Promise<string> {
   if (!context) throw new Error('LOGO_UNREADABLE');
   context.drawImage(image, 0, 0, width, height);
 
-  const dataUrl = hasTransparentPixel(context, width, height)
-    ? canvas.toDataURL('image/png')
-    : canvas.toDataURL('image/jpeg', JPEG_QUALITY);
+  let dataUrl: string;
+  if (hasTransparentPixel(context, width, height)) {
+    dataUrl = canvas.toDataURL('image/png');
+    if (dataUrlByteLength(dataUrl) > LOGO_MAX_BYTES) {
+      // Too heavy as a PNG: flatten onto white (printed pages are white) and keep it as a JPEG.
+      context.globalCompositeOperation = 'destination-over';
+      context.fillStyle = '#ffffff';
+      context.fillRect(0, 0, width, height);
+      dataUrl = canvas.toDataURL('image/jpeg', JPEG_QUALITY);
+    }
+  } else {
+    dataUrl = canvas.toDataURL('image/jpeg', JPEG_QUALITY);
+  }
   if (!/^data:image\/(png|jpeg);base64,/.test(dataUrl) || dataUrl.length > MAX_DATA_URL_LENGTH) {
     throw new Error('LOGO_TOO_LARGE');
   }
