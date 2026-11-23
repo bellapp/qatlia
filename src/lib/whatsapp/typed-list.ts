@@ -38,6 +38,8 @@ export async function handleTypedList(input: {
   now: Date;
   deliver: (text: string, kind: PhotoMessageKind) => Promise<boolean>;
   deliverImage?: (link: string, caption: string, kind: PhotoMessageKind, card: PlanCard) => Promise<boolean>;
+  /** Less than TYPED_READ_TIMEOUT_MS when the route has less time left (a voice note already heard). */
+  readTimeoutMs?: number;
 }): Promise<TypedListOutcome> {
   const { db, config, waId, text, lang, now, deliver, deliverImage } = input;
   if (config.photoDailyCap <= 0) return 'fallback';
@@ -55,7 +57,7 @@ export async function handleTypedList(input: {
   // must not use up the number's read, nor count as a failed one.
   let read;
   try {
-    read = await readTypedCutList(text, { timeoutMs: TYPED_READ_TIMEOUT_MS });
+    read = await readTypedCutList(text, { timeoutMs: Math.min(input.readTimeoutMs ?? TYPED_READ_TIMEOUT_MS, TYPED_READ_TIMEOUT_MS) });
   } catch (error) {
     console.error('[whatsapp] typed list read threw', describe(error));
     return 'fallback';

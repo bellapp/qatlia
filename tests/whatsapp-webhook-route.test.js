@@ -70,6 +70,7 @@ function resetState() {
     history: null,
     typedCalls: [],
     typedOutcome: 'fallback',
+    order: [],
   });
 }
 resetState();
@@ -151,7 +152,11 @@ stubModule('@/lib/whatsapp/store', {
   },
 });
 stubModule('@/lib/whatsapp/voice', {
-  assistantBudgetMs: (elapsed) => state.budget(elapsed),
+  assistantBudgetMs: (elapsed) => {
+    const budget = state.budget(elapsed, state.order.length);
+    state.order.push(`budget:${budget}`);
+    return budget;
+  },
   hearVoice: async (input) => {
     state.voiceCalls.push(input);
     return state.voiceResult(input);
@@ -192,6 +197,7 @@ stubModule('@/lib/whatsapp/photo', {
 });
 stubModule('@/lib/whatsapp/typed-list', {
   handleTypedList: async (input) => {
+    state.order.push('typed');
     state.typedCalls.push(input);
     return state.typedOutcome;
   },
@@ -1749,5 +1755,47 @@ test('a first contact typing measurements gets the greeting, then the typed-list
     assert.equal(state.sent.length, 1, 'the greeting');
     assert.equal(state.typedCalls.length, 1);
     assert.equal(state.typedCalls[0].text, '220 / 67');
+  });
+});
+
+// Hearing, then up to 20 s of typed reading: the assistant's time is what is
+// left after both, or the route's 60 s run out and nothing goes out.
+test('a voice note with sizes: the typed read gets the time left, then the assistant what remains after it', async () => {
+  resetState();
+  greetedFr();
+  state.voiceResult = () => ({ status: 'heard', text: 'جوج بيبان 195 على 45' });
+  state.typedOutcome = 'fallback';
+  state.assistantResult = () => ({ reply: 'ok', handoff: false });
+  // Enough before the typed read, too little after it.
+  state.budget = (elapsed, calls) => (calls === 0 ? 12000 : null);
+  await withEnv(CONFIGURED, async () => {
+    await POST(signedPost(messagesPayload([voiceMessage('wamid.t8', WA_ID)])));
+    assert.deepEqual(state.order, ['budget:12000', 'typed', 'budget:null']);
+    assert.equal(state.typedCalls[0].readTimeoutMs, 12000);
+    assert.equal(state.assistantCalls.length, 0);
+    assert.deepEqual(state.sent.map((m) => m.body), [COPY.fallback.ar], 'darija heard: darija fallback');
+  });
+});
+
+test('a voice note with sizes and no time left skips the typed read', async () => {
+  resetState();
+  greetedFr();
+  state.voiceResult = () => ({ status: 'heard', text: 'جوج بيبان 195 على 45' });
+  state.budget = () => null;
+  await withEnv(CONFIGURED, async () => {
+    await POST(signedPost(messagesPayload([voiceMessage('wamid.t9', WA_ID)])));
+    assert.equal(state.typedCalls.length, 0);
+    assert.deepEqual(state.sent.map((m) => m.body), [COPY.fallback.ar], 'darija heard: darija fallback');
+  });
+});
+
+test('a typed text message gives the typed read its own 20 s', async () => {
+  resetState();
+  greetedFr();
+  state.typedOutcome = 'handled';
+  await withEnv(CONFIGURED, async () => {
+    await POST(signedPost(messagesPayload([textMessage('wamid.t10', WA_ID, '90x45x2')])));
+    assert.equal(state.typedCalls[0].readTimeoutMs, undefined);
+    assert.equal(state.order.filter((o) => o.startsWith('budget')).length, 0);
   });
 });

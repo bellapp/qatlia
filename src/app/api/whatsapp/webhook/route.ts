@@ -433,8 +433,8 @@ async function handleVoiceMessage(
     // Hearing took its time already: no extra wait, only the check for a newer message.
     settleMs: 0,
     overtakenInBatch,
-    // Whatever hearing took comes off the assistant's time (60 s route budget).
-    timeoutMs: assistantBudgetMs(Date.now() - now.getTime()),
+    // Whatever hearing took comes off the typed read's and the assistant's time (60 s route budget).
+    budgeted: true,
   });
 }
 
@@ -467,8 +467,13 @@ async function answerWithAssistant(
     settleMs: number;
     /** A later message of the same delivery takes the answer over. */
     overtakenInBatch: boolean;
-    /** Omitted: the assistant's own deadline. `null`: no time left, the fallback goes out. */
-    timeoutMs?: number | null;
+    /**
+     * A voice note: the typed read and the assistant only get what is left of
+     * the route's time (assistantBudgetMs), measured right before each; with
+     * too little left, the typed read is skipped and the fallback goes out.
+     * Omitted: their own deadlines.
+     */
+    budgeted?: boolean;
   },
 ): Promise<void> {
   const { waId, lang, now } = input;
@@ -480,8 +485,12 @@ async function answerWithAssistant(
 
   // Measurements typed (or said) instead of a photo: read like a sheet, the
   // plan card goes out. Nothing read: the assistant answers as before.
+  const timeLeft = (): number | null | undefined =>
+    input.budgeted ? assistantBudgetMs(Date.now() - now.getTime()) : undefined;
+
   const typed = typedMeasurements(history, input.message);
-  if (looksLikeMeasurements(typed)) {
+  const readTimeoutMs = looksLikeMeasurements(typed) ? timeLeft() : null;
+  if (readTimeoutMs !== null) {
     const outcome = await handleTypedList({
       db,
       config,
@@ -491,6 +500,7 @@ async function answerWithAssistant(
       now,
       deliver: (text, kind) => deliver(db, config, waId, text, kind),
       deliverImage: (link, caption, kind, card) => deliverPicture(db, config, waId, link, caption, kind, now, card),
+      ...(readTimeoutMs !== undefined ? { readTimeoutMs } : {}),
     });
     if (outcome !== 'fallback') return;
   }
@@ -498,8 +508,9 @@ async function answerWithAssistant(
   const redirect = config.handoffMode === 'redirect';
   const linkSent = redirect && (await advisorLinkSentLately(db, waId, now));
   const photoRead = await photoReadFor(db, waId, now);
+  const timeoutMs = timeLeft();
   const answer =
-    config.openrouterKey && input.timeoutMs !== null
+    config.openrouterKey && timeoutMs !== null
       ? await askAssistant({
           history,
           message: input.message,
@@ -508,7 +519,7 @@ async function answerWithAssistant(
           handoffMode: config.handoffMode,
           photoRead,
           advisorLinkSent: linkSent,
-          ...(input.timeoutMs !== undefined ? { timeoutMs: input.timeoutMs } : {}),
+          ...(timeoutMs !== undefined ? { timeoutMs } : {}),
         })
       : null;
 
