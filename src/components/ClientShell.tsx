@@ -5,6 +5,7 @@ import { ThemeProvider } from '@/components/ThemeProvider';
 import { PwaShell } from '@/components/PwaShell';
 import { StoreAppGuard } from '@/components/StoreAppGuard';
 import { LocaleProvider } from '@/components/LocaleProvider';
+import { WhatsAppFloating } from '@/components/WhatsAppContact';
 import { recordBrowserVisit, withoutTracking } from '@/lib/acquisition';
 import type { Locale } from '@/i18n';
 
@@ -34,6 +35,8 @@ export function ClientShell({ children, pinnedLocale }: { children: React.ReactN
       <ThemeProvider>
         <PwaShell>
           <StoreAppGuard>{children}</StoreAppGuard>
+          {/* The WhatsApp button, on the pages where it covers nothing (src/lib/whatsapp/site-contact.ts). */}
+          <WhatsAppFloating />
         </PwaShell>
       </ThemeProvider>
     </LocaleProvider>

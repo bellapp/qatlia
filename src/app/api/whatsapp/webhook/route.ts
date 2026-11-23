@@ -25,6 +25,7 @@ import {
   typedBeyondPrefill,
   type Decision,
 } from '@/lib/whatsapp/router';
+import { withSiteReferral } from '@/lib/whatsapp/site-contact';
 import { assistantBudgetMs, hearVoice } from '@/lib/whatsapp/voice';
 import { HISTORY_MESSAGES, askAssistant, type HistoryItem, type PhotoReadNote } from '@/lib/whatsapp/assistant';
 import { handleTypedList } from '@/lib/whatsapp/typed-list';
@@ -286,9 +287,11 @@ async function handlePhotoMessage(
 async function handleInbound(
   db: SupabaseClient,
   config: WhatsAppConfig,
-  event: InboundEvent,
+  inboundEvent: InboundEvent,
   overtakenInBatch = false,
 ): Promise<void> {
+  // Written through the site's WhatsApp button: stored and answered like a contact from the ad.
+  const event = withSiteReferral(inboundEvent);
   const now = new Date();
   const { waId } = event;
 
