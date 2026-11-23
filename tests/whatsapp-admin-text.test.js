@@ -17,3 +17,11 @@ test('the back office sends a text to a number or a business-scoped id, signed i
   assert.match(source, /sendText\(config, to, body\)/);
   assert.match(source, /recordOutbound\(db, \{ waId: to, wamid, direction: 'human', kind: 'admin_text', body \}\)/);
 });
+
+// 22/11/2026: after a catch-up text from the owner, « Chhal fi chhar » got the
+// full greeting instead of an answer. The owner's text counts as the greeting.
+test('a text from the back office counts as the greeting, once', () => {
+  const source = fs.readFileSync(path.join(ROOT, 'src/app/api/admin/whatsapp/text/route.ts'), 'utf8');
+  assert.match(source, /await claimGreeting\(db, to, new Date\(\)\)/);
+  assert.ok(source.indexOf('claimGreeting(db, to') > source.indexOf('recordOutbound(db'), 'only once the text is sent');
+});

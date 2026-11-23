@@ -259,6 +259,31 @@ export async function countBotMessages(db: SupabaseClient, waId: string, kind: s
   return count ?? 0;
 }
 
+/**
+ * What this contact sent after the message `wamid` (its kind and text), oldest
+ * first; empty when `wamid` is not stored. Rows are ordered by id, which grows
+ * with every insert, so "after" holds even within the same second.
+ */
+export async function inboundAfter(
+  db: SupabaseClient,
+  waId: string,
+  wamid: string,
+): Promise<Array<{ kind: string; body: string | null }>> {
+  const own = await db.from(MESSAGES).select('id').eq('wamid', wamid).eq('direction', 'user').maybeSingle();
+  if (own.error) raise(own.error, 'find inbound message');
+  const ownId = (own.data as { id: number } | null)?.id;
+  if (ownId === undefined) return [];
+  const { data, error } = await db
+    .from(MESSAGES)
+    .select('kind, body')
+    .eq('wa_id', waId)
+    .eq('direction', 'user')
+    .gt('id', ownId)
+    .order('id', { ascending: true });
+  if (error) raise(error, 'read newer inbound messages');
+  return (data ?? []) as Array<{ kind: string; body: string | null }>;
+}
+
 /** Number of messages of the given kind this contact sent since `since` (the one being handled included). */
 export async function countInboundMessages(db: SupabaseClient, waId: string, kind: string, since: Date): Promise<number> {
   const { count, error } = await db

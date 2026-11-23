@@ -67,6 +67,32 @@ test('new contact gets the greeting and is marked greeted', () => {
   });
 });
 
+// 22/11/2026: « Chhal fi chhar » and « ماريوا 200 الطول العرض 100 » as first
+// messages got the greeting and nothing about what they asked.
+test('a first contact asking something gets the greeting, then the assistant answers it', () => {
+  const d = run({ event: { text: 'Chhal fi chhar' }, contact: { greetedAt: null, lang: 'ar' } });
+  const expected = greeting({ lang: 'ar', bilingual: false, voice: false });
+  assert.deepEqual(d, {
+    action: 'send',
+    text: expected.text,
+    markGreeted: true,
+    handoff: false,
+    greeting: true,
+    menu: { buttons: MENU_BUTTONS, fallbackText: expected.plain },
+    thenAssistant: true,
+  });
+  assert.equal(run({ event: { text: 'ماريوا 200 الطول العرض 100' }, contact: { greetedAt: null, lang: 'ar' } }).thenAssistant, true);
+});
+
+test('a first contact only saying hello gets the greeting and the example, nothing more', () => {
+  for (const text of ['Slm', 'سلام عليكم', 'Salam', 'مرحبا', 'Bonjour', 'Bonsoir !', 'cv', 'السلام عليكم ورحمة الله', 'Bonjour ! Puis-je en savoir plus à ce sujet ?']) {
+    const d = run({ event: { text }, contact: { greetedAt: null } });
+    assert.equal(d.greeting, true, text);
+    assert.equal(d.thenAssistant, undefined, text);
+    assert.ok(d.exampleCaption, text);
+  }
+});
+
 test('new contact choosing 1 gets howItWorks, not the greeting', () => {
   const d = run({ event: { text: '1' }, contact: { greetedAt: null } });
   assert.deepEqual(d, { action: 'send', text: COPY.howItWorks.fr, markGreeted: true, handoff: false });
@@ -135,10 +161,31 @@ test('choice 3: handoff in coexistence, redirect link and no handoff in redirect
     handoff: true,
   });
   const d = run({ event: { text: '3' }, handoffMode: 'redirect' });
-  assert.equal(d.text, `${COPY.advisor.fr}\n\n${COPY.redirect.fr}`);
-  assert.ok(d.text.includes(WA_LINK));
+  assert.equal(d.text, COPY.advisorRedirect.fr);
+  assert.equal(d.text.split(WA_LINK).length, 2, 'the link once');
   assert.equal(d.handoff, false);
   assert.equal(d.markGreeted, true);
+  // The route logs it as the advisor link, so the assistant does not hand it out again.
+  assert.equal(d.advisorLink, true);
+  assert.equal(run({ event: { text: '3' } }).advisorLink, undefined);
+});
+
+// « بسم الله », 23/11/2026: « مستشار غادي يتواصل معاك دابا » seven times at
+// 8 am, nobody came, the prospect got angry. The advisor answers on another
+// number: the text gives it and promises no delay.
+test('redirect mode: the advisor text gives the number and promises no delay', () => {
+  for (const lang of ['fr', 'ar']) {
+    const text = COPY.advisorRedirect[lang];
+    assert.ok(text.includes(WA_LINK), lang);
+    assert.doesNotMatch(text, /دابا|قريب|très vite|tout de suite|maintenant/, lang);
+  }
+  assert.ok(!/[A-Za-z]/.test(COPY.advisorRedirect.ar.replace(WA_LINK, '')), 'the darija text has no Latin letters');
+  // The texts that name the advisor without his link (sent alone once the link went out) promise no delay either.
+  for (const key of ['fallback', 'voiceUnclear']) {
+    for (const lang of ['fr', 'ar']) {
+      assert.doesNotMatch(COPY[key][lang], /دابا|قريب|très vite|tout de suite/, `${key}.${lang}`);
+    }
+  }
 });
 
 test('choices 1 and 2 never hand off and do not get the redirect', () => {
@@ -256,8 +303,15 @@ test('daily assistant cap sends the advisor text and hands off', () => {
   });
   assert.equal(run({ assistantRepliesLast24h: 19 }).action, 'assistant');
   const d = run({ assistantRepliesLast24h: 20, handoffMode: 'redirect', contact: { lang: 'ar' } });
-  assert.equal(d.text, `${COPY.advisor.ar}\n\n${COPY.redirect.ar}`);
+  assert.equal(d.text, COPY.advisorRedirect.ar);
   assert.equal(d.handoff, false);
+  assert.equal(d.advisorLink, true);
+});
+
+test('redirect mode: media the bot cannot read gets the link, logged as the advisor link', () => {
+  const d = run({ event: { kind: 'video', text: null }, handoffMode: 'redirect' });
+  assert.equal(d.text, `${COPY.mediaHandoff.fr}\n\n${COPY.redirect.fr}`);
+  assert.equal(d.advisorLink, true);
 });
 
 test('free text goes to the assistant', () => {
@@ -266,7 +320,14 @@ test('free text goes to the assistant', () => {
 
 test('detectLang', () => {
   assert.equal(detectLang('سلام', 'fr'), 'ar');
-  assert.equal(detectLang('salam bghit n3ref', 'ar'), 'fr');
+  // Darija in Latin letters is darija (22/11/2026: « Slm » and « Chhal fi chhar » got the French greeting).
+  assert.equal(detectLang('salam bghit n3ref', 'fr'), 'ar');
+  for (const text of ['Slm', 'Chhal fi chhar', 'ch7al taman', '3afak', 'Wach hada proghram', 'Ana bghit 244*122', 'Salam khoya']) {
+    assert.equal(detectLang(text, 'fr'), 'ar', text);
+  }
+  for (const text of ['je veux les tarifs', 'Bonjour', 'Merci beaucoup', 'Ok merci', 'combien ça coûte', 'la fin du mois']) {
+    assert.equal(detectLang(text, 'ar'), 'fr', text);
+  }
   assert.equal(detectLang('1', 'ar'), 'ar');
   assert.equal(detectLang('1', 'fr'), 'fr');
   assert.equal(detectLang(null, 'ar'), 'ar');
@@ -323,7 +384,7 @@ test('tapping a menu button gets the same reply as typing its digit', () => {
   const [howItWorks, pricing, advisor] = MENU_BUTTONS;
   assert.equal(run({ event: { text: howItWorks.id } }).text, COPY.howItWorks.fr);
   assert.equal(run({ event: { text: pricing.id }, contact: { lang: 'ar' } }).text, COPY.pricing.ar);
-  assert.equal(run({ event: { text: advisor.id }, handoffMode: 'redirect' }).text, `${COPY.advisor.fr}\n\n${COPY.redirect.fr}`);
+  assert.equal(run({ event: { text: advisor.id }, handoffMode: 'redirect' }).text, COPY.advisorRedirect.fr);
 });
 
 test('the button greeting points at the buttons; its plain fallback keeps the typed 1/2/3 menu', () => {

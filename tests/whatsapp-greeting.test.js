@@ -85,19 +85,20 @@ test('the button greeting points at the buttons; the plain one keeps the typed 1
 });
 
 test('a first message in Arabic letters gets the darija-only greeting', () => {
-  for (const text of [AR_PREFILL, 'سلام', 'بشحال']) {
-    const d = firstContact(text, 'ar');
-    const expected = greeting({ lang: 'ar', bilingual: false, voice: true });
-    assert.deepEqual(d, {
-      action: 'send',
-      text: expected.text,
-      markGreeted: true,
-      handoff: false,
-      greeting: true,
-      menu: { buttons: MENU_BUTTONS, fallbackText: expected.plain },
-      exampleCaption: exampleCaption('ar', false),
-    });
+  const expected = greeting({ lang: 'ar', bilingual: false, voice: true });
+  const greetingDecision = {
+    action: 'send',
+    text: expected.text,
+    markGreeted: true,
+    handoff: false,
+    greeting: true,
+    menu: { buttons: MENU_BUTTONS, fallbackText: expected.plain },
+  };
+  for (const text of [AR_PREFILL, 'سلام']) {
+    assert.deepEqual(firstContact(text, 'ar'), { ...greetingDecision, exampleCaption: exampleCaption('ar', false) });
   }
+  // A question is answered right after the greeting, in place of the example (whatsapp-router.test.js).
+  assert.deepEqual(firstContact('بشحال', 'ar'), { ...greetingDecision, thenAssistant: true });
 });
 
 test('the French pre-filled text (a French phone, often a darija speaker) gets both languages, darija first', () => {

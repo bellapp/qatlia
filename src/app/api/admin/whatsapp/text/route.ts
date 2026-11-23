@@ -4,7 +4,7 @@ import { authorizeAdminRequest } from '@/lib/admin/auth';
 import { getAdminDb } from '@/lib/admin/db';
 import { getWhatsAppConfig } from '@/lib/whatsapp/config';
 import { isBusinessScopedId, sendText } from '@/lib/whatsapp/send';
-import { recordOutbound, upsertContact } from '@/lib/whatsapp/store';
+import { claimGreeting, recordOutbound, upsertContact } from '@/lib/whatsapp/store';
 
 export const dynamic = 'force-dynamic';
 
@@ -49,6 +49,8 @@ export async function POST(req: Request) {
     // whatsapp_messages.wa_id references the contact.
     await upsertContact(db, { waId: to, profileName: null, referral: null });
     await recordOutbound(db, { waId: to, wamid, direction: 'human', kind: 'admin_text', body });
+    // The owner's text greets: the next message gets an answer, not the greeting (22/11/2026).
+    await claimGreeting(db, to, new Date());
   } catch (error) {
     console.error('[admin] text sent but not logged', error instanceof Error ? error.message : 'unknown error');
   }

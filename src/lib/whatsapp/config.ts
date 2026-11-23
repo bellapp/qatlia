@@ -40,9 +40,24 @@ export interface WhatsAppConfig {
   voiceEnabled: boolean;
   /** Its own model: the text model of the bot may not take audio. */
   voiceModel: string;
+  /**
+   * How long a typed question waits before it is answered, so a message sent
+   * right after it takes the answer over (two answers to « هدا دابا ديبيتاج » +
+   * « ياك », 22/11/2026). `WHATSAPP_REPLY_SETTLE_MS`, 0 to 10 000 ms.
+   */
+  replySettleMs: number;
 }
 
 const DEFAULT_PHOTO_DAILY_CAP = 300;
+const DEFAULT_REPLY_SETTLE_MS = 4000;
+const MAX_REPLY_SETTLE_MS = 10_000;
+
+function readReplySettleMs(env: Env): number {
+  const raw = env.WHATSAPP_REPLY_SETTLE_MS;
+  if (typeof raw !== 'string' || !/^\d+$/.test(raw.trim())) return DEFAULT_REPLY_SETTLE_MS;
+  const ms = Number(raw.trim());
+  return ms <= MAX_REPLY_SETTLE_MS ? ms : DEFAULT_REPLY_SETTLE_MS;
+}
 
 function readPhotoDailyCap(env: Env): number {
   const raw = env.WHATSAPP_PHOTO_DAILY_CAP;
@@ -113,5 +128,6 @@ export function getWhatsAppConfig(env: Env = process.env): WhatsAppConfig | null
     photoDailyCap: readPhotoDailyCap(env),
     voiceEnabled: env.WHATSAPP_VOICE_ENABLED?.trim().toLowerCase() !== 'false',
     voiceModel: read(env, 'WHATSAPP_VOICE_MODEL') ?? DEFAULT_VOICE_MODEL,
+    replySettleMs: readReplySettleMs(env),
   };
 }

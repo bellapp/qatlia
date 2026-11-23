@@ -133,6 +133,8 @@ export const COPY: {
   howItWorks: Record<Lang, string>;
   pricing: Record<Lang, string>;
   advisor: Record<Lang, string>;
+  /** Redirect mode: the advisor answers on another number, given here once, with no delay promised. */
+  advisorRedirect: Record<Lang, string>;
   redirect: Record<Lang, string>;
   imageHint: Record<Lang, string>;
   mediaHandoff: Record<Lang, string>;
@@ -193,6 +195,17 @@ ${PACK_LINES_AR}
     ar: `مرحبا! مستشار غادي يجاوبك قريب 🙏 قول لينا شنو كتصاوب (كوزينات، بلاكارات…)، بالكتابة ولا بأوديو.`,
   },
 
+  // « بسم الله », 23/11/2026: « مستشار غادي يتواصل معاك دابا » at 8 am, nobody
+  // came. The advisor is on another number: say so, and promise no delay.
+  advisorRedirect: {
+    fr: `Avec plaisir ! 🙏 Notre conseiller répond sur ce numéro :
+👉 ${SUPPORT_URL}
+Écrivez-lui là-bas, il vous répond dès qu'il est disponible.`,
+    ar: `مرحبا! 🙏 المستشار ديالنا كيجاوب فهاد الرقم:
+👉 ${SUPPORT_URL}
+كتب ليه تما، وغادي يجاوبك ملي يكون متوفر.`,
+  },
+
   redirect: {
     fr: `Écrivez directement à notre conseiller ici : ${SUPPORT_URL}`,
     ar: `كتب للمستشار ديالنا مباشرة هنا: ${SUPPORT_URL}`,
@@ -211,13 +224,13 @@ ${PACK_LINES_AR}
   },
 
   voiceUnclear: {
-    fr: `Je n'ai pas bien entendu votre vocal 🙏 Envoyez-moi la photo de votre fiche de débit, ou un conseiller vous répond très vite.`,
-    ar: `ما سمعتش مزيان الأوديو ديالك 🙏 صيفط ليا تصويرة ورقة القياسات، ولا مستشار غادي يجاوبك قريب.`,
+    fr: `Je n'ai pas bien entendu votre vocal 🙏 Envoyez-moi la photo de votre fiche de débit, ou écrivez votre question : un conseiller peut aussi vous répondre.`,
+    ar: `ما سمعتش مزيان الأوديو ديالك 🙏 صيفط ليا تصويرة ورقة القياسات، ولا كتب ليا سؤالك. والمستشار يقدر يجاوبك حتى هو.`,
   },
 
   fallback: {
-    fr: `Merci pour votre message ! Un conseiller vous répond très vite.`,
-    ar: `شكرا على رسالتك! مستشار غادي يجاوبك قريب.`,
+    fr: `Merci pour votre message ! Notre conseiller vous répond dès qu'il est disponible.`,
+    ar: `شكرا على رسالتك! المستشار ديالنا غادي يجاوبك ملي يكون متوفر.`,
   },
 };
 
