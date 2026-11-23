@@ -64,6 +64,9 @@ function resetState() {
     setBodyError: null,
     updateError: null,
     budget: () => 15000,
+    afterCalls: [],
+    newer: () => [],
+    redirectCount: 0,
   });
 }
 resetState();
@@ -117,7 +120,11 @@ stubModule('@/lib/whatsapp/store', {
   },
   countBotMessages: async (db, waId, kind, since) => {
     state.countCalls.push({ waId, kind, since });
-    return state.imageHintCount;
+    return kind === 'redirect' ? state.redirectCount : state.imageHintCount;
+  },
+  inboundAfter: async (db, waId, wamid) => {
+    state.afterCalls.push({ waId, wamid });
+    return state.newer(state.afterCalls.length, wamid);
   },
   updateContact: async (db, waId, patch) => {
     if (state.updateError) throw state.updateError;
@@ -211,6 +218,7 @@ const ENV_KEYS = [
   'WHATSAPP_VOICE_MODEL',
   'OPENROUTER_API_KEY',
   'OPENROUTER_MODEL',
+  'WHATSAPP_REPLY_SETTLE_MS',
   'NEXT_PUBLIC_SUPABASE_URL',
   'SUPABASE_SERVICE_ROLE_KEY',
 ];
@@ -218,6 +226,8 @@ const ENV_KEYS = [
 // Scope 'all' keeps the routing tests independent of the ad gate; the gate has its own tests.
 const CONFIGURED = {
   WHATSAPP_BOT_SCOPE: 'all',
+  // No wait for a following message in the tests; the default has its own test.
+  WHATSAPP_REPLY_SETTLE_MS: '0',
   WHATSAPP_APP_SECRET: APP_SECRET,
   WHATSAPP_VERIFY_TOKEN: VERIFY_TOKEN,
   WHATSAPP_ACCESS_TOKEN: 'wa_access_token_5h1',
@@ -587,7 +597,7 @@ test('in redirect mode an assistant handoff adds the redirect message and no han
     );
     assert.deepEqual(
       state.outbound.map((o) => o.kind),
-      ['assistant', 'fixed']
+      ['assistant', 'redirect']
     );
     assert.equal(handoffUpdates().length, 0);
   });
@@ -600,6 +610,7 @@ test('in redirect mode the fallback carries the redirect text and no handoffUnti
     await POST(signedPost(messagesPayload([textMessage('wamid.7', WA_ID, 'Une question ?')])));
     assert.equal(state.sent.length, 1);
     assert.equal(state.sent[0].body, `${COPY.fallback.fr}\n\n${COPY.redirect.fr}`);
+    assert.equal(state.outbound[0].kind, 'redirect');
     assert.equal(handoffUpdates().length, 0);
   });
 });
@@ -608,7 +619,7 @@ test('a failed send is recorded as send_failed and leaves the contact un-greeted
   resetState();
   state.sendResult = () => null;
   await withEnv(CONFIGURED, async () => {
-    const res = await POST(signedPost(messagesPayload([textMessage('wamid.8', WA_ID, 'salam')])));
+    const res = await POST(signedPost(messagesPayload([textMessage('wamid.8', WA_ID, 'bonjour')])));
     assert.equal(res.status, 200);
     // The button greeting, then its plain-text fallback: both fail.
     assert.deepEqual(
@@ -629,7 +640,7 @@ test('a failure to record a failed send does not stop the plain-text fallback', 
   state.sendResult = (n) => (n === 1 ? null : 'wamid.PLAIN');
   state.recordFailedError = new Error('db down');
   await withEnv(CONFIGURED, async () => {
-    const res = await POST(signedPost(messagesPayload([textMessage('wamid.8b', WA_ID, 'salam')])));
+    const res = await POST(signedPost(messagesPayload([textMessage('wamid.8b', WA_ID, 'bonjour')])));
     assert.equal(res.status, 200);
     assert.deepEqual(
       state.sent.map((m) => m.body),
@@ -1294,6 +1305,7 @@ test('a voice note the bot could not hear gets voiceUnclear and the advisor hand
   await withEnv({ ...CONFIGURED, WHATSAPP_HANDOFF_MODE: 'redirect' }, async () => {
     await POST(signedPost(messagesPayload([voiceMessage('wamid.V4', WA_ID)])));
     assert.deepEqual(state.sent.map((m) => m.body), [`${COPY.voiceUnclear.fr}\n\n${COPY.redirect.fr}`]);
+    assert.equal(state.outbound[0].kind, 'redirect');
     assert.equal(handoffUpdates().length, 0);
   });
 });
@@ -1437,3 +1449,200 @@ test('a greeted contact tapping a button gets no example', async () => {
   });
 });
 
+
+// Two messages close together got two near-identical answers (22/11/2026:
+// « هدا دابا ديبيتاج » + « ياك »). The earlier one leaves the answer to the
+// newer message, whose history holds both.
+test('a text followed by a newer question is not answered: the newer one answers both', async () => {
+  resetState();
+  greetedFr();
+  state.assistantResult = () => ({ reply: 'ok', handoff: false });
+  state.newer = () => [{ kind: 'text', body: 'et le prix ?' }];
+  await withEnv(CONFIGURED, async () => {
+    await POST(signedPost(messagesPayload([textMessage('wamid.b1', WA_ID, 'Vous livrez ?')])));
+    assert.equal(state.assistantCalls.length, 0);
+    assert.equal(state.sent.length, 0);
+    assert.deepEqual(state.afterCalls[0], { waId: WA_ID, wamid: 'wamid.b1' });
+  });
+});
+
+test('a newer photo, voice note or button tap also takes over the answer', async () => {
+  for (const row of [{ kind: 'image', body: null }, { kind: 'audio', body: null }, { kind: 'text', body: '2' }]) {
+    resetState();
+    greetedFr();
+    state.assistantResult = () => ({ reply: 'ok', handoff: false });
+    state.newer = () => [row];
+    await withEnv(CONFIGURED, async () => {
+      await POST(signedPost(messagesPayload([textMessage('wamid.b2', WA_ID, 'Vous livrez ?')])));
+      assert.equal(state.sent.length, 0, row.kind);
+    });
+  }
+});
+
+test('a newer reaction, sticker or ad text does not silence the answer: they get none of their own', async () => {
+  resetState();
+  greetedFr();
+  state.assistantResult = () => ({ reply: 'ok', handoff: false });
+  state.newer = () => [
+    { kind: 'reaction', body: null },
+    { kind: 'sticker', body: null },
+    { kind: 'text', body: 'Bonjour ! Puis-je en savoir plus à ce sujet ?' },
+    { kind: 'text', body: null },
+  ];
+  await withEnv(CONFIGURED, async () => {
+    await POST(signedPost(messagesPayload([textMessage('wamid.b3', WA_ID, 'Vous livrez ?')])));
+    assert.deepEqual(state.sent.map((m) => m.body), ['ok']);
+  });
+});
+
+test('a question arriving while the assistant writes drops the first answer', async () => {
+  resetState();
+  greetedFr();
+  state.assistantResult = () => ({ reply: 'ok', handoff: false });
+  state.newer = (call) => (call === 1 ? [] : [{ kind: 'text', body: 'et le prix ?' }]);
+  await withEnv(CONFIGURED, async () => {
+    await POST(signedPost(messagesPayload([textMessage('wamid.b4', WA_ID, 'Vous livrez ?')])));
+    assert.equal(state.assistantCalls.length, 1);
+    assert.equal(state.afterCalls.length, 2);
+    assert.equal(state.sent.length, 0);
+  });
+});
+
+test('two texts in one delivery: only the last is answered', async () => {
+  resetState();
+  greetedFr();
+  state.assistantResult = (input) => ({ reply: `re: ${input.message}`, handoff: false });
+  await withEnv(CONFIGURED, async () => {
+    await POST(
+      signedPost(messagesPayload([textMessage('wamid.b5', WA_ID, 'هدا دابا ديبيتاج'), textMessage('wamid.b6', WA_ID, 'ياك')])),
+    );
+    assert.deepEqual(state.sent.map((m) => m.body), ['re: ياك']);
+    assert.equal(state.claims.length, 2, 'both are stored, so the answer sees both');
+  });
+});
+
+test('a failing check for newer messages never costs the answer', async () => {
+  resetState();
+  greetedFr();
+  state.assistantResult = () => ({ reply: 'ok', handoff: false });
+  state.newer = () => {
+    throw new Error('db down');
+  };
+  await quietly(async () => {
+    await withEnv(CONFIGURED, async () => {
+      await POST(signedPost(messagesPayload([textMessage('wamid.b7', WA_ID, 'Vous livrez ?')])));
+      assert.deepEqual(state.sent.map((m) => m.body), ['ok']);
+    });
+  });
+});
+
+test('a heard voice note followed by a newer message is not answered either', async () => {
+  resetState();
+  greetedFr();
+  state.assistantResult = () => ({ reply: 'ok', handoff: false });
+  state.newer = () => [{ kind: 'audio', body: null }];
+  await withEnv(CONFIGURED, async () => {
+    await POST(signedPost(messagesPayload([voiceMessage('wamid.b8', WA_ID)])));
+    assert.equal(state.inboundBodies.length, 1, 'the transcript is stored for the next answer');
+    assert.equal(state.sent.length, 0);
+  });
+});
+
+test('the wait for a following message defaults to 4 s and reads WHATSAPP_REPLY_SETTLE_MS', () => {
+  const { getWhatsAppConfig } = loadTsModule('src/lib/whatsapp/config.ts');
+  const env = {
+    WHATSAPP_APP_SECRET: APP_SECRET,
+    WHATSAPP_VERIFY_TOKEN: VERIFY_TOKEN,
+    WHATSAPP_ACCESS_TOKEN: 'tok',
+    WHATSAPP_PHONE_NUMBER_ID: PHONE_NUMBER_ID,
+  };
+  assert.equal(getWhatsAppConfig(env).replySettleMs, 4000);
+  assert.equal(getWhatsAppConfig({ ...env, WHATSAPP_REPLY_SETTLE_MS: '0' }).replySettleMs, 0);
+  assert.equal(getWhatsAppConfig({ ...env, WHATSAPP_REPLY_SETTLE_MS: '2500' }).replySettleMs, 2500);
+  assert.equal(getWhatsAppConfig({ ...env, WHATSAPP_REPLY_SETTLE_MS: 'abc' }).replySettleMs, 4000);
+  assert.equal(getWhatsAppConfig({ ...env, WHATSAPP_REPLY_SETTLE_MS: '60000' }).replySettleMs, 4000, 'never more than 10 s');
+});
+
+// « بسم الله », 23/11/2026: the advisor's link seven times in 13 minutes.
+test('redirect mode: once the advisor link went out, the assistant is told and the link is not sent again', async () => {
+  resetState();
+  greetedFr();
+  state.redirectCount = 1;
+  state.assistantResult = () => ({ reply: 'Je ne sais pas.', handoff: true });
+  await withEnv({ ...CONFIGURED, WHATSAPP_HANDOFF_MODE: 'redirect' }, async () => {
+    const before = Date.now();
+    await POST(signedPost(messagesPayload([textMessage('wamid.l1', WA_ID, 'Les signes à droite ?')])));
+    assert.equal(state.assistantCalls[0].advisorLinkSent, true);
+    assert.deepEqual(state.sent.map((m) => m.body), ['Je ne sais pas.']);
+    const count = state.countCalls.find((c) => c.kind === 'redirect');
+    assert.ok(Math.abs(before - 24 * 60 * 60 * 1000 - count.since.getTime()) < 5000, 'over the last 24 h');
+  });
+
+  resetState();
+  greetedFr();
+  state.assistantResult = () => ({ reply: 'Je passe la main.', handoff: true });
+  await withEnv({ ...CONFIGURED, WHATSAPP_HANDOFF_MODE: 'redirect' }, async () => {
+    await POST(signedPost(messagesPayload([textMessage('wamid.l2', WA_ID, 'Je veux un devis')])));
+    assert.equal(state.assistantCalls[0].advisorLinkSent, false);
+    assert.deepEqual(state.sent.map((m) => m.body), ['Je passe la main.', COPY.redirect.fr]);
+  });
+});
+
+test('coexistence mode never counts advisor links: the advisor is in this chat', async () => {
+  resetState();
+  greetedFr();
+  state.assistantResult = () => ({ reply: 'ok', handoff: false });
+  await withEnv(CONFIGURED, async () => {
+    await POST(signedPost(messagesPayload([textMessage('wamid.l3', WA_ID, 'Vous livrez ?')])));
+    assert.equal(state.assistantCalls[0].advisorLinkSent, false);
+    assert.equal(state.countCalls.filter((c) => c.kind === 'redirect').length, 0);
+  });
+});
+
+test('redirect mode: the fallback after the link went out does not repeat it', async () => {
+  resetState();
+  greetedFr();
+  state.redirectCount = 1;
+  await withEnv({ ...CONFIGURED, WHATSAPP_HANDOFF_MODE: 'redirect' }, async () => {
+    await POST(signedPost(messagesPayload([textMessage('wamid.l4', WA_ID, 'Une question ?')])));
+    assert.deepEqual(state.sent.map((m) => m.body), [COPY.fallback.fr]);
+    assert.equal(state.outbound[0].kind, 'fixed');
+  });
+});
+
+test('redirect mode: the advisor button always gives the number, logged as the advisor link', async () => {
+  resetState();
+  greetedFr();
+  state.redirectCount = 1;
+  await withEnv({ ...CONFIGURED, WHATSAPP_HANDOFF_MODE: 'redirect' }, async () => {
+    await POST(signedPost(messagesPayload([buttonTap('wamid.l5', WA_ID, '3')])));
+    assert.deepEqual(state.sent.map((m) => m.body), [COPY.advisorRedirect.fr]);
+    assert.equal(state.outbound[0].kind, 'redirect');
+  });
+});
+
+// 22/11/2026: « Chhal fi chhar » as a first message got the greeting, and no price.
+test('a first contact asking something gets the greeting, then the answer, and no example', async () => {
+  resetState();
+  state.assistantResult = (input) => ({ reply: `re: ${input.message}`, handoff: false });
+  await withEnv(CONFIGURED, async () => {
+    await POST(signedPost(messagesPayload([textMessage('wamid.q1', WA_ID, 'Chhal fi chhar')])));
+    assert.equal(state.sent.length, 2);
+    assert.equal(state.sent[0].body, greeting({ lang: 'ar', bilingual: false, voice: true }).text);
+    assert.ok(state.sent[0].buttons, 'the greeting keeps its buttons');
+    assert.equal(state.sent[1].body, 're: Chhal fi chhar');
+    assert.equal(state.images.length, 0);
+    assert.equal(state.contacts.get(WA_ID).lang, 'ar');
+    assert.deepEqual(state.historyCalls[0], { waId: WA_ID, limit: 10, excludeWamid: 'wamid.q1' });
+  });
+});
+
+test('a first contact only saying hello gets the greeting and the example, no assistant', async () => {
+  resetState();
+  state.assistantResult = () => ({ reply: 'ok', handoff: false });
+  await withEnv(CONFIGURED, async () => {
+    await POST(signedPost(messagesPayload([textMessage('wamid.q2', WA_ID, 'Slm')])));
+    assert.equal(state.assistantCalls.length, 0);
+    assert.equal(state.images.length, 1);
+  });
+});

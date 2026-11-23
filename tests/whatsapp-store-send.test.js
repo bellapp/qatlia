@@ -49,6 +49,7 @@ function fakeDb(respond) {
         is(column, value) { query.filters.push(['is', column, value]); return builder; },
         neq(column, value) { query.filters.push(['neq', column, value]); return builder; },
         gte(column, value) { query.filters.push(['gte', column, value]); return builder; },
+        gt(column, value) { query.filters.push(['gt', column, value]); return builder; },
         order(column, options) { query.orders.push([column, options]); return builder; },
         limit(n) { query.limit = n; return builder; },
         maybeSingle() { query.single = 'maybe'; return builder; },
@@ -352,6 +353,28 @@ test('countInboundMessages counts the contact own rows of a kind since the given
   assert.deepEqual(q.options, { count: 'exact', head: true });
   assert.equal(await countInboundMessages(fakeDb(() => ok(null, { count: null })), '1', 'audio', since), 0);
   await assert.rejects(() => countInboundMessages(fakeDb(() => fail('XX000')), '1', 'audio', since));
+});
+
+// Two near-identical answers to two close messages (22/11/2026): the route
+// asks what came after the message it is about to answer.
+test('inboundAfter lists what the contact sent after a message, oldest first, by id', async () => {
+  const { inboundAfter } = load('src/lib/whatsapp/store.ts');
+  const rows = [{ kind: 'text', body: 'ياك' }, { kind: 'reaction', body: null }];
+  const db = fakeDb((q) => (q.single === 'maybe' ? ok({ id: 41 }) : ok(rows)));
+  assert.deepEqual(await inboundAfter(db, '212600000000', 'wamid.A'), rows);
+  const [own, after] = db.queries;
+  assert.deepEqual(own.filters, [['eq', 'wamid', 'wamid.A'], ['eq', 'direction', 'user']]);
+  assert.deepEqual(after.filters, [['eq', 'wa_id', '212600000000'], ['eq', 'direction', 'user'], ['gt', 'id', 41]]);
+  assert.deepEqual(after.orders, [['id', { ascending: true }]]);
+});
+
+test('inboundAfter is empty for a message not stored, and rethrows database errors', async () => {
+  const { inboundAfter } = load('src/lib/whatsapp/store.ts');
+  const missing = fakeDb(() => ok(null));
+  assert.deepEqual(await inboundAfter(missing, '1', 'wamid.X'), []);
+  assert.equal(missing.queries.length, 1);
+  await assert.rejects(() => inboundAfter(fakeDb(() => fail('XX000')), '1', 'wamid.X'));
+  await assert.rejects(() => inboundAfter(fakeDb((q) => (q.single === 'maybe' ? ok({ id: 1 }) : fail('XX000'))), '1', 'wamid.X'));
 });
 
 test('setInboundBody writes the transcript on the inbound row only', async () => {

@@ -87,10 +87,60 @@ test('coexistence mode never mentions the human WhatsApp link: the prospect is a
   assert.ok(prompt.includes('"handoff" à true'));
 });
 
-test('both modes tell the model to say a conseiller takes over when handoff is true', () => {
+// « بسم الله », 23/11/2026: « مستشار غادي يتواصل معاك دابا » seven times in
+// 13 minutes, at 8 am, and nobody came.
+test('a handoff is announced once, with no delay promised', () => {
+  assert.ok(buildSystemPrompt('coexistence').includes('conseiller prend le relais'));
+  assert.ok(buildSystemPrompt('redirect').includes('avec le lien qui suit'));
   for (const mode of ['coexistence', 'redirect']) {
-    assert.ok(buildSystemPrompt(mode).includes('conseiller prend le relais'), mode);
+    const prompt = buildSystemPrompt(mode);
+    assert.ok(prompt.includes('Ne promets jamais de délai'), mode);
+    assert.ok(prompt.includes('« دابا »'), mode);
+    assert.ok(prompt.includes("Si l'historique montre que tu as déjà renvoyé vers le conseiller"), mode);
   }
+});
+
+// The same prospect: « دخلت معرفتش منين نطليشارجيه » went to the advisor,
+// the bot knew nothing of the page its own link opens.
+test('the assistant knows the plan page and how to get the PDF', () => {
+  const prompt = buildSystemPrompt('redirect');
+  assert.ok(prompt.includes('« تصدير تقرير PDF »'));
+  assert.ok(prompt.includes('« Exporter le rapport PDF »'));
+  assert.ok(prompt.includes('compte gratuit'));
+  assert.ok(prompt.includes('hachurées'));
+});
+
+// « شرح ليا العلامات لي على اليمين »: the edge-banding column of the example sheet.
+test('the assistant knows the edge-banding marks of the example sheet', () => {
+  const prompt = buildSystemPrompt('redirect');
+  assert.ok(prompt.includes('السينتة'));
+  assert.ok(prompt.includes('□ = 4 côtés'));
+  assert.ok(prompt.includes('le plan envoyé ici ne les montre pas'));
+});
+
+// 21/11/2026: « اكتبهم فورقة وصوّرها » six times to a carpenter typing his measurements.
+test('typed measurements go to the atelier, never back onto paper', () => {
+  const { ATELIER_LINK } = load('src/lib/whatsapp/copy.ts');
+  const prompt = buildSystemPrompt('coexistence');
+  assert.ok(prompt.includes('ne lui demande jamais de les recopier sur une feuille'));
+  assert.ok(prompt.includes(ATELIER_LINK));
+});
+
+test('darija in Latin letters says kridi, never Arabic letters in the middle', () => {
+  assert.ok(buildSystemPrompt('coexistence').includes('« kridi »'));
+});
+
+test('the assistant is told when the advisor link was already given', async () => {
+  const f = fakeFetch(() => llmResponse('{"reply":"ok","handoff":false}'));
+  await ask(f, { handoffMode: 'redirect', advisorLinkSent: true });
+  const system = f.calls[0].body.messages[0].content;
+  assert.ok(system.startsWith(buildSystemPrompt('redirect')));
+  assert.match(system, /déjà reçu le lien du conseiller/);
+  assert.match(system, /handoff à false/);
+
+  const none = fakeFetch(() => llmResponse('{"reply":"ok","handoff":false}'));
+  await ask(none, { handoffMode: 'redirect', advisorLinkSent: false });
+  assert.equal(none.calls[0].body.messages[0].content, buildSystemPrompt('redirect'));
 });
 
 test('askAssistant builds the prompt for the mode it is given', async () => {

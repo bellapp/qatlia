@@ -16,7 +16,7 @@ import { getWhatsAppConfig, type WhatsAppConfig } from '@/lib/whatsapp/config';
 import { verifySignature } from '@/lib/whatsapp/signature';
 import { parseWebhook, type EchoEvent, type InboundEvent } from '@/lib/whatsapp/payload';
 import { COPY, EXAMPLE_FICHE_URL, type Lang, type MenuButton } from '@/lib/whatsapp/copy';
-import { HANDOFF_HOURS, decide, detectLang, resolveLang, type Decision } from '@/lib/whatsapp/router';
+import { HANDOFF_HOURS, decide, detectLang, resolveLang, typedBeyondPrefill, type Decision } from '@/lib/whatsapp/router';
 import { assistantBudgetMs, hearVoice } from '@/lib/whatsapp/voice';
 import { HISTORY_MESSAGES, askAssistant, type PhotoReadNote } from '@/lib/whatsapp/assistant';
 import { latestPhotoRead } from '@/lib/whatsapp/photo-store';
@@ -33,6 +33,7 @@ import {
   countAssistantReplies,
   countBotMessages,
   countInboundMessages,
+  inboundAfter,
   recentHistory,
   recordOutbound,
   releaseGreeting,
@@ -49,7 +50,53 @@ const DAY_MS = 24 * HOUR_MS;
 /** One fixed "send us a photo in the app" hint per contact in this window, however many photos they send. */
 const IMAGE_HINT_COOLDOWN_MINUTES = 10;
 
+/**
+ * A message carrying the advisor's number (redirect mode). The assistant gives
+ * it at most once per ADVISOR_LINK_WINDOW_HOURS: it gave it seven times in 13
+ * minutes to « بسم الله » (23/11/2026). An explicit ask (button 3) always gets it.
+ */
+const ADVISOR_LINK_KIND = 'redirect';
+const ADVISOR_LINK_WINDOW_HOURS = 24;
+
 const ok = () => new Response('ok', { status: 200 });
+
+const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
+
+/**
+ * Whether a message the contact sent gets an answer of its own: a typed text
+ * (not the ad's pre-filled one), a photo, a voice note. Reactions, stickers
+ * and the pre-filled text get none, so they never take an answer over.
+ */
+function answersItself(row: { kind: string; body: string | null }): boolean {
+  if (row.kind === 'image' || row.kind === 'audio') return true;
+  if (row.kind !== 'text' || !row.body) return false;
+  return typedBeyondPrefill(row.body) !== '';
+}
+
+/**
+ * A newer message from the contact will be answered, with this one in its
+ * history: this one stays unanswered (two near-identical answers to
+ * « هدا دابا ديبيتاج » + « ياك », 22/11/2026). A failing check answers anyway.
+ */
+async function overtaken(db: SupabaseClient, waId: string, wamid: string): Promise<boolean> {
+  try {
+    return (await inboundAfter(db, waId, wamid)).some(answersItself);
+  } catch (error) {
+    console.error('[whatsapp] newer message check failed', describeError(error));
+    return false;
+  }
+}
+
+/** Redirect mode: whether the advisor's number already went to this contact lately. Unknown counts as no. */
+async function advisorLinkSentLately(db: SupabaseClient, waId: string, now: Date): Promise<boolean> {
+  try {
+    const since = new Date(now.getTime() - ADVISOR_LINK_WINDOW_HOURS * HOUR_MS);
+    return (await countBotMessages(db, waId, ADVISOR_LINK_KIND, since)) > 0;
+  } catch (error) {
+    console.error('[whatsapp] advisor link lookup failed', describeError(error));
+    return false;
+  }
+}
 
 function describeError(error: unknown): string {
   return error instanceof Error ? `${error.name}: ${error.message}` : 'unknown error';
@@ -69,7 +116,7 @@ async function deliver(
   config: WhatsAppConfig,
   waId: string,
   body: string,
-  kind: 'fixed' | 'assistant' | 'image_hint' | PhotoMessageKind,
+  kind: 'fixed' | 'assistant' | 'image_hint' | typeof ADVISOR_LINK_KIND | PhotoMessageKind,
   buttons?: readonly MenuButton[],
 ): Promise<boolean> {
   const wamid = buttons ? await sendButtons(config, waId, body, buttons) : await sendText(config, waId, body);
@@ -209,7 +256,13 @@ async function handlePhotoMessage(
   if (contact.greetedAt === null) await updateContact(db, waId, { greetedAt: now });
 }
 
-async function handleInbound(db: SupabaseClient, config: WhatsAppConfig, event: InboundEvent): Promise<void> {
+/** `overtakenInBatch`: a later message of this delivery, from the same contact, gets its own answer. */
+async function handleInbound(
+  db: SupabaseClient,
+  config: WhatsAppConfig,
+  event: InboundEvent,
+  overtakenInBatch = false,
+): Promise<void> {
   const now = new Date();
   const { waId } = event;
 
@@ -260,8 +313,19 @@ async function handleInbound(db: SupabaseClient, config: WhatsAppConfig, event: 
     return;
   }
 
+  // What the assistant answers: a typed text, after a short wait for a message sent right after it.
+  const assistantInput = {
+    waId,
+    wamid: event.wamid,
+    message: event.text ?? '',
+    lang,
+    now,
+    settleMs: config.replySettleMs,
+    overtakenInBatch,
+  };
+
   if (decision.action === 'send') {
-    const kind = 'fixed';
+    const kind = decision.advisorLink ? ADVISOR_LINK_KIND : 'fixed';
     // A message with buttons that cannot be sent falls back to its plain-text version, so the contact still gets an answer.
     const sent = decision.menu
       ? (await deliver(db, config, waId, decision.text, kind, decision.menu.buttons)) ||
@@ -276,16 +340,18 @@ async function handleInbound(db: SupabaseClient, config: WhatsAppConfig, event: 
     if (decision.handoff) patch.handoffUntil = handoffDeadline(now);
     if (Object.keys(patch).length > 0) await updateContact(db, waId, patch);
     if (decision.exampleCaption) await deliverExample(db, config, waId, decision.exampleCaption);
+    // A first contact asking something: the greeting, then the answer.
+    if (decision.thenAssistant) await answerWithAssistant(db, config, assistantInput);
     return;
   }
 
   if (decision.action === 'voice') {
-    await handleVoiceMessage(db, config, event, contact.lang, now);
+    await handleVoiceMessage(db, config, event, contact.lang, now, overtakenInBatch);
     return;
   }
 
   // decision.action === 'assistant'
-  await answerWithAssistant(db, config, { waId, wamid: event.wamid, message: event.text ?? '', lang, now });
+  await answerWithAssistant(db, config, assistantInput);
 }
 
 /**
@@ -300,6 +366,7 @@ async function handleVoiceMessage(
   event: InboundEvent,
   storedLang: Lang,
   now: Date,
+  overtakenInBatch: boolean,
 ): Promise<void> {
   const { waId } = event;
   const heard = await hearVoice({
@@ -312,7 +379,7 @@ async function handleVoiceMessage(
   if (heard.status === 'unheard') {
     const redirect = config.handoffMode === 'redirect';
     const text = redirect ? `${COPY.voiceUnclear[storedLang]}\n\n${COPY.redirect[storedLang]}` : COPY.voiceUnclear[storedLang];
-    if (!(await deliver(db, config, waId, text, 'fixed'))) return;
+    if (!(await deliver(db, config, waId, text, redirect ? ADVISOR_LINK_KIND : 'fixed'))) return;
     if (!redirect) await updateContact(db, waId, { handoffUntil: handoffDeadline(now) });
     return;
   }
@@ -337,6 +404,9 @@ async function handleVoiceMessage(
     message: heard.text,
     lang,
     now,
+    // Hearing took its time already: no extra wait, only the check for a newer message.
+    settleMs: 0,
+    overtakenInBatch,
     // Whatever hearing took comes off the assistant's time (60 s route budget).
     timeoutMs: assistantBudgetMs(Date.now() - now.getTime()),
   });
@@ -367,12 +437,21 @@ async function answerWithAssistant(
     message: string;
     lang: Lang;
     now: Date;
+    /** Wait this long first, so a message sent right after this one takes the answer over. */
+    settleMs: number;
+    /** A later message of the same delivery takes the answer over. */
+    overtakenInBatch: boolean;
     /** Omitted: the assistant's own deadline. `null`: no time left, the fallback goes out. */
     timeoutMs?: number | null;
   },
 ): Promise<void> {
   const { waId, lang, now } = input;
+  if (input.overtakenInBatch) return;
+  if (input.settleMs > 0) await sleep(input.settleMs);
+  if (await overtaken(db, waId, input.wamid)) return;
+
   const redirect = config.handoffMode === 'redirect';
+  const linkSent = redirect && (await advisorLinkSentLately(db, waId, now));
   const history = await recentHistory(db, waId, HISTORY_MESSAGES, input.wamid);
   const photoRead = await photoReadFor(db, waId, now);
   const answer =
@@ -384,13 +463,18 @@ async function answerWithAssistant(
           apiKey: config.openrouterKey,
           handoffMode: config.handoffMode,
           photoRead,
+          advisorLinkSent: linkSent,
           ...(input.timeoutMs !== undefined ? { timeoutMs: input.timeoutMs } : {}),
         })
       : null;
 
+  // A message that came in while the assistant was writing answers both.
+  if (answer && (await overtaken(db, waId, input.wamid))) return;
+
   if (!answer) {
-    const text = redirect ? `${COPY.fallback[lang]}\n\n${COPY.redirect[lang]}` : COPY.fallback[lang];
-    if (!(await deliver(db, config, waId, text, 'fixed'))) return;
+    const withLink = redirect && !linkSent;
+    const text = withLink ? `${COPY.fallback[lang]}\n\n${COPY.redirect[lang]}` : COPY.fallback[lang];
+    if (!(await deliver(db, config, waId, text, withLink ? ADVISOR_LINK_KIND : 'fixed'))) return;
     if (!redirect) await updateContact(db, waId, { handoffUntil: handoffDeadline(now) });
     return;
   }
@@ -398,7 +482,7 @@ async function answerWithAssistant(
   if (!(await deliver(db, config, waId, answer.reply, 'assistant'))) return;
   if (!answer.handoff) return;
   if (redirect) {
-    await deliver(db, config, waId, COPY.redirect[lang], 'fixed');
+    if (!linkSent) await deliver(db, config, waId, COPY.redirect[lang], ADVISOR_LINK_KIND);
   } else {
     await updateContact(db, waId, { handoffUntil: handoffDeadline(now) });
   }
@@ -451,10 +535,24 @@ export async function POST(request: Request): Promise<Response> {
     auth: { persistSession: false, autoRefreshToken: false },
   });
 
-  for (const event of events) {
+  for (let index = 0; index < events.length; index++) {
+    const event = events[index];
     try {
-      if (event.type === 'echo') await handleEcho(db, config, event);
-      else await handleInbound(db, config, event);
+      if (event.type === 'echo') {
+        await handleEcho(db, config, event);
+        continue;
+      }
+      // Handled one after the other, a later message of this delivery is not
+      // stored yet when this one checks for newer messages: look ahead here.
+      const overtakenInBatch = events
+        .slice(index + 1)
+        .some(
+          (later) =>
+            later.type === 'inbound' &&
+            later.waId === event.waId &&
+            answersItself({ kind: later.kind, body: later.text }),
+        );
+      await handleInbound(db, config, event, overtakenInBatch);
     } catch (error) {
       if (error instanceof WhatsAppTablesMissingError) {
         console.error('[whatsapp] migration 016 non appliquée');

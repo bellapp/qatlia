@@ -63,7 +63,11 @@ const decideFor = (text, overrides = {}) =>
 test('only the greeting carries the example, captioned like the greeting', () => {
   assert.equal(decideFor('سلام').exampleCaption, exampleCaption('ar', false));
   assert.equal(decideFor('Bonjour ! Puis-je en savoir plus à ce sujet ?').exampleCaption, exampleCaption('ar', true));
-  assert.equal(decideFor('Bonjour, prix ?', { lang: 'fr' }).exampleCaption, exampleCaption('fr', true));
+  assert.equal(decideFor('Bonjour', { lang: 'fr' }).exampleCaption, exampleCaption('fr', true));
+  // A question gets its answer after the greeting instead (whatsapp-router.test.js).
+  const asks = decideFor('Bonjour, prix ?', { lang: 'fr' });
+  assert.equal(asks.exampleCaption, undefined);
+  assert.equal(asks.thenAssistant, true);
   // A menu choice, even as a first message, and the menu sent again carry none.
   assert.equal(decideFor('2').exampleCaption, undefined);
   const back = decideFor('Bonjour ! Puis-je en savoir plus à ce sujet ?', { greetedAt: new Date(NOW.getTime() - 3600000) });
