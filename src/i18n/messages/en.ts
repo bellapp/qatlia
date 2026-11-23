@@ -867,10 +867,7 @@ export const en: Catalog = {
   accountPage: {
     eyebrow: 'Account',
     title: 'Your workshop space',
-    topUp: 'Top up',
     creditsRemaining: 'credits left',
-    ledgerShowAll: 'Show all ({count})',
-    ledgerShowLess: 'Show less',
     ledgerAria: 'Credit movements',
     noMovements:
       'No movement yet. A complete analysis costs 1 credit; exports are free.',

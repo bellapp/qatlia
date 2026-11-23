@@ -867,10 +867,7 @@ export const ar: Catalog = {
   accountPage: {
     eyebrow: 'الحساب',
     title: 'مساحتك الخاصة بالورشة',
-    topUp: 'تعبئة',
     creditsRemaining: 'رصيد متبقٍ',
-    ledgerShowAll: 'عرض الكل ({count})',
-    ledgerShowLess: 'عرض أقل',
     ledgerAria: 'حركات الأرصدة',
     noMovements:
       'لا توجد حركات بعد. يكلف التحليل الكامل رصيداً واحداً؛ أما التصدير فمجاني.',

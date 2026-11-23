@@ -600,7 +600,7 @@ test('the credits page reads the shared catalog and never hardcodes a credit bal
 });
 
 test('no client code calls /api/credits/consume: exports are free', () => {
-  for (const file of ['src/app/(site)/atelier/page.tsx', 'src/app/(site)/credits/page.tsx', 'src/app/(site)/account/page.tsx']) {
+  for (const file of ['src/app/(site)/atelier/page.tsx', 'src/app/(site)/credits/page.tsx', 'src/app/(site)/account/page.tsx', 'src/app/(site)/account/credits/page.tsx']) {
     assert.ok(!/api\/credits\/consume/.test(read(file)), `${file} must not debit credits`);
   }
 });

@@ -28,6 +28,7 @@ const PAGES = {
   creditsSuccess: 'src/app/(site)/credits/success/page.tsx',
   history: 'src/app/(site)/history/page.tsx',
   account: 'src/app/(site)/account/page.tsx',
+  accountCredits: 'src/app/(site)/account/credits/page.tsx',
   login: 'src/app/(site)/auth/login/page.tsx',
 };
 
@@ -302,7 +303,7 @@ test('the sign-in page maps every auth failure to localized copy', () => {
 
 test('a persisted ledger description survives, while its fallback label is translated', () => {
   const { LOCALES, translate } = loadI18n();
-  const source = readPage('account');
+  const source = readPage('accountCredits');
   // The description written into the ledger is the customer's own record: it is
   // rendered verbatim, and only the fallback for a row without one is localized.
   assert.match(source, /tx\.description \|\| t\(/, 'the ledger description must be preferred over the fallback');
