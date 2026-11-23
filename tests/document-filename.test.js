@@ -84,3 +84,16 @@ test('fileNameFromContentDisposition falls back to the plain filename and tolera
   assert.equal(fileNameFromContentDisposition('attachment'), null);
   assert.equal(fileNameFromContentDisposition("attachment; filename*=UTF-8''%E0%A4%A"), null);
 });
+
+test('a free-typed project name cannot inject quotes, semicolons or backslashes into the ascii filename', () => {
+  const project = 'Cuisine "A";B\C';
+  for (const names of [cutPlanFileNames(project), cutPlanFileNames(project, 'Menuiserie Benali')]) {
+    assert.doesNotMatch(names.ascii, /["\;]/);
+    assert.match(names.ascii, /CUISINE_AB.*C\.pdf$/);
+  }
+  assert.equal(cutPlanFileNames(project).ascii, 'QatliA_CUISINE_ABC.pdf');
+  assert.equal(
+    contentDispositionFor(cutPlanFileNames(project)).split('; filename*=')[0],
+    'attachment; filename="QatliA_CUISINE_ABC.pdf"'
+  );
+});

@@ -51,6 +51,8 @@ export function cutPlanFileNames(projectName: string, companyName?: string | nul
     projectName
       .toUpperCase()
       .replace(/[^\x20-\x7E]/g, '')
+      // A free-typed name must not break out of `filename="…"` in the header.
+      .replace(/["\\;]/g, '')
       .trim()
       .replace(/\s+/g, '_') || 'EXPORT';
   const utf8ProjectName = projectName.toUpperCase().replace(/\s+/g, '_');
