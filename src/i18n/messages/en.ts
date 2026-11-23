@@ -899,6 +899,7 @@ export const en: Catalog = {
         invalidLogo: 'This image cannot be used as a logo. Choose another PNG or JPG image.',
         saveFailed: 'The details could not be saved. Please try again.',
         invalidData: 'Check the details you entered (for example the email), then try again.',
+        loadFailed: 'Your details could not be loaded. Please reload the page.',
       },
     },
     currencyTitle: 'Currency',

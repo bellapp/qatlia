@@ -72,9 +72,11 @@ export function BusinessIdentityForm() {
   const [form, setForm] = useState<FormValues>(EMPTY_FORM);
   // The logo as the server holds it, or as just chosen; null once removed.
   const [logo, setLogo] = useState<string | null>(null);
-  // Sent as logoDataUrl only when the artisan touched the logo; otherwise the
-  // saved one is kept untouched on the server.
-  const [logoChanged, setLogoChanged] = useState(false);
+  // True once « Retirer » was pressed on a logo: the save then sends null.
+  const [logoRemoved, setLogoRemoved] = useState(false);
+  // Saving stays off until the saved details are known: a save sends the whole
+  // form, so saving over an unloaded one would wipe what is stored.
+  const [loadState, setLoadState] = useState<'loading' | 'ready' | 'failed'>('loading');
   const [saving, setSaving] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
@@ -85,9 +87,13 @@ export function BusinessIdentityForm() {
     async function load() {
       try {
         const res = await fetch('/api/atelier');
-        if (!res.ok) return;
-        const data: { atelier?: Atelier | null } = await res.json();
+        const data: { atelier?: Atelier | null } = res.ok ? await res.json() : {};
         if (cancelled) return;
+        if (data.atelier === undefined) {
+          setLoadState('failed');
+          return;
+        }
+        setLoadState('ready');
         if (data.atelier) {
           setForm(formFrom(data.atelier));
           setLogo(data.atelier.logoDataUrl ?? null);
@@ -97,7 +103,7 @@ export function BusinessIdentityForm() {
         const remembered = readStoredCompanyIdentity(window.localStorage);
         if (remembered) setForm(formFrom(remembered));
       } catch {
-        /* the form simply starts empty */
+        if (!cancelled) setLoadState('failed');
       }
     }
     load();
@@ -130,7 +136,7 @@ export function BusinessIdentityForm() {
     clearMessages();
     try {
       setLogo(await resizeLogoFile(file));
-      setLogoChanged(true);
+      setLogoRemoved(false);
     } catch {
       // The current logo stays as it was.
       setErrorMessage(t('accountPage.business.errors.invalidLogo'));
@@ -140,17 +146,20 @@ export function BusinessIdentityForm() {
   const handleRemoveLogo = () => {
     clearMessages();
     setLogo(null);
-    setLogoChanged(true);
+    setLogoRemoved(true);
   };
 
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
-    if (saving || !form.name.trim()) return;
+    if (saving || loadState !== 'ready' || !form.name.trim()) return;
     clearMessages();
     setSaving(true);
     try {
       const body = bodyFrom(form);
-      if (logoChanged) body.logoDataUrl = logo;
+      // The current logo is always sent (an absent one means "keep" to the server
+      // but the response only echoes the request); null only after « Retirer ».
+      if (logo) body.logoDataUrl = logo;
+      else if (logoRemoved) body.logoDataUrl = null;
       const res = await fetch('/api/atelier', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
@@ -162,8 +171,7 @@ export function BusinessIdentityForm() {
         return;
       }
       setForm(formFrom(data.atelier));
-      setLogo(data.atelier.logoDataUrl ?? null);
-      setLogoChanged(false);
+      setLogoRemoved(false);
       setSaved(true);
     } catch {
       setErrorMessage(t('accountPage.business.errors.saveFailed'));
@@ -235,12 +243,15 @@ export function BusinessIdentityForm() {
 
       <button
         type="submit"
-        disabled={saving || !form.name.trim()}
+        disabled={saving || loadState !== 'ready' || !form.name.trim()}
         aria-busy={saving}
         className="w-full py-2.5 rounded-xl bg-brand-400 hover:bg-brand-500 text-slate-950 font-black text-xs disabled:opacity-50"
       >
         {saving ? t('accountPage.saving') : t('accountPage.business.save')}
       </button>
+      {loadState === 'failed' && (
+        <p role="alert" className="text-xs text-rose-300">{t('accountPage.business.errors.loadFailed')}</p>
+      )}
       {errorMessage && <p role="alert" className="text-xs text-rose-300">{errorMessage}</p>}
       {saved && <p role="status" className="text-xs text-emerald-400">{t('accountPage.business.saved')}</p>}
     </form>

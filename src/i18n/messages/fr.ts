@@ -988,6 +988,7 @@ export const fr = {
         invalidLogo: 'Cette image ne peut pas servir de logo. Choisissez une autre image PNG ou JPG.',
         saveFailed: 'L’enregistrement a échoué. Réessayez.',
         invalidData: 'Vérifiez les informations saisies (par exemple l’email), puis réessayez.',
+        loadFailed: 'Impossible de charger vos informations. Rechargez la page.',
       },
     },
     currencyTitle: 'Devise',
