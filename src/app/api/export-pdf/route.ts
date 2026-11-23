@@ -270,7 +270,25 @@ export async function POST(req: Request) {
       doc.setFont(BASE_FONT, 'normal');
       doc.setFontSize(7);
       doc.setTextColor(100, 116, 139);
-      drawText(`${cat.pageIndicator(pageNum, totalPgs)} · ${cat.madeWith}`, pW / 2, pH - 6, { align: 'center' });
+      // Two segments, each drawn on its own so that Arabic and Latin runs never
+      // get mixed into one bidi pass: `page · signature` reads left to right in
+      // fr/en, and right to left in ar (page indicator on the right). The whole
+      // line stays centred on the page.
+      // An Arabic signature carries a Latin tail (`QatliA · qatlia.ma`): it is its
+      // own segment too, since an Arabic and a Latin run never lay out correctly together.
+      const latinStart = cat.madeWith.search(/[A-Za-z]/);
+      const signature =
+        latinStart > 0
+          ? [cat.madeWith.slice(0, latinStart).trimEnd(), ' ', cat.madeWith.slice(latinStart)]
+          : [cat.madeWith];
+      const segments = [cat.pageIndicator(pageNum, totalPgs), ' · ', ...signature];
+      const visual = locale === 'ar' ? [...segments].reverse() : segments;
+      const widths = visual.map((segment) => drawnTextWidth(segment));
+      let x = pW / 2 - widths.reduce((sum, width) => sum + width, 0) / 2;
+      visual.forEach((segment, index) => {
+        drawText(segment, x, pH - 6);
+        x += widths[index];
+      });
     };
 
     const drawQatliaHeader = (pageNum: number, totalPgs: number, orientation: 'portrait' | 'landscape') => {
@@ -679,7 +697,9 @@ export async function POST(req: Request) {
       const maxDrawW = pW - 28;
       // With a business, the footer sits at the bottom of the page: the drawing
       // (and its dimension labels) must stop above it.
-      const maxDrawH = pH - 46 - (business ? 6 : 0);
+      // A horizontal grain label sits 9.5 mm under the drawing, so it needs more room.
+      const grainLabelBelow = sheet.hasGrain && sheet.grainOrientation !== 'vertical';
+      const maxDrawH = business ? pH - 46 - (grainLabelBelow ? 12 : 6) : pH - 46;
 
       const scale = Math.min(maxDrawW / sheet.width, maxDrawH / sheet.height);
       const canvasW = sheet.width * scale;

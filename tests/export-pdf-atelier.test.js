@@ -161,3 +161,49 @@ test('with a business, every page carries the footer', async (t) => {
   assert.equal((text.match(/Réalisé avec QatliA/g) || []).length, 2, 'one footer per page (portrait + schema page)');
   assert.match(text, /%PDF-1\./);
 });
+
+test('ar locale with a business: the page indicator and the signature are both in the PDF', async (t) => {
+  const POST = routeWith(t, { name: 'Menuiserie Benali' });
+  const res = await POST(makeRequest(baseBody({ locale: 'ar' })));
+  assert.equal(res.status, 200);
+  const raw = await pdfTextOf(res);
+  assert.match(raw, /Amiri/);
+  assert.ok(raw.includes('qatlia.ma'), 'the Latin tail of the signature is drawn');
+  assert.ok(raw.includes('QatliA'));
+  assert.equal((raw.match(/qatlia\.ma/g) || []).length, 2, 'one signature per page');
+});
+
+// y (in points, from the bottom of the page) of the first text run drawn with `text`.
+function textYOf(raw, text) {
+  const match = new RegExp(String.raw`([\d.]+) ([\d.]+) Td\s*\(${text}\) Tj`).exec(raw);
+  assert.ok(match, `"${text}" must be drawn`);
+  return Number(match[2]);
+}
+
+const TALL_GRAIN_SHEET = { width: 100, height: 300, kerf: 0.3, margin: 0, hasGrain: true, grainOrientation: 'horizontal' };
+const SMALL_PIECE_RESULT = {
+  sheetsUsed: 1,
+  wastePercentage: 1,
+  totalAreaUsed: 5,
+  totalAreaAvailable: 5.78,
+  offcuts: [],
+  placedPieces: [{ pieceNumber: 1, name: 'P', sheetIndex: 0, width: 50, height: 60, rotated: false, x: 0, y: 0 }],
+};
+
+test('with a business, the horizontal grain label on a height-limited sheet stays clear of the footer', async (t) => {
+  const POST = routeWith(t, { name: 'Menuiserie Benali' });
+  const res = await POST(makeRequest(baseBody({ sheet: TALL_GRAIN_SHEET, result: SMALL_PIECE_RESULT })));
+  assert.equal(res.status, 200);
+  const raw = await pdfTextOf(res);
+  const labelY = textYOf(raw, 'Sens du ramage');
+  const footerY = textYOf(raw, 'Page 2 / 2');
+  // 14 pt (about 5 mm) of baseline-to-baseline clearance above the footer line.
+  assert.ok(labelY - footerY >= 14, `grain label (y=${labelY}) too close to the footer (y=${footerY})`);
+});
+
+test('without a business the grain label position is unchanged (it sits at the bottom edge)', async (t) => {
+  const POST = routeWith(t, null);
+  const res = await POST(makeRequest(baseBody({ sheet: TALL_GRAIN_SHEET, result: SMALL_PIECE_RESULT })));
+  const raw = await pdfTextOf(res);
+  assert.ok(Math.abs(textYOf(raw, 'Sens du ramage') - 1.4217) < 0.01);
+});
