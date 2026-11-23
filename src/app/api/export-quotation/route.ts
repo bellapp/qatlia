@@ -30,6 +30,7 @@ import {
 } from '@/lib/exports/pdf-fonts';
 import { containsArabicScript } from '@/lib/exports/pdf-bidi';
 import { QUOTATION_PDF_LAYOUT } from '@/lib/exports/quotation-pdf-layout';
+import { fittedFooterNoteSegments, joinSegments } from '@/lib/exports/quotation-footer';
 import { quotationFileNames, contentDispositionFor } from '@/lib/document-filename';
 import { formatDateTime } from '@/i18n';
 
@@ -716,26 +717,8 @@ async function renderQuotationPdf(input: QuotationInputData, totals: QuotationTo
 
 /** The `madeWith` credit sits this far under the footer note (page bottom is 297, footer note at 288). */
 const MADE_WITH_LINE_OFFSET_MM = 3.5;
-
-/**
- * An Arabic string with a Latin run in it (the business name in the footer
- * note, the `QatliA · qatlia.ma` tail of the credit) laid out in a single
- * draw call comes out in the wrong order: jsPDF runs one bidi pass over the
- * whole string and the runs end up swapped. So each run is its own segment.
- * Text with no Arabic in it needs none of this and stays one draw call.
- */
-function footerNoteSegments(note: string, companyName: string): string[] {
-  const at = companyName ? note.indexOf(companyName) : -1;
-  if (at < 0 || !containsArabicScript(note)) return [note];
-  const before = note.slice(0, at).trimEnd();
-  const after = note.slice(at + companyName.length).trimStart();
-  if (!containsArabicScript(after)) return [before, companyName, after].filter(Boolean);
-  // A dash or full stop at the edge of an Arabic run would be placed on the
-  // wrong side of it (the bidi pass takes a left-to-right base direction), so
-  // each such mark is a segment of its own.
-  const [lead, core, trail] = /^([—–-]?)\s*([\s\S]*?)([.،]?)$/.exec(after)!.slice(1);
-  return [before, companyName, lead, core, trail].filter(Boolean);
-}
+/** Least clear space between the footer note and the page indicator. */
+const FOOTER_NOTE_GAP_MM = 4;
 
 function latinTailSegments(text: string): string[] {
   const latinStart = text.search(/[A-Za-z]/);
@@ -755,10 +738,7 @@ function drawSegmentedLine(
   y: number,
   isRtl: boolean
 ): void {
-  // One space between segments, except before a closing full stop or comma.
-  const parts = segments.flatMap((segment, index) =>
-    index === 0 || /^[.,،:;!?؟]+$/.test(segment) ? [segment] : [' ', segment]
-  );
+  const parts = joinSegments(segments);
   const visual = isRtl ? [...parts].reverse() : parts;
   const widths = visual.map((part) => drawnTextWidth(part));
   let x = isRtl ? startX - widths.reduce((sum, width) => sum + width, 0) : startX;
@@ -804,7 +784,10 @@ function stampHeadersAndFooters(
     doc.setFont(BASE_FONT, 'normal');
     doc.setFontSize(7);
     doc.setTextColor(100, 116, 139);
-    drawSegmentedLine(drawText, drawnTextWidth, footerNoteSegments(cat.footerNote(companyName), companyName), startX, footerY, isRtl);
+    // The note stays on one line: it may not run into the page indicator.
+    const noteMaxWidth = pageWidth - 2 * margin - drawnTextWidth(cat.pageIndicator(page, totalPages)) - FOOTER_NOTE_GAP_MM;
+    const noteSegments = fittedFooterNoteSegments(cat.footerNote, companyName, noteMaxWidth, drawnTextWidth);
+    drawSegmentedLine(drawText, drawnTextWidth, noteSegments, startX, footerY, isRtl);
     drawSegmentedLine(drawText, drawnTextWidth, latinTailSegments(cat.madeWith), startX, footerY + MADE_WITH_LINE_OFFSET_MM, isRtl);
     drawText(cat.pageIndicator(page, totalPages), endX, footerY, { align: endAlign });
   }

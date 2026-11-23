@@ -652,3 +652,22 @@ test('the quotation is issued in the business name: file name, footer note and t
     assert.ok(text.includes('Réalisé avec QatliA'), 'the small QatliA credit is on the page');
   });
 });
+
+test('a 200-character company name is shortened in the footer note, never run off the page', async () => {
+  resetState();
+  state.user = { id: UUID, email: 'artisan@example.ma' };
+  await withEnv(CONFIGURED, async () => {
+    const name = 'Menuiserie '.repeat(20).trim().slice(0, 200);
+    assert.equal(name.length, 200);
+    for (const locale of ['fr', 'ar']) {
+      const { POST } = freshRoute();
+      const res = await POST(jsonRequest(baseBody({ company: { name }, locale })));
+      assert.equal(res.status, 200, locale);
+      if (locale === 'fr') {
+        const text = Buffer.from(await res.arrayBuffer()).toString('latin1');
+        assert.ok(text.includes('') || text.includes('…'), 'the shortened name ends with an ellipsis');
+        assert.equal(text.includes(name), false, 'the full 200-character name is not drawn in the footer');
+      }
+    }
+  });
+});
