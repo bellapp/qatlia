@@ -84,6 +84,37 @@ test('a first contact asking something gets the greeting, then the assistant ans
   assert.equal(run({ event: { text: 'ماريوا 200 الطول العرض 100' }, contact: { greetedAt: null, lang: 'ar' } }).thenAssistant, true);
 });
 
+// The ad puts its referral on the first message, whatever is typed: the text decides.
+test('through the ad: the plain pre-filled text gets the example, a question typed with or instead of it gets the answer', () => {
+  const referral = { source_id: 'ad-1' };
+  const first = (text) => run({ event: { text, referral }, contact: { greetedAt: null } });
+  for (const text of [
+    'Bonjour ! Puis-je en savoir plus à ce sujet ?',
+    'Bonjour ! Puis-je en savoir\nplus à ce sujet ?',
+    'مرحبًا! هل يمكنني الحصول على مزيد من المعلومات حول هذا؟',
+    'Hallo! Kann ich hierzu mehr Informationen erhalten?',
+    '¡Hola! Quiero más información',
+    '¡Hola! Me gustaría conseguir más información sobre esto.',
+    'Bonjour ! Puis-je en savoir plus à ce sujet ? سلام',
+    'Bonjour ! Puis-je en savoir plus à ce sujet ?👍',
+  ]) {
+    const d = first(text);
+    assert.equal(d.thenAssistant, undefined, text);
+    assert.ok(d.exampleCaption, text);
+  }
+  assert.equal(first('Bonjour ! Puis-je en savoir plus à ce sujet ?بشحال هاد الخير').thenAssistant, true);
+  assert.equal(first('بشحال الخدمة ديالكم؟').thenAssistant, true);
+});
+
+test('a greeted contact back through the ad with a question gets the assistant, not the menu again', () => {
+  const back = { greetedAt: new Date(NOW.getTime() - 3600000) };
+  const referral = { source_id: 'ad-1' };
+  assert.deepEqual(run({ event: { text: 'Bonjour ! Puis-je en savoir plus à ce sujet ? prix svp', referral }, contact: back }), {
+    action: 'assistant',
+  });
+  assert.equal(run({ event: { text: 'Bonjour ! Puis-je en savoir plus à ce sujet ?', referral }, contact: back }).text, COPY.menuAgain);
+});
+
 test('a first contact only saying hello gets the greeting and the example, nothing more', () => {
   for (const text of ['Slm', 'سلام عليكم', 'Salam', 'مرحبا', 'Bonjour', 'Bonsoir !', 'cv', 'السلام عليكم ورحمة الله', 'Bonjour ! Puis-je en savoir plus à ce sujet ?']) {
     const d = run({ event: { text }, contact: { greetedAt: null } });
@@ -325,7 +356,7 @@ test('detectLang', () => {
   for (const text of ['Slm', 'Chhal fi chhar', 'ch7al taman', '3afak', 'Wach hada proghram', 'Ana bghit 244*122', 'Salam khoya']) {
     assert.equal(detectLang(text, 'fr'), 'ar', text);
   }
-  for (const text of ['je veux les tarifs', 'Bonjour', 'Merci beaucoup', 'Ok merci', 'combien ça coûte', 'la fin du mois']) {
+  for (const text of ['je veux les tarifs', 'Bonjour', 'Merci beaucoup', 'Ok merci', 'combien ça coûte', 'la fin du mois', 'panneau 180x5x2 en 5mm', 'chant 3mm', '7cm de large']) {
     assert.equal(detectLang(text, 'ar'), 'fr', text);
   }
   assert.equal(detectLang('1', 'ar'), 'ar');

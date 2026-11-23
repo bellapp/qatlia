@@ -58,7 +58,8 @@ const MIN_LATIN_LETTERS = 3;
 // an Arabic letter inside a word (3afak, ch7al, l9yassat).
 const DARIJA_WORD =
   /\b(slm|salam|salamo|salm|salem|chhal|ch7al|wach|wash|bghit|bghina|kifach|kifash|khoya|khouya|bzaf|bzzaf|daba|hadi|hada|hadchi|mzyan|mezyan|chno|achno|wakha|safi|labas|dyal|dial|diali|dyali|ghir|taman|tamane|fabour)\b/i;
-const DIGIT_LETTER = /[a-z][3579][a-z]|\b[3579][a-z]{2,}/i;
+// Never an « x » around the digit (180x5x2), never a unit after it (3mm, 7cm).
+const DIGIT_LETTER = /[a-wyz][3579][a-wyz]|\b3(?!mm|cm)[a-wyz]{2,}/i;
 
 export function isLatinDarija(text: string): boolean {
   return DARIJA_WORD.test(text) || DIGIT_LETTER.test(text);
@@ -99,10 +100,45 @@ export function isSalutationOnly(text: string): boolean {
  * French phone sends the French one.
  */
 const AD_PREFILLS: readonly RegExp[] = [
-  /^\s*Bonjour\s*!\s*Puis-je en savoir plus/i,
+  /^\s*Bonjour\s*!\s*Puis-je en savoir\s+plus/i,
   /^\s*Hello!?\s*Can I get more info/i,
   /^\s*مرحب[اًا]*!?\s*هل يمكنني الحصول على مزيد من المعلومات/,
+  /^\s*Hallo!?\s*Kann ich hierzu mehr Informationen/i,
+  /^\s*¡?Hola!?\s*(Quiero|Me gustaría conseguir) más información/i,
 ];
+
+/** The same texts whole, so what a person typed after them can be told apart. */
+const AD_PREFILLS_WHOLE: readonly RegExp[] = [
+  /^\s*Bonjour\s*!\s*Puis-je en savoir\s+plus à ce sujet\s*\?/i,
+  /^\s*Hello!?\s*Can I get more info on this\s*\??/i,
+  /^\s*مرحب[اًا]*!?\s*هل يمكنني الحصول على مزيد من المعلومات حول هذا\s*[؟?]?/,
+  /^\s*Hallo!?\s*Kann ich hierzu mehr Informationen erhalten\s*\??/i,
+  /^\s*¡?Hola!?\s*(Quiero más información|Me gustaría conseguir más información sobre esto)\s*\.?/i,
+];
+
+/**
+ * What the person typed beyond WhatsApp's pre-filled ad text: the whole text
+ * when it is not one, '' when it is only one (or a cut-off one).
+ */
+export function typedBeyondPrefill(text: string): string {
+  for (const whole of AD_PREFILLS_WHOLE) {
+    const match = whole.exec(text);
+    if (match) return text.slice(match[0].length).trim();
+  }
+  return AD_PREFILLS.some((prefill) => prefill.test(text)) ? '' : text.trim();
+}
+
+/**
+ * Something to answer in a text: not only the pre-filled ad text, not only a
+ * hello. The ad's referral says nothing here: it rides on the first message
+ * whatever the person typed (« …à ce sujet ?بشحال هاد الخير », 22/11/2026).
+ */
+export function asksSomething(text: string): boolean {
+  const typed = typedBeyondPrefill(text);
+  // No letter nor digit (« 👍 », « ?? »): nothing to answer.
+  if (!/[A-Za-zÀ-ÿ0-9؀-ۿ]/.test(typed)) return false;
+  return !isSalutationOnly(typed);
+}
 
 /** The message came from tapping the ad: it carries the ad referral, or is one of WhatsApp's pre-filled texts. */
 export function isAdPrefill(event: Pick<InboundEvent, 'kind' | 'text' | 'referral'>): boolean {
@@ -206,7 +242,7 @@ export function decide(input: {
     const bilingual = !darija;
     const { text, plain } = greeting({ lang, bilingual, voice: input.voiceEnabled === true });
     // A real question (not the ad's text, not a hello) is answered after the greeting.
-    const asks = event.kind === 'text' && event.text !== null && !isAdPrefill(event) && !isSalutationOnly(event.text);
+    const asks = event.kind === 'text' && event.text !== null && asksSomething(event.text);
     return {
       action: 'send',
       text,
@@ -219,8 +255,9 @@ export function decide(input: {
     };
   }
 
-  // 5. Back through the ad: the menu again rather than a presentation written by the assistant.
-  if (isAdPrefill(event)) {
+  // 5. Back through the ad: the menu again rather than a presentation written by the assistant,
+  // unless a question was typed with it (then the assistant answers it, step 9).
+  if (isAdPrefill(event) && !(event.kind === 'text' && event.text !== null && asksSomething(event.text))) {
     const quietUntil = contact.greetedAt.getTime() + REGREET_QUIET_MINUTES * 60 * 1000;
     if (now.getTime() < quietUntil) return { action: 'silent' };
     return {

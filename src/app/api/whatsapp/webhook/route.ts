@@ -16,7 +16,7 @@ import { getWhatsAppConfig, type WhatsAppConfig } from '@/lib/whatsapp/config';
 import { verifySignature } from '@/lib/whatsapp/signature';
 import { parseWebhook, type EchoEvent, type InboundEvent } from '@/lib/whatsapp/payload';
 import { COPY, EXAMPLE_FICHE_URL, type Lang, type MenuButton } from '@/lib/whatsapp/copy';
-import { HANDOFF_HOURS, decide, detectLang, isAdPrefill, resolveLang, type Decision } from '@/lib/whatsapp/router';
+import { HANDOFF_HOURS, decide, detectLang, resolveLang, typedBeyondPrefill, type Decision } from '@/lib/whatsapp/router';
 import { assistantBudgetMs, hearVoice } from '@/lib/whatsapp/voice';
 import { HISTORY_MESSAGES, askAssistant, type PhotoReadNote } from '@/lib/whatsapp/assistant';
 import { latestPhotoRead } from '@/lib/whatsapp/photo-store';
@@ -70,7 +70,7 @@ const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve,
 function answersItself(row: { kind: string; body: string | null }): boolean {
   if (row.kind === 'image' || row.kind === 'audio') return true;
   if (row.kind !== 'text' || !row.body) return false;
-  return !isAdPrefill({ kind: 'text', text: row.body, referral: null });
+  return typedBeyondPrefill(row.body) !== '';
 }
 
 /**
