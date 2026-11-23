@@ -16,6 +16,7 @@ import { CurrencySwitcher } from '@/components/CurrencySwitcher';
 import { BusinessIdentityForm } from '@/components/BusinessIdentityForm';
 import { authErrorKey } from '@/components/AuthModal';
 import { formatDateTime } from '@/i18n';
+import { ledgerPreview } from '@/lib/credit-ledger-preview';
 
 interface Tx {
   id: string;
@@ -49,6 +50,9 @@ export default function AccountPage() {
   const [pwdErr, setPwdErr] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [txs, setTxs] = useState<Tx[]>([]);
+  // A long history must not push the business identity out of sight.
+  const [ledgerExpanded, setLedgerExpanded] = useState(false);
+  const ledger = ledgerPreview(txs, ledgerExpanded);
 
   useEffect(() => {
     async function load() {
@@ -168,8 +172,9 @@ export default function AccountPage() {
           {txs.length === 0 ? (
             <p className="text-xs text-slate-500 dark:text-slate-400">{t('accountPage.noMovements')}</p>
           ) : (
-            <ul aria-label={t('accountPage.ledgerAria')} className="divide-y divide-slate-800">
-              {txs.map((tx) => (
+            <>
+            <ul id="credit-ledger" aria-label={t('accountPage.ledgerAria')} className="divide-y divide-slate-800">
+              {ledger.shown.map((tx) => (
                 <li key={tx.id} className="py-2.5 flex items-center justify-between gap-3 text-xs">
                   <div>
                     {/* The description saved in the ledger is the artisan's own
@@ -186,6 +191,20 @@ export default function AccountPage() {
                 </li>
               ))}
             </ul>
+            {(ledger.hidden > 0 || ledgerExpanded) && (
+              <button
+                type="button"
+                aria-expanded={ledgerExpanded}
+                aria-controls="credit-ledger"
+                onClick={() => setLedgerExpanded((v) => !v)}
+                className="text-xs font-semibold text-brand-400 hover:text-brand-500"
+              >
+                {ledgerExpanded
+                  ? t('accountPage.ledgerShowLess')
+                  : t('accountPage.ledgerShowAll', { count: n(txs.length) })}
+              </button>
+            )}
+            </>
           )}
         </section>
 
