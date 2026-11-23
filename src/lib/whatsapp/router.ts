@@ -9,6 +9,7 @@
 import type { HandoffMode } from '@/lib/whatsapp/config';
 import { COPY, MENU_BUTTONS, exampleCaption, greeting, type Lang, type MenuButton } from '@/lib/whatsapp/copy';
 import type { InboundEvent } from '@/lib/whatsapp/payload';
+import { isSiteMessage, isSiteReferral, typedBeyondSiteMessage } from '@/lib/whatsapp/site-contact';
 
 export const HANDOFF_HOURS = 24;
 export const MAX_ASSISTANT_REPLIES_PER_DAY = 20;
@@ -140,6 +141,8 @@ const AD_PREFILLS_WHOLE: readonly RegExp[] = [
  * when it is not one, '' when it is only one (or a cut-off one).
  */
 export function typedBeyondPrefill(text: string): string {
+  // The site button's message (src/lib/whatsapp/site-contact.ts) counts like the ad's.
+  if (isSiteMessage(text)) return typedBeyondSiteMessage(text);
   for (const whole of AD_PREFILLS_WHOLE) {
     const match = whole.exec(text);
     if (match) return text.slice(match[0].length).trim();
@@ -180,6 +183,8 @@ export function resolveLang(
   event: Pick<InboundEvent, 'kind' | 'text' | 'referral'>,
   contact: Pick<ContactState, 'lang' | 'greetedAt'>,
 ): Lang {
+  // The site button pre-fills in the language the person chose on the site: it says who they are.
+  if (isSiteReferral(event.referral)) return detectLang(event.text, contact.lang);
   if (isAdPrefill(event)) {
     if (event.text && ARABIC_LETTER.test(event.text)) return 'ar';
     return contact.greetedAt === null ? AD_DEFAULT_LANG : contact.lang;

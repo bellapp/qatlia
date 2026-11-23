@@ -618,6 +618,7 @@ export const ar: Catalog = {
   support: {
     footerHeading: 'تواصل معنا',
     menuEntry: 'التواصل مع الدعم',
+    whatsappButton: 'راسل QatliA على واتساب',
     needHelp: 'تحتاج مساعدة؟ راسلنا:',
     paymentHelp: 'مشكلة في الدفع؟ راسلنا مع رقم طلبك:',
     prefill: 'السلام عليكم QatliA، ',

@@ -1799,3 +1799,25 @@ test('a typed text message gives the typed read its own 20 s', async () => {
     assert.equal(state.order.filter((o) => o.startsWith('budget')).length, 0);
   });
 });
+
+// --- The site's WhatsApp button (spec 2026-11-23) ---------------------------
+
+const { siteMessage } = loadTsModule('src/lib/whatsapp/site-contact.ts');
+
+test('coexistence + scope ads: a new contact writing through the site button gets the greeting, in French', async () => {
+  resetState();
+  await withEnv({ ...CONFIGURED, WHATSAPP_BOT_SCOPE: 'ads' }, async () => {
+    await POST(signedPost(messagesPayload([textMessage('wamid.s1', WA_ID, siteMessage('atelier', 'fr'))])));
+    assert.equal(state.sent.length, 1);
+    assert.equal(state.sent[0].body, greeting({ lang: 'fr', bilingual: true, voice: true }).text);
+    assert.equal(state.contacts.get(WA_ID).fromAd, true, 'the site referral is stored: the next messages are answered too');
+  });
+});
+
+test('coexistence + scope ads: the site message without its marker is an ordinary message, left to the owner', async () => {
+  resetState();
+  await withEnv({ ...CONFIGURED, WHATSAPP_BOT_SCOPE: 'ads' }, async () => {
+    await POST(signedPost(messagesPayload([textMessage('wamid.s2', WA_ID, "Bonjour, j'ai besoin d'aide dans l'atelier.")])));
+    assert.equal(state.sent.length, 0);
+  });
+});
