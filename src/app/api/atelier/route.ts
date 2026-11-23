@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { AtelierSchema } from '@/lib/atelier';
-import { readAtelier, saveAtelier } from '@/lib/atelier-server';
+import { readAtelierResult, saveAtelier } from '@/lib/atelier-server';
 import { validateLogoDataUrl } from '@/lib/exports/quotation-logo';
 
 export const dynamic = 'force-dynamic';
@@ -21,12 +21,18 @@ async function currentUserId(): Promise<string | null> {
   }
 }
 
-/** GET: the signed-in account's business, or null when it has none. */
-export async function GET(_req: Request) {
+/**
+ * GET: the signed-in account's business, or null when it has none. A failed
+ * read is 503, never `{ atelier: null }`: the account form would take it for
+ * an empty account and its next save would overwrite the stored business.
+ */
+export async function GET() {
   const userId = await currentUserId();
   if (!userId) return NextResponse.json({ error: 'AUTH_REQUIRED' }, { status: 401 });
 
-  return NextResponse.json({ atelier: await readAtelier(userId) });
+  const result = await readAtelierResult(userId);
+  if (result.status === 'error') return NextResponse.json({ error: 'READ_FAILED' }, { status: 503 });
+  return NextResponse.json({ atelier: result.status === 'found' ? result.atelier : null });
 }
 
 /**

@@ -50,14 +50,24 @@ function validLogo(value: unknown): string | undefined {
   return validateLogoDataUrl(logo).ok ? logo : undefined;
 }
 
-/** The business of an account, or null when there is none (or it cannot be read). */
-export async function readAtelier(userId: string): Promise<Atelier | null> {
+/** What a read found: a business, none, or a failure (database down, table missing, no service role). */
+export type AtelierRead = { status: 'found'; atelier: Atelier } | { status: 'none' } | { status: 'error' };
+
+/**
+ * The business of an account, with a failed read told apart from "no
+ * business": the account form must not treat a database error as an empty
+ * account, or its next save would overwrite the stored business. Never throws.
+ * `signal` cancels the query (see `atelierForCurrentRequest`).
+ */
+export async function readAtelierResult(userId: string, options: { signal?: AbortSignal } = {}): Promise<AtelierRead> {
   try {
     const admin = adminClient();
-    if (!admin) return null;
+    if (!admin) return { status: 'error' };
 
-    const { data, error } = await admin.from('ateliers').select(COLUMNS).eq('user_id', userId).maybeSingle();
-    if (error || !data) return null;
+    const query = admin.from('ateliers').select(COLUMNS).eq('user_id', userId);
+    const { data, error } = await (options.signal ? query.abortSignal(options.signal) : query).maybeSingle();
+    if (error) return { status: 'error' };
+    if (!data) return { status: 'none' };
 
     const row = data as Record<string, unknown>;
     // Absent fields stay absent (no key at all), never `undefined`.
@@ -67,15 +77,21 @@ export async function readAtelier(userId: string): Promise<Atelier | null> {
       if (value !== undefined) fields[field] = value;
     }
     const identity = CompanyIdentitySchema.safeParse(fields);
-    if (!identity.success) return null;
+    if (!identity.success) return { status: 'none' };
 
     const atelier: Atelier = { ...identity.data };
     const logo = validLogo(row.logo_data_url);
     if (logo) atelier.logoDataUrl = logo;
-    return atelier;
+    return { status: 'found', atelier };
   } catch {
-    return null;
+    return { status: 'error' };
   }
+}
+
+/** The business of an account, or null when there is none or it cannot be read (the export paths). */
+export async function readAtelier(userId: string, options: { signal?: AbortSignal } = {}): Promise<Atelier | null> {
+  const result = await readAtelierResult(userId, options);
+  return result.status === 'found' ? result.atelier : null;
 }
 
 /**
@@ -119,18 +135,43 @@ export async function saveAtelier(
   }
 }
 
-/** The business of the signed-in user of this request, or null. */
-export async function atelierForCurrentRequest(): Promise<Atelier | null> {
+/** How long an export waits for the business before printing without it. */
+export const ATELIER_READ_TIMEOUT_MS = 2500;
+
+/**
+ * The business of the signed-in user of this request, or null. The free cut
+ * plan export must never hang on a slow database, so the whole read (session,
+ * then query) is raced against a timer; the query is aborted when it loses.
+ */
+export async function atelierForCurrentRequest(timeoutMs: number = ATELIER_READ_TIMEOUT_MS): Promise<Atelier | null> {
   // Checked first: the session client reads cookies(), which only exists inside a request.
   if (!getSupabaseAdminConfig()) return null;
+
+  const abort = new AbortController();
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const timedOut = new Promise<null>((resolve) => {
+    timer = setTimeout(() => {
+      abort.abort();
+      resolve(null);
+    }, timeoutMs);
+  });
+
+  const read = (async () => {
+    try {
+      const supabase = createSessionClient();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (!user) return null;
+      return await readAtelier(user.id, { signal: abort.signal });
+    } catch {
+      return null;
+    }
+  })();
+
   try {
-    const supabase = createSessionClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-    if (!user) return null;
-    return await readAtelier(user.id);
-  } catch {
-    return null;
+    return await Promise.race([read, timedOut]);
+  } finally {
+    clearTimeout(timer);
   }
 }

@@ -27,6 +27,8 @@ const state = {
   getUserThrows: false,
   clientThrows: false,
   upsertError: null,
+  getUserHangs: false,
+  signals: [],
 };
 
 function resetState() {
@@ -40,6 +42,8 @@ function resetState() {
   state.getUserThrows = false;
   state.clientThrows = false;
   state.upsertError = null;
+  state.getUserHangs = false;
+  state.signals = [];
 }
 
 function atelierTable() {
@@ -47,12 +51,17 @@ function atelierTable() {
     select: () => ({
       eq: (column, value) => {
         state.eqCalls.push({ column, value });
-        return {
+        const query = {
+          abortSignal: (signal) => {
+            state.signals.push(signal);
+            return query;
+          },
           maybeSingle: async () => {
             if (state.selectResult) return state.selectResult;
             return { data: state.rows.get(value) ?? null, error: null };
           },
         };
+        return query;
       },
     }),
     upsert: async (row, options) => {
@@ -85,6 +94,7 @@ stubModule('@/lib/supabase/server', {
       auth: {
         getUser: async () => {
           if (state.getUserThrows) throw new Error('cookies() outside a request scope');
+          if (state.getUserHangs) await new Promise(() => {});
           return { data: { user: state.user }, error: null };
         },
       },
@@ -92,7 +102,7 @@ stubModule('@/lib/supabase/server', {
   },
 });
 
-const { readAtelier, saveAtelier, atelierForCurrentRequest } = loadTsModule('src/lib/atelier-server.ts');
+const { readAtelier, readAtelierResult, saveAtelier, atelierForCurrentRequest, ATELIER_READ_TIMEOUT_MS } = loadTsModule('src/lib/atelier-server.ts');
 
 const ENV_KEYS = ['NEXT_PUBLIC_SUPABASE_URL', 'SUPABASE_SERVICE_ROLE_KEY', 'NODE_ENV'];
 const CONFIGURED = {
@@ -274,4 +284,62 @@ test('atelierForCurrentRequest is null without a user, and when getUser throws',
     assert.equal(await atelierForCurrentRequest(), null);
   });
   assert.deepEqual(state.fromCalls, []);
+});
+
+test('readAtelierResult tells a business, no business and a failed read apart', async () => {
+  resetState();
+  await withEnv(CONFIGURED, async () => {
+    assert.deepEqual(await readAtelierResult(UUID), { status: 'none' });
+
+    state.rows.set(UUID, { user_id: UUID, name: 'Mine' });
+    assert.deepEqual(await readAtelierResult(UUID), { status: 'found', atelier: { name: 'Mine' } });
+
+    state.selectResult = { data: null, error: { message: 'connection reset' } };
+    assert.deepEqual(await readAtelierResult(UUID), { status: 'error' });
+    // The export paths keep reading an error as "no business".
+    assert.equal(await readAtelier(UUID), null);
+  });
+});
+
+test('readAtelierResult is an error without the service role and when the client throws', async () => {
+  resetState();
+  await withEnv({}, async () => {
+    assert.deepEqual(await readAtelierResult(UUID), { status: 'error' });
+  });
+  assert.deepEqual(state.fromCalls, []);
+  await withEnv(CONFIGURED, async () => {
+    state.clientThrows = true;
+    assert.deepEqual(await readAtelierResult(UUID), { status: 'error' });
+  });
+});
+
+test('readAtelierResult of a row whose text part is invalid is none, not an error', async () => {
+  resetState();
+  state.rows.set(UUID, { user_id: UUID, name: '   ' });
+  await withEnv(CONFIGURED, async () => {
+    assert.deepEqual(await readAtelierResult(UUID), { status: 'none' });
+  });
+});
+
+test('atelierForCurrentRequest gives up after the timeout when Supabase never answers', async () => {
+  resetState();
+  state.user = { id: UUID };
+  state.getUserHangs = true;
+  assert.equal(typeof ATELIER_READ_TIMEOUT_MS, 'number');
+  await withEnv(CONFIGURED, async () => {
+    const started = Date.now();
+    assert.equal(await atelierForCurrentRequest(30), null);
+    assert.ok(Date.now() - started < 1000, 'it did not wait for Supabase');
+  });
+});
+
+test('atelierForCurrentRequest hands the select an abort signal that stays live when the read wins', async () => {
+  resetState();
+  state.user = { id: UUID };
+  state.rows.set(UUID, { user_id: UUID, name: 'Mine' });
+  await withEnv(CONFIGURED, async () => {
+    assert.deepEqual(await atelierForCurrentRequest(5000), { name: 'Mine' });
+  });
+  assert.equal(state.signals.length, 1);
+  assert.equal(state.signals[0].aborted, false);
 });

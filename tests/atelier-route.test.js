@@ -30,15 +30,16 @@ function jpegBase64() {
   return Buffer.concat(parts).toString('base64');
 }
 
-function loadRoute({ user = { id: USER_ID }, read = null, save = true } = {}) {
+function loadRoute({ user = { id: USER_ID }, read = null, readStatus = null, save = true } = {}) {
   const calls = { reads: [], saves: [] };
   stubModule('@/lib/supabase/server', {
     createClient: () => ({ auth: { getUser: async () => ({ data: { user } }) } }),
   });
   stubModule('@/lib/atelier-server', {
-    readAtelier: async (userId) => {
+    readAtelierResult: async (userId) => {
       calls.reads.push(userId);
-      return read;
+      if (readStatus === 'error') return { status: 'error' };
+      return read ? { status: 'found', atelier: read } : { status: 'none' };
     },
     saveAtelier: async (...args) => {
       calls.saves.push(args);
@@ -93,6 +94,15 @@ test('GET answers { atelier: null } when the account has no business', async (t)
   const res = await route.GET(GET_REQUEST());
   assert.equal(res.status, 200);
   assert.deepEqual(await res.json(), { atelier: null });
+  assert.deepEqual(calls.reads, [USER_ID]);
+});
+
+test('GET answers 503 READ_FAILED when the business cannot be read, never an empty business', async (t) => {
+  t.after(restoreStubs);
+  const { route, calls } = loadRoute({ readStatus: 'error' });
+  const res = await route.GET(GET_REQUEST());
+  assert.equal(res.status, 503);
+  assert.deepEqual(await res.json(), { error: 'READ_FAILED' });
   assert.deepEqual(calls.reads, [USER_ID]);
 });
 
