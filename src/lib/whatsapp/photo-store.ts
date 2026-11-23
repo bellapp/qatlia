@@ -250,3 +250,19 @@ export async function latestPhotoRead(
   const pieceCount = typeof row.summary?.pieceCount === 'number' ? row.summary.pieceCount : 0;
   return { pieceCount, code: valid ? row.code : null };
 }
+
+/**
+ * Whether a read of this number started less than STALE_READING_MS ago and
+ * has not ended: a message sent meanwhile waits for it (src/lib/whatsapp/read-wait.ts).
+ */
+export async function photoReadRunning(db: SupabaseClient, waId: string, now: Date): Promise<boolean> {
+  const found = await db
+    .from(TABLE)
+    .select('id')
+    .eq('wa_id', waId)
+    .eq('status', 'reading')
+    .gt('created_at', new Date(now.getTime() - STALE_READING_MS).toISOString())
+    .limit(1);
+  check(found.error, 'running read');
+  return (found.data ?? []).length > 0;
+}

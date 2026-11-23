@@ -71,6 +71,8 @@ function resetState() {
     typedCalls: [],
     typedOutcome: 'fallback',
     order: [],
+    readWait: 'none',
+    readWaitCalls: [],
   });
 }
 resetState();
@@ -137,6 +139,7 @@ stubModule('@/lib/whatsapp/store', {
     if (contact) Object.assign(contact, patch);
   },
   recentHistory: async (db, waId, limit, excludeWamid) => {
+    state.order.push('history');
     state.historyCalls.push({ waId, limit, excludeWamid });
     return state.history ?? [{ direction: 'bot', body: 'Bonjour' }];
   },
@@ -193,6 +196,13 @@ stubModule('@/lib/whatsapp/photo', {
   handlePhoto: async (input) => {
     state.photoCalls.push(input);
     return state.photoOutcome;
+  },
+});
+stubModule('@/lib/whatsapp/read-wait', {
+  waitForPhotoRead: async (db, waId, receivedAt) => {
+    state.order.push('wait');
+    state.readWaitCalls.push({ waId, receivedAt });
+    return state.readWait;
   },
 });
 stubModule('@/lib/whatsapp/typed-list', {
@@ -1766,11 +1776,11 @@ test('a voice note with sizes: the typed read gets the time left, then the assis
   state.voiceResult = () => ({ status: 'heard', text: 'جوج بيبان 195 على 45' });
   state.typedOutcome = 'fallback';
   state.assistantResult = () => ({ reply: 'ok', handoff: false });
-  // Enough before the typed read, too little after it.
-  state.budget = (elapsed, calls) => (calls === 0 ? 12000 : null);
+  // Enough before the typed read, too little after it (the wait and the history come first).
+  state.budget = (elapsed, calls) => (calls === 2 ? 12000 : null);
   await withEnv(CONFIGURED, async () => {
     await POST(signedPost(messagesPayload([voiceMessage('wamid.t8', WA_ID)])));
-    assert.deepEqual(state.order, ['budget:12000', 'typed', 'budget:null']);
+    assert.deepEqual(state.order, ['wait', 'history', 'budget:12000', 'typed', 'budget:null']);
     assert.equal(state.typedCalls[0].readTimeoutMs, 12000);
     assert.equal(state.assistantCalls.length, 0);
     assert.deepEqual(state.sent.map((m) => m.body), [COPY.fallback.ar], 'darija heard: darija fallback');
@@ -1818,6 +1828,73 @@ test('coexistence + scope ads: the site message without its marker is an ordinar
   resetState();
   await withEnv({ ...CONFIGURED, WHATSAPP_BOT_SCOPE: 'ads' }, async () => {
     await POST(signedPost(messagesPayload([textMessage('wamid.s2', WA_ID, "Bonjour, j'ai besoin d'aide dans l'atelier.")])));
+    assert.equal(state.sent.length, 0);
+  });
+});
+
+// Minuisr Aluminium, 23/11/2026: a voice note sent while his photo was read
+// was answered « صوّر الورقة… وصيفطها ليا هنا », one second after his plan.
+// The assistant waits for the read; the read lookup and the history come after the wait.
+test('a message sent while a photo is read waits for it, then the read and the history are looked up', async () => {
+  resetState();
+  greetedFr();
+  state.readWait = 'done';
+  // The read stored while the message waited: the assistant is told of it.
+  state.latestRead = () => (state.order.includes('wait') ? { pieceCount: 30, code: 'k7m2qx9dab' } : null);
+  state.assistantResult = () => ({ reply: 'ok', handoff: false });
+  state.budget = () => 9000;
+  await withEnv(CONFIGURED, async () => {
+    await POST(signedPost(messagesPayload([textMessage('wamid.rw1', WA_ID, 'Vous livrez à Fès ?')])));
+    assert.equal(state.readWaitCalls.length, 1);
+    assert.equal(state.readWaitCalls[0].waId, WA_ID);
+    assert.ok(state.readWaitCalls[0].receivedAt instanceof Date);
+    assert.equal(state.order[0], 'wait');
+    assert.equal(state.order[1], 'history');
+    const call = state.assistantCalls[0];
+    assert.equal(call.photoReading, false);
+    assert.equal(call.photoRead.pieceCount, 30);
+    assert.equal(call.timeoutMs, 9000, 'after a wait, the assistant gets what is left of the time');
+    assert.deepEqual(state.sent.map((m) => m.body), ['ok']);
+  });
+});
+
+test('a photo still being read at the end of the wait: the assistant is told, the typed read is skipped', async () => {
+  resetState();
+  greetedFr();
+  state.readWait = 'running';
+  state.typedOutcome = 'handled';
+  state.assistantResult = () => ({ reply: 'ok', handoff: false });
+  await withEnv(CONFIGURED, async () => {
+    await POST(signedPost(messagesPayload([textMessage('wamid.rw2', WA_ID, '90x45x2')])));
+    assert.equal(state.typedCalls.length, 0);
+    assert.equal(state.assistantCalls[0].photoReading, true);
+    assert.deepEqual(state.sent.map((m) => m.body), ['ok']);
+  });
+});
+
+test('no photo being read: no wait, the timing is unchanged', async () => {
+  resetState();
+  greetedFr();
+  state.readWait = 'none';
+  state.assistantResult = () => ({ reply: 'ok', handoff: false });
+  await withEnv(CONFIGURED, async () => {
+    await POST(signedPost(messagesPayload([textMessage('wamid.rw3', WA_ID, 'Vous livrez à Fès ?')])));
+    assert.equal(state.assistantCalls[0].photoReading, false);
+    assert.equal(state.assistantCalls[0].timeoutMs, undefined);
+    assert.equal(state.order.filter((o) => o.startsWith('budget')).length, 0);
+  });
+});
+
+test('a newer message during the wait takes the answer over: no typed read, no assistant', async () => {
+  resetState();
+  greetedFr();
+  state.readWait = 'done';
+  state.newer = () => (state.order.includes('wait') ? [{ kind: 'text', body: 'Et le prix ?' }] : []);
+  state.typedOutcome = 'handled';
+  await withEnv(CONFIGURED, async () => {
+    await POST(signedPost(messagesPayload([textMessage('wamid.rw4', WA_ID, '90x45x2')])));
+    assert.equal(state.typedCalls.length, 0);
+    assert.equal(state.assistantCalls.length, 0);
     assert.equal(state.sent.length, 0);
   });
 });
