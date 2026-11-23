@@ -207,3 +207,46 @@ test('without a business the grain label position is unchanged (it sits at the b
   const raw = await pdfTextOf(res);
   assert.ok(Math.abs(textYOf(raw, 'Sens du ramage') - 1.4217) < 0.01);
 });
+
+test('with a business, the footer follows the real size of each page, including portrait pages that overflow the first section', async (t) => {
+  const { jsPDF } = require('jspdf');
+  const placedPieces = Array.from({ length: 70 }, (_, i) => ({
+    pieceNumber: i + 1,
+    name: `P${i + 1}`,
+    sheetIndex: 0,
+    width: 10 + i,
+    height: 20,
+    rotated: false,
+    x: 0,
+    y: 0,
+  }));
+  const body = baseBody({ result: { ...SMALL_PIECE_RESULT, placedPieces } });
+  const POST = routeWith(t, { name: 'Menuiserie Benali' });
+  const res = await POST(makeRequest(body));
+  assert.equal(res.status, 200);
+  const raw = await pdfTextOf(res);
+
+  const mediaBoxes = [...raw.matchAll(/\/MediaBox \[0 0 ([\d.]+) ([\d.]+)\]/g)].map((m) => ({ w: Number(m[1]), h: Number(m[2]) }));
+  const total = mediaBoxes.length;
+  assert.ok(total >= 3, `the 70 pieces must overflow the first section (got ${total} pages)`);
+  assert.ok(mediaBoxes[1].h > mediaBoxes[1].w, 'page 2 is a portrait overflow page');
+
+  const measure = new jsPDF({ unit: 'pt' });
+  measure.setFont('helvetica', 'normal');
+  measure.setFontSize(7);
+  const signature = 'Réalisé avec QatliA · qatlia.ma';
+
+  for (let page = 1; page <= total; page++) {
+    const label = `Page ${page} / ${total}`;
+    const match = new RegExp(String.raw`([\d.]+) ([\d.]+) Td\s*\(${label}\) Tj`).exec(raw);
+    assert.ok(match, `footer of page ${page} must be drawn`);
+    const box = mediaBoxes[page - 1];
+    const x = Number(match[1]);
+    const y = Number(match[2]);
+    // Baseline 6 mm above the bottom edge of THIS page.
+    assert.ok(Math.abs(y - (6 * 72) / 25.4) < 0.5, `page ${page}: footer baseline y=${y}pt is not 6 mm above the bottom`);
+    // Whole line centred on THIS page's width.
+    const lineWidth = [label, ' · ', signature].reduce((sum, text) => sum + measure.getTextWidth(text), 0);
+    assert.ok(Math.abs(x - (box.w / 2 - lineWidth / 2)) < 1, `page ${page}: footer x=${x}pt is not centred on a ${box.w}pt wide page`);
+  }
+});

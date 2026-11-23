@@ -263,10 +263,15 @@ export async function POST(req: Request) {
       }
     };
 
-    /** Footer of a page of a business PDF: page number and QatliA signature, centred. */
-    const drawBusinessFooter = (pageNum: number, totalPgs: number, orientation: 'portrait' | 'landscape') => {
-      const pW = orientation === 'landscape' ? 297 : 210;
-      const pH = orientation === 'landscape' ? 210 : 297;
+    /**
+     * Footer of the current page of a business PDF: page number and QatliA
+     * signature, centred. Uses the page's real size: portrait pages can follow
+     * the first one when a table overflows, so the page number says nothing
+     * about the orientation.
+     */
+    const drawBusinessFooter = (pageNum: number, totalPgs: number) => {
+      const pW = doc.internal.pageSize.getWidth();
+      const pH = doc.internal.pageSize.getHeight();
       doc.setFont(BASE_FONT, 'normal');
       doc.setFontSize(7);
       doc.setTextColor(100, 116, 139);
@@ -815,7 +820,7 @@ export async function POST(req: Request) {
       doc.setPage(i);
       const isLand = i > 1;
       drawQatliaHeader(i, totalPgs, isLand ? 'landscape' : 'portrait');
-      if (business) drawBusinessFooter(i, totalPgs, isLand ? 'landscape' : 'portrait');
+      if (business) drawBusinessFooter(i, totalPgs);
     }
 
     const pdfBuffer = doc.output('arraybuffer');
