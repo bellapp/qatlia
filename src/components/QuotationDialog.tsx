@@ -771,6 +771,15 @@ export const QuotationDialog: React.FC<QuotationDialogProps> = ({
                 className="text-xs text-slate-600 dark:text-slate-300 file:mr-2 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:bg-studio-field file:text-slate-700 dark:file:text-slate-200 file:text-xs file:font-semibold"
               />
               {logoDataUrl && (
+                // The logo the quotation will print: a data: URL, nothing for next/image to optimise.
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={logoDataUrl}
+                  alt={t('quotation.logo.label')}
+                  className="h-12 max-w-[8rem] object-contain rounded-md bg-white border border-studio-border p-0.5"
+                />
+              )}
+              {logoDataUrl && (
                 <button
                   type="button"
                   onClick={handleRemoveLogo}

@@ -5,6 +5,7 @@ import { useLocale } from '@/components/LocaleProvider';
 import type { TranslationKey } from '@/i18n';
 import { resizeLogoFile } from '@/lib/logo-resize';
 import { readStoredCompanyIdentity } from '@/lib/quotation-local-store';
+import { QUOTATION_TEXT_LIMITS } from '@/lib/quotation';
 import type { Atelier } from '@/lib/atelier';
 
 interface FormValues {
@@ -19,7 +20,7 @@ interface FormValues {
 const EMPTY_FORM: FormValues = { name: '', phone: '', address: '', email: '', ice: '', taxId: '' };
 
 const FIELD_CLASS =
-  'px-3 py-2.5 rounded-xl bg-studio-field border border-studio-border text-sm outline-none focus:border-brand-500/50';
+  'px-3 py-2.5 rounded-xl bg-studio-field border border-studio-border text-sm outline-none focus:border-brand-500/50 disabled:opacity-60';
 
 // Every field of the form, in the order it is shown. Numbers and addresses
 // stay left-to-right (ltr) even in an Arabic page.
@@ -28,15 +29,17 @@ const FIELDS: ReadonlyArray<{
   label: TranslationKey;
   type: 'text' | 'tel' | 'email';
   ltr: boolean;
+  /** The longest value the server accepts (the schema's own bound). */
+  maxLength: number;
   required?: boolean;
   wide?: boolean;
 }> = [
-  { key: 'name', label: 'accountPage.business.name', type: 'text', ltr: false, required: true, wide: true },
-  { key: 'phone', label: 'accountPage.business.phone', type: 'tel', ltr: true },
-  { key: 'address', label: 'accountPage.business.address', type: 'text', ltr: false },
-  { key: 'email', label: 'accountPage.business.email', type: 'email', ltr: true },
-  { key: 'ice', label: 'accountPage.business.ice', type: 'text', ltr: true },
-  { key: 'taxId', label: 'accountPage.business.taxId', type: 'text', ltr: true },
+  { key: 'name', label: 'accountPage.business.name', type: 'text', ltr: false, maxLength: QUOTATION_TEXT_LIMITS.shortText, required: true, wide: true },
+  { key: 'phone', label: 'accountPage.business.phone', type: 'tel', ltr: true, maxLength: QUOTATION_TEXT_LIMITS.phoneText },
+  { key: 'address', label: 'accountPage.business.address', type: 'text', ltr: false, maxLength: QUOTATION_TEXT_LIMITS.addressText },
+  { key: 'email', label: 'accountPage.business.email', type: 'email', ltr: true, maxLength: QUOTATION_TEXT_LIMITS.shortText },
+  { key: 'ice', label: 'accountPage.business.ice', type: 'text', ltr: true, maxLength: QUOTATION_TEXT_LIMITS.phoneText },
+  { key: 'taxId', label: 'accountPage.business.taxId', type: 'text', ltr: true, maxLength: QUOTATION_TEXT_LIMITS.phoneText },
 ];
 
 function formFrom(atelier: Atelier): FormValues {
@@ -193,6 +196,9 @@ export function BusinessIdentityForm() {
               value={form[field.key]}
               onChange={(e) => handleChange(field.key, e.target.value)}
               required={field.required}
+              maxLength={field.maxLength}
+              // Typing before the saved details arrive would be overwritten by them.
+              disabled={loadState === 'loading'}
               dir={field.ltr ? 'ltr' : undefined}
               className={`${FIELD_CLASS} ${field.ltr ? 'text-start' : ''}`}
             />
@@ -224,7 +230,8 @@ export function BusinessIdentityForm() {
           <button
             type="button"
             onClick={() => fileInput.current?.click()}
-            className="px-3 py-2 rounded-xl bg-studio-field border border-studio-border text-xs font-semibold text-slate-700 dark:text-slate-300 hover:bg-studio-panel"
+            disabled={loadState === 'loading'}
+            className="px-3 py-2 rounded-xl bg-studio-field border border-studio-border text-xs font-semibold text-slate-700 dark:text-slate-300 hover:bg-studio-panel disabled:opacity-50"
           >
             {t('accountPage.business.logoChoose')}
           </button>
