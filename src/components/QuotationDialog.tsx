@@ -474,6 +474,8 @@ export const QuotationDialog: React.FC<QuotationDialogProps> = ({
               {t('quotation.companySection')}
               <a
                 href="/account#entreprise"
+                target="_blank"
+                rel="noopener noreferrer"
                 className="ms-3 normal-case tracking-normal font-semibold text-brand-600 dark:text-brand-400 underline-offset-2 hover:underline"
               >
                 {t('quotation.editBusiness')}
