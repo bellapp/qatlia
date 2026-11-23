@@ -937,6 +937,7 @@ export const ar: Catalog = {
     subtitle: 'إنشاء عرض سعر بصيغة PDF جاهز للإرسال، انطلاقاً من التكلفة الحالية للمخطط.',
     authRequired: 'سجّل الدخول لإنشاء عرض سعر للزبون.',
     companySection: 'مؤسستك',
+    editBusiness: 'تعديل مؤسستي',
     clientSection: 'الزبون',
     fields: {
       companyName: 'اسم المؤسسة',

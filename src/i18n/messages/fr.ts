@@ -1036,6 +1036,7 @@ export const fr = {
     subtitle: 'Génère un devis PDF prêt à envoyer, à partir du chiffrage actuel du plan.',
     authRequired: 'Connectez-vous pour générer un devis client.',
     companySection: 'Votre entreprise',
+    editBusiness: 'Modifier mon entreprise',
     clientSection: 'Client',
     fields: {
       companyName: 'Nom de l’entreprise',

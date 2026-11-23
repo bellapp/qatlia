@@ -22,6 +22,7 @@ import {
   type QuotationPieceLine,
 } from '@/lib/quotation';
 import { readStoredCompanyIdentity, writeStoredCompanyIdentity } from '@/lib/quotation-local-store';
+import { resolveQuotationCompany, type Atelier } from '@/lib/atelier';
 import { fileNameFromContentDisposition } from '@/lib/document-filename';
 
 const MAX_LOGO_BYTES = 500 * 1024;
@@ -81,6 +82,32 @@ interface StoredQuotationMetadata {
   includeAmountInWords?: boolean;
 }
 
+/** The account's business, as GET /api/atelier reports it. `knownEmpty` is true only for a 200 answer that says "no business yet" — an error, a 401 or a dropped network is "unknown", never "empty". */
+async function fetchAccountBusiness(): Promise<{ account: Atelier | null; knownEmpty: boolean }> {
+  try {
+    const res = await fetch('/api/atelier');
+    if (!res.ok) return { account: null, knownEmpty: false };
+    const body = await res.json().catch(() => null);
+    if (!body || typeof body !== 'object' || !('atelier' in body)) return { account: null, knownEmpty: false };
+    const atelier = (body.atelier as Atelier | null) ?? null;
+    return { account: atelier, knownEmpty: atelier === null };
+  } catch {
+    return { account: null, knownEmpty: false };
+  }
+}
+
+/** The project's saved quotation metadata, or null on any failure. */
+async function fetchProjectQuotation(projectId: string): Promise<StoredQuotationMetadata | null> {
+  try {
+    const res = await fetch(`/api/projects/${projectId}`);
+    if (!res.ok) return null;
+    const body = await res.json().catch(() => null);
+    return (body?.quotation as StoredQuotationMetadata | null | undefined) ?? null;
+  } catch {
+    return null;
+  }
+}
+
 const FOCUSABLE_SELECTOR =
   'a[href], button:not([disabled]), textarea:not([disabled]), input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])';
 
@@ -125,6 +152,10 @@ export const QuotationDialog: React.FC<QuotationDialogProps> = ({
   const [submitting, setSubmitting] = useState(false);
   const [errorKey, setErrorKey] = useState<TranslationKey | null>(null);
   const [successState, setSuccessState] = useState<SuccessState>(null);
+  // True only when GET /api/atelier answered 200 with no business: the first
+  // exported quote then becomes the account's business. We never guess the
+  // account is empty — see fetchAccountBusiness.
+  const [accountBusinessKnownEmpty, setAccountBusinessKnownEmpty] = useState(false);
 
   // Prefill on every open: the artisan's own company identity comes back
   // from local storage (see quotation-local-store.ts) as a fallback only —
@@ -155,44 +186,54 @@ export const QuotationDialog: React.FC<QuotationDialogProps> = ({
     setLogoError(null);
     setErrorKey(null);
     setSuccessState(null);
+    setAccountBusinessKnownEmpty(false);
     if (logoInputRef.current) logoInputRef.current.value = '';
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen]);
 
-  // Server-owned prefill: when reopening a dialog for a project that
-  // already carries saved quotation metadata (see /api/export-quotation's
-  // own options_json merge), fetch and overlay it — company/client here
-  // take priority over the reset effect's local-storage/empty defaults
-  // above. `cancelled` guards against a slow response landing after the
+  // Server-owned prefill, once per open: the account's business and, when
+  // the dialog is attached to a project, that project's saved quotation
+  // metadata, fetched together. The company is then resolved once — account
+  // > project > local storage (see resolveQuotationCompany) — and the rest of
+  // the project's metadata (client, notes, discount...) overlays the reset
+  // defaults. The two fetches fail independently: a failed one contributes
+  // nothing. `cancelled` guards against a slow response landing after the
   // dialog closed or `projectId` changed to a different project.
   useEffect(() => {
-    if (!isOpen || !projectId) return;
+    if (!isOpen) return;
     let cancelled = false;
     (async () => {
-      try {
-        const res = await fetch(`/api/projects/${projectId}`);
-        if (!res.ok || cancelled) return;
-        const body = await res.json().catch(() => null);
-        const quotation = body?.quotation as StoredQuotationMetadata | null | undefined;
-        if (!quotation || cancelled) return;
-        if (quotation.company) setCompany(quotation.company);
-        if (quotation.client) setClient(quotation.client);
-        if (quotation.projectReference !== undefined) setProjectReference(quotation.projectReference);
-        if (quotation.notes !== undefined) setNotes(quotation.notes);
-        if (quotation.locale) setOutputLocale(quotation.locale);
-        if (quotation.deliveryCost !== undefined) setDeliveryDraft(String(quotation.deliveryCost));
-        if (quotation.discount) {
-          setDiscountMode(quotation.discount.mode);
-          if (quotation.discount.value !== undefined) setDiscountDraft(String(quotation.discount.value));
-        }
-        if (quotation.tax) {
-          setVatEnabled(quotation.tax.mode === 'percentage');
-          if (quotation.tax.ratePercent !== undefined) setVatRateDraft(String(quotation.tax.ratePercent));
-        }
-        if (quotation.includeAmountInWords !== undefined) setIncludeAmountInWords(quotation.includeAmountInWords);
-      } catch {
-        /* best-effort prefill only — the dialog stays usable with its local/empty defaults */
+      const [{ account, knownEmpty }, quotation] = await Promise.all([
+        fetchAccountBusiness(),
+        projectId ? fetchProjectQuotation(projectId) : Promise.resolve(null),
+      ]);
+      if (cancelled) return;
+
+      setAccountBusinessKnownEmpty(knownEmpty);
+      const storage = typeof window !== 'undefined' ? window.localStorage : null;
+      const resolved = resolveQuotationCompany({
+        account,
+        project: quotation?.company ?? null,
+        local: readStoredCompanyIdentity(storage),
+      });
+      setCompany(resolved.company ?? EMPTY_COMPANY);
+      if (resolved.logoDataUrl) setLogoDataUrl(resolved.logoDataUrl);
+
+      if (!quotation) return;
+      if (quotation.client) setClient(quotation.client);
+      if (quotation.projectReference !== undefined) setProjectReference(quotation.projectReference);
+      if (quotation.notes !== undefined) setNotes(quotation.notes);
+      if (quotation.locale) setOutputLocale(quotation.locale);
+      if (quotation.deliveryCost !== undefined) setDeliveryDraft(String(quotation.deliveryCost));
+      if (quotation.discount) {
+        setDiscountMode(quotation.discount.mode);
+        if (quotation.discount.value !== undefined) setDiscountDraft(String(quotation.discount.value));
       }
+      if (quotation.tax) {
+        setVatEnabled(quotation.tax.mode === 'percentage');
+        if (quotation.tax.ratePercent !== undefined) setVatRateDraft(String(quotation.tax.ratePercent));
+      }
+      if (quotation.includeAmountInWords !== undefined) setIncludeAmountInWords(quotation.includeAmountInWords);
     })();
     return () => {
       cancelled = true;
@@ -350,6 +391,28 @@ export const QuotationDialog: React.FC<QuotationDialogProps> = ({
       // Revoking immediately after click() can race the browser's own read
       // of the blob URL in some engines — see REVOKE_OBJECT_URL_DELAY_MS.
       window.setTimeout(() => window.URL.revokeObjectURL(url), REVOKE_OBJECT_URL_DELAY_MS);
+
+      // First quote of an account with no business yet: what was typed
+      // becomes the account's business. Fire-and-forget — the response is
+      // ignored (createOnly answers 200 with the submitted body even when
+      // nothing was written) and the server never overwrites an existing
+      // business, even if this client state is wrong.
+      if (accountBusinessKnownEmpty) {
+        setAccountBusinessKnownEmpty(false);
+        const business: Record<string, string> = {};
+        for (const [key, value] of Object.entries(company)) {
+          const trimmed = typeof value === 'string' ? value.trim() : '';
+          if (trimmed) business[key] = trimmed;
+        }
+        if (logoDataUrl) business.logoDataUrl = logoDataUrl;
+        if (business.name) {
+          fetch('/api/atelier?createOnly=1', {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(business),
+          }).catch(() => {});
+        }
+      }
     } catch (err) {
       console.error('Erreur génération devis:', err);
       setErrorKey('quotation.errors.generic');
@@ -407,7 +470,15 @@ export const QuotationDialog: React.FC<QuotationDialogProps> = ({
           )}
 
           <fieldset className="space-y-3">
-            <legend className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">{t('quotation.companySection')}</legend>
+            <legend className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+              {t('quotation.companySection')}
+              <a
+                href="/account#entreprise"
+                className="ms-3 normal-case tracking-normal font-semibold text-brand-600 dark:text-brand-400 underline-offset-2 hover:underline"
+              >
+                {t('quotation.editBusiness')}
+              </a>
+            </legend>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
                 <label className={labelClass} htmlFor={`${headingId}-company-name`}>{t('quotation.fields.companyName')}</label>

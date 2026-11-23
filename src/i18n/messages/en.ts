@@ -938,6 +938,7 @@ export const en: Catalog = {
     subtitle: 'Generates a ready-to-send PDF quote from the plan\'s current costing.',
     authRequired: 'Sign in to generate a client quote.',
     companySection: 'Your company',
+    editBusiness: 'Edit my business',
     clientSection: 'Client',
     fields: {
       companyName: 'Company name',
