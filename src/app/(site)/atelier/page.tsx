@@ -111,6 +111,7 @@ import { ScanSheets } from '@/components/ScanSheets';
 import { isPhotoPreview } from '@/lib/whatsapp/photo-summary';
 import { photoPreviewStep, previewExportGate } from '@/lib/whatsapp/photo-preview';
 import { readAnalysisPass, storeAnalysisPass } from '@/lib/billing/analysis-pass-store';
+import { fileNameFromContentDisposition } from '@/lib/document-filename';
 import { piecesOnlyOnScreen } from '@/lib/new-job';
 import {
   type DisplayUnit,
@@ -1696,7 +1697,7 @@ const commitPanelName = () => {
         const url = window.URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
-        a.download = `qatlia_rapport_${Date.now()}.pdf`;
+        a.download = fileNameFromContentDisposition(res.headers.get('Content-Disposition')) ?? `qatlia_rapport_${Date.now()}.pdf`;
         document.body.appendChild(a);
         a.click();
         window.URL.revokeObjectURL(url);

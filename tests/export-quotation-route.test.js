@@ -634,3 +634,40 @@ test('renders an Arabic-locale PDF without throwing, as a real parseable multi-K
     assert.ok(buf.length > 3000, `expected a real embedded-font PDF, got ${buf.length} bytes`);
   });
 });
+
+test('the quotation is issued in the business name: file name, footer note and the small QatliA credit', async () => {
+  resetState();
+  state.user = { id: UUID, email: 'artisan@example.ma' };
+  await withEnv(CONFIGURED, async () => {
+    const { POST } = freshRoute();
+    const res = await POST(jsonRequest(baseBody()));
+    assert.equal(res.status, 200);
+    const disposition = res.headers.get('Content-Disposition');
+    assert.ok(disposition.includes('filename="Atelier_Karim_Devis_DEV-1.pdf"'), disposition);
+    assert.doesNotMatch(disposition, /QatliA_Devis/);
+
+    const text = Buffer.from(await res.arrayBuffer()).toString('latin1');
+    assert.ok(text.includes('Devis établi par Atelier Karim'), 'footer note names the business');
+    assert.equal(text.includes('Devis établi par QatliA'), false);
+    assert.ok(text.includes('Réalisé avec QatliA'), 'the small QatliA credit is on the page');
+  });
+});
+
+test('a 200-character company name is shortened in the footer note, never run off the page', async () => {
+  resetState();
+  state.user = { id: UUID, email: 'artisan@example.ma' };
+  await withEnv(CONFIGURED, async () => {
+    const name = 'Menuiserie '.repeat(20).trim().slice(0, 200);
+    assert.equal(name.length, 200);
+    for (const locale of ['fr', 'ar']) {
+      const { POST } = freshRoute();
+      const res = await POST(jsonRequest(baseBody({ company: { name }, locale })));
+      assert.equal(res.status, 200, locale);
+      if (locale === 'fr') {
+        const text = Buffer.from(await res.arrayBuffer()).toString('latin1');
+        assert.ok(text.includes('') || text.includes('…'), 'the shortened name ends with an ellipsis');
+        assert.equal(text.includes(name), false, 'the full 200-character name is not drawn in the footer');
+      }
+    }
+  });
+});

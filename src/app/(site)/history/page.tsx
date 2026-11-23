@@ -23,6 +23,7 @@ import { HistoryViewToggle } from '@/components/history/HistoryViewToggle';
 import { materialLabelKey } from '@/i18n/domain';
 import { type TranslationKey } from '@/i18n';
 import { readHistoryView, restoreSeedFromRow, toHistoryRow, writeHistoryView, type HistoryView } from '@/lib/projects/history-row';
+import { fileNameFromContentDisposition } from '@/lib/document-filename';
 import type { DisplayUnit } from '@/lib/units';
 
 interface ProjectHistoryItem {
@@ -201,7 +202,7 @@ export default function HistoryPage() {
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `QatliA_${(optJson.projectName || proj.name).replace(/\s+/g, '_')}.pdf`;
+      a.download = fileNameFromContentDisposition(res.headers.get('Content-Disposition')) ?? `QatliA_${(optJson.projectName || proj.name).replace(/\s+/g, '_')}.pdf`;
       document.body.appendChild(a);
       a.click();
       a.remove();

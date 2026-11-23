@@ -6,13 +6,14 @@ import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { clearPendingWork } from '@/lib/pending-work';
 import { forgetAtelierDraft } from '@/lib/atelier-draft';
-import { ArrowLeft, ArrowRight, Coins, KeyRound, LogOut, Receipt, Shield, Zap } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Building2, Coins, KeyRound, LogOut, Receipt, Shield, Zap } from 'lucide-react';
 import { AccountMenu } from '@/components/AccountMenu';
 import { useStoreApp } from '@/components/useStoreApp';
 import { isStoreAppDocument, storeAppCopyKey, storeAppSignOutPath } from '@/lib/store-app';
 import { QatlIALogo } from '@/components/QatlIALogo';
 import { LocaleSwitcher, useLocale } from '@/components/LocaleProvider';
 import { CurrencySwitcher } from '@/components/CurrencySwitcher';
+import { BusinessIdentityForm } from '@/components/BusinessIdentityForm';
 import { authErrorKey } from '@/components/AuthModal';
 import { formatDateTime } from '@/i18n';
 
@@ -186,6 +187,16 @@ export default function AccountPage() {
               ))}
             </ul>
           )}
+        </section>
+
+        {/* The business identity printed on the cut plans and quotes. */}
+        <section id="entreprise" className="p-5 rounded-2xl bg-studio-panel/70 border border-studio-border space-y-4">
+          <div className="flex items-center gap-2">
+            <Building2 className="w-4 h-4 text-brand-400" aria-hidden="true" />
+            <h2 className="text-sm font-bold text-slate-900 dark:text-white">{t('accountPage.business.title')}</h2>
+          </div>
+          <p className="text-xs text-slate-600 dark:text-slate-400">{t('accountPage.business.hint')}</p>
+          <BusinessIdentityForm />
         </section>
 
         {/* One currency for the whole account, assigned from the country on

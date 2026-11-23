@@ -179,6 +179,32 @@ export function drawContentAwareText(
   if (priorFont) doc.setFont(priorFont.fontName, priorFont.fontStyle);
 }
 
+/**
+ * Width of `text` as `drawContentAwareText` would draw it, in the font and
+ * size currently set: Arabic content is measured shaped, in Amiri (when
+ * registered), then the prior font is restored. Anything else is plain.
+ */
+export function measureContentAwareText(doc: jsPDF, registration: FontRegistration, text: string): number {
+  const clean = stripBidiControls(text);
+  if (!containsArabicScript(clean) || !registration.ok) return doc.getTextWidth(clean);
+  const prior = doc.getFont();
+  doc.setFont(AMIRI_FONT_FAMILY, prior.fontStyle);
+  const width = doc.getTextWidth(doc.processArabic(clean));
+  doc.setFont(prior.fontName, prior.fontStyle);
+  return width;
+}
+
+/**
+ * An Arabic line that ends in a Latin tail (`... QatliA · qatlia.ma`) as
+ * [Arabic head, Latin tail]: an Arabic and a Latin run never lay out
+ * correctly in one bidi pass, so each is drawn on its own. Any other text is
+ * a single segment.
+ */
+export function latinTailSegments(text: string): string[] {
+  const latinStart = text.search(/[A-Za-z]/);
+  return latinStart > 0 && containsArabicScript(text) ? [text.slice(0, latinStart).trimEnd(), text.slice(latinStart)] : [text];
+}
+
 interface CellTextStyles {
   halign?: 'left' | 'center' | 'right' | 'justify';
   valign?: 'top' | 'middle' | 'bottom';

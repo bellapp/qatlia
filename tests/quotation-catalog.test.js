@@ -93,3 +93,51 @@ test('MAD (the currency code) is never translated in either catalog', () => {
     assert.doesNotMatch(source, /درهم مغربي|درهم مغربى/, `${locale} catalog must use the "MAD" code, not a translated currency name, for consistency with the rest of the app`);
   }
 });
+
+test('footerNote names the issuing business, never QatliA', () => {
+  const { quotationCatalogs } = loadCatalog();
+  assert.equal(
+    quotationCatalogs.fr.footerNote('Atelier Karim'),
+    "Devis établi par Atelier Karim — n'engage l'émetteur que jusqu'à sa date de validité."
+  );
+  assert.ok(quotationCatalogs.ar.footerNote('Atelier Karim').includes('عرض سعر صادر عن Atelier Karim'));
+  for (const locale of ['fr', 'ar']) {
+    assert.doesNotMatch(quotationCatalogs[locale].footerNote('Atelier Karim'), /QatliA/);
+  }
+});
+
+test('madeWith is the small QatliA credit in both catalogs', () => {
+  const { quotationCatalogs } = loadCatalog();
+  assert.equal(quotationCatalogs.fr.madeWith, 'Réalisé avec QatliA · qatlia.ma');
+  assert.equal(quotationCatalogs.ar.madeWith, 'أُنجز بواسطة QatliA · qatlia.ma');
+});
+
+test('fittedFooterNoteSegments leaves a name that fits untouched', () => {
+  const { quotationCatalogs } = loadCatalog();
+  const { fittedFooterNoteSegments } = loadTsModule('src/lib/exports/quotation-footer.ts');
+  const segments = fittedFooterNoteSegments(quotationCatalogs.fr.footerNote, 'Atelier Karim', 10_000, (text) => text.length);
+  assert.deepEqual(segments, [quotationCatalogs.fr.footerNote('Atelier Karim')]);
+});
+
+test('fittedFooterNoteSegments shortens only the name, with an ellipsis, until the line fits', () => {
+  const { quotationCatalogs } = loadCatalog();
+  const { fittedFooterNoteSegments, joinSegments } = loadTsModule('src/lib/exports/quotation-footer.ts');
+  const longName = 'Menuiserie '.repeat(20).trim().slice(0, 200);
+  for (const locale of ['fr', 'ar']) {
+    const note = quotationCatalogs[locale].footerNote;
+    const fixedLength = note('').length;
+    const maxWidth = fixedLength + 40;
+    const segments = fittedFooterNoteSegments(note, longName, maxWidth, (text) => text.length);
+    const line = joinSegments(segments).join('');
+    assert.ok(line.length <= maxWidth, `${locale}: ${line.length} > ${maxWidth}`);
+    assert.ok(line.includes('…'), `${locale}: the name is cut with an ellipsis`);
+    assert.ok(line.includes(longName.slice(0, 10)), `${locale}: the start of the name is kept`);
+    assert.ok(!line.includes(longName), `${locale}: the full name no longer fits`);
+    // The fixed text is intact.
+    assert.ok(line.includes('—'), `${locale}: the dash is kept`);
+  }
+  // fr keeps the sentence word for word around the name.
+  const fr = fittedFooterNoteSegments(quotationCatalogs.fr.footerNote, longName, 120, (text) => text.length).join('');
+  assert.ok(fr.startsWith('Devis établi par Menuiserie'));
+  assert.ok(fr.endsWith(" — n'engage l'émetteur que jusqu'à sa date de validité."));
+});

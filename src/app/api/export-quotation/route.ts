@@ -10,8 +10,6 @@ import {
   computeQuotationDocumentTotals,
   amountInWords,
   AMOUNT_IN_WORDS_MAX_MAD,
-  sanitizeQuoteNumberForFilename,
-  encodeRfc5987Filename,
   type QuotationLocale,
   type QuotationPanelLine,
   type QuotationPieceLine,
@@ -27,11 +25,15 @@ import {
   arabicSafeCellHooks,
   stripBidiControls,
   AMIRI_FONT_FAMILY,
+  measureContentAwareText,
+  latinTailSegments,
   NOT_REGISTERED,
   type FontRegistration,
 } from '@/lib/exports/pdf-fonts';
 import { containsArabicScript } from '@/lib/exports/pdf-bidi';
 import { QUOTATION_PDF_LAYOUT } from '@/lib/exports/quotation-pdf-layout';
+import { fittedFooterNoteSegments, joinSegments } from '@/lib/exports/quotation-footer';
+import { quotationFileNames, contentDispositionFor } from '@/lib/document-filename';
 import { formatDateTime } from '@/i18n';
 
 /**
@@ -269,14 +271,9 @@ export async function POST(req: Request) {
     // ─── Render ──────────────────────────────────────────────────────────
     const pdfBytes = await renderQuotationPdf(input, totals, logo);
 
-    const asciiQuoteNumber = sanitizeQuoteNumberForFilename(input.quoteNumber);
-    const utf8FileName = `QatliA_Devis_${input.quoteNumber}.pdf`;
-
     const headers: Record<string, string> = {
       'Content-Type': 'application/pdf',
-      'Content-Disposition':
-        `attachment; filename="QatliA_Devis_${asciiQuoteNumber}.pdf"; ` +
-        `filename*=UTF-8''${encodeRfc5987Filename(utf8FileName)}`,
+      'Content-Disposition': contentDispositionFor(quotationFileNames(input.quoteNumber, input.company.name)),
     };
     if (input.projectId) headers['X-Quotation-Project-Saved'] = String(projectSaved === true);
 
@@ -425,6 +422,8 @@ async function renderQuotationPdf(input: QuotationInputData, totals: QuotationTo
   const drawText = (text: string, x: number, y: number, options?: TextOptionsLight) => {
     drawContentAwareText(doc, fontRegistration, text, x, y, options);
   };
+  /** Width of `text` as drawText would draw it, in the font and size currently set. */
+  const drawnTextWidth = (text: string) => measureContentAwareText(doc, fontRegistration, text);
 
   // Reading-start/end anchors: for `fr`, start (where a block's own title
   // sits) is the left margin; for `ar`, start is the right margin — the
@@ -704,16 +703,46 @@ async function renderQuotationPdf(input: QuotationInputData, totals: QuotationTo
   // contentBottomMm), so stamping it here afterwards can never overlap
   // earlier content — and this is the only place that needs to know the
   // final page count. ───────────────────────────────────────────────────
-  stampHeadersAndFooters(doc, drawText, cat, quoteNumber, startX, startAlign, isRtl);
+  stampHeadersAndFooters(doc, drawText, drawnTextWidth, cat, quoteNumber, company.name, startX, startAlign, isRtl);
 
   return doc.output('arraybuffer');
+}
+
+/** The `madeWith` credit sits this far under the footer note (page bottom is 297, footer note at 288). */
+const MADE_WITH_LINE_OFFSET_MM = 3.5;
+/** Least clear space between the footer note and the page indicator. */
+const FOOTER_NOTE_GAP_MM = 4;
+
+/**
+ * Draws `segments` (in reading order, one space between them) as one line
+ * that starts at `startX`: running right from it for `fr`, and running left
+ * from it for `ar`, where the first segment is the rightmost.
+ */
+function drawSegmentedLine(
+  drawText: (text: string, x: number, y: number, options?: TextOptionsLight) => void,
+  drawnTextWidth: (text: string) => number,
+  segments: string[],
+  startX: number,
+  y: number,
+  isRtl: boolean
+): void {
+  const parts = joinSegments(segments);
+  const visual = isRtl ? [...parts].reverse() : parts;
+  const widths = visual.map((part) => drawnTextWidth(part));
+  let x = isRtl ? startX - widths.reduce((sum, width) => sum + width, 0) : startX;
+  visual.forEach((part, index) => {
+    drawText(part, x, y);
+    x += widths[index];
+  });
 }
 
 function stampHeadersAndFooters(
   doc: jsPDF,
   drawText: (text: string, x: number, y: number, options?: TextOptionsLight) => void,
+  drawnTextWidth: (text: string) => number,
   cat: QuotationCatalog,
   quoteNumber: string,
+  companyName: string,
   startX: number,
   startAlign: Halign,
   isRtl: boolean
@@ -743,7 +772,11 @@ function stampHeadersAndFooters(
     doc.setFont(BASE_FONT, 'normal');
     doc.setFontSize(7);
     doc.setTextColor(100, 116, 139);
-    drawText(cat.footerNote, startX, footerY, { align: startAlign });
+    // The note stays on one line: it may not run into the page indicator.
+    const noteMaxWidth = pageWidth - 2 * margin - drawnTextWidth(cat.pageIndicator(page, totalPages)) - FOOTER_NOTE_GAP_MM;
+    const noteSegments = fittedFooterNoteSegments(cat.footerNote, companyName, noteMaxWidth, drawnTextWidth);
+    drawSegmentedLine(drawText, drawnTextWidth, noteSegments, startX, footerY, isRtl);
+    drawSegmentedLine(drawText, drawnTextWidth, latinTailSegments(cat.madeWith), startX, footerY + MADE_WITH_LINE_OFFSET_MM, isRtl);
     drawText(cat.pageIndicator(page, totalPages), endX, footerY, { align: endAlign });
   }
 }

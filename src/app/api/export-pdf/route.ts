@@ -12,8 +12,13 @@ import {
   payloadNeedsArabicFont,
   drawContentAwareText,
   arabicSafeCellHooks,
+  measureContentAwareText,
+  latinTailSegments,
   NOT_REGISTERED,
 } from '@/lib/exports/pdf-fonts';
+import { validateLogoDataUrl } from '@/lib/exports/quotation-logo';
+import { atelierForCurrentRequest } from '@/lib/atelier-server';
+import { contentDispositionFor, cutPlanFileNames } from '@/lib/document-filename';
 import { formatDateTime, translate } from '@/i18n';
 import { edgeBandingLabelKey, materialLabelKey } from '@/i18n/domain';
 
@@ -155,6 +160,16 @@ export async function POST(req: Request) {
     const debitList = Array.from(aggMap.values());
     const totalDebitQty = debitList.reduce((s, p) => s + p.quantity, 0);
 
+    // The artisan's business (« Mon entreprise »), when the account has one
+    // saved. Any failure to read it means "no business": the export must
+    // never fail, or change, because of it.
+    const atelier = await atelierForCurrentRequest().catch(() => null);
+    const business = atelier && atelier.name.trim() ? atelier : null;
+    // The logo is validated again right here, whatever was validated on save,
+    // and is never logged.
+    const businessLogoCheck = business?.logoDataUrl ? validateLogoDataUrl(business.logoDataUrl) : null;
+    const businessLogo = businessLogoCheck?.ok ? businessLogoCheck : null;
+
     const doc = new jsPDF({
       orientation: 'portrait',
       unit: 'mm',
@@ -168,7 +183,7 @@ export async function POST(req: Request) {
     // pure-Latin fr/en export never decodes or embeds the font at all.
     // The price detail also prints the artisan's own panel names and colours.
     const panelTexts = (result.costingInput?.material.sheets ?? []).flatMap((line) => [line.label ?? '', line.color ?? '']);
-    const fontRegistration = payloadNeedsArabicFont(locale, projectName, material, ...panelTexts)
+    const fontRegistration = payloadNeedsArabicFont(locale, projectName, material, business?.name ?? '', business?.phone ?? '', ...panelTexts)
       ? await registerAmiriFont(doc)
       : NOT_REGISTERED;
     const cellHooks = arabicSafeCellHooks(doc, fontRegistration);
@@ -186,22 +201,109 @@ export async function POST(req: Request) {
 
     const today = formatDateTime(locale, new Date(), { day: '2-digit', month: '2-digit', year: 'numeric' });
 
-    const drawQatliaHeader = (pageNum: number, totalPgs: number, orientation: 'portrait' | 'landscape') => {
-      const pW = orientation === 'landscape' ? 297 : 210;
-      doc.setDrawColor(0, 0, 0);
-      doc.setLineWidth(0.3);
-      doc.rect(14, 10, pW - 28, 15);
+    /** Width of `text` as drawText would draw it, in the font and size currently set. */
+    const drawnTextWidth = (text: string) => measureContentAwareText(doc, fontRegistration, text);
+
+    /** `text` shortened with a trailing ellipsis until it fits `maxWidth` (font and size already set). */
+    const fitText = (text: string, maxWidth: number) => {
+      if (drawnTextWidth(text) <= maxWidth) return text;
+      const chars = Array.from(text);
+      while (chars.length > 0 && drawnTextWidth(`${chars.join('').trimEnd()}…`) > maxWidth) chars.pop();
+      return `${chars.join('').trimEnd()}…`;
+    };
+
+    /** Left of the header frame, in place of the QatliA brand: logo, business name and phone. */
+    const drawBusinessIdentity = (pW: number) => {
+      let textX = 16;
+      if (businessLogo) {
+        // Fitted inside a 12 x 12 mm box, aspect ratio kept (same rule as the quotation).
+        const box = 12;
+        const scale = Math.min(box / businessLogo.width, box / businessLogo.height, 1);
+        const w = businessLogo.width * scale;
+        const h = businessLogo.height * scale;
+        try {
+          doc.addImage(
+            businessLogo.bytes,
+            businessLogo.mime === 'image/png' ? 'PNG' : 'JPEG',
+            16 + (box - w) / 2,
+            11.5 + (box - h) / 2,
+            w,
+            h
+          );
+          textX = 16 + box + 2;
+        } catch {
+          // A logo that fails to embed must never fail the export (and is never logged).
+          console.error('PDF_LOGO_EMBED_FAILED');
+        }
+      }
+      // Stops short of the central project title block.
+      const maxWidth = pW / 2 - 40 - textX;
+      const phone = business?.phone?.trim() ?? '';
 
       doc.setFont(BASE_FONT, 'bold');
       doc.setFontSize(9);
       doc.setTextColor(30, 58, 95);
-      drawText(cat.brand, 16, 15);
+      drawText(fitText(business?.name.trim() ?? '', maxWidth), textX, phone ? 16 : 18);
 
+      if (phone) {
+        doc.setFont(BASE_FONT, 'normal');
+        doc.setFontSize(7.5);
+        doc.setTextColor(100, 116, 139);
+        drawText(fitText(phone, maxWidth), textX, 21);
+      }
+    };
+
+    /**
+     * Footer of the current page of a business PDF: page number and QatliA
+     * signature, centred. Uses the page's real size: portrait pages can follow
+     * the first one when a table overflows, so the page number says nothing
+     * about the orientation.
+     */
+    const drawBusinessFooter = (pageNum: number, totalPgs: number) => {
+      const pW = doc.internal.pageSize.getWidth();
+      const pH = doc.internal.pageSize.getHeight();
       doc.setFont(BASE_FONT, 'normal');
-      doc.setFontSize(7.5);
+      doc.setFontSize(7);
       doc.setTextColor(100, 116, 139);
-      drawText(cat.tagline, 16, 19);
-      drawText(cat.pageIndicator(pageNum, totalPgs), 16, 23);
+      // Two segments, each drawn on its own so that Arabic and Latin runs never
+      // get mixed into one bidi pass: `page · signature` reads left to right in
+      // fr/en, and right to left in ar (page indicator on the right). The whole
+      // line stays centred on the page.
+      // An Arabic signature carries a Latin tail (`QatliA · qatlia.ma`): it is its
+      // own segment too, since an Arabic and a Latin run never lay out correctly together.
+      const signature = latinTailSegments(cat.madeWith).flatMap((segment, index) => (index === 0 ? [segment] : [' ', segment]));
+      const segments = [cat.pageIndicator(pageNum, totalPgs), ' · ', ...signature];
+      const visual = locale === 'ar' ? [...segments].reverse() : segments;
+      const widths = visual.map((segment) => drawnTextWidth(segment));
+      let x = pW / 2 - widths.reduce((sum, width) => sum + width, 0) / 2;
+      visual.forEach((segment, index) => {
+        drawText(segment, x, pH - 6);
+        x += widths[index];
+      });
+    };
+
+    const drawQatliaHeader = (pageNum: number, totalPgs: number, orientation: 'portrait' | 'landscape') => {
+      // A business PDF uses the page's real size: an overflow page can be portrait
+      // after the first one, so the page number says nothing about the orientation.
+      const pW = business ? doc.internal.pageSize.getWidth() : orientation === 'landscape' ? 297 : 210;
+      doc.setDrawColor(0, 0, 0);
+      doc.setLineWidth(0.3);
+      doc.rect(14, 10, pW - 28, 15);
+
+      if (business) {
+        drawBusinessIdentity(pW);
+      } else {
+        doc.setFont(BASE_FONT, 'bold');
+        doc.setFontSize(9);
+        doc.setTextColor(30, 58, 95);
+        drawText(cat.brand, 16, 15);
+
+        doc.setFont(BASE_FONT, 'normal');
+        doc.setFontSize(7.5);
+        doc.setTextColor(100, 116, 139);
+        drawText(cat.tagline, 16, 19);
+        drawText(cat.pageIndicator(pageNum, totalPgs), 16, 23);
+      }
 
       doc.setFont(BASE_FONT, 'bold');
       doc.setFontSize(13);
@@ -586,7 +688,11 @@ export async function POST(req: Request) {
       const drawX = 14;
       const drawY = 36;
       const maxDrawW = pW - 28;
-      const maxDrawH = pH - 46;
+      // With a business, the footer sits at the bottom of the page: the drawing
+      // (and its dimension labels) must stop above it.
+      // A horizontal grain label sits 9.5 mm under the drawing, so it needs more room.
+      const grainLabelBelow = sheet.hasGrain && sheet.grainOrientation !== 'vertical';
+      const maxDrawH = business ? pH - 46 - (grainLabelBelow ? 12 : 6) : pH - 46;
 
       const scale = Math.min(maxDrawW / sheet.width, maxDrawH / sheet.height);
       const canvasW = sheet.width * scale;
@@ -702,32 +808,22 @@ export async function POST(req: Request) {
       doc.setPage(i);
       const isLand = i > 1;
       drawQatliaHeader(i, totalPgs, isLand ? 'landscape' : 'portrait');
+      if (business) drawBusinessFooter(i, totalPgs);
     }
 
     const pdfBuffer = doc.output('arraybuffer');
 
-    // A `Content-Disposition` header value must be a valid HTTP ByteString
-    // (Latin-1 range only) — the artisan's free-typed `projectName` is not
-    // guaranteed to be (an Arabic name, or any other non-ASCII text, would
-    // otherwise throw constructing the Response and 500 the whole export).
-    // The ASCII-only `filename` stays a safe fallback for older clients;
-    // `filename*` (RFC 5987/6266) carries the exact project name, percent-
-    // encoded, for every modern browser.
-    const asciiProjectName =
-      projectName
-        .toUpperCase()
-        .replace(/[^\x20-\x7E]/g, '')
-        .trim()
-        .replace(/\s+/g, '_') || 'EXPORT';
-    const utf8FileName = `QatliA_${projectName.toUpperCase().replace(/\s+/g, '_')}.pdf`;
+    // The file names (an ASCII-only `filename` for older clients, the exact
+    // UTF-8 name in `filename*`) are built by src/lib/document-filename.ts: a
+    // free-typed project or business name can be Arabic or any other non-Latin-1
+    // text, which would otherwise throw constructing the Response.
+    const fileNames = cutPlanFileNames(projectName, business?.name);
 
     return new Response(pdfBuffer, {
       status: 200,
       headers: {
         'Content-Type': 'application/pdf',
-        'Content-Disposition':
-          `attachment; filename="QatliA_${asciiProjectName}.pdf"; ` +
-          `filename*=UTF-8''${encodeURIComponent(utf8FileName)}`,
+        'Content-Disposition': contentDispositionFor(fileNames),
       },
     });
   } catch (error: unknown) {
