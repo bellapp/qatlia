@@ -9,6 +9,7 @@
 import type { HandoffMode } from '@/lib/whatsapp/config';
 import { COPY, MENU_BUTTONS, exampleCaption, greeting, type Lang, type MenuButton } from '@/lib/whatsapp/copy';
 import type { InboundEvent } from '@/lib/whatsapp/payload';
+import { isSiteMessage, isSiteReferral, typedBeyondSiteMessage } from '@/lib/whatsapp/site-contact';
 
 export const HANDOFF_HOURS = 24;
 export const MAX_ASSISTANT_REPLIES_PER_DAY = 20;
@@ -65,12 +66,31 @@ export function isLatinDarija(text: string): boolean {
   return DARIJA_WORD.test(text) || DIGIT_LETTER.test(text);
 }
 
+// A size: 2 to 4 digits, with a decimal part (58,5) or not.
+const SIZE = String.raw`\d{2,4}(?:[.,]\d+)?`;
+// Two sizes side by side: 180x60, 90*45, 220 / 67, 195×45, « 195 على 45 », « 45 في 195 ».
+const SIZE_PAIR = new RegExp(`${SIZE}\\s*(?:x|×|\\*|/|على|في)\\s*${SIZE}`, 'i');
+const SIZE_WORDS = /طول|طوال|عرض|longueur|largeur|hauteur|length|width|\btol\b|\b3ard\b/i;
+
+/**
+ * Measurements typed instead of a photo (22/11/2026: « 180x160/140x120/260x60 »,
+ * « ذيال تحت 45 في عرض طوال 195 »): two sizes side by side, or two sizes
+ * with a length or width word. The model then reads them like a sheet.
+ */
+export function looksLikeMeasurements(text: string): boolean {
+  if (SIZE_PAIR.test(text)) return true;
+  const sizes = text.match(new RegExp(SIZE, 'g')) ?? [];
+  return sizes.length >= 2 && SIZE_WORDS.test(text);
+}
+
 /** Arabic if any Arabic letter or darija in Latin letters, French if at least 3 Latin letters, otherwise unchanged. */
 export function detectLang(text: string | null, previous: Lang): Lang {
   if (!text) return previous;
   if (ARABIC_LETTER.test(text)) return 'ar';
   if (isLatinDarija(text)) return 'ar';
-  if ((text.match(LATIN_LETTERS) ?? []).length >= MIN_LATIN_LETTERS) return 'fr';
+  // The « x » of a size (180x60, 90 X 45 x 2) is not a letter of any language.
+  const words = text.replace(/(\d)\s*[x×]\s*(?=\d)/gi, '$1 ');
+  if ((words.match(LATIN_LETTERS) ?? []).length >= MIN_LATIN_LETTERS) return 'fr';
   return previous;
 }
 
@@ -121,6 +141,8 @@ const AD_PREFILLS_WHOLE: readonly RegExp[] = [
  * when it is not one, '' when it is only one (or a cut-off one).
  */
 export function typedBeyondPrefill(text: string): string {
+  // The site button's message (src/lib/whatsapp/site-contact.ts) counts like the ad's.
+  if (isSiteMessage(text)) return typedBeyondSiteMessage(text);
   for (const whole of AD_PREFILLS_WHOLE) {
     const match = whole.exec(text);
     if (match) return text.slice(match[0].length).trim();
@@ -161,6 +183,8 @@ export function resolveLang(
   event: Pick<InboundEvent, 'kind' | 'text' | 'referral'>,
   contact: Pick<ContactState, 'lang' | 'greetedAt'>,
 ): Lang {
+  // The site button pre-fills in the language the person chose on the site: it says who they are.
+  if (isSiteReferral(event.referral)) return detectLang(event.text, contact.lang);
   if (isAdPrefill(event)) {
     if (event.text && ARABIC_LETTER.test(event.text)) return 'ar';
     return contact.greetedAt === null ? AD_DEFAULT_LANG : contact.lang;

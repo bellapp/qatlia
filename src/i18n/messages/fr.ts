@@ -676,6 +676,8 @@ export const fr = {
   support: {
     footerHeading: 'Contact',
     menuEntry: 'Contacter le support',
+    /** The WhatsApp button of every page: it leads to the bot (src/lib/whatsapp/site-contact.ts). */
+    whatsappButton: 'Écrire à QatliA sur WhatsApp',
     needHelp: 'Besoin d’aide ? Écrivez-nous :',
     paymentHelp: 'Un souci avec un paiement ? Écrivez-nous avec votre numéro de commande :',
     /** Prefilled in WhatsApp / the email body so the first message is never blank. */

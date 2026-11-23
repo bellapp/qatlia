@@ -67,6 +67,10 @@ function resetState() {
     afterCalls: [],
     newer: () => [],
     redirectCount: 0,
+    history: null,
+    typedCalls: [],
+    typedOutcome: 'fallback',
+    order: [],
   });
 }
 resetState();
@@ -134,7 +138,7 @@ stubModule('@/lib/whatsapp/store', {
   },
   recentHistory: async (db, waId, limit, excludeWamid) => {
     state.historyCalls.push({ waId, limit, excludeWamid });
-    return [{ direction: 'bot', body: 'Bonjour' }];
+    return state.history ?? [{ direction: 'bot', body: 'Bonjour' }];
   },
   countAssistantReplies: async () => state.assistantCount,
   countInboundMessages: async (db, waId, kind, since) => {
@@ -148,7 +152,11 @@ stubModule('@/lib/whatsapp/store', {
   },
 });
 stubModule('@/lib/whatsapp/voice', {
-  assistantBudgetMs: (elapsed) => state.budget(elapsed),
+  assistantBudgetMs: (elapsed) => {
+    const budget = state.budget(elapsed, state.order.length);
+    state.order.push(`budget:${budget}`);
+    return budget;
+  },
   hearVoice: async (input) => {
     state.voiceCalls.push(input);
     return state.voiceResult(input);
@@ -185,6 +193,13 @@ stubModule('@/lib/whatsapp/photo', {
   handlePhoto: async (input) => {
     state.photoCalls.push(input);
     return state.photoOutcome;
+  },
+});
+stubModule('@/lib/whatsapp/typed-list', {
+  handleTypedList: async (input) => {
+    state.order.push('typed');
+    state.typedCalls.push(input);
+    return state.typedOutcome;
   },
 });
 stubModule('@/lib/whatsapp/assistant', {
@@ -1644,5 +1659,165 @@ test('a first contact only saying hello gets the greeting and the example, no as
     await POST(signedPost(messagesPayload([textMessage('wamid.q2', WA_ID, 'Slm')])));
     assert.equal(state.assistantCalls.length, 0);
     assert.equal(state.images.length, 1);
+  });
+});
+
+// Measurements typed instead of a photo (22/11/2026): read like a sheet, the plan card goes out.
+test('typed measurements go to the typed-list reading; when it answers, the assistant does not', async () => {
+  resetState();
+  greetedFr();
+  state.contacts.get(WA_ID).lang = 'ar';
+  state.typedOutcome = 'handled';
+  state.assistantResult = () => ({ reply: 'ok', handoff: false });
+  await withEnv(CONFIGURED, async () => {
+    await POST(signedPost(messagesPayload([textMessage('wamid.t1', WA_ID, '180x160/140x120/260x60')])));
+    assert.equal(state.typedCalls.length, 1);
+    const call = state.typedCalls[0];
+    assert.equal(call.waId, WA_ID);
+    assert.equal(call.text, '180x160/140x120/260x60');
+    assert.equal(call.lang, 'ar');
+    assert.equal(call.config.photoDailyCap, 300);
+    assert.equal(typeof call.deliver, 'function');
+    assert.equal(typeof call.deliverImage, 'function');
+    assert.equal(state.assistantCalls.length, 0);
+    assert.equal(state.sent.length, 0);
+  });
+});
+
+test('typed measurements the reading cannot take are answered by the assistant', async () => {
+  resetState();
+  greetedFr();
+  state.typedOutcome = 'fallback';
+  state.assistantResult = () => ({ reply: 'ok', handoff: false });
+  await withEnv(CONFIGURED, async () => {
+    await POST(signedPost(messagesPayload([textMessage('wamid.t2', WA_ID, '244*122')])));
+    assert.equal(state.typedCalls.length, 1);
+    assert.deepEqual(state.sent.map((m) => m.body), ['ok']);
+  });
+});
+
+test('another read running: the typed list stays silent, no assistant either', async () => {
+  resetState();
+  greetedFr();
+  state.typedOutcome = 'silent';
+  await withEnv(CONFIGURED, async () => {
+    await POST(signedPost(messagesPayload([textMessage('wamid.t3', WA_ID, '90x45x2')])));
+    assert.equal(state.assistantCalls.length, 0);
+    assert.equal(state.sent.length, 0);
+  });
+});
+
+test('measurements given over several messages are read together, the newest last', async () => {
+  resetState();
+  greetedFr();
+  state.history = [
+    { direction: 'user', body: 'avant' },
+    { direction: 'bot', body: 'Bonjour' },
+    { direction: 'user', body: 'ذيال تحت 45' },
+    { direction: 'user', body: '📷 photo' },
+    { direction: 'user', body: 'في عرض' },
+  ];
+  state.typedOutcome = 'handled';
+  await withEnv(CONFIGURED, async () => {
+    await POST(signedPost(messagesPayload([textMessage('wamid.t4', WA_ID, 'طوال 195')])));
+    assert.equal(state.typedCalls[0].text, 'ذيال تحت 45\nفي عرض\nطوال 195');
+  });
+});
+
+test('a question without measurements never reaches the typed reading', async () => {
+  resetState();
+  greetedFr();
+  state.assistantResult = () => ({ reply: 'ok', handoff: false });
+  await withEnv(CONFIGURED, async () => {
+    await POST(signedPost(messagesPayload([textMessage('wamid.t5', WA_ID, 'Vous livrez à Fès ?')])));
+    assert.equal(state.typedCalls.length, 0);
+    assert.deepEqual(state.sent.map((m) => m.body), ['ok']);
+  });
+});
+
+test('measurements said in a voice note are read the same way', async () => {
+  resetState();
+  greetedFr();
+  state.voiceResult = () => ({ status: 'heard', text: 'جوج بيبان 195 على 45' });
+  state.typedOutcome = 'handled';
+  await withEnv(CONFIGURED, async () => {
+    await POST(signedPost(messagesPayload([voiceMessage('wamid.t6', WA_ID)])));
+    assert.equal(state.typedCalls[0].text, 'جوج بيبان 195 على 45');
+    assert.equal(state.assistantCalls.length, 0);
+  });
+});
+
+test('a first contact typing measurements gets the greeting, then the typed-list reading', async () => {
+  resetState();
+  state.typedOutcome = 'handled';
+  await withEnv(CONFIGURED, async () => {
+    await POST(signedPost(messagesPayload([textMessage('wamid.t7', WA_ID, '220 / 67')])));
+    assert.equal(state.sent.length, 1, 'the greeting');
+    assert.equal(state.typedCalls.length, 1);
+    assert.equal(state.typedCalls[0].text, '220 / 67');
+  });
+});
+
+// Hearing, then up to 20 s of typed reading: the assistant's time is what is
+// left after both, or the route's 60 s run out and nothing goes out.
+test('a voice note with sizes: the typed read gets the time left, then the assistant what remains after it', async () => {
+  resetState();
+  greetedFr();
+  state.voiceResult = () => ({ status: 'heard', text: 'جوج بيبان 195 على 45' });
+  state.typedOutcome = 'fallback';
+  state.assistantResult = () => ({ reply: 'ok', handoff: false });
+  // Enough before the typed read, too little after it.
+  state.budget = (elapsed, calls) => (calls === 0 ? 12000 : null);
+  await withEnv(CONFIGURED, async () => {
+    await POST(signedPost(messagesPayload([voiceMessage('wamid.t8', WA_ID)])));
+    assert.deepEqual(state.order, ['budget:12000', 'typed', 'budget:null']);
+    assert.equal(state.typedCalls[0].readTimeoutMs, 12000);
+    assert.equal(state.assistantCalls.length, 0);
+    assert.deepEqual(state.sent.map((m) => m.body), [COPY.fallback.ar], 'darija heard: darija fallback');
+  });
+});
+
+test('a voice note with sizes and no time left skips the typed read', async () => {
+  resetState();
+  greetedFr();
+  state.voiceResult = () => ({ status: 'heard', text: 'جوج بيبان 195 على 45' });
+  state.budget = () => null;
+  await withEnv(CONFIGURED, async () => {
+    await POST(signedPost(messagesPayload([voiceMessage('wamid.t9', WA_ID)])));
+    assert.equal(state.typedCalls.length, 0);
+    assert.deepEqual(state.sent.map((m) => m.body), [COPY.fallback.ar], 'darija heard: darija fallback');
+  });
+});
+
+test('a typed text message gives the typed read its own 20 s', async () => {
+  resetState();
+  greetedFr();
+  state.typedOutcome = 'handled';
+  await withEnv(CONFIGURED, async () => {
+    await POST(signedPost(messagesPayload([textMessage('wamid.t10', WA_ID, '90x45x2')])));
+    assert.equal(state.typedCalls[0].readTimeoutMs, undefined);
+    assert.equal(state.order.filter((o) => o.startsWith('budget')).length, 0);
+  });
+});
+
+// --- The site's WhatsApp button (spec 2026-11-23) ---------------------------
+
+const { siteMessage } = loadTsModule('src/lib/whatsapp/site-contact.ts');
+
+test('coexistence + scope ads: a new contact writing through the site button gets the greeting, in French', async () => {
+  resetState();
+  await withEnv({ ...CONFIGURED, WHATSAPP_BOT_SCOPE: 'ads' }, async () => {
+    await POST(signedPost(messagesPayload([textMessage('wamid.s1', WA_ID, siteMessage('atelier', 'fr'))])));
+    assert.equal(state.sent.length, 1);
+    assert.equal(state.sent[0].body, greeting({ lang: 'fr', bilingual: true, voice: true }).text);
+    assert.equal(state.contacts.get(WA_ID).fromAd, true, 'the site referral is stored: the next messages are answered too');
+  });
+});
+
+test('coexistence + scope ads: the site message without its marker is an ordinary message, left to the owner', async () => {
+  resetState();
+  await withEnv({ ...CONFIGURED, WHATSAPP_BOT_SCOPE: 'ads' }, async () => {
+    await POST(signedPost(messagesPayload([textMessage('wamid.s2', WA_ID, "Bonjour, j'ai besoin d'aide dans l'atelier.")])));
+    assert.equal(state.sent.length, 0);
   });
 });

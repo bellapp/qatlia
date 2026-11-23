@@ -124,6 +124,9 @@ test('typed measurements go to the atelier, never back onto paper', () => {
   const prompt = buildSystemPrompt('coexistence');
   assert.ok(prompt.includes('ne lui demande jamais de les recopier sur une feuille'));
   assert.ok(prompt.includes(ATELIER_LINK));
+  // The bot reads a first typed list itself; the assistant only sees what it could not plan.
+  assert.ok(prompt.includes('taper ses mesures ici (ex : 180x60x2'));
+  assert.ok(prompt.includes('le bot les lit comme une photo'));
 });
 
 test('darija in Latin letters says kridi, never Arabic letters in the middle', () => {

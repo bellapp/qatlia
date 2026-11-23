@@ -356,6 +356,9 @@ test('detectLang', () => {
   for (const text of ['Slm', 'Chhal fi chhar', 'ch7al taman', '3afak', 'Wach hada proghram', 'Ana bghit 244*122', 'Salam khoya']) {
     assert.equal(detectLang(text, 'fr'), 'ar', text);
   }
+  // The « x » of a size is not a word: typed measurements keep the language.
+  assert.equal(detectLang('180x160/140x120/260x60', 'ar'), 'ar');
+  assert.equal(detectLang('90X45 x 2', 'ar'), 'ar');
   for (const text of ['je veux les tarifs', 'Bonjour', 'Merci beaucoup', 'Ok merci', 'combien ça coûte', 'la fin du mois', 'panneau 180x5x2 en 5mm', 'chant 3mm', '7cm de large']) {
     assert.equal(detectLang(text, 'ar'), 'fr', text);
   }
@@ -491,5 +494,27 @@ test('the bot links are short WhatsApp links (tagged by their redirect), and the
   assert.ok(COPY.imageHint.ar.includes(ATELIER_LINK));
   for (const text of [COPY.greeting, COPY.greetingPlain, COPY.pricing.fr, COPY.howItWorks.fr, COPY.imageHint.fr]) {
     assert.ok(!/https:\/\/qatlia\.ma(?![/?])/.test(text) && !/qatlia\.ma\s/.test(text), 'no untagged site link');
+  }
+});
+
+// Measurements typed instead of a photo (22/11/2026): the bot reads them like a sheet.
+test('looksLikeMeasurements: two sizes side by side, or numbers with length and width words', () => {
+  const { looksLikeMeasurements } = load('src/lib/whatsapp/router.ts');
+  for (const text of [
+    '180x160/140x120/260x60',
+    '220 / 67',
+    '90*45 x2',
+    '195×45',
+    'ماريوا 200 الطول العرض 100',
+    'ذيال تحت 45 في عرض طوال 195',
+    '180 عرض 2 او 250 طول سمك 50',
+    'longueur 120 largeur 60',
+    '244*122',
+    '58,5 x 92',
+  ]) {
+    assert.equal(looksLikeMeasurements(text), true, text);
+  }
+  for (const text of ['واش فكل وقت', 'شحال الثمن؟', '20 كريدي', 'Bonjour', '1', 'عندي 4 بيبان', 'Chhal fi chhar', '']) {
+    assert.equal(looksLikeMeasurements(text), false, text);
   }
 });

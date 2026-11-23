@@ -165,29 +165,16 @@ function normalizePiece(p: RawPiece): ReadPiece {
   };
 }
 
-/**
- * `timeoutMs` (the bot only) puts a deadline on the model call; running out
- * of time is then an 'error' result. The site passes none, so its request and
- * its failures stay exactly as they were.
- */
-export async function readCutList(
-  imageDataUrl: string,
-  options: { readPanel?: boolean; timeoutMs?: number } = {},
-): Promise<ReadResult> {
+/** The model provider from the environment (OpenRouter first), or null without a real key. */
+function provider(): { endpoint: string; model: string; headers: Record<string, string> } | null {
   const openrouterKey = process.env.OPENROUTER_API_KEY;
   const openaiKey = process.env.OPENAI_API_KEY;
   const apiKey = openrouterKey || openaiKey;
   const isUsingOpenRouter = !isPlaceholder(openrouterKey);
-  if (isPlaceholder(apiKey)) return { status: 'unavailable' };
-
-  const endpoint = isUsingOpenRouter
-    ? 'https://openrouter.ai/api/v1/chat/completions'
-    : 'https://api.openai.com/v1/chat/completions';
-  const model = isUsingOpenRouter ? process.env.OPENROUTER_MODEL || 'google/gemini-3.7-flash' : 'gpt-4o-mini';
-  const systemPrompt = options.readPanel ? SYSTEM_PROMPT + PANEL_INSTRUCTION : SYSTEM_PROMPT;
-
-  const request: RequestInit = {
-    method: 'POST',
+  if (isPlaceholder(apiKey)) return null;
+  return {
+    endpoint: isUsingOpenRouter ? 'https://openrouter.ai/api/v1/chat/completions' : 'https://api.openai.com/v1/chat/completions',
+    model: isUsingOpenRouter ? process.env.OPENROUTER_MODEL || 'google/gemini-3.7-flash' : 'gpt-4o-mini',
     headers: {
       'Content-Type': 'application/json',
       Authorization: `Bearer ${apiKey}`,
@@ -198,6 +185,26 @@ export async function readCutList(
           }
         : {}),
     },
+  };
+}
+
+/**
+ * `timeoutMs` (the bot only) puts a deadline on the model call; running out
+ * of time is then an 'error' result. The site passes none, so its request and
+ * its failures stay exactly as they were.
+ */
+export async function readCutList(
+  imageDataUrl: string,
+  options: { readPanel?: boolean; timeoutMs?: number } = {},
+): Promise<ReadResult> {
+  const chosen = provider();
+  if (!chosen) return { status: 'unavailable' };
+  const { endpoint, model } = chosen;
+  const systemPrompt = options.readPanel ? SYSTEM_PROMPT + PANEL_INSTRUCTION : SYSTEM_PROMPT;
+
+  const request: RequestInit = {
+    method: 'POST',
+    headers: chosen.headers,
     body: JSON.stringify({
       model,
       // Large cut lists (30+ rows) need room: each row is ~50 output tokens,
@@ -247,4 +254,64 @@ export async function readCutList(
     pieces: parsed.pieces.map(normalizePiece),
     sheet: options.readPanel ? readSheet(parsed.sheet) : null,
   };
+}
+
+/**
+ * The bot only: measurements a prospect types in WhatsApp instead of a photo
+ * (22/11/2026: « 180x160/140x120/260x60 », a carpenter giving his doors one
+ * message at a time). Same model and same JSON as a photo read, text only.
+ */
+export const TYPED_SYSTEM_PROMPT = `Tu lis un message WhatsApp où un menuisier marocain tape les mesures des pièces à couper, en darija, en arabe ou en français, parfois en plusieurs messages.
+Extrais chaque pièce sous la convention : HAUTEUR × LARGEUR = QUANTITÉ, en CENTIMÈTRES (cm).
+
+Règles impératives :
+1. Une pièce a deux cotes. Une cote seule, une épaisseur (سمك, épaisseur, 18 mm) ou un prix ne sont jamais des pièces.
+2. Les cotes sont en centimètres. Si elles sont visiblement en millimètres (ex : 2300 x 1200, 450 x 1950), convertis en centimètres (230 x 120, 45 x 195). Des mètres (2.80) se convertissent aussi (280).
+3. La quantité : "x2" ou "× 2" après les deux cotes, "= 2", "2 حبات", "زوج" (2), "4 بيبان", "2 pièces"… Sans quantité, mets 1.
+4. "name" : le nom donné à la pièce s'il y en a un (ex : "باب", "جنب", "Côté G"), sinon "". N'invente jamais de nom.
+5. Le format du panneau (ex : "panneau 280x207", "لوحة 244*122", "بلاكة 2.80 × 2.07", "البانو 2800/2100") n'est JAMAIS une pièce : mets-le dans le champ "sheet": {"height": 280, "width": 207}, en cm. Une seule paire de cotes de la taille d'un panneau entier (244 x 122, 280 x 207, 300 x 122 ou plus), sans autre pièce, est le format du panneau.
+6. Les dimensions d'un meuble entier (ماريو, دولاب, placard, armoire, cuisine : "ماريوا 200 الطول العرض 100") ne sont pas des pièces à couper : ignore-les.
+7. N'invente jamais une pièce ni une cote. Si le message ne donne aucune pièce complète, retourne {"pieces": []}.
+8. Retourne STRICTEMENT un objet JSON, sans "sheet" si aucun format de panneau n'est donné :
+{
+  "pieces": [
+    { "name": "باب", "height": 195, "width": 45, "quantity": 4 },
+    { "name": "", "height": 180, "width": 160, "quantity": 1 }
+  ],
+  "sheet": { "height": 280, "width": 207 }
+}`;
+
+export async function readTypedCutList(text: string, options: { timeoutMs?: number } = {}): Promise<ReadResult> {
+  const chosen = provider();
+  if (!chosen) return { status: 'unavailable' };
+  const request: RequestInit = {
+    method: 'POST',
+    headers: chosen.headers,
+    body: JSON.stringify({
+      model: chosen.model,
+      max_tokens: 4000,
+      response_format: { type: 'json_object' },
+      messages: [
+        { role: 'system', content: TYPED_SYSTEM_PROMPT },
+        { role: 'user', content: `Message du menuisier :\n${text}` },
+      ],
+    }),
+  };
+  if (options.timeoutMs) request.signal = AbortSignal.timeout(options.timeoutMs);
+
+  // The bot falls back to its assistant on any failure: never a throw.
+  let res: Response;
+  try {
+    res = await fetch(chosen.endpoint, request);
+  } catch {
+    return { status: 'error', rateLimited: false, httpStatus: 0 };
+  }
+  if (!res.ok) {
+    const errText = await res.text().catch(() => '');
+    return { status: 'error', rateLimited: errText.includes('rate limit') || errText.includes('429'), httpStatus: res.status };
+  }
+  const data = await res.json().catch(() => null);
+  const parsed = extractJson(data?.choices?.[0]?.message?.content || '');
+  if (!parsed || !Array.isArray(parsed.pieces) || parsed.pieces.length === 0) return { status: 'unreadable' };
+  return { status: 'ok', pieces: parsed.pieces.map(normalizePiece), sheet: readSheet(parsed.sheet) };
 }

@@ -617,6 +617,7 @@ export const en: Catalog = {
   support: {
     footerHeading: 'Contact',
     menuEntry: 'Contact support',
+    whatsappButton: 'Message QatliA on WhatsApp',
     needHelp: 'Need help? Write to us:',
     paymentHelp: 'A problem with a payment? Write to us with your order number:',
     prefill: 'Hello QatliA, ',

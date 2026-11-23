@@ -2,8 +2,11 @@
 
 import type { ReactNode } from 'react';
 import Link from 'next/link';
+import { usePathname } from 'next/navigation';
 import { History, Layers, Scissors, type LucideIcon } from 'lucide-react';
 import { useLocale } from '@/components/LocaleProvider';
+import { WhatsAppHeaderButton } from '@/components/WhatsAppContact';
+import { placementFor } from '@/lib/whatsapp/site-contact';
 import type { TranslationKey } from '@/i18n';
 
 export type WorkspaceScreen = 'atelier' | 'history' | 'panels';
@@ -50,6 +53,8 @@ interface WorkspaceNavProps {
  */
 export function WorkspaceNav({ current, className, children, busy = false }: WorkspaceNavProps) {
   const { t } = useLocale();
+  // The WhatsApp button stands here on the work screens (src/lib/whatsapp/site-contact.ts).
+  const contact = placementFor(usePathname() ?? '/').kind === 'header';
 
   return (
     <nav
@@ -95,7 +100,13 @@ export function WorkspaceNav({ current, className, children, busy = false }: Wor
               </Link>
             );
           })}
-          {children ? <div className="ms-auto flex shrink-0 items-center gap-2 ps-3">{children}</div> : null}
+          {/* The page's own figures, then the WhatsApp button: no floating one on these screens. */}
+          {children || contact ? (
+            <div className="ms-auto flex shrink-0 items-center gap-2 ps-3">
+              {children}
+              {contact ? <WhatsAppHeaderButton /> : null}
+            </div>
+          ) : null}
         </div>
       </div>
     </nav>
