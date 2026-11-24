@@ -227,7 +227,7 @@ export const OptionsPanel: React.FC<OptionsPanelProps> = ({
                 dir="ltr"
                 aria-label={t('options.pricing.laborValueAria')}
                 onChange={(e) => updateLaborPricing({ mode: laborPricing.mode, value: Math.max(0, parseFloat(e.target.value) || 0) })}
-                className="w-20 px-2 py-1.5 rounded-lg bg-studio-field border border-studio-border text-slate-200 text-[11px] outline-none disabled:opacity-50" />
+                className="w-20 px-2 py-1.5 rounded-lg bg-studio-field border border-studio-border text-slate-800 dark:text-slate-200 text-[11px] outline-none disabled:opacity-50" />
             </div>
           </div>
 
