@@ -4,6 +4,7 @@ import React, { useEffect, useState } from 'react';
 import { Sparkles, Check, Zap, ArrowLeft, ShieldCheck, CreditCard, Landmark, MessageCircle, Mail } from 'lucide-react';
 import { SUPPORT_EMAIL, SUPPORT_WHATSAPP_DISPLAY, supportMailto, supportWhatsAppUrl } from '@/lib/support';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { CREDIT_PACKS, PACK_IDS, formatPrice, packPrice, BILLING_CURRENCY } from '@/lib/billing/catalog';
 import { cardCurrencyFor, offersManualPayment, type AppCurrency } from '@/lib/currency';
@@ -19,8 +20,15 @@ import { ANALYSIS_WINDOW_HOURS, MAX_SCANS_PER_ANALYSIS, VISION_CREDIT_COST } fro
 const PAYMENT_PROVIDER_NAMES = { creem: 'Creem', stripe: 'Stripe' } as const;
 type CardProvider = keyof typeof PAYMENT_PROVIDER_NAMES;
 
+/**
+ * Where a signed-out buyer goes when they pick a pack. A message at the top of
+ * the page would be out of sight on a phone, and leave nothing to press.
+ */
+const SIGN_IN_AND_BACK = '/auth/login?redirect=/credits';
+
 export default function CreditsPage() {
   const { t, tn, n, locale } = useLocale();
+  const router = useRouter();
   const [loadingPack, setLoadingPack] = useState<string | null>(null);
   const [checkoutError, setCheckoutError] = useState<string | null>(null);
   // null until the real balance is known — never a hardcoded placeholder.
@@ -85,6 +93,10 @@ export default function CreditsPage() {
       const data = await res.json();
       if (res.ok && data.url) {
         window.location.href = data.url;
+        return;
+      }
+      if (data?.error === 'AUTH_REQUIRED') {
+        router.push(SIGN_IN_AND_BACK);
         return;
       }
       // Card payment not configured yet: the manual order IS the buying path
@@ -178,6 +190,9 @@ export default function CreditsPage() {
         setBankDetails(data.bank ?? null);
         setIsExistingOrder(data.existing === true);
         setConfirmCancel(null);
+      } else if (data?.error === 'AUTH_REQUIRED') {
+        router.push(SIGN_IN_AND_BACK);
+        return;
       } else {
         setCheckoutError(t(checkoutErrorKey(data?.error)) || t('creditsPage.errors.network'));
       }
