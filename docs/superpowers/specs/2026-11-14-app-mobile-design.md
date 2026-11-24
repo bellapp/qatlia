@@ -133,8 +133,8 @@ Le serveur ne connaît pas le mode, puisqu'aucun cookie ne le porte. Les redirec
 | `/credits`, `/credits/success` | page d'achat | redirige vers `/account` |
 | `/` et `/ar` (pages d'accueil avec tarifs) | landing | redirige vers `/atelier` |
 | Atelier, pastille de solde (`atelier/page.tsx` ~l. 1805) | lien vers `/credits` | affiche le solde, mène à `/account` |
-| Atelier, erreur « plus de crédits » à l'optimisation (~l. 2356) | message + lien « Recharger » | message seul |
-| Atelier, erreur de lecture photo `atelier.visionError.insufficientCredits` | « Rechargez votre compte » | texte sans invitation à recharger |
+| Atelier, erreur « plus de crédits » à l'optimisation (~l. 2356) | message + lien « Recharger » | phrase sans lien : « Vous pouvez en acheter sur notre site qatlia.ma » (relevé du 24) |
+| Atelier, erreur de lecture photo `atelier.visionError.insufficientCredits` | « Rechargez votre compte » | la même phrase sans lien (relevé du 24) |
 | `AccountMenu`, page compte (2 liens), page historique (1 lien), page panneaux `/panels` (1 lien, ajoutée au relevé du 21) | liens vers `/credits` | masqués |
 | Lien vers la page remboursement, y compris les renvois entre pages légales (`LegalPage.tsx`) | visible | masqué |
 
@@ -143,7 +143,7 @@ Le serveur ne connaît pas le mode, puisqu'aucun cookie ne le porte. Les redirec
 - La mention des 20 crédits offerts à l'inscription reste.
 - **Pages légales (choix du rédacteur) :** confidentialité et conditions restent accessibles avec leur texte actuel, qui décrit le paiement par carte, virement et cash. Un texte légal n'est pas une invitation à payer ; le risque de refus est jugé faible. Si Google le relève, on servira une version allégée en mode app.
 
-**Conséquence assumée :** un utilisateur de l'app qui n'a plus de crédits lit « Vous n'avez plus de crédits » sans indication de la marche à suivre. C'est le prix du refus des achats intégrés.
+**Corrigé le 24 novembre, décidé par le propriétaire :** un utilisateur de l'app qui n'a plus de crédits lit où en acheter, en texte simple. La FAQ de Google sur les règles de paiement (https://support.google.com/googleplay/android-developer/answer/10281818) autorise cette phrase, sans lien direct, pour une app qui ne vend rien ; un bouton ou un lien reste interdit. Elle laisse libre ce qui est dit hors de l'app (e-mail, WhatsApp). Apple n'a pas été vérifié sur ce point : à revoir avant la phase iPhone.
 
 **Vérification :** ouvrir `/atelier?app=android` dans un navigateur sur l'aperçu de la PR et parcourir chaque ligne du tableau, y compris après une déconnexion ; puis ouvrir `/atelier` dans un autre onglet et constater que rien n'a changé.
 
