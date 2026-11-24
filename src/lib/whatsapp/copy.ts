@@ -236,6 +236,16 @@ ${PACK_LINES_AR}
 };
 
 /**
+ * The last line of the prices, for a number that can still have its free read
+ * (24/11/2026: three prospects read the prices and wrote nothing more). The
+ * webhook adds it: a number already read would have its photo refused.
+ */
+export const PRICING_TRY: Record<Lang, string> = {
+  fr: `📸 Envie d'essayer gratuitement ? Envoyez-moi ici la photo de votre fiche de débit, je vous montre le plan.`,
+  ar: `📸 بغيتي تجرب فابور؟ صيفط ليا هنا تصويرة ورقة القياسات ديالك، ونوريك المخطط.`,
+};
+
+/**
  * Texts of the photo reading (plan 2026-11-19): the bot reads a photographed
  * cut list once per number. The result itself is built in photo-summary.ts.
  */

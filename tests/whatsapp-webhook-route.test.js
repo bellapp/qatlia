@@ -49,6 +49,7 @@ function resetState() {
     assistantCalls: [],
     assistantResult: () => null,
     latestRead: () => null,
+    readRunning: () => false,
     stored: [],
     storeResult: () => STORED,
     assistantCount: 0,
@@ -191,6 +192,7 @@ stubModule('@/lib/whatsapp/plan-picture-store', {
 });
 stubModule('@/lib/whatsapp/photo-store', {
   latestPhotoRead: async (db, waId, now) => state.latestRead(waId, now),
+  photoReadRunning: async (db, waId, now) => state.readRunning(waId, now),
 });
 stubModule('@/lib/whatsapp/photo', {
   handlePhoto: async (input) => {
@@ -220,7 +222,7 @@ stubModule('@/lib/whatsapp/assistant', {
   },
 });
 
-const { COPY, MENU_BUTTONS, greeting, exampleCaption, EXAMPLE_FICHE_URL } = loadTsModule('src/lib/whatsapp/copy.ts');
+const { COPY, MENU_BUTTONS, PRICING_TRY, greeting, exampleCaption, EXAMPLE_FICHE_URL } = loadTsModule('src/lib/whatsapp/copy.ts');
 // Arabic letters get the darija-only greeting; the ad (referral, pre-filled text) both languages, darija first.
 // The text messages logged, without the example cut list sent after the greeting (tested at the end).
 const textOutbound = () => state.outbound.filter((row) => row.kind !== 'example');
@@ -758,7 +760,7 @@ test('coexistence + scope ads: a contact with a stored referral is answered late
   await withEnv({ ...CONFIGURED, WHATSAPP_BOT_SCOPE: 'ads' }, async () => {
     await POST(signedPost(messagesPayload([textMessage('wamid.a2', WA_ID, '2')])));
     assert.equal(state.sent.length, 1);
-    assert.equal(state.sent[0].body, COPY.pricing.fr);
+    assert.equal(state.sent[0].body, `${COPY.pricing.fr}\n${PRICING_TRY.fr}`);
   });
 });
 
@@ -1165,7 +1167,7 @@ test('the greeting is sent with the menu buttons; later replies are plain text',
 
     await POST(signedPost(messagesPayload([textMessage('wamid.btn2', WA_ID, '2')])));
     assert.equal(state.sent.length, 2);
-    assert.equal(state.sent[1].body, COPY.pricing.fr);
+    assert.equal(state.sent[1].body, `${COPY.pricing.fr}\n${PRICING_TRY.fr}`);
     assert.equal(state.sent[1].buttons, undefined);
   });
 });
@@ -1206,6 +1208,66 @@ test('tapping a menu button answers like the typed digit, in the contact languag
   });
 });
 
+// --- the prices end on the free try (24/11/2026) -------------------------------
+// dmcz, Amine, #polpo#: the prices read, not a word after. A number that had
+// its free read would have its photo refused: it only gets the prices.
+
+async function tapPrices(env = CONFIGURED, lang = 'ar') {
+  state.contacts.set(WA_ID, { waId: WA_ID, lang, greetedAt: new Date(), handoffUntil: null });
+  await withEnv(env, () => POST(signedPost(messagesPayload([buttonTap('wamid.prices', WA_ID, '2')]))));
+}
+
+test('the prices end on the free try, logged as sent, with the site link still the first URL', async () => {
+  for (const lang of ['ar', 'fr']) {
+    resetState();
+    await tapPrices(CONFIGURED, lang);
+    const body = `${COPY.pricing[lang]}\n${PRICING_TRY[lang]}`;
+    assert.deepEqual(state.sent.map((m) => m.body), [body]);
+    assert.equal(state.outbound[0].body, body);
+    assert.doesNotMatch(PRICING_TRY[lang], /https?:/);
+  }
+});
+
+test('a number whose sheet was already read gets the prices alone, link still valid or not', async () => {
+  for (const code of ['k7m2qx9dab', null]) {
+    resetState();
+    state.latestRead = (waId) => (waId === WA_ID ? { pieceCount: 97, code } : null);
+    await tapPrices();
+    assert.deepEqual(state.sent.map((m) => m.body), [COPY.pricing.ar]);
+  }
+});
+
+test('no free try while a sheet of this number is being read', async () => {
+  resetState();
+  state.readRunning = (waId) => waId === WA_ID;
+  await tapPrices();
+  assert.deepEqual(state.sent.map((m) => m.body), [COPY.pricing.ar]);
+});
+
+test('no free try when the photo reading is off', async () => {
+  resetState();
+  await tapPrices({ ...CONFIGURED, WHATSAPP_PHOTO_DAILY_CAP: '0' });
+  assert.deepEqual(state.sent.map((m) => m.body), [COPY.pricing.ar]);
+});
+
+test('a failing lookup sends the prices alone, never nothing', async () => {
+  for (const broken of ['latestRead', 'readRunning']) {
+    resetState();
+    state[broken] = () => {
+      throw new Error('boom');
+    };
+    await quietly(() => tapPrices());
+    assert.deepEqual(state.sent.map((m) => m.body), [COPY.pricing.ar], broken);
+  }
+});
+
+test('"how it works" does not carry the free try', async () => {
+  resetState();
+  state.contacts.set(WA_ID, { waId: WA_ID, lang: 'ar', greetedAt: new Date(), handoffUntil: null });
+  await withEnv(CONFIGURED, () => POST(signedPost(messagesPayload([buttonTap('wamid.how', WA_ID, '1')]))));
+  assert.deepEqual(state.sent.map((m) => m.body), [COPY.howItWorks.ar]);
+});
+
 // --- ad pre-filled messages ----------------------------------------------------
 // WhatsApp pre-fills the first message of an ad tap in the phone's language,
 // which says nothing about the person: the ad speaks darija.
@@ -1222,7 +1284,7 @@ test('a first contact through the ad is answered in darija, whatever the pre-fil
     assert.deepEqual(langUpdates(), ['ar']);
 
     await POST(signedPost(messagesPayload([buttonTap('wamid.ad2', WA_ID, '2')])));
-    assert.equal(state.sent[1].body, COPY.pricing.ar);
+    assert.equal(state.sent[1].body, `${COPY.pricing.ar}\n${PRICING_TRY.ar}`);
   });
 });
 
