@@ -84,3 +84,30 @@ export function creditCostFor(action: string): number {
 export function isFreeAction(action: string): boolean {
   return CREDIT_POLICY[assertKnownAction(action)] === 0;
 }
+
+/** How close to running out a balance is. */
+export type CreditLevel = 'unknown' | 'ok' | 'low' | 'empty';
+
+const LOW_CREDITS_FIXED = 5;
+const LOW_CREDITS_SHARE_FROM = 100;
+/** Dividing by ten is the 10 % share, without its floating-point surprises. */
+const LOW_CREDITS_SHARE_DIVISOR = 10;
+
+/**
+ * The balance from which the artisan is told credits run low (user decision
+ * 2026-11-24): 5 for a starting balance under 100, 10 % of it from 100.
+ * `start` is the balance right after the last credits added, null if unknown.
+ */
+export function lowCreditsThreshold(start: number | null): number {
+  if (start === null || start < LOW_CREDITS_SHARE_FROM) return LOW_CREDITS_FIXED;
+  return Math.ceil(start / LOW_CREDITS_SHARE_DIVISOR);
+}
+
+/** `start` undefined: still being read, so only a balance low for everyone is low. */
+export function creditLevel(balance: number | null, start: number | null | undefined): CreditLevel {
+  if (balance === null) return 'unknown';
+  if (balance <= 0) return 'empty';
+  if (balance <= LOW_CREDITS_FIXED) return 'low';
+  if (start === undefined) return 'unknown';
+  return balance <= lowCreditsThreshold(start) ? 'low' : 'ok';
+}
