@@ -8,6 +8,7 @@ import { clearPendingWork } from '@/lib/pending-work';
 import { forgetAtelierDraft } from '@/lib/atelier-draft';
 import { ArrowLeft, Building2, Coins, KeyRound, LogOut, Shield, Zap } from 'lucide-react';
 import { AccountMenu } from '@/components/AccountMenu';
+import { CREDIT_BADGE_TONES, useCreditLevel } from '@/components/useCreditLevel';
 import { useStoreApp } from '@/components/useStoreApp';
 import { isStoreAppDocument, storeAppCopyKey, storeAppSignOutPath } from '@/lib/store-app';
 import { QatlIALogo } from '@/components/QatlIALogo';
@@ -26,6 +27,7 @@ export default function AccountPage() {
   const [email, setEmail] = useState<string | null>(null);
   // null until the real balance is read from the profile.
   const [credits, setCredits] = useState<number | null>(null);
+  const creditLevel = useCreditLevel(credits);
   const [password, setPassword] = useState('');
   const [confirm, setConfirm] = useState('');
   const [pwdMsg, setPwdMsg] = useState<string | null>(null);
@@ -103,9 +105,9 @@ export default function AccountPage() {
             <Link
               href={inApp ? '/account/credits' : '/credits'}
               aria-label={`${t('atelier.header.creditsAria')}: ${credits === null ? '—' : n(credits)}`}
-              className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-brand-400/10 border border-brand-500/25 text-brand-400 hover:bg-brand-500/15 text-xs font-semibold transition-all"
+              className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl border text-xs font-semibold transition-all ${CREDIT_BADGE_TONES[creditLevel].box}`}
             >
-              <Zap className="w-3.5 h-3.5 fill-brand-400 text-brand-400" aria-hidden="true" />
+              <Zap className={`w-3.5 h-3.5 ${CREDIT_BADGE_TONES[creditLevel].icon}`} aria-hidden="true" />
               <span dir="ltr" className="font-mono font-bold">{credits === null ? '—' : n(credits)}</span>
             </Link>
             {email && <AccountMenu email={email} />}

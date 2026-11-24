@@ -6,6 +6,8 @@ import { useRouter } from 'next/navigation';
 import { ArrowLeft, Receipt, Zap } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { AccountMenu } from '@/components/AccountMenu';
+import { LowCreditsBanner } from '@/components/LowCreditsBanner';
+import { useCreditLevel } from '@/components/useCreditLevel';
 import { QatlIALogo } from '@/components/QatlIALogo';
 import { LocaleSwitcher, useLocale } from '@/components/LocaleProvider';
 import { formatDateTime } from '@/i18n';
@@ -33,6 +35,7 @@ export default function AccountCreditsPage() {
   const [email, setEmail] = useState<string | null>(null);
   // null until the real balance is read from the profile.
   const [credits, setCredits] = useState<number | null>(null);
+  const creditLevel = useCreditLevel(credits);
   // null until the ledger answers: an empty list must not flash "no movement".
   const [txs, setTxs] = useState<Tx[] | null>(null);
 
@@ -90,6 +93,8 @@ export default function AccountCreditsPage() {
 
       <main className="max-w-4xl mx-auto px-4 sm:px-8 py-8 space-y-6">
         <h1 className="text-2xl font-black text-slate-900 dark:text-white">{t('account.creditsUsage')}</h1>
+
+        <LowCreditsBanner balance={credits} level={creditLevel} />
 
         <section className="p-5 rounded-2xl bg-studio-panel/70 border border-studio-border flex flex-wrap items-center justify-between gap-4">
           <div className="flex items-end gap-3">

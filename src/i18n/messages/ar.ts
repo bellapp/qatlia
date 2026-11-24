@@ -238,7 +238,7 @@ export const ar: Catalog = {
       rateLimited: 'عدد كبير من التحليلات في وقت قصير. انتظر لحظة قبل إعادة المحاولة.',
       visionUnavailable: 'تحليل الصور غير متاح مؤقتاً. أعد المحاولة بعد قليل.',
       creditLedgerUnavailable: 'حساب الأرصدة غير متاح حالياً. أعد المحاولة بعد قليل.',
-      insufficientCredits: 'نفد رصيدك. اشحن حسابك لتحليل صورة جديدة.',
+      insufficientCredits: 'نفد رصيدك. اشترِ أرصدة لتحليل صورة جديدة.',
       // Inside the Play Store app: where to buy, in words only (src/lib/store-app.ts).
       insufficientCreditsApp: 'نفدت أرصدتك. يمكنك شراء الأرصدة من موقعنا qatlia.ma.',
       aiRateLimit: 'الخدمة مزدحمة مؤقتاً. أعد المحاولة بعد قليل.',
@@ -311,7 +311,6 @@ export const ar: Catalog = {
       failed: 'فشل التحسين. أعد المحاولة.',
       tooLarge: 'المخطط كبير جدًا: {max} قطعة كحد أقصى لكل عملية تحسين. قسّم المشروع إلى دفعات — لم يُخصم أي رصيد.',
       network: 'خطأ في الشبكة. تحقق من اتصالك.',
-      recharge: 'إعادة الشحن',
       running: 'جارٍ حساب التوزيع…',
       cta: 'حسِّن مخطط القطع',
     },
@@ -603,6 +602,10 @@ export const ar: Catalog = {
     step3Desc: 'اضغط على «حسِّن» لحساب أفضل توزيع. اضبط الخيارات المتقدمة.',
     step4Title: '4. صدّر مخططك',
     step4Desc: 'حمّل تقرير PDF أو DXF للتحكم الرقمي أو PNG أو JSON. واطّلع على التكلفة التقديرية.',
+  },
+  lowCredits: {
+    left: { one: 'الرصيد المتبقي: {count}.', many: 'الأرصدة المتبقية: {count}.' },
+    empty: 'لم يبق لديك أي رصيد.',
   },
   account: {
     menuAria: 'قائمة حساب {email}',

@@ -9,7 +9,7 @@ const { loadTsModule } = require('./helpers/load-ts-module');
 // simplest one: send the photo of the cut list right here.
 
 const load = (rel) => loadTsModule(path.resolve(__dirname, '..', rel));
-const { COPY, PHOTO_COPY, DEMO_VIDEO_URL, SITE_LINKS } = load('src/lib/whatsapp/copy.ts');
+const { COPY, PHOTO_COPY, PRICING_TRY, DEMO_VIDEO_URL, SITE_LINKS } = load('src/lib/whatsapp/copy.ts');
 const { buildSystemPrompt } = load('src/lib/whatsapp/assistant.ts');
 const { CREDIT_PACKS } = load('src/lib/billing/catalog.ts');
 const { SIGNUP_FREE_CREDITS, VISION_CREDIT_COST } = load('src/lib/billing/policy.ts');
@@ -76,6 +76,14 @@ test('pricing keeps the packs, the gift and what a credit buys, in plain words',
   assert.ok(COPY.pricing.ar.includes(SITE_LINKS.ar));
   // Title, gift, what a credit buys, the packs heading, the packs, the link.
   assert.ok(lines(COPY.pricing.fr).length <= 5 + Object.keys(CREDIT_PACKS).length);
+});
+
+test('the free try after the prices is one line: the photo, sent here', () => {
+  assert.match(PRICING_TRY.fr, /^📸 .*gratuitement.*Envoyez-moi ici la photo de votre fiche/);
+  assert.match(PRICING_TRY.ar, /^📸 .*فابور.*صيفط ليا هنا تصويرة ورقة القياسات/);
+  for (const lang of ['fr', 'ar']) assert.equal(lines(PRICING_TRY[lang]).length, 1);
+  assert.doesNotMatch(PRICING_TRY.fr, JARGON_FR);
+  assert.doesNotMatch(PRICING_TRY.ar, JARGON_AR);
 });
 
 test('the assistant knows the photo can be sent here, and that voice notes are heard', () => {
