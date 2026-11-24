@@ -61,7 +61,10 @@ test('the buy entry, the top-up links and the refund link carry the hidden mark'
   const usage = read('src/app/(site)/account/credits/page.tsx');
   assert.ok(marked(usage, 'href="/credits"'), 'credits usage page: buy credits');
   const atelier = read('src/app/(site)/atelier/page.tsx');
-  assert.ok(marked(atelier, '<a href="/credits"'), 'atelier: recharge after an optimisation refused');
+  const buyLinks = [...atelier.matchAll(/href="\/credits"/g)];
+  assert.equal(buyLinks.length, 2, 'atelier: a photo refused and an optimisation refused');
+  for (const link of buyLinks) assert.match(tagAround(atelier, link.index), /data-sells/, 'atelier: buy credits after a refusal');
+  assert.ok(marked(read('src/components/LowCreditsBanner.tsx'), 'href="/credits"'), 'low credits message: buy credits');
   assert.match(read('src/components/LegalPage.tsx'), /data-sells=\{other === 'refund' \? '' : undefined\}/);
 });
 

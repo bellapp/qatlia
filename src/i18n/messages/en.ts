@@ -237,7 +237,7 @@ export const en: Catalog = {
       rateLimited: 'Too many analyses in a short time. Wait a moment before trying again.',
       visionUnavailable: 'Photo analysis is temporarily unavailable. Try again in a moment.',
       creditLedgerUnavailable: 'The credit ledger is unavailable. Try again in a moment.',
-      insufficientCredits: 'Your credit balance is empty. Top up your account to analyze another photo.',
+      insufficientCredits: 'Your credit balance is empty. Buy credits to analyze another photo.',
       // Inside the Play Store app, which sells nothing.
       insufficientCreditsApp: 'Your credit balance is empty.',
       aiRateLimit: 'The service is temporarily saturated. Please try again in a moment.',
@@ -308,7 +308,6 @@ export const en: Catalog = {
       failed: 'The optimization failed. Try again.',
       tooLarge: 'Plan too large: {max} pieces maximum per optimization. Split the project into several batches — no credit was charged.',
       network: 'Network error. Check your connection.',
-      recharge: 'Recharge',
       running: 'Computing the nesting…',
       cta: 'Optimize the cut plan',
     },
@@ -600,6 +599,10 @@ export const en: Catalog = {
     step3Desc: 'Click Optimize to compute the best nesting. Fine-tune the advanced options.',
     step4Title: '4. Export your plan',
     step4Desc: 'Download the PDF report, DXF for CNC, PNG or JSON. Review the estimated cost.',
+  },
+  lowCredits: {
+    left: { one: 'You have {count} credit left.', many: 'You have {count} credits left.' },
+    empty: 'You have no credits left.',
   },
   account: {
     menuAria: 'Account menu {email}',

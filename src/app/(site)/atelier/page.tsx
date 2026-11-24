@@ -78,6 +78,8 @@ import { QuotationDialog } from '@/components/QuotationDialog';
 import { ScanViewer, useScanViewer } from '@/components/ScanViewer';
 import { EmptyState } from '@/components/EmptyState';
 import { AccountMenu } from '@/components/AccountMenu';
+import { CREDIT_BADGE_TONES, useCreditLevel } from '@/components/useCreditLevel';
+import { LowCreditsBanner } from '@/components/LowCreditsBanner';
 import { useStoreApp } from '@/components/useStoreApp';
 import { storeAppCopyKey } from '@/lib/store-app';
 import { WorkspaceNav } from '@/components/WorkspaceNav';
@@ -259,6 +261,7 @@ export default function Dashboard() {
   // null until the signed-in artisan's real balance is loaded — never a
   // hardcoded placeholder the customer could mistake for their actual solde.
   const [userCredits, setUserCredits] = useState<number | null>(null);
+  const creditLevel = useCreditLevel(userCredits);
   const [userEmail, setUserEmail] = useState<string | null>(null);
   // The failure is held as a catalog key, not as rendered prose: the server
   // answers with a machine-readable code, and holding the key means an artisan
@@ -1192,6 +1195,7 @@ const commitPanelName = () => {
         } else if (res.status === 401) {
           setOptimizeError(t('atelier.optimize.authRequired'));
         } else if (res.status === 402) {
+          if (typeof data?.creditsRemaining === 'number') setUserCredits(data.creditsRemaining);
           setOptimizeError(t('atelier.optimize.noCredits'));
         } else if (data?.error === 'WORKLOAD_TOO_LARGE') {
           // Rejected before the debit — no credit was spent on this run.
@@ -1808,13 +1812,13 @@ const commitPanelName = () => {
               <Link
                 href={inApp ? '/account/credits' : '/credits'}
                 aria-label={t('atelier.header.creditsAria')}
-                className="group relative flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-brand-400/10 border border-brand-500/25 text-brand-400 hover:bg-brand-500/15 hover:border-brand-500/40 text-xs font-semibold transition-all"
+                className={`group relative flex items-center gap-1.5 px-3.5 py-2 rounded-lg border text-xs font-semibold transition-all ${CREDIT_BADGE_TONES[creditLevel].box}`}
               >
                 <span className="relative flex h-2 w-2">
-                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-brand-400 opacity-60" />
-                  <span className="relative inline-flex rounded-full h-2 w-2 bg-brand-400" />
+                  <span className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-60 ${CREDIT_BADGE_TONES[creditLevel].dot}`} />
+                  <span className={`relative inline-flex rounded-full h-2 w-2 ${CREDIT_BADGE_TONES[creditLevel].dot}`} />
                 </span>
-                <Zap className="w-3.5 h-3.5 fill-brand-400 text-brand-400" />
+                <Zap className={`w-3.5 h-3.5 ${CREDIT_BADGE_TONES[creditLevel].icon}`} />
                 <span className="font-mono font-bold" dir="ltr">{userCredits === null ? '—' : n(userCredits)}</span>
                 <span className="text-[10px] opacity-80 hidden sm:inline">{t('atelier.header.credits')}</span>
               </Link>
@@ -1860,6 +1864,8 @@ const commitPanelName = () => {
         <div className="space-y-4">
 
           <div className="min-w-0 w-full space-y-4">
+
+            <LowCreditsBanner balance={userCredits} level={creditLevel} dismissible />
 
             {/* Project strip — always visible, independent of the result state. */}
             <div className="flex flex-wrap items-center gap-2.5 px-4 py-3 rounded-xl bg-studio-panel border border-studio-border shadow-sm">
@@ -2029,7 +2035,16 @@ const commitPanelName = () => {
             {visionError && (
               <div role="alert" className="flex items-center gap-3 p-3 rounded-xl bg-rose-500/10 border border-rose-500/20">
                 <AlertTriangle className="w-4 h-4 text-rose-400 shrink-0" />
-                <span className="text-xs text-rose-300 font-medium">{t(storeAppCopyKey(visionError, inApp), { max: MAX_SCAN_SHEETS })}</span>
+                <span className="text-xs text-rose-700 dark:text-rose-300 font-medium">{t(storeAppCopyKey(visionError, inApp), { max: MAX_SCAN_SHEETS })}</span>
+                {visionError === 'atelier.visionError.insufficientCredits' && (
+                  <Link
+                    href="/credits"
+                    data-sells=""
+                    className="ms-auto shrink-0 px-3 py-2 rounded-lg bg-brand-400 hover:bg-brand-500 text-slate-950 text-xs font-black transition-colors"
+                  >
+                    {t('account.buyCredits')}
+                  </Link>
+                )}
               </div>
             )}
 
@@ -2358,7 +2373,7 @@ const commitPanelName = () => {
                 <AlertTriangle className="w-4 h-4 shrink-0" aria-hidden="true" />
                 {optimizeError}
                 {(optimizeError === t('atelier.optimize.noCredits')) && (
-                  <a href="/credits" data-sells="" className="ms-auto font-black underline hover:no-underline">{t('atelier.optimize.recharge')}</a>
+                  <Link href="/credits" data-sells="" className="ms-auto shrink-0 px-3 py-2 rounded-lg bg-brand-400 hover:bg-brand-500 text-slate-950 font-black transition-colors">{t('account.buyCredits')}</Link>
                 )}
               </p>
             )}

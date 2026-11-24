@@ -11,6 +11,7 @@ import {
 } from 'lucide-react';
 import { readLocalHistory, renameLocalHistoryItem, type LocalHistoryItem } from '@/lib/history';
 import { AccountMenu } from '@/components/AccountMenu';
+import { CREDIT_BADGE_TONES, useCreditLevel } from '@/components/useCreditLevel';
 import { useStoreApp } from '@/components/useStoreApp';
 import { WorkspaceNav } from '@/components/WorkspaceNav';
 import { QatlIALogo } from '@/components/QatlIALogo';
@@ -122,6 +123,7 @@ export default function HistoryPage() {
   const [loading, setLoading] = useState(true);
   const [userEmail, setUserEmail] = useState<string | null>(null);
   const [userCredits, setUserCredits] = useState<number | null>(null);
+  const creditLevel = useCreditLevel(userCredits);
   // The note is held as a key, not as rendered copy, so a language switch
   // re-renders it instead of leaving the previous locale on screen.
   const [syncNote, setSyncNote] = useState<TranslationKey | null>(null);
@@ -379,9 +381,9 @@ export default function HistoryPage() {
             <Link
               href={inApp ? '/account/credits' : '/credits'}
               aria-label={`${t('atelier.header.creditsAria')}: ${userCredits === null ? '—' : n(userCredits)}`}
-              className="flex items-center gap-1.5 px-2.5 sm:px-3.5 py-2 rounded-xl bg-brand-400/10 border border-brand-500/25 text-brand-400 hover:bg-brand-500/15 text-xs font-semibold transition-all"
+              className={`flex items-center gap-1.5 px-2.5 sm:px-3.5 py-2 rounded-xl border text-xs font-semibold transition-all ${CREDIT_BADGE_TONES[creditLevel].box}`}
             >
-              <Zap className="w-3.5 h-3.5 fill-brand-400 text-brand-400" aria-hidden="true" />
+              <Zap className={`w-3.5 h-3.5 ${CREDIT_BADGE_TONES[creditLevel].icon}`} aria-hidden="true" />
               <span dir="ltr" className="font-mono font-bold">{userCredits === null ? '—' : n(userCredits)}</span>
             </Link>
             {userEmail ? (<AccountMenu email={userEmail} />) : (

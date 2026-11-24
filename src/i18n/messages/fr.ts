@@ -278,7 +278,7 @@ export const fr = {
       rateLimited: 'Trop d’analyses en peu de temps. Patientez un instant avant de réessayer.',
       visionUnavailable: 'L’analyse photo est momentanément indisponible. Réessayez dans un instant.',
       creditLedgerUnavailable: 'Le décompte des crédits est indisponible. Réessayez dans un instant.',
-      insufficientCredits: 'Votre solde de crédits est épuisé. Rechargez votre compte pour analyser une nouvelle photo.',
+      insufficientCredits: 'Votre solde de crédits est épuisé. Achetez des crédits pour analyser une nouvelle photo.',
       // Inside the Play Store app, which sells nothing.
       insufficientCreditsApp: 'Votre solde de crédits est épuisé.',
       aiRateLimit: 'Service temporairement saturé. Veuillez réessayer dans un instant.',
@@ -349,7 +349,6 @@ export const fr = {
       failed: 'L’optimisation a échoué. Réessayez.',
       tooLarge: 'Plan trop volumineux : {max} pièces maximum par optimisation. Découpez le projet en plusieurs lots — aucun crédit n’a été débité.',
       network: 'Erreur réseau. Vérifiez votre connexion.',
-      recharge: 'Recharger',
       running: 'Calcul du calepinage…',
       cta: 'Optimiser le plan de coupe',
     },
@@ -658,6 +657,10 @@ export const fr = {
     step3Desc: 'Cliquez sur Optimiser pour calculer le placement optimal. Ajustez les options avancées.',
     step4Title: '4. Exportez votre plan',
     step4Desc: 'Téléchargez le rapport PDF, DXF pour CNC, PNG ou JSON. Visualisez le coût estimé.',
+  },
+  lowCredits: {
+    left: { one: 'Il vous reste {count} crédit.', many: 'Il vous reste {count} crédits.' },
+    empty: 'Vous n’avez plus de crédits.',
   },
   account: {
     menuAria: 'Menu du compte {email}',

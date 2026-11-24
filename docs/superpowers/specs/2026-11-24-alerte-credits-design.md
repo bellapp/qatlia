@@ -10,16 +10,16 @@ Inciter les clients à acheter des crédits avant d'être bloqués. Aujourd'hui 
 
 - **A. Prévenir à temps (choisie par l'utilisateur, 2026-11-24).** Ne coûte rien, ne touche ni aux prix ni aux paiements. Risque : agacer, d'où le message que l'on peut fermer.
 - **B. Offrir un bonus à l'achat.** Écartée pour l'instant : coûte des crédits et peut habituer les clients à attendre le bonus.
-- Seuil : 10 % sous 100 crédits (demande de l'utilisateur, 2026-11-24). Un pourcentage pour tous est écarté : 10 % de 400 alerteraient à 40.
+- Seuil (décision de l'utilisateur, 2026-11-24) : 5 crédits sous 100, 10 % à partir de 100.
 
 ## Ce que le client voit
 
 Seuil, calculé à un seul endroit (`src/lib/billing/policy.ts`), sur le **solde de départ** :
 
-- solde de départ = le solde juste après le dernier ajout de crédits (achat ou ajout par l'admin), lu dans `credit_transactions.balance_after` ; sans aucun ajout, les crédits offerts à l'inscription (`SIGNUP_FREE_CREDITS`, 20) ;
-- moins de 100 : 10 %, arrondi au-dessus (20 → 2, 30 → 3, 80 → 8) ;
-- 100 et plus : 10 crédits fixes (proposition, à confirmer par l'utilisateur) ;
-- solde de départ illisible : seul l'état 0 est affiché.
+- solde de départ = le solde juste après le dernier ajout de crédits (achat ou ajout par l'admin), lu dans `credit_transactions.balance_after` ; sans aucun ajout, inconnu (les crédits offerts à l'inscription sont sous 100) ;
+- moins de 100 : 5 crédits ;
+- 100 et plus : 10 %, arrondi au-dessus (200 → 20, 400 → 40) ;
+- solde de départ illisible ou inconnu : 5 crédits.
 
 | Solde | Badge du solde | Message |
 |---|---|---|
