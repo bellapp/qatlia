@@ -77,7 +77,7 @@ export async function planAndAnswer<Failed>(input: {
     };
   } catch (error) {
     console.error('[whatsapp] plan answer threw', describe(error));
-    return await fail('threw');
+    return await fail('plan threw', PHOTO_COPY.ourFault[lang]);
   }
 
   // The read is stored and the number served: a failing send is logged, never undone.

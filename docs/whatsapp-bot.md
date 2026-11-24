@@ -133,7 +133,10 @@ Règles :
 - **une lecture réussie par numéro, définitivement**. Les photos suivantes reçoivent le lien de la première fiche et l'invitation à continuer dans l'atelier ;
   - une seule réponse « déjà lue » par numéro et par tranche de 10 minutes, même pour plusieurs photos envoyées d'un coup : la réponse est réservée par une ligne `photo_already_claim` (wamid unique `claim:photo_already:<numéro>:<tranche>`) dans `whatsapp_messages`. Avant le 22/11/2026, 5 photos envoyées ensemble recevaient 4 réponses identiques ;
   - l'assistant sait que la fiche a été lue : il reçoit le nombre de pièces et le lien (ou « expiré »), et ne redemande plus la fiche. Dans son historique, une photo reçue apparaît comme « 📷 photo » ;
+  - les photos arrivées **pendant** la lecture d'une autre ne sont pas lues (ligne `photo_waiting` par photo dans `whatsapp_messages`) : après le plan, un seul message dit que le plan est celui d'une seule photo et renvoie les autres vers l'atelier (24/11/2026). Si la lecture échoue, seul le message d'échec part ;
 - une lecture ratée (photo illisible, pas une fiche) libère le numéro, jusqu'à 3 échecs par numéro sur 24 h ;
+  - la lecture a ce qui reste de 45 s depuis l'arrivée de la photo, 40 s au plus (30 s avant le 24/11/2026). Si elle s'arrête de notre côté (délai, téléchargement, fournisseur), le bot le dit et n'accuse pas la photo ;
+  - la raison et la durée de l'échec sont gardées dans `summary` de la ligne `failed` (`{"failure": "read error 0", "ms": 41000}`, où `0` veut dire délai dépassé) ;
 - garde-fous : 10 s par requête Meta, 30 s pour la lecture IA ; une ligne sans cote lisible est ignorée, un format de panneau hors 30–400 cm est remplacé par le panneau par défaut ;
 - taille de la liste (nombre de pièces, quantités comprises) :
   - **jusqu'à 450 pièces**, le bot calcule le plan comme décrit plus haut ;

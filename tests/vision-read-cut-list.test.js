@@ -193,6 +193,19 @@ test('timeoutMs gives the request a deadline; running out of time is an error, n
   assert.deepEqual(result, { status: 'error', rateLimited: false, httpStatus: 0 });
 });
 
+// The answer's headers can come long before its body: the deadline may fall while reading it.
+test('running out of time while the answer is read is an error too, for the bot only', async () => {
+  const stalled = async () => ({
+    ok: true,
+    json: async () => {
+      throw Object.assign(new Error('The operation was aborted due to timeout'), { name: 'TimeoutError' });
+    },
+  });
+  const { result } = await read(null, { timeoutMs: 5 }, { fetchImpl: stalled });
+  assert.deepEqual(result, { status: 'error', rateLimited: false, httpStatus: 0 });
+  await assert.rejects(() => read(null, undefined, { fetchImpl: stalled }));
+});
+
 test('any other network failure still throws, as the site route expects', async () => {
   await assert.rejects(() => read(null, undefined, { fetchImpl: async () => { throw new TypeError('fetch failed'); } }));
 });
