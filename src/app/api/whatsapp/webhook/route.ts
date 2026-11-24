@@ -538,6 +538,7 @@ async function answerWithAssistant(
   const redirect = config.handoffMode === 'redirect';
   const linkSent = redirect && (await advisorLinkSentLately(db, waId, now));
   const photoRead = await photoReadFor(db, waId, now);
+  const freeTry = await canHaveFreeRead(db, config, waId, now);
   const timeoutMs = timeLeft();
   const answer =
     config.openrouterKey && timeoutMs !== null
@@ -550,6 +551,7 @@ async function answerWithAssistant(
           photoRead,
           advisorLinkSent: linkSent,
           photoReading,
+          freeTry,
           ...(timeoutMs !== undefined ? { timeoutMs } : {}),
         })
       : null;

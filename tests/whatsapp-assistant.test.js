@@ -9,6 +9,7 @@ const load = (rel) => loadTsModule(path.join(PROJECT_ROOT, rel));
 
 const { buildSystemPrompt, askAssistant, MAX_REPLY_CHARS, HISTORY_MESSAGES, MAX_INBOUND_CHARS, ASSISTANT_TIMEOUT_MS } =
   load('src/lib/whatsapp/assistant.ts');
+const { ATELIER_LINK, PRICING_TRY } = load('src/lib/whatsapp/copy.ts');
 const { CREDIT_PACKS, formatMAD } = load('src/lib/billing/catalog.ts');
 const { SIGNUP_FREE_CREDITS, VISION_CREDIT_COST, ANALYSIS_WINDOW_HOURS } = load('src/lib/billing/policy.ts');
 const { fr } = load('src/i18n/messages/fr.ts');
@@ -344,6 +345,37 @@ test('the assistant knows the sheet this number sent was read, and points to its
   const none = fakeFetch(() => llmResponse('{"reply":"ok","handoff":false}'));
   await ask(none, { handoffMode: 'coexistence' });
   assert.equal(none.calls[0].body.messages[0].content, buildSystemPrompt('coexistence'));
+});
+
+// Moi, 24/11/2026: plan made the day before, then asked to list the pieces
+// here; the list came, and was refused (one read per number).
+test('after a read, the assistant asks for nothing more here: the next job goes to the atelier', async () => {
+  for (const link of ['https://qatlia.ma/w/k7m2qx9dab', null]) {
+    const f = fakeFetch(() => llmResponse('{"reply":"ok","handoff":false}'));
+    await ask(f, { handoffMode: 'redirect', photoRead: { pieceCount: 97, link } });
+    const note = f.calls[0].body.messages[0].content.slice(buildSystemPrompt('redirect').length);
+    assert.match(note, /ne fera pas d'autre plan ici/, String(link));
+    assert.match(note, /ni photo, ni mesures, ni liste de pièces/, String(link));
+    assert.match(note, /même si elle montre ou décrit un meuble/, String(link));
+    assert.ok(note.includes(ATELIER_LINK), String(link));
+  }
+});
+
+// woodvanest, 24/11/2026: « الثمن » typed, the prices, nothing more.
+test('asked for the prices, the assistant ends on the free try, only when the number can have it', async () => {
+  const f = fakeFetch(() => llmResponse('{"reply":"ok","handoff":false}'));
+  await ask(f, { handoffMode: 'redirect', freeTry: true });
+  const system = f.calls[0].body.messages[0].content;
+  assert.ok(system.startsWith(buildSystemPrompt('redirect')));
+  const note = system.slice(buildSystemPrompt('redirect').length);
+  assert.ok(note.includes(PRICING_TRY.fr));
+  assert.ok(note.includes(PRICING_TRY.ar));
+  assert.match(note, /prix/);
+  assert.match(note, /dernière ligne/);
+
+  const none = fakeFetch(() => llmResponse('{"reply":"ok","handoff":false}'));
+  await ask(none, { handoffMode: 'redirect', freeTry: false });
+  assert.equal(none.calls[0].body.messages[0].content, buildSystemPrompt('redirect'));
 });
 
 // Minuisr Aluminium, 23/11/2026: a voice note sent while his photo was being

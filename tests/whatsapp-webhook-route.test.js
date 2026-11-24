@@ -1261,6 +1261,35 @@ test('a failing lookup sends the prices alone, never nothing', async () => {
   }
 });
 
+test('the assistant may offer the free try to a number that can have it, and to no other', async () => {
+  const typePrice = async (env = CONFIGURED) => {
+    state.contacts.set(WA_ID, { waId: WA_ID, lang: 'ar', greetedAt: new Date(), handoffUntil: null });
+    state.assistantResult = () => ({ reply: 'ok', handoff: false });
+    await withEnv({ ...env, WHATSAPP_BOT_MODEL: 'test/model' }, () =>
+      POST(signedPost(messagesPayload([textMessage('wamid.typedprice', WA_ID, 'الثمن')]))));
+    return state.assistantCalls[0].freeTry;
+  };
+  resetState();
+  assert.equal(await typePrice(), true);
+
+  resetState();
+  state.latestRead = () => ({ pieceCount: 97, code: null });
+  assert.equal(await typePrice(), false, 'already read');
+
+  resetState();
+  state.readRunning = () => true;
+  assert.equal(await typePrice(), false, 'being read');
+
+  resetState();
+  assert.equal(await typePrice({ ...CONFIGURED, WHATSAPP_PHOTO_DAILY_CAP: '0' }), false, 'reading off');
+
+  resetState();
+  state.readRunning = () => {
+    throw new Error('boom');
+  };
+  await quietly(async () => assert.equal(await typePrice(), false, 'lookup failed'));
+});
+
 test('"how it works" does not carry the free try', async () => {
   resetState();
   state.contacts.set(WA_ID, { waId: WA_ID, lang: 'ar', greetedAt: new Date(), handoffUntil: null });
