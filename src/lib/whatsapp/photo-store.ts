@@ -174,8 +174,13 @@ export async function completePhotoRead(
   check(error, 'complete');
 }
 
-export async function failPhotoRead(db: SupabaseClient, id: string): Promise<void> {
-  const { error } = await db.from(TABLE).update({ status: 'failed' }).eq('id', id);
+/** `failure`: why, and after how long (the platform logs are kept only for minutes). Nothing about the sheet. */
+export async function failPhotoRead(db: SupabaseClient, id: string, failure?: { reason: string; ms: number }): Promise<void> {
+  const summary = failure ? { failure: failure.reason, ms: failure.ms } : null;
+  const { error } = await db
+    .from(TABLE)
+    .update({ status: 'failed', ...(summary ? { summary } : {}) })
+    .eq('id', id);
   check(error, 'fail');
 }
 

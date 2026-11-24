@@ -135,6 +135,13 @@ test('failing marks the row failed', async () => {
   assert.ok(has(fake.state.fromCalls[0], 'eq', 'id', 'r1'));
 });
 
+// The platform logs are kept only for minutes: why a read failed stays with its row.
+test('failing with a reason keeps the reason and the time taken', async () => {
+  const fake = createFakeSupabase();
+  await failPhotoRead(fake.client, 'r1', { reason: 'read error 0', ms: 41000 });
+  assert.deepEqual(updates(fake), [{ status: 'failed', summary: { failure: 'read error 0', ms: 41000 } }]);
+});
+
 const row = (over = {}) => ({
   id: 'r1',
   pieces: [{ name: '', height: 50, width: 40, quantity: 2 }],

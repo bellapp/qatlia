@@ -250,6 +250,10 @@ export const PHOTO_COPY: {
    * to take the photo again). The pieces typed in one message get the plan.
    */
   notAList: Record<NotAListKind, Record<Lang, string>>;
+  /** The read stopped on our side (out of time, download, provider): the photo is never blamed. */
+  ourFault: Record<Lang, string>;
+  /** After the plan, when other photos came during its read (one read per number). */
+  others: Record<Lang, string>;
   /** A number whose photo was already read: its link while valid, and the atelier for the next ones. */
   already: (lang: Lang, link: string | null) => string;
   /** A list read but over the bot's limit (MAX_BOT_PIECES): it was read, so never the unreadable text. */
@@ -280,6 +284,14 @@ Exemple : 60x40x2`,
 كتبهم ليا هنا كاملين فـ ميساج واحد: الطول x العرض x العدد.
 مثلا: 60x40x2`,
     },
+  },
+  ourFault: {
+    fr: `La lecture s'est arrêtée de notre côté 🙏 Votre photo n'est pas en cause. Renvoyez-moi la même photo ici.`,
+    ar: `القراية وقفات من عندنا 🙏 التصويرة ديالك ما فيها حتى مشكل. صيفط ليا نفس التصويرة مرة أخرى هنا.`,
+  },
+  others: {
+    fr: `📄 Vous avez envoyé plusieurs photos : ce plan est celui d'une seule photo. Les autres se lisent dans l'atelier, après votre inscription gratuite :\n👉 ${ATELIER_LINK}`,
+    ar: `📄 صيفطتي كتر من تصويرة: هاد المخطط ديال تصويرة وحدة. الأخرين صوّرهم فالورشة، من بعد ما تدير حساب مجاني:\n👉 ${ATELIER_LINK}`,
   },
   already: (lang, link) => {
     if (lang === 'ar') {

@@ -233,15 +233,19 @@ export async function readCutList(
   };
   if (options.timeoutMs) request.signal = AbortSignal.timeout(options.timeoutMs);
 
-  let res: Response;
-  try {
-    res = await fetch(endpoint, request);
-  } catch (error) {
+  const outOfTime = (error: unknown): ReadResult => {
     const name = error instanceof Error ? error.name : '';
     if (options.timeoutMs && (name === 'TimeoutError' || name === 'AbortError')) {
       return { status: 'error', rateLimited: false, httpStatus: 0 };
     }
     throw error;
+  };
+
+  let res: Response;
+  try {
+    res = await fetch(endpoint, request);
+  } catch (error) {
+    return outOfTime(error);
   }
 
   if (!res.ok) {
@@ -250,7 +254,13 @@ export async function readCutList(
     return { status: 'error', rateLimited: errText.includes('rate limit') || errText.includes('429'), httpStatus: res.status };
   }
 
-  const data = await res.json();
+  // The headers can come long before the body: the deadline may fall here too.
+  let data;
+  try {
+    data = await res.json();
+  } catch (error) {
+    return outOfTime(error);
+  }
   const rawContent = data.choices?.[0]?.message?.content || '';
   const parsed = extractJson(rawContent);
   if (!parsed || !Array.isArray(parsed.pieces) || parsed.pieces.length === 0) return { status: 'unreadable' };
