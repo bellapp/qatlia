@@ -41,7 +41,7 @@ test('without a logo the card draws no image', () => {
 });
 
 test('the card speaks the artisan language', () => {
-  assert.match(render({ company: { name: 'نجارة بنعلي' } }, 'ar'), /تعديل مؤسستي/);
+  assert.match(render({ company: { name: 'نجارة بنعلي' } }, 'ar'), /تعديل شركتي/);
 });
 
 test('the dialog shows the card for an account business and the fields otherwise', () => {
