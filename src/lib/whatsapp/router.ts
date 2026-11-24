@@ -7,7 +7,7 @@
  */
 
 import type { HandoffMode } from '@/lib/whatsapp/config';
-import { COPY, MENU_BUTTONS, exampleCaption, greeting, type Lang, type MenuButton } from '@/lib/whatsapp/copy';
+import { COPY, MENU_BUTTONS, PRICING_TRY, exampleCaption, greeting, type Lang, type MenuButton } from '@/lib/whatsapp/copy';
 import type { InboundEvent } from '@/lib/whatsapp/payload';
 import { isSiteMessage, isSiteReferral, typedBeyondSiteMessage } from '@/lib/whatsapp/site-contact';
 
@@ -33,6 +33,7 @@ export type Decision =
   /** `exampleCaption`: once the text is out, the example cut list (EXAMPLE_FICHE_URL) goes with this caption. */
   /** `thenAssistant`: once the greeting is out, the assistant answers the message (a first contact asking something). */
   /** `advisorLink`: the text carries the advisor's number (redirect mode); the route logs it as such. */
+  /** `freeTry`: the route ends the text with this line when the number can still have its free read. */
   | {
       action: 'send';
       text: string;
@@ -43,6 +44,7 @@ export type Decision =
       exampleCaption?: string;
       thenAssistant?: true;
       advisorLink?: true;
+      freeTry?: string;
     }
   | { action: 'assistant' }
   /** A photo: the webhook tries to read it as a cut list (src/lib/whatsapp/photo.ts). */
@@ -252,7 +254,7 @@ export function decide(input: {
   // 3. Menu choices, even for a contact not greeted yet.
   const choice = menuChoice(event.text);
   if (choice === 1) return reply(COPY.howItWorks[lang], true);
-  if (choice === 2) return reply(COPY.pricing[lang], true);
+  if (choice === 2) return { action: 'send', text: COPY.pricing[lang], markGreeted: true, handoff: false, freeTry: PRICING_TRY[lang] };
   if (choice === 3) return toAdvisor(COPY.advisor[lang], true, COPY.advisorRedirect[lang]);
 
   // 3b. A photo is read as a cut list, even as the very first message: these

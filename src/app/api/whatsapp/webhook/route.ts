@@ -30,7 +30,7 @@ import { assistantBudgetMs, hearVoice } from '@/lib/whatsapp/voice';
 import { waitForPhotoRead } from '@/lib/whatsapp/read-wait';
 import { HISTORY_MESSAGES, askAssistant, type HistoryItem, type PhotoReadNote } from '@/lib/whatsapp/assistant';
 import { handleTypedList } from '@/lib/whatsapp/typed-list';
-import { latestPhotoRead } from '@/lib/whatsapp/photo-store';
+import { latestPhotoRead, photoReadRunning } from '@/lib/whatsapp/photo-store';
 import { photoLink } from '@/lib/whatsapp/photo-summary';
 import { sendButtons, sendImage, sendPlanCard, sendText, type PlanCard } from '@/lib/whatsapp/send';
 import { handlePhoto, type PhotoMessageKind } from '@/lib/whatsapp/photo';
@@ -356,11 +356,13 @@ async function handleInbound(
 
   if (decision.action === 'send') {
     const kind = decision.advisorLink ? ADVISOR_LINK_KIND : 'fixed';
+    const freeTry = decision.freeTry && (await canHaveFreeRead(db, config, waId, now)) ? `\n${decision.freeTry}` : '';
+    const text = `${decision.text}${freeTry}`;
     // A message with buttons that cannot be sent falls back to its plain-text version, so the contact still gets an answer.
     const sent = decision.menu
-      ? (await deliver(db, config, waId, decision.text, kind, decision.menu.buttons)) ||
+      ? (await deliver(db, config, waId, text, kind, decision.menu.buttons)) ||
         (await deliver(db, config, waId, decision.menu.fallbackText, kind))
-      : await deliver(db, config, waId, decision.text, kind);
+      : await deliver(db, config, waId, text, kind);
     if (!sent) {
       if (greetingClaimed) await releaseGreeting(db, waId, now);
       return;
@@ -454,6 +456,21 @@ async function photoReadFor(db: SupabaseClient, waId: string, now: Date): Promis
   } catch (error) {
     console.error('[whatsapp] latest photo read lookup failed', describeError(error));
     return null;
+  }
+}
+
+/**
+ * Whether a photo of this number would be read now: the reading is on, and no
+ * sheet of it was read or is being read. Unknown counts as no: the offer is
+ * left out rather than made and refused.
+ */
+async function canHaveFreeRead(db: SupabaseClient, config: WhatsAppConfig, waId: string, now: Date): Promise<boolean> {
+  if (config.photoDailyCap <= 0) return false;
+  try {
+    return (await latestPhotoRead(db, waId, now)) === null && !(await photoReadRunning(db, waId, now));
+  } catch (error) {
+    console.error('[whatsapp] free read lookup failed', describeError(error));
+    return false;
   }
 }
 
