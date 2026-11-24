@@ -239,8 +239,8 @@ export const ar: Catalog = {
       visionUnavailable: 'تحليل الصور غير متاح مؤقتاً. أعد المحاولة بعد قليل.',
       creditLedgerUnavailable: 'حساب الأرصدة غير متاح حالياً. أعد المحاولة بعد قليل.',
       insufficientCredits: 'نفد رصيدك. اشترِ أرصدة لتحليل صورة جديدة.',
-      // Inside the Play Store app, which sells nothing.
-      insufficientCreditsApp: 'نفد رصيدك.',
+      // Inside the Play Store app: where to buy, in words only (src/lib/store-app.ts).
+      insufficientCreditsApp: 'نفدت أرصدتك. يمكنك شراء الأرصدة من موقعنا qatlia.ma.',
       aiRateLimit: 'الخدمة مزدحمة مؤقتاً. أعد المحاولة بعد قليل.',
       aiServiceError: 'خطأ في التحليل. أعد المحاولة بصورة أوضح.',
       aiParseError: 'لم يتم التعرّف على أي قياس مقروء. تأكد من وضوح الصورة وحسن تأطيرها.',
@@ -306,6 +306,8 @@ export const ar: Catalog = {
     optimize: {
       authRequired: 'سجّل الدخول لإجراء التحسين.',
       noCredits: 'نفدت الأرصدة — رصيد واحد لكل تحليل كامل.',
+      // Inside the Play Store app: where to buy, in words only (src/lib/store-app.ts).
+      noCreditsApp: 'نفدت أرصدتك. يمكنك شراء الأرصدة من موقعنا qatlia.ma.',
       failed: 'فشل التحسين. أعد المحاولة.',
       tooLarge: 'المخطط كبير جدًا: {max} قطعة كحد أقصى لكل عملية تحسين. قسّم المشروع إلى دفعات — لم يُخصم أي رصيد.',
       network: 'خطأ في الشبكة. تحقق من اتصالك.',

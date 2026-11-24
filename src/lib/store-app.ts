@@ -95,12 +95,15 @@ var p=window.location.pathname.replace(/\\/+$/,'')||'/';if(Object.prototype.hasO
 )}));}}catch(e){}})();`;
 
 /**
- * Messages whose site wording invites the reader to pay, and the wording the
- * app shows instead: the vision error says the balance is empty without
- * « Rechargez votre compte », the currency hint leaves out the packs.
+ * Messages whose site wording leads to a purchase, and the wording the app
+ * shows instead. Out of credits, it says where to buy them in words only:
+ * Google lets an app that sells nothing do so, but forbids any link, button or
+ * web address to follow (payments policy FAQ, answer/10281818, read on
+ * 2026-11-24). The currency hint leaves out the packs.
  */
 const STORE_APP_COPY: Partial<Record<TranslationKey, TranslationKey>> = {
   'atelier.visionError.insufficientCredits': 'atelier.visionError.insufficientCreditsApp',
+  'atelier.optimize.noCredits': 'atelier.optimize.noCreditsApp',
   'accountPage.currencyHint': 'accountPage.currencyHintApp',
 };
 
