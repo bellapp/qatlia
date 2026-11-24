@@ -79,7 +79,7 @@ import { ScanViewer, useScanViewer } from '@/components/ScanViewer';
 import { EmptyState } from '@/components/EmptyState';
 import { AccountMenu } from '@/components/AccountMenu';
 import { useStoreApp } from '@/components/useStoreApp';
-import { storeAppCopyKey } from '@/lib/store-app';
+import { isStoreAppDocument, storeAppCopyKey } from '@/lib/store-app';
 import { WorkspaceNav } from '@/components/WorkspaceNav';
 import { QatlIALogo } from '@/components/QatlIALogo';
 import { ThemeToggle } from '@/components/ThemeToggle';
@@ -1192,7 +1192,7 @@ const commitPanelName = () => {
         } else if (res.status === 401) {
           setOptimizeError(t('atelier.optimize.authRequired'));
         } else if (res.status === 402) {
-          setOptimizeError(t('atelier.optimize.noCredits'));
+          setOptimizeError(t(storeAppCopyKey('atelier.optimize.noCredits', isStoreAppDocument())));
         } else if (data?.error === 'WORKLOAD_TOO_LARGE') {
           // Rejected before the debit — no credit was spent on this run.
           setOptimizeError(t('atelier.optimize.tooLarge', { max: String(data.maxPieces ?? '') }));

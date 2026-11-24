@@ -279,8 +279,8 @@ export const fr = {
       visionUnavailable: 'L’analyse photo est momentanément indisponible. Réessayez dans un instant.',
       creditLedgerUnavailable: 'Le décompte des crédits est indisponible. Réessayez dans un instant.',
       insufficientCredits: 'Votre solde de crédits est épuisé. Rechargez votre compte pour analyser une nouvelle photo.',
-      // Inside the Play Store app, which sells nothing.
-      insufficientCreditsApp: 'Votre solde de crédits est épuisé.',
+      // Inside the Play Store app: where to buy, in words only (src/lib/store-app.ts).
+      insufficientCreditsApp: 'Vous n’avez plus de crédits. Vous pouvez en acheter sur notre site qatlia.ma.',
       aiRateLimit: 'Service temporairement saturé. Veuillez réessayer dans un instant.',
       aiServiceError: 'Erreur d’analyse. Veuillez réessayer avec une photo plus nette.',
       aiParseError: 'Aucune mesure lisible n’a été détectée. Vérifiez que la photo est nette et bien cadrée.',
@@ -346,6 +346,8 @@ export const fr = {
     optimize: {
       authRequired: 'Connectez-vous pour lancer une optimisation.',
       noCredits: 'Crédits épuisés — 1 crédit par analyse complète.',
+      // Inside the Play Store app: where to buy, in words only (src/lib/store-app.ts).
+      noCreditsApp: 'Vous n’avez plus de crédits. Vous pouvez en acheter sur notre site qatlia.ma.',
       failed: 'L’optimisation a échoué. Réessayez.',
       tooLarge: 'Plan trop volumineux : {max} pièces maximum par optimisation. Découpez le projet en plusieurs lots — aucun crédit n’a été débité.',
       network: 'Erreur réseau. Vérifiez votre connexion.',

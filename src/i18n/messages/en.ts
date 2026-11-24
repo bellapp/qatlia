@@ -238,8 +238,8 @@ export const en: Catalog = {
       visionUnavailable: 'Photo analysis is temporarily unavailable. Try again in a moment.',
       creditLedgerUnavailable: 'The credit ledger is unavailable. Try again in a moment.',
       insufficientCredits: 'Your credit balance is empty. Top up your account to analyze another photo.',
-      // Inside the Play Store app, which sells nothing.
-      insufficientCreditsApp: 'Your credit balance is empty.',
+      // Inside the Play Store app: where to buy, in words only (src/lib/store-app.ts).
+      insufficientCreditsApp: 'You have no credits left. You can buy some on our website, qatlia.ma.',
       aiRateLimit: 'The service is temporarily saturated. Please try again in a moment.',
       aiServiceError: 'Analysis error. Please try again with a sharper photo.',
       aiParseError: 'No readable measurement was detected. Check that the photo is sharp and well framed.',
@@ -305,6 +305,8 @@ export const en: Catalog = {
     optimize: {
       authRequired: 'Sign in to run an optimization.',
       noCredits: 'Out of credits — 1 credit per complete analysis.',
+      // Inside the Play Store app: where to buy, in words only (src/lib/store-app.ts).
+      noCreditsApp: 'You have no credits left. You can buy some on our website, qatlia.ma.',
       failed: 'The optimization failed. Try again.',
       tooLarge: 'Plan too large: {max} pieces maximum per optimization. Split the project into several batches — no credit was charged.',
       network: 'Network error. Check your connection.',

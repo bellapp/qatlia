@@ -74,7 +74,7 @@ test('support, the balance history and the free credits stay', () => {
 
 const { loadTsModule } = require('./helpers/load-ts-module');
 
-test('in the app, two messages lose their invitation to pay, in every locale', () => {
+test('in the app, some messages take their own wording, in every locale', () => {
   const { storeAppCopyKey } = loadTsModule(path.join(ROOT, 'src/lib/store-app.ts'));
   assert.equal(storeAppCopyKey('atelier.visionError.insufficientCredits', true), 'atelier.visionError.insufficientCreditsApp');
   assert.equal(storeAppCopyKey('accountPage.currencyHint', true), 'accountPage.currencyHintApp');
@@ -83,9 +83,6 @@ test('in the app, two messages lose their invitation to pay, in every locale', (
 
   const load = (locale) => loadTsModule(path.join(ROOT, `src/i18n/messages/${locale}.ts`))[locale];
   const [fr, en, ar] = ['fr', 'en', 'ar'].map(load);
-  assert.equal(fr.atelier.visionError.insufficientCreditsApp, 'Votre solde de crédits est épuisé.');
-  assert.equal(en.atelier.visionError.insufficientCreditsApp, 'Your credit balance is empty.');
-  assert.equal(ar.atelier.visionError.insufficientCreditsApp, 'نفد رصيدك.');
   assert.equal(
     fr.accountPage.currencyHintApp,
     'Vos chiffrages, devis et PDF sont dans cette devise. Elle a été choisie selon votre pays ; vous pouvez la changer. Les prix que vous avez enregistrés ne sont pas convertis.'
@@ -101,4 +98,30 @@ test('in the app, two messages lose their invitation to pay, in every locale', (
 
   assert.match(read('src/app/(site)/atelier/page.tsx'), /t\(storeAppCopyKey\(visionError, inApp\), \{ max: MAX_SCAN_SHEETS \}\)/);
   assert.match(read('src/app/(site)/account/page.tsx'), /t\(storeAppCopyKey\('accountPage\.currencyHint', inApp\)\)/);
+});
+
+// Google lets an app that sells nothing say where to buy, in words and without
+// a direct link (« Head to our website to purchase more »,
+// support.google.com/googleplay/android-developer/answer/10281818).
+test('out of credits, the app says where to buy them, as plain text', () => {
+  const { storeAppCopyKey } = loadTsModule(path.join(ROOT, 'src/lib/store-app.ts'));
+  assert.equal(storeAppCopyKey('atelier.optimize.noCredits', true), 'atelier.optimize.noCreditsApp');
+  assert.equal(storeAppCopyKey('atelier.optimize.noCredits', false), 'atelier.optimize.noCredits');
+
+  const expected = {
+    fr: 'Vous n’avez plus de crédits. Vous pouvez en acheter sur notre site qatlia.ma.',
+    en: 'You have no credits left. You can buy some on our website, qatlia.ma.',
+    ar: 'نفدت أرصدتك. يمكنك شراء الأرصدة من موقعنا qatlia.ma.',
+  };
+  for (const [locale, text] of Object.entries(expected)) {
+    const messages = loadTsModule(path.join(ROOT, `src/i18n/messages/${locale}.ts`))[locale];
+    assert.equal(messages.atelier.visionError.insufficientCreditsApp, text, locale);
+    assert.equal(messages.atelier.optimize.noCreditsApp, text, locale);
+    assert.doesNotMatch(text, /https?:|[/]/, 'no address to follow');
+  }
+
+  const atelier = read('src/app/(site)/atelier/page.tsx');
+  assert.match(atelier, /setOptimizeError\(t\(storeAppCopyKey\('atelier\.optimize\.noCredits', isStoreAppDocument\(\)\)\)\)/);
+  // The recharge link goes with the site's message only, never beside the app's.
+  assert.match(atelier, /optimizeError === t\('atelier\.optimize\.noCredits'\)\) && \(\s*<a href="[/]credits" data-sells=""/);
 });
