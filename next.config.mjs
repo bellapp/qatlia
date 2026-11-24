@@ -7,6 +7,7 @@ const WHATSAPP_SHORT_LINKS = [
   { source: '/wa', destination: '/?utm_source=whatsapp' },
   { source: '/wa/ar', destination: '/ar?utm_source=whatsapp' },
   { source: '/wa/atelier', destination: '/atelier?utm_source=whatsapp' },
+  { source: '/wa/credits', destination: '/credits?utm_source=whatsapp' },
 ];
 
 /** @type {import('next').NextConfig} */
