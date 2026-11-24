@@ -15,7 +15,7 @@ import { ANALYSIS_WINDOW_HOURS, MAX_SCANS_PER_ANALYSIS, SIGNUP_FREE_CREDITS, VIS
 import { fr } from '@/i18n/messages/fr';
 import { supportWhatsAppUrl } from '@/lib/support';
 import type { HandoffMode } from '@/lib/whatsapp/config';
-import { ATELIER_LINK, CREDITS_LINK, DEMO_VIDEO_URL, SITE_LINKS } from '@/lib/whatsapp/copy';
+import { ATELIER_LINK, CREDITS_LINK, DEMO_VIDEO_URL, PRICING_TRY, SITE_LINKS } from '@/lib/whatsapp/copy';
 
 export const MAX_REPLY_CHARS = 700;
 export const HISTORY_MESSAGES = 10;
@@ -108,16 +108,18 @@ export interface PhotoReadNote {
 
 /**
  * Tells the assistant the bot read this person's sheet: it asked again for a
- * sheet it had read (anas, 21/11/2026). Built from our own row, never from
- * what the person wrote.
+ * sheet it had read (anas, 21/11/2026). One read per number: it must not ask
+ * for a list the bot then refuses either (Moi, 24/11/2026: asked to type the
+ * pieces, sent the list, refused). Built from our own row, never from what
+ * the person wrote.
  */
 export function photoReadNote(read: PhotoReadNote): string {
   const head = `
 
-CETTE PERSONNE : elle a déjà envoyé ici sa fiche de débit (en photo ou en tapant les mesures), et le bot l'a lue (${read.pieceCount} pièces). Ne lui redemande pas sa fiche.`;
+CETTE PERSONNE : elle a déjà envoyé ici sa fiche de débit (en photo ou en tapant les mesures), et le bot l'a lue (${read.pieceCount} pièces). Ne lui redemande pas sa fiche. Le bot ne fera pas d'autre plan ici : ne lui demande ni photo, ni mesures, ni liste de pièces dans WhatsApp, même si elle montre ou décrit un meuble, ou veut un autre plan (cette règle passe avant toutes celles ci-dessus). Pour une autre fiche, dis-lui d'ouvrir l'atelier et d'y prendre sa fiche en photo ou d'y taper ses pièces : ${ATELIER_LINK}`;
   return read.link
-    ? `${head} Son plan de coupe est ici : ${read.link} (lien valable 24 h après la lecture). Si elle veut voir son plan, renvoie-la vers ce lien ; pour une autre fiche, elle la prend en photo dans l'atelier après l'inscription.`
-    : `${head} Le lien de son plan a expiré : pour revoir son plan ou essayer une autre fiche, elle s'inscrit et prend sa fiche en photo dans l'atelier.`;
+    ? `${head} Son plan de coupe est ici : ${read.link} (lien valable 24 h après la lecture). Si elle veut voir son plan, renvoie-la vers ce lien.`
+    : `${head} Le lien de son plan a expiré : pour revoir son plan, elle s'inscrit et prend sa fiche en photo dans l'atelier.`;
 }
 
 /**
@@ -137,6 +139,17 @@ CETTE PERSONNE : elle a déjà reçu le lien du conseiller. Ne le redonne pas et
 export const PHOTO_READING_NOTE = `
 
 CETTE PERSONNE : le bot est en train de lire la photo qu'elle vient d'envoyer ; le résultat lui arrive dans quelques secondes, dans un autre message. Ne lui demande pas sa fiche et ne dis pas que tu ne l'as pas reçue : réponds seulement à son message.`;
+
+/**
+ * The number can still have its free read: a price answer ends on the same
+ * invitation as the prices button (woodvanest, 24/11/2026: « الثمن » typed,
+ * the prices, nothing more). Set by the webhook, never from what the person wrote.
+ */
+export const FREE_TRY_NOTE = `
+
+CETTE PERSONNE : elle n'a pas encore essayé. Si elle demande le prix (et seulement dans ce cas, et pas si handoff est true), termine ta réponse par cette dernière ligne, en plus des 3 lignes :
+- en arabe ou en darija : ${PRICING_TRY.ar}
+- en français : ${PRICING_TRY.fr}`;
 
 /** Tolerant JSON reader: plain JSON, a ```json fence, or the first `{` to the last `}`. */
 function parseAssistantJson(text: string): unknown {
@@ -172,6 +185,8 @@ export async function askAssistant(input: {
   advisorLinkSent?: boolean;
   /** A photo of this person is still being read (PHOTO_READING_NOTE). */
   photoReading?: boolean;
+  /** The number can still have its free read (FREE_TRY_NOTE). */
+  freeTry?: boolean;
   fetchImpl?: typeof fetch;
   timeoutMs?: number;
 }): Promise<AssistantReply | null> {
@@ -202,7 +217,8 @@ export async function askAssistant(input: {
               buildSystemPrompt(input.handoffMode) +
               (input.photoRead ? photoReadNote(input.photoRead) : '') +
               (input.advisorLinkSent ? ADVISOR_LINK_SENT_NOTE : '') +
-              (input.photoReading ? PHOTO_READING_NOTE : ''),
+              (input.photoReading ? PHOTO_READING_NOTE : '') +
+              (input.freeTry ? FREE_TRY_NOTE : ''),
           },
           ...history,
           { role: 'user', content: input.message.slice(0, MAX_INBOUND_CHARS) },
