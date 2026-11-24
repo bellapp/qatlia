@@ -107,6 +107,6 @@ test('the assistant writes for people not at ease with technology', () => {
   assert.ok(prompt.includes('« optimisation »'));
   // The photo first; the site only when it is what the person asks about.
   assert.ok(prompt.includes("propose d'abord d'envoyer ici la photo de sa fiche"));
-  assert.ok(prompt.includes("Ne donne le lien du site que si la personne parle d'inscription, de compte, d'achat ou de prix"));
+  assert.ok(prompt.includes("Ne donne le lien du site que si la personne parle d'inscription, de compte ou de prix"));
   assert.ok(!prompt.includes('Invite la personne à essayer, avec le lien'));
 });

@@ -31,6 +31,13 @@ export const SITE_LINKS: Record<Lang, string> = {
 /** The workshop opens without an account: the photo is kept and read right after sign-up. */
 export const ATELIER_LINK = 'https://qatlia.ma/wa/atelier';
 
+/**
+ * The purchase page. It opens in the browser even when the Play Store app is
+ * installed (the app takes neither /wa nor /credits), and the app has no
+ * purchase page.
+ */
+export const CREDITS_LINK = 'https://qatlia.ma/wa/credits';
+
 const SUPPORT_URL = supportWhatsAppUrl();
 
 // Packs are listed from the catalog so a price change reaches the bot too.
