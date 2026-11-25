@@ -286,7 +286,7 @@ const ar: PdfCatalog = {
   },
   schema: {
     grainDirectionLabel: 'اتجاه العروق',
-    edgeLegend: 'حافة',
+    edgeLegend: 'السنتة',
     uniqueSample: 'نسخة واحدة',
     multipleSamples: (count) => `للتصنيع في ${count} نسخ`,
     header: (index, total, material, dims, samples) => `${index}/${total} -- ${material} -- ${dims} -- ${samples}`,
