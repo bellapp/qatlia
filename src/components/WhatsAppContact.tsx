@@ -18,7 +18,7 @@ const isField = (target: EventTarget | null): boolean =>
   target instanceof HTMLElement && (FIELDS.has(target.tagName) || target.isContentEditable);
 
 /** True while a field has the focus: on a phone the keyboard is open, the button would sit on it. */
-function useTyping(): boolean {
+export function useTyping(): boolean {
   const [typing, setTyping] = useState(false);
   useEffect(() => {
     const onFocusIn = (event: FocusEvent) => setTyping(isField(event.target));

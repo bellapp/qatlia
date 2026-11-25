@@ -17,6 +17,8 @@ export interface AtelierDraft {
   project: Record<string, unknown>;
   /** The pieces the plan on screen was computed from, when they differ from `project.pieces`. */
   plannedPieces: unknown[] | null;
+  /** What the plan on screen was computed from (src/lib/plan-inputs.ts). Absent on an older draft. */
+  planKey?: string;
   cutMode: '2d' | '1d';
   projectId: string | null;
   localProjectId: string | null;
@@ -148,6 +150,8 @@ export interface AtelierLeaveState {
   hasPlan: boolean;
   /** The pieces that plan was made from. */
   plannedPieces: readonly unknown[] | null;
+  /** See planInputsKey (src/lib/plan-inputs.ts). */
+  planKey?: string | null;
   cutMode: '2d' | '1d';
   projectId: string | null;
   localProjectId: string | null;
@@ -174,6 +178,7 @@ export function buildAtelierDraft(state: AtelierLeaveState): AtelierDraft {
     v: 1,
     project,
     plannedPieces: plannedDiffers && state.plannedPieces ? [...state.plannedPieces] : null,
+    ...(state.hasPlan && state.planKey ? { planKey: state.planKey } : {}),
     cutMode: state.cutMode,
     projectId: state.projectId,
     localProjectId: state.localProjectId,
