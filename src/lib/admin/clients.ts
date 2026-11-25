@@ -14,7 +14,30 @@ import { summarizeProject, type ProjectRow, type ProjectSummary } from './projec
 export const CLIENT_SEGMENTS = ['all', 'paying', 'never_paid', 'out_of_credits', 'inactive_30d', 'pending_order'] as const;
 export type ClientSegment = (typeof CLIENT_SEGMENTS)[number];
 
-export const CLIENT_SORTS = ['created_desc', 'last_activity_desc', 'credits_asc', 'credits_desc', 'paid_desc', 'scans_desc'] as const;
+/**
+ * The sort orders of the client list, one pair per sortable column header.
+ * The first six are migration 012's; the others need 021, and before it the
+ * SQL falls back to the newest sign-up first. Each one has its own CASE in
+ * 021_admin_client_phones.sql (a test keeps the two in step).
+ */
+export const CLIENT_SORTS = [
+  'created_desc',
+  'last_activity_desc',
+  'credits_asc',
+  'credits_desc',
+  'paid_desc',
+  'scans_desc',
+  'created_asc',
+  'last_activity_asc',
+  'paid_asc',
+  'scans_asc',
+  'purchases_desc',
+  'purchases_asc',
+  'projects_desc',
+  'projects_asc',
+  'email_asc',
+  'email_desc',
+] as const;
 export type ClientSort = (typeof CLIENT_SORTS)[number];
 
 export const CLIENT_PAGE_SIZE = 50;
@@ -62,7 +85,12 @@ export interface ClientListRow {
   pendingOrders: number;
   projects: number;
   lastActivityAt: string | null;
+  /** The operator's note phone. */
   phone: string | null;
+  /** The WhatsApp number the account came from (« +212… »), or a username's id. Null before migration 021. */
+  whatsapp: string | null;
+  /** The phone of the client's « Mon entreprise ». Null before migration 021. */
+  atelierPhone: string | null;
   tags: string[];
 }
 
@@ -72,6 +100,12 @@ export type ClientListResult =
   | { status: 'error' };
 
 const str = (value: unknown): string | null => (typeof value === 'string' && value !== '' ? value : null);
+/** A WhatsApp id as shown: « +212… » for a number, the id itself for a username. */
+export function formatWhatsappId(waId: string | null): string | null {
+  if (!waId) return null;
+  return /^\d+$/.test(waId) ? `+${waId}` : waId;
+}
+
 const tags = (value: unknown): string[] => (Array.isArray(value) ? value.filter((t): t is string => typeof t === 'string') : []);
 
 function toClientListRow(raw: Record<string, unknown>): ClientListRow {
@@ -93,6 +127,8 @@ function toClientListRow(raw: Record<string, unknown>): ClientListRow {
     projects: ledgerAmount(raw.projects),
     lastActivityAt: str(raw.last_activity_at),
     phone: str(raw.phone),
+    whatsapp: formatWhatsappId(str(raw.whatsapp)),
+    atelierPhone: str(raw.atelier_phone),
     tags: tags(raw.tags),
   };
 }
@@ -159,6 +195,8 @@ export interface ClientIdentity {
    * before signing up (user_metadata.whatsapp_code → whatsapp_photo_reads).
    */
   whatsapp: string | null;
+  /** The phone saved in « Mon entreprise » (public.ateliers, migration 020), or null. */
+  atelierPhone: string | null;
 }
 
 export interface ClientDetail {
@@ -232,9 +270,7 @@ async function whatsappOf(db: SupabaseClient, code: string | null): Promise<stri
   try {
     const { data, error } = await db.from('whatsapp_photo_reads').select('wa_id').eq('code', code).maybeSingle();
     if (error) return null;
-    const waId = str(asRecord(data)?.wa_id);
-    if (!waId) return null;
-    return /^\d+$/.test(waId) ? `+${waId}` : waId;
+    return formatWhatsappId(str(asRecord(data)?.wa_id));
   } catch {
     return null;
   }
@@ -253,7 +289,7 @@ export async function getClientDetail(db: SupabaseClient, userId: string): Promi
   const user = authData?.user;
   if (!user) return { status: 'not_found' };
 
-  const [profile, ledger, orders, projects, presets, note, audit] = await Promise.all([
+  const [profile, ledger, orders, projects, presets, note, audit, atelier] = await Promise.all([
     db.from('profiles').select('full_name, locale, credits, updated_at').eq('id', userId).maybeSingle(),
     db
       .from('credit_transactions')
@@ -280,6 +316,7 @@ export async function getClientDetail(db: SupabaseClient, userId: string): Promi
       .eq('target_user_id', userId)
       .order('created_at', { ascending: false })
       .limit(AUDIT_LIMIT),
+    db.from('ateliers').select('phone').eq('user_id', userId).maybeSingle(),
   ]);
 
   // Without the ledger or the projects every figure on the page would be
@@ -319,6 +356,8 @@ export async function getClientDetail(db: SupabaseClient, userId: string): Promi
         signupSource: str(userMeta.signup_source),
         signupCampaign: str(userMeta.signup_campaign),
         whatsapp,
+        // A missing table (020 not applied) or a read error only hides the field.
+        atelierPhone: atelier.error ? null : str(asRecord(atelier.data)?.phone),
       },
       balance,
       summary: summarizeLedger(ledgerRows, balance),

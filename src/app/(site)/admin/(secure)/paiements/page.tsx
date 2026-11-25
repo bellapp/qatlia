@@ -2,7 +2,7 @@ import Link from 'next/link';
 import { Search } from 'lucide-react';
 import { requireAdminPage } from '@/lib/admin/auth';
 import { getAdminDb } from '@/lib/admin/db';
-import { listPayments, parsePaymentFilters, type PaymentFilters } from '@/lib/admin/payments';
+import { listPayments, parsePaymentFilters, type PaymentFilters, type PaymentSort } from '@/lib/admin/payments';
 import { ORDER_STATUS_LABELS, ORDER_STATUS_STYLES, PAYMENT_METHOD_LABELS, formatDateTime, formatMoney, packLabel } from '@/lib/admin/format';
 import { Badge, Notice } from '../ui';
 import { PaymentActions } from './PaymentActions';
@@ -22,12 +22,20 @@ const SOURCE_BADGES = {
   stripe: 'bg-indigo-500/15 text-indigo-300 border-indigo-500/30',
 };
 
+/** One link per sort key: a first click sorts largest (or newest) first, a second reverses. */
+const SORT_KEYS: { label: string; first: PaymentSort; second: PaymentSort }[] = [
+  { label: 'Date', first: 'date_desc', second: 'date_asc' },
+  { label: 'Montant', first: 'amount_desc', second: 'amount_asc' },
+  { label: 'Crédits', first: 'credits_desc', second: 'credits_asc' },
+];
+
 function hrefWith(filters: PaymentFilters, overrides: Partial<PaymentFilters>): string {
   const next = { ...filters, ...overrides };
   const qs = new URLSearchParams();
   if (next.source !== 'all') qs.set('source', next.source);
   if (next.status !== 'pending') qs.set('status', next.status);
   if (next.search) qs.set('q', next.search);
+  if (next.sort !== 'date_desc') qs.set('sort', next.sort);
   const query = qs.toString();
   return query ? `/admin/paiements?${query}` : '/admin/paiements';
 }
@@ -57,6 +65,18 @@ export default async function PaymentsPage({ searchParams }: { searchParams: Rec
             </Link>
           ))}
         </div>
+        <div className="flex flex-wrap items-center gap-1.5" aria-label="Trier">
+          <span className="text-[10px] font-bold uppercase tracking-widest text-slate-500 me-1">Trier</span>
+          {SORT_KEYS.map((key) => {
+            const active = filters.sort === key.first || filters.sort === key.second;
+            const next = filters.sort === key.first ? key.second : key.first;
+            return (
+              <Link key={key.label} href={hrefWith(filters, { sort: next })} aria-current={active ? 'true' : undefined} className={pill(active)}>
+                {key.label} <span aria-hidden="true">{active ? (filters.sort.endsWith('_asc') ? '↑' : '↓') : '↕'}</span>
+              </Link>
+            );
+          })}
+        </div>
         <div className="flex flex-wrap items-center gap-1.5" aria-label="Moyen de paiement">
           <span className="text-[10px] font-bold uppercase tracking-widest text-slate-500 me-1">Moyen</span>
           {(Object.keys(SOURCE_LABELS) as PaymentFilters['source'][]).map((source) => (
@@ -70,6 +90,7 @@ export default async function PaymentsPage({ searchParams }: { searchParams: Rec
       <form method="get" action="/admin/paiements" className="flex gap-2">
         {filters.source !== 'all' ? <input type="hidden" name="source" value={filters.source} /> : null}
         {filters.status !== 'pending' ? <input type="hidden" name="status" value={filters.status} /> : null}
+        {filters.sort !== 'date_desc' ? <input type="hidden" name="sort" value={filters.sort} /> : null}
         <div className="relative flex-1">
           <Search className="w-3.5 h-3.5 text-slate-500 absolute start-2.5 top-1/2 -translate-y-1/2 pointer-events-none" aria-hidden="true" />
           <input

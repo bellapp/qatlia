@@ -7,7 +7,7 @@ const { createFakeSupabase } = require('./helpers/fake-supabase');
 // 2026-11-12, Task 8). A card amount is exact when the webhook recorded it,
 // otherwise the catalog price marked as an estimate — never invented.
 
-const { toCardPaymentView, toManualPaymentView, parsePaymentFilters, listPayments } = loadTsModule('src/lib/admin/payments.ts');
+const { toCardPaymentView, toManualPaymentView, parsePaymentFilters, listPayments, sortPayments } = loadTsModule('src/lib/admin/payments.ts');
 const { CREDIT_PACKS } = loadTsModule('src/lib/billing/catalog.ts');
 
 const CLIENT = 'cccccccc-cccc-4ccc-8ccc-cccccccccccc';
@@ -72,9 +72,9 @@ test('commande manuelle : montant en MAD exact', () => {
 });
 
 test('parsePaymentFilters : défauts et valeurs inconnues', () => {
-  assert.deepEqual(parsePaymentFilters({}), { source: 'all', status: 'pending', search: '' });
-  assert.deepEqual(parsePaymentFilters({ source: 'x', status: 'drop', q: ' QIA ' }), { source: 'all', status: 'pending', search: 'QIA' });
-  assert.deepEqual(parsePaymentFilters({ source: 'card', status: 'all' }), { source: 'card', status: 'all', search: '' });
+  assert.deepEqual(parsePaymentFilters({}), { source: 'all', status: 'pending', search: '', sort: 'date_desc' });
+  assert.deepEqual(parsePaymentFilters({ source: 'x', status: 'drop', q: ' QIA ', sort: 'DROP' }), { source: 'all', status: 'pending', search: 'QIA', sort: 'date_desc' });
+  assert.deepEqual(parsePaymentFilters({ source: 'card', status: 'all', sort: 'amount_asc' }), { source: 'card', status: 'all', search: '', sort: 'amount_asc' });
 });
 
 function seeded() {
@@ -134,4 +134,16 @@ test('échec de lecture : error', async () => {
   const fake = seeded();
   fake.state.tableErrors = { manual_payments: { code: '57014', message: 'timeout' } };
   assert.deepEqual(await listPayments(fake.client, { source: 'all', status: 'all', search: '' }), { status: 'error' });
+});
+
+test('sortPayments : date, montant ou crédits, dans les deux sens, vides en dernier', () => {
+  const p = (id, createdAt, amount, credits) => ({ id, createdAt, amount, credits });
+  const list = [p('a', '2026-11-01T00:00:00Z', 99, 30), p('b', '2026-11-03T00:00:00Z', null, 60), p('c', '2026-11-02T00:00:00Z', 299, 10)];
+  const ids = (sort) => sortPayments(list, sort).map((x) => x.id).join('');
+  assert.equal(ids('date_desc'), 'bca');
+  assert.equal(ids('date_asc'), 'acb');
+  assert.equal(ids('amount_desc'), 'cab');
+  assert.equal(ids('amount_asc'), 'acb');
+  assert.equal(ids('credits_desc'), 'bac');
+  assert.equal(ids('credits_asc'), 'cab');
 });

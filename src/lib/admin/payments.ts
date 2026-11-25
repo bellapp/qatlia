@@ -1,6 +1,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { CREDIT_PACKS, isPackId } from '@/lib/billing/catalog';
 import { classifyLedgerEntry, LEDGER_KEY_PREFIXES, ledgerAmount, type LedgerRow } from './ledger';
+import { compareSortValues } from './sort';
 
 /**
  * Every payment in one list: manual orders (public.manual_payments) and card
@@ -92,10 +93,14 @@ export function toCardPaymentView(row: LedgerRow & { user_id: string }): Payment
   };
 }
 
+export const PAYMENT_SORTS = ['date_desc', 'date_asc', 'amount_desc', 'amount_asc', 'credits_desc', 'credits_asc'] as const;
+export type PaymentSort = (typeof PAYMENT_SORTS)[number];
+
 export interface PaymentFilters {
   source: 'all' | 'manual' | 'card';
   status: 'pending' | 'granted' | 'refused' | 'all';
   search: string;
+  sort: PaymentSort;
 }
 
 type SearchParams = Record<string, string | string[] | undefined>;
@@ -108,7 +113,21 @@ export function parsePaymentFilters(searchParams: SearchParams): PaymentFilters 
     source: source === 'manual' || source === 'card' ? source : 'all',
     status: status === 'granted' || status === 'refused' || status === 'all' ? status : 'pending',
     search: single(searchParams.q).trim().slice(0, 80),
+    sort: (PAYMENT_SORTS as readonly string[]).includes(single(searchParams.sort)) ? (single(searchParams.sort) as PaymentSort) : 'date_desc',
   };
+}
+
+/**
+ * The payments in the order asked for; the newest first breaks ties. An
+ * amount is compared as recorded, whatever its currency (a dollar card
+ * payment is not converted).
+ */
+export function sortPayments(payments: PaymentView[], sort: PaymentSort): PaymentView[] {
+  const [key, dir] = sort.split('_') as ['date' | 'amount' | 'credits', 'asc' | 'desc'];
+  const value = (p: PaymentView) => (key === 'date' ? p.createdAt || null : key === 'amount' ? p.amount : p.credits);
+  return [...payments].sort(
+    (a, b) => compareSortValues(value(a), value(b), dir) || compareSortValues(a.createdAt || null, b.createdAt || null, 'desc')
+  );
 }
 
 const LIST_LIMIT = 200;
@@ -178,6 +197,5 @@ export async function listPayments(db: SupabaseClient, filters: PaymentFilters):
       )
     : payments;
 
-  matching.sort((a, b) => (a.createdAt < b.createdAt ? 1 : a.createdAt > b.createdAt ? -1 : 0));
-  return { status: 'ok', payments: matching };
+  return { status: 'ok', payments: sortPayments(matching, filters.sort ?? 'date_desc') };
 }

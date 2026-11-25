@@ -88,6 +88,11 @@ function createFakeSupabase() {
           if (state.storageError) return { data: null, error: state.storageError };
           return { data: (state.storage?.[bucket] ?? []).map((name) => ({ name })), error: null };
         },
+        createSignedUrl: async (path, expiresIn) => {
+          state.rpcCalls.push({ name: 'storage.createSignedUrl', args: { bucket, path, expiresIn } });
+          if (state.storageError) return { data: null, error: state.storageError };
+          return { data: { signedUrl: `https://signed.test/${bucket}/${path}?ttl=${expiresIn}` }, error: null };
+        },
         remove: async (paths) => {
           state.rpcCalls.push({ name: 'storage.remove', args: { bucket, paths } });
           if (state.storageError) return { data: null, error: state.storageError };
