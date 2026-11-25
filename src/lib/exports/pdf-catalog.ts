@@ -95,6 +95,7 @@ const fr = {
   },
   schema: {
     grainDirectionLabel: 'Sens du ramage',
+    edgeLegend: 'Chant',
     uniqueSample: 'Exemplaire unique',
     multipleSamples: (count: number) => `À fabriquer en ${count} exemplaires`,
     header: (index: number, total: number, material: string, dims: string, samples: string) =>
@@ -173,6 +174,7 @@ const en: PdfCatalog = {
   },
   schema: {
     grainDirectionLabel: 'Grain direction',
+    edgeLegend: 'Edge band',
     uniqueSample: 'Single copy',
     multipleSamples: (count) => `To be produced in ${count} copies`,
     header: (index, total, material, dims, samples) => `${index}/${total} -- ${material} -- ${dims} -- ${samples}`,
@@ -248,6 +250,7 @@ const ar: PdfCatalog = {
   },
   schema: {
     grainDirectionLabel: 'اتجاه العروق',
+    edgeLegend: 'حافة',
     uniqueSample: 'نسخة واحدة',
     multipleSamples: (count) => `للتصنيع في ${count} نسخ`,
     header: (index, total, material, dims, samples) => `${index}/${total} -- ${material} -- ${dims} -- ${samples}`,

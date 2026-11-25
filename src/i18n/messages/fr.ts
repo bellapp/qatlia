@@ -402,6 +402,8 @@ export const fr = {
       zoomIn: 'Zoom avant',
       zoomReset: 'Réinitialiser le zoom',
       zoomLevelAria: 'Niveau de zoom',
+      edgeLegend: 'Chant à plaquer',
+      edgeToggle: 'Afficher et imprimer les chants',
     },
     exports: {
       csv: 'CSV',

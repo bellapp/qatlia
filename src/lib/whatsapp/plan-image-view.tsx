@@ -11,6 +11,7 @@
  * flex box, everything is absolutely placed. Latin text only (the bundled font).
  */
 
+import { EDGE_COLOR, EDGE_HALO } from '@/lib/cutting/edge-lines';
 import type { PlanImageLayout, PlanImageOffcut, PlanImagePiece, PlanImageTab } from '@/lib/whatsapp/plan-image';
 import { PLAN_IMAGE_EXPORT_ROWS, PLAN_IMAGE_TABS_HEIGHT } from '@/lib/whatsapp/plan-image';
 
@@ -222,6 +223,51 @@ function Exports({ layout }: { layout: PlanImageLayout }) {
   );
 }
 
+/** The chants, in one drawing over the whole panel: two paths, however many pieces. */
+function Edges({ layout }: { layout: PlanImageLayout }) {
+  const { edges, panel } = layout;
+  if (!edges) return null;
+  const d = edges.lines.map((l) => `M${l.x1} ${l.y1}L${l.x2} ${l.y2}`).join('');
+  return (
+    <svg
+      width={panel.width}
+      height={panel.height}
+      viewBox={`0 0 ${panel.width} ${panel.height}`}
+      fill="none"
+      style={{ position: 'absolute', left: panel.left, top: panel.top }}
+    >
+      <path d={d} stroke={EDGE_HALO} strokeWidth={edges.halo} strokeOpacity="0.85" />
+      <path d={d} stroke={EDGE_COLOR} strokeWidth={edges.stroke} strokeDasharray={edges.dash.join(' ')} />
+    </svg>
+  );
+}
+
+function EdgeLegend({ layout }: { layout: PlanImageLayout }) {
+  const legend = layout.edgeLegend;
+  if (!legend) return null;
+  return (
+    <div
+      style={{
+        display: 'flex',
+        position: 'absolute',
+        left: legend.left,
+        top: legend.top,
+        width: legend.width,
+        height: legend.height,
+        alignItems: 'center',
+        fontSize: 28,
+        fontWeight: 700,
+        color: INK,
+      }}
+    >
+      <svg width="84" height="8" viewBox="0 0 84 8" fill="none" style={{ marginRight: 16 }}>
+        <path d="M0 4L84 4" stroke={EDGE_COLOR} strokeWidth="6" strokeDasharray="16 10" />
+      </svg>
+      {legend.label}
+    </div>
+  );
+}
+
 export function PlanImage({ layout }: { layout: PlanImageLayout }) {
   const { panel, card } = layout;
   // The atelier's strokes, in cm: 1.5 for the panel, 0.4 for a piece.
@@ -285,6 +331,8 @@ export function PlanImage({ layout }: { layout: PlanImageLayout }) {
       {layout.pieces.map((piece, i) => (
         <Piece key={`p${i}`} piece={piece} outline={pieceOutline} />
       ))}
+      <Edges layout={layout} />
+      <EdgeLegend layout={layout} />
 
       <Exports layout={layout} />
 

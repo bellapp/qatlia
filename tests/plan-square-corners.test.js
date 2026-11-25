@@ -18,7 +18,7 @@ function planSvgTag() {
 
 /** The plan SVG, from its opening tag to its closing one. */
 function planSvg() {
-  const start = source.indexOf('data-testid="cut-plan-svg"');
+  const start = source.search(/<svg\s+data-testid="cut-plan-svg"/);
   const end = source.indexOf('</svg>', start);
   assert.ok(start >= 0 && end > start, 'the plan SVG is found');
   return source.slice(start, end);

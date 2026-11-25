@@ -21,6 +21,7 @@
 
 import type { OptimizationResult } from '@/lib/cutting/binpacking';
 import { PIECE_COLOR_PALETTE } from '@/lib/pieces/catalog';
+import { EDGE_DASH_CM, EDGE_HALO_CM, EDGE_STROKE_CM, edgeLines, type EdgeLine } from '@/lib/cutting/edge-lines';
 
 export const PLAN_IMAGE_WIDTH = 1080;
 /** The page's side margin. */
@@ -40,6 +41,8 @@ const ARROW_WIDTH = 40;
 const PLAN_PAD = 30;
 /** Keeps a tall panel on one phone screen. */
 const MAX_PANEL_HEIGHT = 1150;
+/** The line under the panel saying what the blue dashes are. */
+const EDGE_LEGEND = 52;
 const EXPORT_ROW = 84;
 const EXPORT_PDF = 96;
 const EXPORT_GAP = 14;
@@ -93,6 +96,14 @@ export interface PlanImageExports {
   quote: string;
 }
 
+/** The chants of panel 1, in pixels from the panel's corner, and their strokes. */
+export interface PlanImageEdges {
+  lines: EdgeLine[];
+  stroke: number;
+  halo: number;
+  dash: [number, number];
+}
+
 export interface PlanImageLayout {
   width: number;
   height: number;
@@ -109,6 +120,9 @@ export interface PlanImageLayout {
   scale: number;
   pieces: PlanImagePiece[];
   offcuts: PlanImageOffcut[];
+  /** null when no piece of the panel is banded; so is the legend. */
+  edges: PlanImageEdges | null;
+  edgeLegend: (PlanImageBox & { label: string }) | null;
   sheetCount: number;
   exportsTop: number;
   exports: PlanImageExports;
@@ -218,7 +232,20 @@ export function planImageLayout(result: PlanImageSource): PlanImageLayout | null
     width: panelWidth,
     height: panelHeight,
   };
-  const card = { left: PAD, top: tabsTop, width: PLAN_IMAGE_WIDTH - 2 * PAD, height: TABS_HEIGHT + 2 * PLAN_PAD + panelHeight };
+  // As the atelier draws them, scaled (src/lib/cutting/edge-lines.ts).
+  const chants = sheet.pieces.flatMap((placed) => edgeLines(placed));
+  const edges: PlanImageEdges | null = chants.length === 0 ? null : {
+    lines: chants.map((l) => ({ x1: round(l.x1 * scale), y1: round(l.y1 * scale), x2: round(l.x2 * scale), y2: round(l.y2 * scale) })),
+    stroke: round(EDGE_STROKE_CM * scale),
+    halo: round(EDGE_HALO_CM * scale),
+    dash: [round(EDGE_DASH_CM[0] * scale), round(EDGE_DASH_CM[1] * scale)],
+  };
+  const legendHeight = edges ? EDGE_LEGEND : 0;
+  const edgeLegend = edges
+    ? { left: PAD + PLAN_PAD, top: round(panel.top + panelHeight + PLAN_PAD / 2), width: PLAN_IMAGE_WIDTH - 2 * PAD - 2 * PLAN_PAD, height: EDGE_LEGEND, label: 'Chant' }
+    : null;
+
+  const card = { left: PAD, top: tabsTop, width: PLAN_IMAGE_WIDTH - 2 * PAD, height: TABS_HEIGHT + 2 * PLAN_PAD + panelHeight + legendHeight };
   const exportsTop = round(card.top + card.height + GAP);
   const box = (item: { x: number; y: number; width: number; height: number }): PlanImageBox => ({
     left: round(panel.left + item.x * scale),
@@ -260,6 +287,8 @@ export function planImageLayout(result: PlanImageSource): PlanImageLayout | null
     scale: round(scale),
     pieces,
     offcuts,
+    edges,
+    edgeLegend,
     sheetCount,
     exportsTop,
     exports: { files: ['CSV', 'JSON', 'PNG', 'DXF'], pdf: 'Exporter le rapport PDF', quote: 'Devis client' },

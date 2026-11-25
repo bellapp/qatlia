@@ -144,6 +144,8 @@ export const ExportSchema = z.object({
    * atelier in it). Older clients that never send it get dirhams.
    */
   currency: z.enum(['MAD', 'EUR', 'USD']).default('MAD'),
+  /** Whether the plan's drawings show the chants; older clients that never send it get them. */
+  showEdges: z.boolean().default(true),
   sheet: z.object({
     width: geometryValue(),
     height: geometryValue(),
@@ -191,6 +193,19 @@ export const ExportSchema = z.object({
           rotated: z.boolean(),
           x: geometryValue(),
           y: geometryValue(),
+          // The chants drawn on the plan (src/lib/cutting/edge-lines.ts). Only a
+          // drawing: a damaged value in an old save reads as none, never a 400.
+          originalWidth: geometryValue().optional().catch(undefined),
+          originalHeight: geometryValue().optional().catch(undefined),
+          edges: z
+            .object({
+              top: z.boolean().optional(),
+              right: z.boolean().optional(),
+              bottom: z.boolean().optional(),
+              left: z.boolean().optional(),
+            })
+            .optional()
+            .catch(undefined),
         })
       )
       .max(MAX_ARRAY_LEN),

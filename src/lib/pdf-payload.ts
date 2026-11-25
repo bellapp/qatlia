@@ -43,6 +43,8 @@ export interface PdfExportPayload {
    * geometry, cost or any other computed figure.
    */
   locale: Locale;
+  /** The chants are drawn on the plan (src/lib/show-edges.ts); the price counts them either way. */
+  showEdges: boolean;
 }
 
 /**
@@ -56,7 +58,8 @@ export function buildPdfPayload(
   result: OptimizationResult,
   displayUnit: DisplayUnit = DEFAULT_DISPLAY_UNIT,
   locale: Locale = DEFAULT_LOCALE,
-  currency: AppCurrency = DEFAULT_CURRENCY
+  currency: AppCurrency = DEFAULT_CURRENCY,
+  showEdges: boolean = true
 ): PdfExportPayload {
   return {
     projectName,
@@ -72,5 +75,6 @@ export function buildPdfPayload(
     displayUnit,
     locale,
     currency,
+    showEdges,
   };
 }
