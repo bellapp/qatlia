@@ -882,7 +882,7 @@ export const PiecesManager: React.FC<PiecesManagerProps> = ({
         <div className={`${WIDE_SPAN} text-end pe-1`}>{t('pieces.columns.color')}</div>
       </div>
 
-      <div ref={listRef} data-testid="pieces-list" className="max-h-[340px] overflow-y-auto overscroll-contain scroll-smooth">
+      <div ref={listRef} data-testid="pieces-list" className="max-h-[340px] overflow-y-auto scroll-smooth">
         {filteredList.length === 0 ? (
           <div className="py-12 px-4 text-center space-y-2">
             <p className="text-xs text-slate-500 dark:text-slate-400 font-medium">
