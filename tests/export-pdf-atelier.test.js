@@ -62,7 +62,7 @@ test("without a business the PDF is today's: QatliA header, page number in it, n
   assert.equal(res.status, 200);
   const text = await pdfTextOf(res);
   assert.ok(text.includes('QatliA'));
-  assert.ok(text.includes('Page 1 / 2'), 'page number stays in the header');
+  assert.ok(text.includes('Page 1 / 3'), 'page number stays in the header');
   assert.ok(!text.includes('Réalisé avec QatliA'));
   assert.ok(res.headers.get('Content-Disposition').includes('filename="QatliA_PROJET_TEST.pdf"'));
 });
@@ -158,7 +158,7 @@ test('with a business, every page carries the footer', async (t) => {
   const POST = routeWith(t, { name: 'Menuiserie Benali' });
   const res = await POST(makeRequest(baseBody()));
   const text = await pdfTextOf(res);
-  assert.equal((text.match(/Réalisé avec QatliA/g) || []).length, 2, 'one footer per page (portrait + schema page)');
+  assert.equal((text.match(/Réalisé avec QatliA/g) || []).length, 3, 'one footer per page (cover, piece sheet, schema page)');
   assert.match(text, /%PDF-1\./);
 });
 
@@ -170,7 +170,7 @@ test('ar locale with a business: the page indicator and the signature are both i
   assert.match(raw, /Amiri/);
   assert.ok(raw.includes('qatlia.ma'), 'the Latin tail of the signature is drawn');
   assert.ok(raw.includes('QatliA'));
-  assert.equal((raw.match(/qatlia\.ma/g) || []).length, 2, 'one signature per page');
+  assert.equal((raw.match(/qatlia\.ma/g) || []).length, 3, 'one signature per page');
 });
 
 // y (in points, from the bottom of the page) of the first text run drawn with `text`.
@@ -196,7 +196,7 @@ test('with a business, the horizontal grain label on a height-limited sheet stay
   assert.equal(res.status, 200);
   const raw = await pdfTextOf(res);
   const labelY = textYOf(raw, 'Sens du ramage');
-  const footerY = textYOf(raw, 'Page 2 / 2');
+  const footerY = textYOf(raw, 'Page 3 / 3');
   // 14 pt (about 5 mm) of baseline-to-baseline clearance above the footer line.
   assert.ok(labelY - footerY >= 14, `grain label (y=${labelY}) too close to the footer (y=${footerY})`);
 });

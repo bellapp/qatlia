@@ -158,6 +158,8 @@ export const ExportSchema = z.object({
     grainOrientation: z.enum(['vertical', 'horizontal']).default('vertical'),
   }),
   result: z.object({
+    /** A bar job (1D) has no piece sheet; anything unknown reads as panels. */
+    cutMode: z.enum(['1d', '2d']).optional().catch(undefined),
     sheetsUsed: z.number().int().min(0).max(MAX_SHEETS_USED),
     wastePercentage: z.number().finite(),
     totalAreaUsed: areaM2(),
@@ -197,6 +199,9 @@ export const ExportSchema = z.object({
           // drawing: a damaged value in an old save reads as none, never a 400.
           originalWidth: geometryValue().optional().catch(undefined),
           originalHeight: geometryValue().optional().catch(undefined),
+          // The artisan's line and its name, for the piece sheet (src/lib/exports/piece-list.ts).
+          originalIndex: z.number().int().nonnegative().optional().catch(undefined),
+          baseName: displayText(120).catch(undefined),
           edges: z
             .object({
               top: z.boolean().optional(),

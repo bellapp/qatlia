@@ -7,6 +7,7 @@ import { ExportSchema } from '@/lib/exports/pdf-schema';
 import { computeCostBreakdown } from '@/lib/costing';
 import { buildCostDetail, hasLaborCharge } from '@/lib/cost-detail';
 import { pdfCatalogFor } from '@/lib/exports/pdf-catalog';
+import { buildPieceList, type PieceListRow } from '@/lib/exports/piece-list';
 import { formatExportMoney } from '@/lib/exports/currency-labels';
 import {
   registerAmiriFont,
@@ -171,6 +172,11 @@ export async function POST(req: Request) {
     const debitList = Array.from(aggMap.values());
     const totalDebitQty = debitList.reduce((s, p) => s + p.quantity, 0);
 
+    // The piece sheet (no price): the artisan's own lines. Bars (1D) have none.
+    const pieceList = result.cutMode === '1d' ? null : buildPieceList(result.placedPieces);
+    /** Pages of that sheet: their header leaves the currency out. */
+    const pieceListPages = new Set<number>();
+
     // The artisan's business (« Mon entreprise »), when the account has one
     // saved. Any failure to read it means "no business": the export must
     // never fail, or change, because of it.
@@ -194,7 +200,7 @@ export async function POST(req: Request) {
     // pure-Latin fr/en export never decodes or embeds the font at all.
     // The price detail also prints the artisan's own panel names and colours.
     const panelTexts = (result.costingInput?.material.sheets ?? []).flatMap((line) => [line.label ?? '', line.color ?? '']);
-    const fontRegistration = payloadNeedsArabicFont(locale, projectName, material, business?.name ?? '', business?.phone ?? '', ...panelTexts)
+    const fontRegistration = payloadNeedsArabicFont(locale, projectName, material, business?.name ?? '', business?.phone ?? '', ...panelTexts, ...(pieceList?.rows.map((row) => row.name) ?? []))
       ? await registerAmiriFont(doc)
       : NOT_REGISTERED;
     const cellHooks = arabicSafeCellHooks(doc, fontRegistration);
@@ -293,10 +299,10 @@ export async function POST(req: Request) {
       });
     };
 
-    const drawQatliaHeader = (pageNum: number, totalPgs: number, orientation: 'portrait' | 'landscape') => {
-      // A business PDF uses the page's real size: an overflow page can be portrait
+    const drawQatliaHeader = (pageNum: number, totalPgs: number) => {
+      // The page's real size: an overflow page or the piece sheet can be portrait
       // after the first one, so the page number says nothing about the orientation.
-      const pW = business ? doc.internal.pageSize.getWidth() : orientation === 'landscape' ? 297 : 210;
+      const pW = doc.internal.pageSize.getWidth();
       doc.setDrawColor(0, 0, 0);
       doc.setLineWidth(0.3);
       doc.rect(14, 10, pW - 28, 15);
@@ -325,9 +331,11 @@ export async function POST(req: Request) {
       doc.setFontSize(8);
       doc.setTextColor(0, 0, 0);
       drawText(today, pW - 16, 15, { align: 'right' });
-      doc.setFont(BASE_FONT, 'bold');
-      doc.setTextColor(245, 166, 35);
-      drawText(cat.currencyLabel, pW - 16, 21, { align: 'right' });
+      if (!pieceListPages.has(pageNum)) {
+        doc.setFont(BASE_FONT, 'bold');
+        doc.setTextColor(245, 166, 35);
+        drawText(cat.currencyLabel, pW - 16, 21, { align: 'right' });
+      }
     };
 
     // PAGE 1
@@ -674,6 +682,113 @@ export async function POST(req: Request) {
       });
     }
 
+    // LISTE DES PIÈCES — a sheet of its own, with no price: for the client who
+    // checks the sizes and for the worker at the edge-banding machine. The
+    // strokes under a size say how many of its two sides take a chant.
+    if (pieceList && pieceList.rows.length > 0) {
+      const hasChants = pieceList.edgeMetres > 0;
+      doc.addPage('a4', 'portrait');
+      const firstListPage = doc.getNumberOfPages();
+      const listRows = pieceList.rows;
+      const size = (valueCm: number) => String(Number(fmt(valueCm)));
+      const strokes = (x: number, y: number, width: number, howMany: number) => {
+        if (howMany === 0) return;
+        doc.setDrawColor(EDGE_COLOR);
+        doc.setLineWidth(0.5);
+        for (let i = 0; i < howMany; i++) doc.line(x, y + i * 1.2, x + width, y + i * 1.2);
+      };
+      const total = (label: string, value: string, x: number) => {
+        doc.setFont(BASE_FONT, 'normal');
+        doc.setFontSize(8);
+        doc.setTextColor(100, 116, 139);
+        drawText(label, x, 31, { align: 'right' });
+        doc.setFont(BASE_FONT, 'bold');
+        doc.setFontSize(11);
+        doc.setTextColor(0, 0, 0);
+        drawText(value, x, 36, { align: 'right' });
+      };
+
+      autoTable(doc, {
+        startY: 49,
+        margin: { left: 14, right: 14, top: 49, bottom: 16 },
+        head: [
+          [
+            '#',
+            cat.pieceList.columnHeight(displayUnit),
+            cat.pieceList.columnWidth(displayUnit),
+            cat.pieceList.columnQuantity,
+            cat.pieceList.columnName,
+            cat.pieceList.columnDone,
+          ],
+        ],
+        body: listRows.map((row) => [String(row.number), size(row.height), size(row.width), String(row.quantity), row.name, '']),
+        theme: 'grid',
+        rowPageBreak: 'avoid',
+        headStyles: {
+          font: BASE_FONT,
+          fontSize: 9,
+          fontStyle: 'bold',
+          fillColor: [241, 245, 249],
+          textColor: [0, 0, 0],
+          halign: 'center',
+          lineColor: [0, 0, 0],
+          lineWidth: 0.2,
+        },
+        styles: {
+          font: BASE_FONT,
+          fontSize: 11,
+          cellPadding: 1.2,
+          minCellHeight: 10,
+          valign: 'middle',
+          textColor: [0, 0, 0],
+          lineColor: [0, 0, 0],
+          lineWidth: 0.2,
+        },
+        columnStyles: {
+          0: { halign: 'center', cellWidth: 12 },
+          1: { halign: 'center', cellWidth: 32 },
+          2: { halign: 'center', cellWidth: 32 },
+          3: { halign: 'center', cellWidth: 24 },
+          4: { halign: 'left', cellWidth: 64, fontSize: 9 },
+          5: { halign: 'center', cellWidth: 18 },
+        },
+        willDrawCell: cellHooks.willDrawCell,
+        didDrawCell: (data) => {
+          cellHooks.didDrawCell?.(data);
+          if (data.section !== 'body') return;
+          const row: PieceListRow | undefined = listRows[data.row.index];
+          if (!row) return;
+          const { x, y, width, height } = data.cell;
+          const middle = y + height / 2;
+          if (data.column.index === 1) strokes(x + width / 2 - 8, middle + 2.6, 16, row.edgesHeight);
+          if (data.column.index === 2) strokes(x + width / 2 - 8, middle + 2.6, 16, row.edgesWidth);
+          if (data.column.index === 5) {
+            doc.setDrawColor(0, 0, 0);
+            doc.setLineWidth(0.3);
+            doc.rect(x + width / 2 - 2.5, middle - 2.5, 5, 5);
+          }
+        },
+        // On every page of the list: it can be torn off and handed over alone.
+        didDrawPage: () => {
+          doc.setFont(BASE_FONT, 'bold');
+          doc.setFontSize(14);
+          doc.setTextColor(0, 0, 0);
+          drawText(cat.pieceList.title, 14, 36);
+          total(cat.pieceList.totalPieces, String(pieceList.quantity), hasChants ? 160 : 196);
+          if (!hasChants) return;
+          total(cat.pieceList.totalEdges, `${pieceList.edgeMetres.toFixed(2)} m`, 196);
+          doc.setFont(BASE_FONT, 'normal');
+          doc.setFontSize(9);
+          doc.setTextColor(0, 0, 0);
+          strokes(14, 43, 12, 1);
+          drawText(cat.pieceList.legendOne, 29, 44);
+          strokes(110, 42.4, 12, 2);
+          drawText(cat.pieceList.legendTwo, 125, 44);
+        },
+      });
+      for (let i = firstListPage; i <= doc.getNumberOfPages(); i++) pieceListPages.add(i);
+    }
+
     // PAGES SCHÉMAS GRAPHIQUES (A4 Paysage)
     uniquePatterns.forEach((pat, pIndex) => {
       doc.addPage('a4', 'landscape');
@@ -842,8 +957,7 @@ export async function POST(req: Request) {
     const totalPgs = doc.getNumberOfPages();
     for (let i = 1; i <= totalPgs; i++) {
       doc.setPage(i);
-      const isLand = i > 1;
-      drawQatliaHeader(i, totalPgs, isLand ? 'landscape' : 'portrait');
+      drawQatliaHeader(i, totalPgs);
       if (business) drawBusinessFooter(i, totalPgs);
     }
 
