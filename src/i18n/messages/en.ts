@@ -312,6 +312,9 @@ export const en: Catalog = {
       network: 'Network error. Check your connection.',
       running: 'Computing the nesting…',
       cta: 'Optimize the cut plan',
+      first: 'Compute the plan',
+      again: 'Compute again',
+      stale: 'The plan is out of date: the pieces or the settings have changed.',
     },
     cost: {
       bannerLabel: 'Estimated total cost',

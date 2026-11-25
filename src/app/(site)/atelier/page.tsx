@@ -119,6 +119,9 @@ import { photoPreviewStep, previewExportGate } from '@/lib/whatsapp/photo-previe
 import { readAnalysisPass, storeAnalysisPass } from '@/lib/billing/analysis-pass-store';
 import { fileNameFromContentDisposition } from '@/lib/document-filename';
 import { piecesOnlyOnScreen } from '@/lib/new-job';
+import { planInputsKey, planShortcut } from '@/lib/plan-inputs';
+import { PlanBar, PlanHeaderButton } from '@/components/PlanShortcut';
+import { useTyping } from '@/components/WhatsAppContact';
 import {
   type DisplayUnit,
   DEFAULT_DISPLAY_UNIT,
@@ -304,6 +307,16 @@ export default function Dashboard() {
   // The pieces the plan on screen was made from, saved with it: the list a
   // new job can drop without asking (see src/lib/new-job.ts).
   const plannedPiecesRef = useRef<Piece[] | null>(null);
+  // What the plan on screen was computed from (src/lib/plan-inputs.ts); null
+  // without a plan, and until a plan put back is on screen with its pieces.
+  const [planKey, setPlanKey] = useState<string | null>(null);
+  // The second button that computes the plan, while the main one is off the screen.
+  const mainRunRef = useRef<HTMLButtonElement>(null);
+  const runErrorRef = useRef<HTMLParagraphElement>(null);
+  const planColumnRef = useRef<HTMLDivElement>(null);
+  const shortcutRunRef = useRef(false);
+  const [mainRunVisible, setMainRunVisible] = useState(true);
+  const typing = useTyping();
   // The new-job button asks once before dropping pieces that are only on screen.
   const [confirmingNewJob, setConfirmingNewJob] = useState(false);
   // A tap gives a button no focus on iOS, so leaving it cannot be all that
@@ -631,6 +644,7 @@ const commitPanelName = () => {
     clearAtelierDraft(window.sessionStorage);
     setPieces([]);
     setResult(null);
+    setPlanKey(null);
     plannedPiecesRef.current = null;
     photoPreviewRef.current = false;
     previewAutoRunRef.current = false;
@@ -714,6 +728,7 @@ const commitPanelName = () => {
       }),
       hasPlan: !!result,
       plannedPieces: plannedPiecesRef.current,
+      planKey,
       cutMode,
       projectId: lastSavedProjectId,
       localProjectId,
@@ -860,6 +875,7 @@ const commitPanelName = () => {
         if (restoredResult) {
           setResult(restoredResult);
           setActiveSheetIndex(0);
+          setPlanKey(typeof draft?.planKey === 'string' ? draft.planKey : null);
           plannedPiecesRef.current = draft?.plannedPieces ? normalizePiecesWithColors(draft.plannedPieces as Piece[]) : restoredPieces;
           // A bar plan reopens in bar mode: the header, the stock card, the
           // project name and a re-run all follow the mode, not only the viewer.
@@ -1172,7 +1188,55 @@ const commitPanelName = () => {
     setResumeRequest({ action: work.action, image: work.image, resumed });
   };
 
+  // A plan put back without its key: it was made from its own pieces, with
+  // the panel and the settings put back along with it.
+  useEffect(() => {
+    if (!result || planKey !== null) return;
+    setPlanKey(planInputsKey({ pieces: plannedPiecesRef.current ?? pieces, sheets, options, cutMode }));
+    // Only when a plan comes on screen: a later edit is what makes it old.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [result, planKey]);
+  const inputsKey = useMemo(() => planInputsKey({ pieces, sheets, options, cutMode }), [pieces, sheets, options, cutMode]);
+  const planIsStale = !!result && planKey !== null && planKey !== inputsKey;
+
+  // The sticky header and bar (128 px) hide the button as surely as the edge of the screen.
+  useEffect(() => {
+    const button = mainRunRef.current;
+    if (!button || typeof IntersectionObserver === 'undefined') return;
+    const observer = new IntersectionObserver(([entry]) => setMainRunVisible(entry.isIntersecting), { rootMargin: '-128px 0px 0px 0px' });
+    observer.observe(button);
+    return () => observer.disconnect();
+  }, []);
+  const shortcut = planShortcut({
+    hasPieces: pieces.length > 0,
+    sampleOnly: !piecesOnlyOnScreen(pieces, INITIAL_PIECES),
+    hasPlan: !!result,
+    stale: planIsStale,
+    mainVisible: mainRunVisible,
+    reading: isProcessingVision,
+    typing,
+  });
+  const runFromShortcut = () => {
+    shortcutRunRef.current = true;
+    void handleRunOptimization();
+  };
+  // A run started away from the main button ends where its answer is: the
+  // message by that button, or the plan.
+  useEffect(() => {
+    if (isOptimizing || !shortcutRunRef.current) return;
+    shortcutRunRef.current = false;
+    if (optimizeError) {
+      runErrorRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      return;
+    }
+    const top = planColumnRef.current?.getBoundingClientRect().top ?? 0;
+    if (result && (top < 0 || top > window.innerHeight * 0.6)) planColumnRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOptimizing]);
+
   const handleRunOptimization = async ({ resumed = false }: { resumed?: boolean } = {}) => {
+    // Taken now: the pieces can still be edited while the answer is on its way.
+    const runKey = planInputsKey({ pieces, sheets, options, cutMode });
     setIsOptimizing(true);
     setOptimizeError(null);
     try {
@@ -1219,6 +1283,7 @@ const commitPanelName = () => {
       const optResult = data.result as OptimizationResult;
       setResult(optResult);
       setRestoredAt(null);
+      setPlanKey(runKey);
       // A paid plan now: no longer the free preview of a WhatsApp link.
       photoPreviewRef.current = false;
       setShowPhotoBanner(false);
@@ -1837,6 +1902,10 @@ const commitPanelName = () => {
               </Link>
             </div>
 
+            {shortcut.header && (
+              <PlanHeaderButton onRun={runFromShortcut} busy={isOptimizing} hasPlan={!!result} stale={planIsStale} />
+            )}
+
             {userEmail ? (
               <AccountMenu email={userEmail} />
             ) : (
@@ -2382,7 +2451,7 @@ const commitPanelName = () => {
             </div>
 
             {optimizeError && (
-              <p role="alert" className="flex items-center gap-2 text-xs font-semibold text-rose-500 bg-rose-500/10 border border-rose-500/30 rounded-xl px-3.5 py-2.5">
+              <p ref={runErrorRef} role="alert" className="flex items-center gap-2 text-xs font-semibold text-rose-500 bg-rose-500/10 border border-rose-500/30 rounded-xl px-3.5 py-2.5">
                 <AlertTriangle className="w-4 h-4 shrink-0" aria-hidden="true" />
                 {optimizeError}
                 {(optimizeError === t('atelier.optimize.noCredits')) && (
@@ -2392,6 +2461,7 @@ const commitPanelName = () => {
             )}
             {/* Primary CTA Button */}
             <button
+              ref={mainRunRef}
               onClick={() => void handleRunOptimization()}
               disabled={isOptimizing || pieces.length === 0}
               className="w-full py-3.5 rounded-xl bg-brand-400 hover:bg-brand-500 text-slate-950 font-bold text-sm tracking-[0.08em] uppercase shadow-xl shadow-brand-500/30 ring-1 ring-brand-600/40 transition-all flex items-center justify-center gap-2.5 disabled:opacity-30 disabled:shadow-none disabled:ring-0 active:scale-[0.98]"
@@ -2412,10 +2482,31 @@ const commitPanelName = () => {
 
           {/* RIGHT COLUMN: Visual Studio & Results (8 cols — the 2D plan is
               the hero of the atelier) */}
-          <div className="lg:col-span-7 space-y-4">
-            
+          <div ref={planColumnRef} className="lg:col-span-7 space-y-4 scroll-mt-32">
+
             {result ? (
               <>
+                {planIsStale && (
+                  <div
+                    role="status"
+                    data-testid="plan-stale-notice"
+                    className="flex flex-wrap items-center justify-between gap-3 p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/30"
+                  >
+                    <p className="flex items-center gap-2 text-xs font-semibold text-amber-800 dark:text-amber-300 min-w-0">
+                      <AlertTriangle className="w-4 h-4 shrink-0" aria-hidden="true" />
+                      {t('atelier.optimize.stale')}
+                    </p>
+                    <button
+                      type="button"
+                      onClick={runFromShortcut}
+                      disabled={isOptimizing || pieces.length === 0}
+                      className="min-h-9 px-4 rounded-lg bg-brand-400 hover:bg-brand-500 text-slate-950 text-xs font-bold transition-colors disabled:opacity-40"
+                    >
+                      {t('atelier.optimize.again')}
+                    </button>
+                  </div>
+                )}
+
                 {/* A plan reopened from history is shown exactly as saved: this
                     says so, with the date, until a new run replaces it. */}
                 {restoredAt && (
@@ -3024,7 +3115,11 @@ const commitPanelName = () => {
             })()}
           </div>
         </div>
+        {/* The end of the page stays reachable above the bar. */}
+        {shortcut.bar && <div aria-hidden="true" className="h-28 lg:hidden" />}
       </main>
+
+      {shortcut.bar && <PlanBar onRun={runFromShortcut} busy={isOptimizing} hasPlan={!!result} stale={planIsStale} />}
 
       <AuthModal
         isOpen={isAuthModalOpen}

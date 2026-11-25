@@ -353,6 +353,9 @@ export const fr = {
       network: 'Erreur réseau. Vérifiez votre connexion.',
       running: 'Calcul du calepinage…',
       cta: 'Optimiser le plan de coupe',
+      first: 'Calculer le plan',
+      again: 'Recalculer le plan',
+      stale: 'Le plan n’est plus à jour : les pièces ou les réglages ont changé.',
     },
     cost: {
       bannerLabel: 'Coût total estimé',
