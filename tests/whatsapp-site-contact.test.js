@@ -84,6 +84,7 @@ test('what was typed beyond the site message', () => {
 
 const { withSiteReferral } = load('src/lib/whatsapp/site-contact.ts');
 const { decide, resolveLang } = load('src/lib/whatsapp/router.ts');
+const { MENU_BUTTONS, greeting, siteQuestion } = load('src/lib/whatsapp/copy.ts');
 
 const NOW = new Date('2026-11-23T10:00:00.000Z');
 const inbound = (text, referral = null) => ({
@@ -113,11 +114,57 @@ const firstContact = (text) =>
     handoffMode: 'coexistence',
   });
 
-test('the bare site message gets the greeting, not an assistant answer', () => {
-  const decision = firstContact(siteMessage('atelier', 'fr'));
-  assert.equal(decision.action, 'send');
-  assert.equal(decision.greeting, true);
-  assert.equal(decision.thenAssistant, undefined);
+// Wafae, 25/11/2026: « j'ai une question sur QatliA » from the site got the ad's
+// greeting (send your sheet) and the example sheet.
+test('the bare site message is asked what its question is: no photo invite, no example, no assistant answer', () => {
+  for (const topic of TOPICS) {
+    const decision = firstContact(siteMessage(topic, 'fr'));
+    assert.equal(decision.action, 'send', topic);
+    assert.equal(decision.text, siteQuestion({ lang: 'fr', voice: false }).text, topic);
+    assert.equal(decision.greeting, true, 'one delivery of a burst sends it');
+    assert.equal(decision.markGreeted, true);
+    assert.equal(decision.handoff, false);
+    assert.equal(decision.exampleCaption, undefined);
+    assert.equal(decision.thenAssistant, undefined);
+    assert.deepEqual(decision.menu, { buttons: MENU_BUTTONS, fallbackText: siteQuestion({ lang: 'fr', voice: false }).plain });
+  }
+});
+
+test('the question is asked in the language of the site', () => {
+  const event = withSiteReferral(inbound(siteMessage('general', 'ar')));
+  const decision = decide({
+    event,
+    contact: { ...newContact, lang: resolveLang(event, { ...newContact, lang: 'fr' }) },
+    now: NOW,
+    assistantRepliesLast24h: 0,
+    handoffMode: 'redirect',
+    voiceEnabled: true,
+  });
+  assert.equal(decision.text, siteQuestion({ lang: 'ar', voice: true }).text);
+});
+
+test('a hello added to the site message is still no question: it is asked for', () => {
+  const decision = firstContact(`${siteMessage('general', 'fr')} Salam`);
+  assert.equal(decision.text, siteQuestion({ lang: 'fr', voice: false }).text);
+});
+
+test('the ad message still gets the greeting and the example', () => {
+  const decision = firstContact('Bonjour ! Puis-je en savoir plus à ce sujet ?');
+  assert.equal(decision.text, greeting({ lang: 'fr', bilingual: true, voice: false }).text);
+  assert.ok(decision.exampleCaption);
+});
+
+test('the text asking for the question: short, no sheet asked, a voice note only when it can be heard', () => {
+  for (const lang of ['fr', 'ar']) {
+    for (const voice of [true, false]) {
+      const { text, plain } = siteQuestion({ lang, voice });
+      assert.doesNotMatch(text, /📸|fiche|ورقة القياسات|https?:/, `${lang}/${voice}`);
+      assert.equal(/vocal|أوديو/.test(text), voice, `${lang}/${voice}`);
+      assert.ok(text.split('\n').length <= 4);
+      assert.doesNotMatch(text, /très vite|دابا|فالبلاصة|قريب/);
+      assert.match(plain, /1️⃣[\s\S]*2️⃣[\s\S]*3️⃣/);
+    }
+  }
 });
 
 test('a question typed with the site message is answered after the greeting', () => {
@@ -126,7 +173,7 @@ test('a question typed with the site message is answered after the greeting', ()
   assert.equal(decision.thenAssistant, true);
 });
 
-test('a greeted contact tapping the button again gets the menu again, not a second greeting', () => {
+test('a greeted contact tapping the button again is asked the question, not greeted a second time', () => {
   const decision = decide({
     event: withSiteReferral(inbound(siteMessage('general', 'fr'))),
     contact: { ...newContact, lang: 'fr', greetedAt: new Date(NOW.getTime() - 2 * 3600 * 1000) },
@@ -137,4 +184,16 @@ test('a greeted contact tapping the button again gets the menu again, not a seco
   assert.equal(decision.action, 'send');
   assert.equal(decision.greeting, undefined);
   assert.equal(decision.markGreeted, false);
+  assert.equal(decision.text, siteQuestion({ lang: 'fr', voice: false }).text);
+});
+
+test('the button tapped right after the greeting stays unanswered, like an ad message (the same burst)', () => {
+  const decision = decide({
+    event: withSiteReferral(inbound(siteMessage('general', 'fr'))),
+    contact: { ...newContact, lang: 'fr', greetedAt: new Date(NOW.getTime() - 60 * 1000) },
+    now: NOW,
+    assistantRepliesLast24h: 0,
+    handoffMode: 'coexistence',
+  });
+  assert.equal(decision.action, 'silent');
 });

@@ -7,7 +7,7 @@
  */
 
 import type { HandoffMode } from '@/lib/whatsapp/config';
-import { COPY, MENU_BUTTONS, PRICING_TRY, exampleCaption, greeting, type Lang, type MenuButton } from '@/lib/whatsapp/copy';
+import { COPY, MENU_BUTTONS, PRICING_TRY, exampleCaption, greeting, siteQuestion, type Lang, type MenuButton } from '@/lib/whatsapp/copy';
 import type { InboundEvent } from '@/lib/whatsapp/payload';
 import { isSiteMessage, isSiteReferral, typedBeyondSiteMessage } from '@/lib/whatsapp/site-contact';
 
@@ -261,7 +261,23 @@ export function decide(input: {
   // are the prospects the reading is for, and a menu would only bury it.
   if (event.kind === 'image') return { action: 'photo' };
 
-  // 4. First contact: the menu comes as buttons, so one tap is enough to answer.
+  // The site button's message alone: ask the question, never the sheet (src/lib/whatsapp/copy.ts siteQuestion).
+  const asksNothing = event.kind === 'text' && event.text !== null && !asksSomething(event.text);
+  const site = asksNothing && isSiteMessage(event.text) ? siteQuestion({ lang, voice: input.voiceEnabled === true }) : null;
+
+  // 4. First contact through the site button.
+  if (contact.greetedAt === null && site) {
+    return {
+      action: 'send',
+      text: site.text,
+      markGreeted: true,
+      handoff: false,
+      greeting: true,
+      menu: { buttons: MENU_BUTTONS, fallbackText: site.plain },
+    };
+  }
+
+  // 4b. First contact: the menu comes as buttons, so one tap is enough to answer.
   // Arabic letters say the reader reads Arabic; anything else gets both languages.
   if (contact.greetedAt === null) {
     const darija = event.text !== null && (ARABIC_LETTER.test(event.text) || isLatinDarija(event.text));
@@ -283,15 +299,16 @@ export function decide(input: {
 
   // 5. Back through the ad: the menu again rather than a presentation written by the assistant,
   // unless a question was typed with it (then the assistant answers it, step 9).
+  // The site button gets its own question instead of the menu.
   if (isAdPrefill(event) && !(event.kind === 'text' && event.text !== null && asksSomething(event.text))) {
     const quietUntil = contact.greetedAt.getTime() + REGREET_QUIET_MINUTES * 60 * 1000;
     if (now.getTime() < quietUntil) return { action: 'silent' };
     return {
       action: 'send',
-      text: COPY.menuAgain,
+      text: site ? site.text : COPY.menuAgain,
       markGreeted: false,
       handoff: false,
-      menu: { buttons: MENU_BUTTONS, fallbackText: COPY.menuAgainPlain },
+      menu: { buttons: MENU_BUTTONS, fallbackText: site ? site.plain : COPY.menuAgainPlain },
     };
   }
 

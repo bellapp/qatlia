@@ -222,7 +222,7 @@ stubModule('@/lib/whatsapp/assistant', {
   },
 });
 
-const { COPY, MENU_BUTTONS, PRICING_TRY, greeting, exampleCaption, EXAMPLE_FICHE_URL } = loadTsModule('src/lib/whatsapp/copy.ts');
+const { COPY, MENU_BUTTONS, PRICING_TRY, greeting, siteQuestion, exampleCaption, EXAMPLE_FICHE_URL } = loadTsModule('src/lib/whatsapp/copy.ts');
 // Arabic letters get the darija-only greeting; the ad (referral, pre-filled text) both languages, darija first.
 // The text messages logged, without the example cut list sent after the greeting (tested at the end).
 const textOutbound = () => state.outbound.filter((row) => row.kind !== 'example');
@@ -1905,12 +1905,13 @@ test('a typed text message gives the typed read its own 20 s', async () => {
 
 const { siteMessage } = loadTsModule('src/lib/whatsapp/site-contact.ts');
 
-test('coexistence + scope ads: a new contact writing through the site button gets the greeting, in French', async () => {
+test('coexistence + scope ads: a new contact writing through the site button is asked their question, in French', async () => {
   resetState();
   await withEnv({ ...CONFIGURED, WHATSAPP_BOT_SCOPE: 'ads' }, async () => {
     await POST(signedPost(messagesPayload([textMessage('wamid.s1', WA_ID, siteMessage('atelier', 'fr'))])));
     assert.equal(state.sent.length, 1);
-    assert.equal(state.sent[0].body, greeting({ lang: 'fr', bilingual: true, voice: true }).text);
+    assert.equal(state.sent[0].body, siteQuestion({ lang: 'fr', voice: true }).text);
+    assert.equal(state.images.length, 0, 'no example sheet');
     assert.equal(state.contacts.get(WA_ID).fromAd, true, 'the site referral is stored: the next messages are answered too');
   });
 });

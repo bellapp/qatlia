@@ -124,6 +124,30 @@ export function greeting(input: { lang: Lang; bilingual: boolean; voice: boolean
   };
 }
 
+const SITE_QUESTION: Record<Lang, { ask: string; voice: string }> = {
+  ar: {
+    ask: 'مرحبا 👋\nشنو نقدر نعاونك فيه؟ كتب ليا السؤال ديالك هنا',
+    voice: '، ولا قولو ليا بأوديو 🎤',
+  },
+  fr: {
+    ask: 'Bonjour 👋\nEn quoi puis-je vous aider ? Écrivez-moi votre question ici',
+    voice: ', ou envoyez un vocal 🎤',
+  },
+};
+
+/**
+ * The answer to the site button's message sent alone (Wafae, 25/11/2026:
+ * « j'ai une question sur QatliA » got the ad's greeting and the example
+ * sheet). Someone on the site, perhaps a customer: ask the question, not the
+ * sheet. One language, the one chosen on the site. `text` goes with the
+ * MENU_BUTTONS; `plain` is its typed 1/2/3 version.
+ */
+export function siteQuestion(input: { lang: Lang; voice: boolean }): { text: string; plain: string } {
+  const { ask, voice } = SITE_QUESTION[input.lang];
+  const head = `${ask}${input.voice ? voice : '.'}`;
+  return { text: `${head}\n${GREETING_BUTTONS[input.lang]}`, plain: `${head}\n${GREETING_TYPED[input.lang]}` };
+}
+
 const DEFAULT_GREETING = greeting({ lang: 'fr', bilingual: true, voice: true });
 
 const MENU_AGAIN_FR = 'Re-bonjour 👋 Envoyez-moi la photo de votre fiche 📸, ou choisissez ci-dessous 👇';
