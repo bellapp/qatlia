@@ -356,6 +356,9 @@ export const fr = {
     },
     cost: {
       bannerLabel: 'Coût total estimé',
+      uncounted: 'Les chants ({meters} m) ne sont pas comptés dans ce prix.',
+      uncountedSet: 'Mettre le prix du chant',
+      uncountedCount: 'Compter les chants',
       currency: '{currency}',
       amount: '{value} {currency}',
       bannerMeta: '{meters} m linéaires de coupe · {sheets}',
@@ -538,7 +541,7 @@ export const fr = {
       pickerTitle: 'Chants de {name}',
     },
     edgeBanding: {
-      none: 'Aucun',
+      none: 'Sans couleur',
       white: 'Blanc',
       beech: 'Hêtre',
       oak: 'Chêne',

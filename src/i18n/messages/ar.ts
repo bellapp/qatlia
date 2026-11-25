@@ -316,6 +316,9 @@ export const ar: Catalog = {
     },
     cost: {
       bannerLabel: 'التكلفة الإجمالية التقديرية',
+      uncounted: 'الحواف ({meters} م) غير محسوبة في هذا الثمن.',
+      uncountedSet: 'ضع ثمن الحافة',
+      uncountedCount: 'احسب الحواف',
       currency: '{currency}',
       amount: '{value} {currency}',
       bannerMeta: '{meters} م طولية من القطع · {sheets}',
@@ -486,7 +489,7 @@ export const ar: Catalog = {
       pickerTitle: 'حواف {name}',
     },
     edgeBanding: {
-      none: 'بدون',
+      none: 'بدون لون',
       white: 'أبيض',
       beech: 'زان',
       oak: 'بلوط',

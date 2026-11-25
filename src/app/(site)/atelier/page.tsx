@@ -95,6 +95,7 @@ import { writeLocalHistoryItem, renameLocalHistoryItem, markLocalHistoryPdf, typ
 import { saveProjectName, type RenameOutcome } from '@/lib/projects/rename';
 import { deriveQuotationPanels, deriveQuotationPieces } from '@/lib/quotation-items';
 import { buildPdfPayload } from '@/lib/pdf-payload';
+import { uncountedEdgeMetres } from '@/lib/uncounted-edges';
 import { readShowEdges, saveShowEdges } from '@/lib/show-edges';
 import { EDGE_COLOR, EDGE_DASH_CM, EDGE_HALO, EDGE_HALO_CM, EDGE_STROKE_CM, edgeLines, hasEdgeLines } from '@/lib/cutting/edge-lines';
 import { SCREEN_MEASURES, shortMeasure, sideMeasures } from '@/lib/cutting/side-measures';
@@ -532,6 +533,7 @@ const commitPanelName = () => {
         edgeBandPricePerM: ownEdgePrice ?? undefined,
         sheet: next.sheet ?? activeSheet,
         currency,
+        placedPieces: current.placedPieces,
       });
       return { ...current, costingInput, costBreakdown: computeCostBreakdown(costingInput) };
     });
@@ -1744,6 +1746,17 @@ const commitPanelName = () => {
   // What each cost total is made of, regrouped from the input the optimizer
   // priced (src/lib/cost-detail.ts) — the same detail the PDF report prints.
   const costDetail = result?.costingInput ? buildCostDetail(result.costingInput) : null;
+  // Sides to band that the price leaves out. A price of zero is a choice.
+  const uncountedEdges = result && edgePrice !== 0 ? uncountedEdgeMetres(result) : 0;
+  const showEdgePriceField = () => {
+    setShowAdvancedOptions(true);
+    // Once the settings are unfolded.
+    window.setTimeout(() => {
+      const field = document.getElementById('edge-price-input');
+      field?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      field?.focus({ preventScroll: true });
+    }, 50);
+  };
   /** At most `decimals` decimals, in the reader's locale (2,9768 ; 6,3 ; 8). */
   const detailNumber = (value: number, decimals: number) => n(value, { maximumFractionDigits: decimals });
   const detailMoney = (value: number) => n(value, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -2476,6 +2489,26 @@ const commitPanelName = () => {
                   </div>
                 </div>
 
+                {uncountedEdges > 0 && (
+                  <div
+                    role="status"
+                    data-testid="uncounted-edges"
+                    className="flex flex-wrap items-center justify-between gap-3 p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/40"
+                  >
+                    <p className="flex items-center gap-2 text-xs font-semibold text-amber-800 dark:text-amber-300 min-w-0">
+                      <AlertTriangle className="w-4 h-4 shrink-0" aria-hidden="true" />
+                      {t('atelier.cost.uncounted', { meters: n(uncountedEdges, { maximumFractionDigits: 2 }) })}
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => (edgePrice === null ? showEdgePriceField() : repriceResult({}))}
+                      className="min-h-9 px-4 rounded-lg bg-brand-400 hover:bg-brand-500 text-slate-950 text-xs font-bold transition-colors"
+                    >
+                      {t(edgePrice === null ? 'atelier.cost.uncountedSet' : 'atelier.cost.uncountedCount')}
+                    </button>
+                  </div>
+                )}
+
                 {/* Unplaced pieces alert — an oversize piece (larger than the
                     stock panel even rotated) must be impossible to miss, and
                     any other structural rejection is named too. */}
@@ -2875,7 +2908,7 @@ const commitPanelName = () => {
                           {costDetail.edges.map((edge, i) => (
                             <li key={`edge-${i}`} className="flex flex-wrap items-baseline justify-between gap-x-3 py-1.5">
                               <span className="text-slate-700 dark:text-slate-200">
-                                {edge.edgeId ? `${t('atelier.cost.detail.edge')} · ${t(edgeBandingLabelKey(edge.edgeId))}` : t('atelier.cost.detail.edge')}
+                                {edge.edgeId && edge.edgeId !== 'none' ? `${t('atelier.cost.detail.edge')} · ${t(edgeBandingLabelKey(edge.edgeId))}` : t('atelier.cost.detail.edge')}
                               </span>
                               <span className="ms-auto flex items-baseline gap-3">
                                 <span className="font-mono text-[10px] text-slate-500 dark:text-slate-400" dir="ltr" translate="no">
@@ -3071,6 +3104,7 @@ const commitPanelName = () => {
           panels={quotationPanels}
           pieces={quotationPieces}
           itemLimitError={quotationItemLimitError}
+          uncountedEdgeMetres={uncountedEdges}
           projectId={lastSavedProjectId}
         />
       )}

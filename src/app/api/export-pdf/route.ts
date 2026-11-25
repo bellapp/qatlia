@@ -635,7 +635,7 @@ export async function POST(req: Request) {
       }
 
       for (const edge of detail.edges) {
-        const name = edge.edgeId ? `${cat.detail.edge} · ${translate(locale, edgeBandingLabelKey(edge.edgeId))}` : cat.detail.edge;
+        const name = edge.edgeId && edge.edgeId !== 'none' ? `${cat.detail.edge} · ${translate(locale, edgeBandingLabelKey(edge.edgeId))}` : cat.detail.edge;
         detailRows.push([name, `${fmtNumber(edge.lengthM, 2)} m`, `${fmtNumber(edge.pricePerMeter, 2)} ${currency}/m`, fmtMad(edge.total)]);
       }
 
