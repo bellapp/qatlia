@@ -543,7 +543,7 @@ export const en: Catalog = {
     labels: {
       label: 'Labels on the pieces',
       desc: 'Number and dimensions shown on the plan',
-      tooltip: 'Shows the number and the dimensions (H×W) at the centre of every piece on the cut plan.',
+      tooltip: 'Shows the number of every piece on the cut plan, and its measures, each along its own side.',
     },
     singleSheet: {
       label: 'Single sheet only',

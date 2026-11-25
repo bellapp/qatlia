@@ -596,7 +596,7 @@ export const fr = {
     labels: {
       label: 'Étiquettes sur les pièces',
       desc: 'N° et dimensions visibles sur le plan',
-      tooltip: 'Affiche le numéro et les dimensions (H×L) au centre de chaque pièce sur le schéma de coupe.',
+      tooltip: 'Affiche sur le schéma de coupe le numéro de chaque pièce et ses mesures, écrites chacune le long de son côté.',
     },
     singleSheet: {
       label: 'Mode 1 feuille unique',
