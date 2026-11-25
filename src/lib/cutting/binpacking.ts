@@ -60,12 +60,45 @@ function isPrice(value: unknown): value is number {
  * Price per metre for an edge-banding colour, in the account currency. The
  * artisan sets one price for every colour (user request, 2026-11-13: a price
  * per colour was too much detail); without it each colour keeps its catalog
- * price — a dirham figure, converted for a euro or dollar account.
+ * price — a dirham figure, converted for a euro or dollar account. A ticked
+ * side without a colour (read from a photo, ticked by hand) has the artisan's
+ * price too (owner report, 2026-11-25); it has no catalog price.
  */
 export function edgePricePerM(edgeId: string, ownPricePerM?: number, currency?: AppCurrency): number {
   const preset = EDGEBANDING_PRESETS.find((e) => e.id === edgeId) || EDGEBANDING_PRESETS[0];
-  if (preset.id === 'none') return 0;
-  return isPrice(ownPricePerM) ? ownPricePerM : catalogPriceIn(preset.pricePerM, currency);
+  if (isPrice(ownPricePerM)) return ownPricePerM;
+  return preset.id === 'none' ? 0 : catalogPriceIn(preset.pricePerM, currency);
+}
+
+/**
+ * Metres of edge banding on a placed piece, or null when a saved piece does
+ * not say its own size. The flags are the piece's own sides, never its
+ * as-placed (possibly rotated) ones: always originalWidth/originalHeight. Only
+ * the sides actually ticked count; no full-perimeter fallback.
+ */
+export function bandedLengthM(placed: Pick<PlacedPiece, 'edges' | 'originalWidth' | 'originalHeight'>): number | null {
+  const { edges, originalWidth, originalHeight } = placed;
+  if (!edges) return 0;
+  const along = (edges.top === true ? 1 : 0) + (edges.bottom === true ? 1 : 0);
+  const up = (edges.left === true ? 1 : 0) + (edges.right === true ? 1 : 0);
+  if (along + up === 0) return 0;
+  const lengthM = (along * originalWidth + up * originalHeight) / 100;
+  return Number.isFinite(lengthM) && lengthM >= 0 ? lengthM : null;
+}
+
+/** The edge banding of a placed piece, priced; null when there is none to count. */
+function edgeSegmentOf(placed: PlacedPiece, ownPricePerM?: number, currency?: AppCurrency): EdgeSegmentCostLine | null {
+  if (!placed.edges) return null;
+  const presetId = placed.edges.color || 'none';
+  const preset = EDGEBANDING_PRESETS.find((e) => e.id === presetId) || EDGEBANDING_PRESETS[0];
+  const pricePerMeter = resolveEdgeRatePerMeter(
+    placed.edges.pricePerM !== undefined
+      ? { kind: 'explicit', pricePerMeter: placed.edges.pricePerM }
+      : { kind: 'preset', preset: { id: preset.id, pricePerMeter: edgePricePerM(preset.id, ownPricePerM, currency) } }
+  );
+  if (pricePerMeter <= 0) return null;
+  const lengthM = bandedLengthM(placed);
+  return lengthM ? { lengthM, pricePerMeter, edgeId: preset.id } : null;
 }
 
 /**
@@ -298,7 +331,9 @@ export interface OptimizationResult {
  * credit). Only lines that say what they are can be repriced — an edge
  * segment with its colour, a panel line with the stock panel's material and
  * size (src/lib/cost-detail.ts) — so a result saved before they existed keeps
- * its prices. Edge segments are always repriced from the colour, which also
+ * its prices. With the placed pieces at hand, the edge banding is counted
+ * again from them: a side without a colour has no segment until a price is
+ * set. Otherwise the segments are repriced from their colour, which also
  * replaces a per-piece rate; the atelier never sets one.
  */
 export function repriceCostingInput(
@@ -308,6 +343,8 @@ export function repriceCostingInput(
     sheet?: Pick<Sheet, 'material' | 'width' | 'height' | 'color' | 'pricePerSheet'>;
     /** The account currency, for the catalog prices (see `catalogPriceIn`). */
     currency?: AppCurrency;
+    /** The pieces of the plan. */
+    placedPieces?: readonly PlacedPiece[];
   }
 ): CostBreakdownInput {
   const { sheet } = prices;
@@ -316,6 +353,12 @@ export function repriceCostingInput(
     line.material === (sheet.material || 'mdf') &&
     line.widthCm === sheet.width &&
     line.heightCm === sheet.height;
+  // An older save may not say a piece's own size, or which colour a segment is.
+  const recount = prices.placedPieces
+    && input.edge.segments.every((segment) => segment.edgeId !== undefined)
+    && prices.placedPieces.every((placed) => bandedLengthM(placed) !== null)
+    ? prices.placedPieces.flatMap((placed) => edgeSegmentOf(placed, prices.edgeBandPricePerM, prices.currency) ?? [])
+    : null;
   return {
     ...input,
     material: {
@@ -330,7 +373,7 @@ export function repriceCostingInput(
     },
     edge: {
       ...input.edge,
-      segments: input.edge.segments.map((segment) =>
+      segments: recount ?? input.edge.segments.map((segment) =>
         segment.edgeId ? { ...segment, pricePerMeter: edgePricePerM(segment.edgeId, prices.edgeBandPricePerM, prices.currency) } : segment
       ),
     },
@@ -2251,25 +2294,8 @@ export function optimizeCutting2D(
   // on the source piece are counted; no full-perimeter fallback.
   const edgeSegments: EdgeSegmentCostLine[] = [];
   for (const placed of finalPlan.placedPieces) {
-    if (!placed.edges) continue;
-    const presetId = placed.edges.color || 'none';
-    const preset = EDGEBANDING_PRESETS.find((e) => e.id === presetId) || EDGEBANDING_PRESETS[0];
-    const pricePerMeter = resolveEdgeRatePerMeter(
-      placed.edges.pricePerM !== undefined
-        ? { kind: 'explicit', pricePerMeter: placed.edges.pricePerM }
-        : { kind: 'preset', preset: { id: preset.id, pricePerMeter: edgePricePerM(preset.id, mergedOptions.edgeBandPricePerM, mergedOptions.currency) } }
-    );
-    if (pricePerMeter <= 0) continue;
-    // Edge flags (top/bottom/left/right) refer to the piece's own labeled
-    // sides, not its as-placed (possibly rotated) orientation — so this
-    // always uses originalWidth/originalHeight, never the rotated width/height.
-    let lengthM = 0;
-    if (placed.edges.top) lengthM += placed.originalWidth / 100;
-    if (placed.edges.bottom) lengthM += placed.originalWidth / 100;
-    if (placed.edges.left) lengthM += placed.originalHeight / 100;
-    if (placed.edges.right) lengthM += placed.originalHeight / 100;
-    if (lengthM === 0) continue;
-    edgeSegments.push({ lengthM, pricePerMeter, edgeId: preset.id });
+    const segment = edgeSegmentOf(placed, mergedOptions.edgeBandPricePerM, mergedOptions.currency);
+    if (segment) edgeSegments.push(segment);
   }
 
   // Built once, then handed to computeCostBreakdown *and* returned verbatim

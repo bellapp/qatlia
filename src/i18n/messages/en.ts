@@ -318,6 +318,9 @@ export const en: Catalog = {
     },
     cost: {
       bannerLabel: 'Estimated total cost',
+      uncounted: 'The edge banding ({meters} m) is not counted in this price.',
+      uncountedSet: 'Set the edge banding price',
+      uncountedCount: 'Count the edge banding',
       currency: '{currency}',
       amount: '{value} {currency}',
       bannerMeta: '{meters} linear m of cutting · {sheets}',
@@ -488,7 +491,7 @@ export const en: Catalog = {
       pickerTitle: 'Edges of {name}',
     },
     edgeBanding: {
-      none: 'None',
+      none: 'No colour',
       white: 'White',
       beech: 'Beech',
       oak: 'Oak',

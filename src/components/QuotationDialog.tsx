@@ -47,6 +47,8 @@ interface QuotationDialogProps {
   pieces?: QuotationPieceLine[];
   /** Already-localized message when the plan's panels/pieces exceed the schema-bounded maximum (see src/lib/quotation-items.ts's `{ ok: false }` result) — non-null both shows a visible error and disables quote generation, since a `.slice()`d document would silently omit panels/pieces with no trace. */
   itemLimitError?: string | null;
+  /** Metres of edge banding the price leaves out (src/lib/uncounted-edges.ts): said before the quote is made. */
+  uncountedEdgeMetres?: number;
   /** The current saved project, if any — merged server-side into its options_json when the quote generates successfully, and used to prefill this dialog from that project's own saved quotation metadata (see the projectId effect below). */
   projectId?: string | null;
 }
@@ -120,9 +122,10 @@ export const QuotationDialog: React.FC<QuotationDialogProps> = ({
   panels = [],
   pieces = [],
   itemLimitError = null,
+  uncountedEdgeMetres = 0,
   projectId,
 }) => {
-  const { t, locale } = useLocale();
+  const { t, n, locale } = useLocale();
   // The quote is in the account currency, the one the plan was priced in.
   const currency = useCurrency().currency ?? DEFAULT_CURRENCY;
   const headingId = useId();
@@ -487,6 +490,11 @@ export const QuotationDialog: React.FC<QuotationDialogProps> = ({
             <div role="alert" className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-400 text-xs">
               {itemLimitError}
               <SupportContact label={t('support.needHelp')} message={t('support.prefill')} className="mt-2" />
+            </div>
+          )}
+          {uncountedEdgeMetres > 0 && (
+            <div role="status" data-testid="quotation-uncounted-edges" className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/40 text-xs font-semibold text-amber-800 dark:text-amber-300">
+              {t('atelier.cost.uncounted', { meters: n(uncountedEdgeMetres, { maximumFractionDigits: 2 }) })}
             </div>
           )}
           {errorKey && (

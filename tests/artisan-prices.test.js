@@ -34,12 +34,15 @@ test('a panel is priced by its own price, else the catalog price of that whole p
   assert.deepEqual(sheetPricing(panel, { melamine: { mode: 'per_m2', value: 170 } }), { mode: 'per_m2', value: 170 });
 });
 
-test("every edge colour is priced at the artisan's one rate, else its catalog rate; « Aucun » is never charged", () => {
+test("every edge colour is priced at the artisan's one rate, else its catalog rate; without a colour there is no catalog rate", () => {
   const { edgePricePerM } = binpacking();
   assert.equal(edgePricePerM('white', 9.5), 9.5);
   assert.equal(edgePricePerM('oak', 9.5), 9.5);
   assert.equal(edgePricePerM('oak'), 12);
-  assert.equal(edgePricePerM('none', 5), 0);
+  // Owner report, 2026-11-25: a ticked side without a colour is banded too.
+  assert.equal(edgePricePerM('none', 5), 5);
+  assert.equal(edgePricePerM('none'), 0);
+  assert.equal(edgePricePerM('none', 0), 0);
   assert.equal(edgePricePerM('white', -1), 8);
 });
 
