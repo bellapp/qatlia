@@ -2707,7 +2707,7 @@ const commitPanelName = () => {
                       </label>
                       {showEdges && (
                         <p data-testid="cut-plan-edge-legend" className="flex items-center gap-2 py-2">
-                          <span aria-hidden="true" className="w-8 border-t-2 border-dashed border-[#1D4ED8] dark:border-[#60A5FA]" />
+                          <svg aria-hidden="true" width="32" height="6" viewBox="0 0 32 6" fill="none"><path d="M0 3H32" stroke={EDGE_HALO} strokeWidth="5" /><path d="M0 3H32" stroke={EDGE_COLOR} strokeWidth="3" strokeDasharray="7 5" /></svg>
                           {t('atelier.plan.edgeLegend')}
                         </p>
                       )}

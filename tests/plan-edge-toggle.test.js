@@ -113,6 +113,10 @@ test('the switch sits under the plan, drives the screen and the PDF, in every la
   assert.match(atelier, /buildPdfPayload\([^)]*, showEdges\)/);
   // Any banded panel: the switch must stay reachable once it is off, and from a panel without chants.
   assert.match(atelier, /hasEdgeLines\(result\.placedPieces\)/);
+  // The legend wears the plan's own colors, in the dark theme too.
+  const legend = atelier.slice(atelier.indexOf('data-testid="cut-plan-edge-legend"'), atelier.indexOf("t('atelier.plan.edgeLegend')"));
+  assert.match(legend, /stroke=\{EDGE_COLOR\}/);
+  assert.match(legend, /stroke=\{EDGE_HALO\}/);
   assert.match(read('src/app/(site)/history/page.tsx'), /showEdges: readShowEdges\(\)/);
   for (const locale of ['fr', 'en', 'ar']) {
     assert.equal(typeof load(`src/i18n/messages/${locale}.ts`)[locale].atelier.plan.edgeToggle, 'string', locale);
