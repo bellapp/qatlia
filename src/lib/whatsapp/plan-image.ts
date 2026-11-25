@@ -7,7 +7,7 @@
  *  - the cost banner: « COÛT TOTAL ESTIMÉ », the amount, the metres of cut and the panels;
  *  - the panel tabs (src/components/SheetTabs.tsx): « Panneau N » and its yield, the first active;
  *  - the plan of panel 1, drawn as the atelier draws it: each piece in its
- *    line's color with « #N » and « H×W cm », the offcuts hatched with their size;
+ *    line's color with « #N » and its measures along its sides, the offcuts hatched likewise;
  *  - the export buttons (CSV, JSON, PNG, DXF, the PDF report, the client quote).
  * The whole plan (all panels, the exports) stays in the app, after sign-up
  * (plan 2026-11-19-whatsapp-plan-apercu). French, as on the owner's screenshot:
@@ -21,6 +21,7 @@
 
 import type { OptimizationResult } from '@/lib/cutting/binpacking';
 import { PIECE_COLOR_PALETTE } from '@/lib/pieces/catalog';
+import { SCREEN_MEASURES, scaleMeasures, shortMeasure, sideMeasures, type SideMeasures } from '@/lib/cutting/side-measures';
 import { EDGE_DASH_CM, EDGE_HALO_CM, EDGE_STROKE_CM, edgeLines, type EdgeLine } from '@/lib/cutting/edge-lines';
 
 export const PLAN_IMAGE_WIDTH = 1080;
@@ -41,8 +42,8 @@ const ARROW_WIDTH = 40;
 const PLAN_PAD = 30;
 /** Keeps a tall panel on one phone screen. */
 const MAX_PANEL_HEIGHT = 1150;
-/** The line under the panel saying what the blue dashes are. */
-const EDGE_LEGEND = 52;
+/** The line under the panel: the unit of the measures, and what the blue dashes are. */
+const LEGEND = 52;
 const EXPORT_ROW = 84;
 const EXPORT_PDF = 96;
 const EXPORT_GAP = 14;
@@ -60,16 +61,13 @@ export interface PlanImagePiece extends PlanImageBox {
   color: string;
   /** "#12", the piece number the atelier shows. */
   number: string;
-  numberFont: number;
-  /** « 228.0×9.0 cm » as placed; null on a piece under 10 cm on its short side, as in the atelier. */
-  size: string | null;
-  sizeFont: number;
+  /** « 228 » along the top and « 9 » along the left, as placed, and where "#12" goes: pixels from the panel's corner. */
+  measures: SideMeasures;
 }
 
 export interface PlanImageOffcut extends PlanImageBox {
-  /** « 41.0 × 208.0 cm »; null under 14 × 10 cm, as in the atelier. */
-  size: string | null;
-  font: number;
+  /** As on a piece; null under 14 × 10 cm, as in the atelier. */
+  measures: SideMeasures | null;
 }
 
 /** The atelier's cost banner (atelier.cost.* in src/i18n/messages/fr.ts). */
@@ -120,9 +118,9 @@ export interface PlanImageLayout {
   scale: number;
   pieces: PlanImagePiece[];
   offcuts: PlanImageOffcut[];
-  /** null when no piece of the panel is banded; so is the legend. */
+  /** null when no piece of the panel is banded; so is their label in the legend. */
   edges: PlanImageEdges | null;
-  edgeLegend: (PlanImageBox & { label: string }) | null;
+  legend: PlanImageBox & { edges: string | null; unit: string };
   sheetCount: number;
   exportsTop: number;
   exports: PlanImageExports;
@@ -240,12 +238,16 @@ export function planImageLayout(result: PlanImageSource): PlanImageLayout | null
     halo: round(EDGE_HALO_CM * scale),
     dash: [round(EDGE_DASH_CM[0] * scale), round(EDGE_DASH_CM[1] * scale)],
   };
-  const legendHeight = edges ? EDGE_LEGEND : 0;
-  const edgeLegend = edges
-    ? { left: PAD + PLAN_PAD, top: round(panel.top + panelHeight + PLAN_PAD / 2), width: PLAN_IMAGE_WIDTH - 2 * PAD - 2 * PLAN_PAD, height: EDGE_LEGEND, label: 'Chant' }
-    : null;
+  const legend = {
+    left: PAD + PLAN_PAD,
+    top: round(panel.top + panelHeight + PLAN_PAD / 2),
+    width: PLAN_IMAGE_WIDTH - 2 * PAD - 2 * PLAN_PAD,
+    height: LEGEND,
+    edges: edges ? 'Chant' : null,
+    unit: 'Mesures en cm',
+  };
 
-  const card = { left: PAD, top: tabsTop, width: PLAN_IMAGE_WIDTH - 2 * PAD, height: TABS_HEIGHT + 2 * PLAN_PAD + panelHeight + legendHeight };
+  const card = { left: PAD, top: tabsTop, width: PLAN_IMAGE_WIDTH - 2 * PAD, height: TABS_HEIGHT + 2 * PLAN_PAD + panelHeight + LEGEND };
   const exportsTop = round(card.top + card.height + GAP);
   const box = (item: { x: number; y: number; width: number; height: number }): PlanImageBox => ({
     left: round(panel.left + item.x * scale),
@@ -254,24 +256,29 @@ export function planImageLayout(result: PlanImageSource): PlanImageLayout | null
     height: round(item.height * scale),
   });
 
-  // Same rules as the atelier's plan, in cm then scaled: "#N" in
-  // min(5.5, max(2.5, side/12)), the size in min(4.5, max(2, side/14)) from 10 cm.
+  // As the atelier's plan, in cm then scaled: "#N" in min(5.5, max(2.5, side/12)),
+  // each measure along its side (src/lib/cutting/side-measures.ts).
+  const style = scaleMeasures(SCREEN_MEASURES, scale);
+  const measuresOf = (item: { x: number; y: number; width: number; height: number }, number?: { text: string; font: number }) =>
+    sideMeasures(
+      { x: item.x * scale, y: item.y * scale, width: item.width * scale, height: item.height * scale },
+      { width: shortMeasure(cm(item.width)), height: shortMeasure(cm(item.height)) },
+      { ...style, number }
+    );
   const pieces = sheet.pieces.map((placed): PlanImagePiece => {
     const minSide = Math.min(placed.width, placed.height);
+    const number = `#${placed.pieceNumber}`;
     return {
       ...box(placed),
       color: pieceColor(placed),
-      number: `#${placed.pieceNumber}`,
-      numberFont: round(clamp(minSide / 12, 2.5, 5.5) * scale),
-      size: minSide >= 10 ? `${cm(placed.height)}×${cm(placed.width)} cm` : null,
-      sizeFont: round(clamp(minSide / 14, 2, 4.5) * scale),
+      number,
+      measures: measuresOf(placed, { text: number, font: clamp(minSide / 12, 2.5, 5.5) * scale }),
     };
   });
 
   const offcuts = (sheet.offcuts ?? []).map((offcut): PlanImageOffcut => ({
     ...box(offcut),
-    size: offcut.width >= 14 && offcut.height >= 10 ? `${cm(offcut.height)} × ${cm(offcut.width)} cm` : null,
-    font: round(clamp(Math.min(offcut.width, offcut.height) / 12, 2.2, 4.5) * scale),
+    measures: offcut.width >= 14 && offcut.height >= 10 ? measuresOf(offcut) : null,
   }));
 
   return {
@@ -288,7 +295,7 @@ export function planImageLayout(result: PlanImageSource): PlanImageLayout | null
     pieces,
     offcuts,
     edges,
-    edgeLegend,
+    legend,
     sheetCount,
     exportsTop,
     exports: { files: ['CSV', 'JSON', 'PNG', 'DXF'], pdf: 'Exporter le rapport PDF', quote: 'Devis client' },

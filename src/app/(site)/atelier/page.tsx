@@ -97,6 +97,8 @@ import { deriveQuotationPanels, deriveQuotationPieces } from '@/lib/quotation-it
 import { buildPdfPayload } from '@/lib/pdf-payload';
 import { readShowEdges, saveShowEdges } from '@/lib/show-edges';
 import { EDGE_COLOR, EDGE_DASH_CM, EDGE_HALO, EDGE_HALO_CM, EDGE_STROKE_CM, edgeLines, hasEdgeLines } from '@/lib/cutting/edge-lines';
+import { SCREEN_MEASURES, shortMeasure, sideMeasures } from '@/lib/cutting/side-measures';
+import PlanMeasures from '@/components/PlanMeasures';
 import { buildPersistedProjectPayload } from '@/lib/projects/persistence-payload';
 import {
   adoptSavedJob,
@@ -2637,18 +2639,17 @@ const commitPanelName = () => {
                         )}
 
                         {result.offcuts && result.offcuts.filter(o => o.sheetIndex === activeSheetIndex).map((off) => {
-                          const minSide = Math.min(off.width, off.height);
+                          const measures = sideMeasures(off, {
+                            width: shortMeasure(formatDisplayValue(off.width, displayUnit)),
+                            height: shortMeasure(formatDisplayValue(off.height, displayUnit)),
+                          }, SCREEN_MEASURES);
                           return (
                             <g key={off.id} data-testid="offcut-svg-group" data-offcut-id={off.id}>
                               <rect data-testid="offcut-svg-rect" data-offcut-id={off.id} data-offcut-width={off.width} data-offcut-height={off.height} x={off.x} y={off.y} width={off.width} height={off.height}
                                 fill={isDark ? 'url(#hatchD)' : 'url(#hatchL)'}
                                 stroke={isDark ? '#2D3A5C' : '#94A3B8'} strokeWidth="0.4" strokeDasharray="2 2" opacity="0.8" />
                               {off.width>=14 && off.height>=10 && (
-                                <text x={off.x+off.width/2} y={off.y+off.height/2} textAnchor="middle" dominantBaseline="central"
-                                  fill={isDark ? '#5B7DA6' : '#64748B'} fontSize={Math.min(4.5, Math.max(2.2, minSide/12))}
-                                  fontFamily="monospace" fontWeight="bold">
-                                  {formatDisplayValue(off.height, displayUnit)} × {formatDisplayValue(off.width, displayUnit)} {displayUnit}
-                                </text>
+                                <PlanMeasures measures={measures} fill={isDark ? '#5B7DA6' : '#64748B'} />
                               )}
                             </g>
                           );
@@ -2658,6 +2659,12 @@ const commitPanelName = () => {
                           const col = p.color || PIECE_COLOR_PALETTE[(p.pieceNumber - 1) % PIECE_COLOR_PALETTE.length];
                           const gradId = `g_${p.sheetIndex}_${p.pieceNumber}`;
                           const minSide = Math.min(p.width, p.height);
+                          const ink = isDark ? '#050A14' : '#1E293B';
+                          // Each measure along its side, "#N" in the middle (src/lib/cutting/side-measures.ts).
+                          const measures = sideMeasures(p, {
+                            width: shortMeasure(formatDisplayValue(p.width, displayUnit)),
+                            height: shortMeasure(formatDisplayValue(p.height, displayUnit)),
+                          }, { ...SCREEN_MEASURES, number: { text: `#${p.pieceNumber}`, font: Math.min(5.5, Math.max(2.5, minSide / 12)) } });
                           const edgePath = (showEdges ? edgeLines(p) : []).map((l) => `M${l.x1} ${l.y1}L${l.x2} ${l.y2}`).join('');
                           return (
                             <g key={`${p.sheetIndex}_${p.pieceNumber}`}>
@@ -2676,14 +2683,10 @@ const commitPanelName = () => {
                                 </g>
                               )}
                               {options.showLabels && (<>
-                                <text x={p.x+p.width/2} y={p.y+p.height/2-(minSide>=20?3:0)} textAnchor="middle" dominantBaseline="central"
-                                  fill={isDark ? '#050A14' : '#1E293B'} fontSize={Math.min(5.5,Math.max(2.5,minSide/12))}
+                                <text x={measures.number.x} y={measures.number.y} textAnchor="middle" dominantBaseline="central"
+                                  fill={ink} fontSize={measures.number.font}
                                   fontWeight="black" fontFamily="monospace">#{p.pieceNumber}</text>
-                                {minSide>=10 && (
-                                  <text x={p.x+p.width/2} y={p.y+p.height/2+(minSide>=20?3.5:2)} textAnchor="middle" dominantBaseline="central"
-                                    fill={isDark ? '#050A14' : '#1E293B'} fontSize={Math.min(4.5,Math.max(2,minSide/14))}
-                                    fontWeight="bold" fontFamily="monospace">{formatDisplayValue(p.height, displayUnit)}×{formatDisplayValue(p.width, displayUnit)} {displayUnit}</text>
-                                )}
+                                <PlanMeasures measures={measures} fill={ink} />
                               </>)}
                             </g>
                           );

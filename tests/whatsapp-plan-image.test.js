@@ -52,9 +52,10 @@ const HAMOUDA = [
 const hamoudaPlan = () => photoPreviewPlan({ pieces: HAMOUDA, sheet: { height: 278, width: 208 } });
 
 // "The same display as in the application" (owner, 21/11/2026): the atelier's
-// plan (src/app/(site)/atelier/page.tsx) draws "#N" and « H×W cm » on each
-// piece, in its palette, and hatches the offcuts with their size.
-test('each piece is drawn as in the atelier: its color, "#N" and its size in cm', () => {
+// plan (src/app/(site)/atelier/page.tsx) draws "#N" on each piece, in its
+// palette, each measure along its own side (owner, 25/11/2026), and hatches
+// the offcuts likewise.
+test('each piece is drawn as in the atelier: its color, "#N" and each measure along its side', () => {
   const { PIECE_COLOR_PALETTE } = load('src/lib/pieces/catalog.ts');
   const plan = photoPreviewPlan(draft);
   const layout = planImageLayout(plan);
@@ -64,7 +65,13 @@ test('each piece is drawn as in the atelier: its color, "#N" and its size in cm'
     assert.equal(piece.color, placed.color || PIECE_COLOR_PALETTE[(placed.pieceNumber - 1) % PIECE_COLOR_PALETTE.length]);
     assert.ok(placed.color, 'every WhatsApp piece has its line color');
     assert.equal(piece.number, `#${placed.pieceNumber}`);
-    assert.equal(piece.size, `${placed.height.toFixed(1)}×${placed.width.toFixed(1)} cm`);
+    const { width, height } = piece.measures;
+    assert.equal(width.text, String(placed.width));
+    assert.equal(height.text, String(placed.height));
+    const left = piece.left - layout.panel.left;
+    const top = piece.top - layout.panel.top;
+    assert.ok(Math.abs(width.x - (left + piece.width / 2)) < 1 && width.y < top + piece.height * 0.2, 'the width along the top');
+    assert.ok(Math.abs(height.y - (top + piece.height / 2)) < 1 && height.x < left + piece.width * 0.2, 'the height along the left');
   });
 });
 
@@ -93,10 +100,12 @@ test('every copy of a line wears the color the atelier gives that line', () => {
     byLine.set(placed.originalIndex, color);
   });
   // The 228 × 9 strips of line 11: all the same color.
-  assert.equal(new Set(layout.pieces.filter((p) => p.size === null).map((p) => p.color)).size, 1);
+  const strips = plan.sheets[0].pieces.flatMap((p, i) => (Math.min(p.width, p.height) === 9 ? [layout.pieces[i].color] : []));
+  assert.ok(strips.length > 0);
+  assert.equal(new Set(strips).size, 1);
 });
 
-test('the atelier font rules, scaled: a piece under 10 cm shows its number only', () => {
+test('the atelier font rules, scaled: a thin strip shows its two measures too', () => {
   const layout = planImageLayout(hamoudaPlan());
   const plan = hamoudaPlan();
   const s = layout.scale;
@@ -104,24 +113,30 @@ test('the atelier font rules, scaled: a piece under 10 cm shows its number only'
     const piece = layout.pieces[i];
     const minSide = Math.min(placed.width, placed.height);
     const near = (a, b) => Math.abs(a - b) < 0.2;
-    assert.ok(near(piece.numberFont, Math.min(5.5, Math.max(2.5, minSide / 12)) * s), 'number font');
-    assert.ok(near(piece.sizeFont, Math.min(4.5, Math.max(2, minSide / 14)) * s), 'size font');
-    assert.equal(piece.size === null, minSide < 10);
+    assert.ok(near(piece.measures.number.font, Math.min(5.5, Math.max(2.5, minSide / 12)) * s), 'number font');
+    for (const m of [piece.measures.width, piece.measures.height]) {
+      assert.ok(m.font >= 2 * s - 0.2 && m.font <= 4.8 * s + 0.2, 'measure font');
+    }
   });
-  // The 228 × 9 strips: their number, no size, as in the atelier.
-  assert.ok(layout.pieces.some((p) => p.size === null));
-  assert.ok(layout.pieces.some((p) => p.size === '160.0×48.0 cm' || p.size === '48.0×160.0 cm'));
+  const pairs = layout.pieces.map((p) => [p.measures.width.text, p.measures.height.text].sort().join(' '));
+  assert.ok(pairs.includes('228 9'), 'the 228 × 9 strips');
+  assert.ok(pairs.includes('160 48'));
 });
 
-test('the offcuts of the panel are drawn with their size from 14 × 10 cm', () => {
+test('the offcuts of the panel are drawn with their measures from 14 × 10 cm', () => {
   const plan = hamoudaPlan();
   const layout = planImageLayout(plan);
   const offcuts = plan.sheets[0].offcuts;
   assert.ok(offcuts.length > 0, 'the fixture leaves offcuts');
   assert.equal(layout.offcuts.length, offcuts.length);
   offcuts.forEach((offcut, i) => {
-    const expected = offcut.width >= 14 && offcut.height >= 10 ? `${offcut.height.toFixed(1)} × ${offcut.width.toFixed(1)} cm` : null;
-    assert.equal(layout.offcuts[i].size, expected);
+    const { measures } = layout.offcuts[i];
+    if (offcut.width < 14 || offcut.height < 10) {
+      assert.equal(measures, null);
+      return;
+    }
+    assert.equal(measures.width.text, String(Number(offcut.width.toFixed(1))));
+    assert.equal(measures.height.text, String(Number(offcut.height.toFixed(1))));
   });
 });
 

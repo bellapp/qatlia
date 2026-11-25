@@ -5,13 +5,14 @@
  * It copies the atelier's result screen in its light theme
  * (src/app/(site)/atelier/page.tsx): the navy cost banner, the panel tabs
  * (src/components/SheetTabs.tsx), the plan — white panel, each piece in its
- * color as a 0.85 → 0.6 gradient with a slate outline, "#N" over « H×W cm »,
- * the offcuts hatched with a dashed outline and their size — and the export
- * buttons. next/og draws a subset of CSS: every element with children is a
+ * color as a 0.85 → 0.6 gradient with a slate outline, "#N" and each measure
+ * along its side, the offcuts hatched with a dashed outline and their measures —
+ * and the export buttons. next/og draws a subset of CSS: every element with children is a
  * flex box, everything is absolutely placed. Latin text only (the bundled font).
  */
 
 import { EDGE_COLOR, EDGE_HALO } from '@/lib/cutting/edge-lines';
+import type { SideMeasures } from '@/lib/cutting/side-measures';
 import type { PlanImageLayout, PlanImageOffcut, PlanImagePiece, PlanImageTab } from '@/lib/whatsapp/plan-image';
 import { PLAN_IMAGE_EXPORT_ROWS, PLAN_IMAGE_TABS_HEIGHT } from '@/lib/whatsapp/plan-image';
 
@@ -128,25 +129,62 @@ function Piece({ piece, outline }: { piece: PlanImagePiece; outline: number }) {
     <div
       style={{
         display: 'flex',
-        flexDirection: 'column',
         position: 'absolute',
         left: piece.left,
         top: piece.top,
         width: piece.width,
         height: piece.height,
-        alignItems: 'center',
-        justifyContent: 'center',
         backgroundImage: `linear-gradient(135deg, ${withOpacity(piece.color, 0.85)}, ${withOpacity(piece.color, 0.6)})`,
         border: `${outline}px solid ${PIECE_OUTLINE}`,
-        color: INK,
+      }}
+    />
+  );
+}
+
+/** A text centred on a point of the panel; `turned`: a quarter counter-clockwise, as a height reads. */
+function PanelText({ text, x, y, font, color, turned }: { text: string; x: number; y: number; font: number; color: string; turned: boolean }) {
+  const width = text.length * font;
+  const height = font * 1.2;
+  return (
+    <div
+      style={{
+        display: 'flex',
+        position: 'absolute',
+        left: x - width / 2,
+        top: y - height / 2,
+        width,
+        height,
+        alignItems: 'center',
+        justifyContent: 'center',
+        fontSize: font,
+        lineHeight: 1,
         fontWeight: 700,
         whiteSpace: 'nowrap',
+        color,
+        ...(turned ? { transform: 'rotate(-90deg)' } : {}),
       }}
     >
-      <div style={{ display: 'flex', fontSize: piece.numberFont, lineHeight: 1.1 }}>{piece.number}</div>
-      {piece.size && <div style={{ display: 'flex', fontSize: piece.sizeFont, lineHeight: 1.1 }}>{piece.size}</div>}
+      {text}
     </div>
   );
+}
+
+/** The texts of the panel, over the chants. */
+function Texts({ layout }: { layout: PlanImageLayout }) {
+  const { left, top } = layout.panel;
+  const at = (m: { x: number; y: number }) => ({ x: left + m.x, y: top + m.y });
+  const measures = (m: SideMeasures | null, color: string) => (m ? [
+    ...(m.width ? [{ text: m.width.text, font: m.width.font, ...at(m.width), color, turned: false }] : []),
+    ...(m.height ? [{ text: m.height.text, font: m.height.font, ...at(m.height), color, turned: true }] : []),
+  ] : []);
+  const texts = [
+    ...layout.offcuts.flatMap((offcut) => measures(offcut.measures, MUTED)),
+    ...layout.pieces.flatMap((piece) => [
+      { text: piece.number, font: piece.measures.number.font, ...at(piece.measures.number), color: INK, turned: false },
+      ...measures(piece.measures, INK),
+    ]),
+  ];
+  return <>{texts.map((text, i) => <PanelText key={`t${i}`} {...text} />)}</>;
 }
 
 function Offcut({ offcut }: { offcut: PlanImageOffcut }) {
@@ -159,21 +197,14 @@ function Offcut({ offcut }: { offcut: PlanImageOffcut }) {
         top: offcut.top,
         width: offcut.width,
         height: offcut.height,
-        alignItems: 'center',
-        justifyContent: 'center',
         // The atelier's 45° hatch; next/og has no repeating gradient, so one
         // 18 px tile with a diagonal stroke (its gradient line is 25.5 px), repeated.
         backgroundImage: 'linear-gradient(45deg, transparent 11.7px, #CBD5E1 11.7px, #CBD5E1 13.8px, transparent 13.8px)',
         backgroundSize: '18px 18px',
         backgroundRepeat: 'repeat',
         border: `2px dashed ${PANEL_OUTLINE}`,
-        color: MUTED,
-        fontWeight: 700,
-        whiteSpace: 'nowrap',
       }}
-    >
-      {offcut.size && <div style={{ display: 'flex', fontSize: offcut.font }}>{offcut.size}</div>}
-    </div>
+    />
   );
 }
 
@@ -242,9 +273,8 @@ function Edges({ layout }: { layout: PlanImageLayout }) {
   );
 }
 
-function EdgeLegend({ layout }: { layout: PlanImageLayout }) {
-  const legend = layout.edgeLegend;
-  if (!legend) return null;
+function Legend({ layout }: { layout: PlanImageLayout }) {
+  const { legend } = layout;
   return (
     <div
       style={{
@@ -255,15 +285,21 @@ function EdgeLegend({ layout }: { layout: PlanImageLayout }) {
         width: legend.width,
         height: legend.height,
         alignItems: 'center',
+        justifyContent: 'space-between',
         fontSize: 28,
         fontWeight: 700,
         color: INK,
       }}
     >
-      <svg width="84" height="8" viewBox="0 0 84 8" fill="none" style={{ marginRight: 16 }}>
-        <path d="M0 4L84 4" stroke={EDGE_COLOR} strokeWidth="6" strokeDasharray="16 10" />
-      </svg>
-      {legend.label}
+      <div style={{ display: 'flex', color: MUTED }}>{legend.unit}</div>
+      {legend.edges && (
+        <div style={{ display: 'flex', alignItems: 'center' }}>
+          <svg width="84" height="8" viewBox="0 0 84 8" fill="none" style={{ marginRight: 16 }}>
+            <path d="M0 4L84 4" stroke={EDGE_COLOR} strokeWidth="6" strokeDasharray="16 10" />
+          </svg>
+          {legend.edges}
+        </div>
+      )}
     </div>
   );
 }
@@ -332,7 +368,8 @@ export function PlanImage({ layout }: { layout: PlanImageLayout }) {
         <Piece key={`p${i}`} piece={piece} outline={pieceOutline} />
       ))}
       <Edges layout={layout} />
-      <EdgeLegend layout={layout} />
+      <Texts layout={layout} />
+      <Legend layout={layout} />
 
       <Exports layout={layout} />
 

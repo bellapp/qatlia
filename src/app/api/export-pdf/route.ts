@@ -3,6 +3,7 @@ import { jsPDF, type TextOptionsLight } from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { fromCanonicalCm } from '@/lib/units';
 import { EDGE_COLOR, EDGE_DASH_CM, EDGE_INSET_PDF_CM, EDGE_STROKE_CM, edgeLines, edgeSidesOnPlan, hasEdgeLines } from '@/lib/cutting/edge-lines';
+import { PDF_MEASURES, scaleMeasures, shortMeasure, sideMeasures } from '@/lib/cutting/side-measures';
 import { ExportSchema } from '@/lib/exports/pdf-schema';
 import { computeCostBreakdown } from '@/lib/costing';
 import { buildCostDetail, hasLaborCharge } from '@/lib/cost-detail';
@@ -41,6 +42,11 @@ const BASE_FONT = 'helvetica';
  * font, correct letter-shaping and correct visual (left-to-right drawing)
  * order instead of tofu or a naively reversed string.
  */
+/** The measures of the plan, in points: readable at the saw, whatever the panel. */
+const MEASURE_MIN_PT = 4.2;
+const MEASURE_MAX_PT = 9;
+const MM_PER_PT = 25.4 / 72;
+
 export async function POST(req: Request) {
   try {
     const body = await req.json();
@@ -220,6 +226,28 @@ export async function POST(req: Request) {
 
     /** Width of `text` as drawText would draw it, in the font and size currently set. */
     const drawnTextWidth = (text: string) => measureContentAwareText(doc, fontRegistration, text);
+
+    /**
+     * The measures of a piece or an offcut, each along its side
+     * (src/lib/cutting/side-measures.ts). `box` is in millimetres on the page,
+     * `size` in centimetres. The turned text is placed by hand: jsPDF's own
+     * centering ignores the angle.
+     */
+    const drawMeasures = (box: { x: number; y: number; width: number; height: number }, size: { width: number; height: number }, scale: number) => {
+      const { width, height } = sideMeasures(
+        box,
+        { width: shortMeasure(fmt(size.width)), height: shortMeasure(fmt(size.height)) },
+        { ...scaleMeasures(PDF_MEASURES, scale), minFont: MEASURE_MIN_PT * MM_PER_PT, maxFont: MEASURE_MAX_PT * MM_PER_PT }
+      );
+      if (width) {
+        doc.setFontSize(width.font / MM_PER_PT);
+        drawText(width.text, width.x - drawnTextWidth(width.text) / 2, width.y + width.thickness / 2);
+      }
+      if (height) {
+        doc.setFontSize(height.font / MM_PER_PT);
+        drawText(height.text, height.x + height.thickness / 2, height.y + drawnTextWidth(height.text) / 2, { angle: 90 });
+      }
+    };
 
     /** `text` shortened with a trailing ellipsis until it fits `maxWidth` (font and size already set). */
     const fitText = (text: string, maxWidth: number) => {
@@ -905,15 +933,11 @@ export async function POST(req: Request) {
         doc.setLineWidth(0.4);
         doc.rect(ox, oy, ow, oh, 'FD');
 
-        // Cotation explicite Hauteur x Largeur au centre de la chute, dans l'unité choisie
-        if (ow > 12 && oh > 5) {
+        // Cotation de la chute, chaque mesure le long de son côté, dans l'unité choisie
+        if (ow > 5 && oh > 5) {
           doc.setFont(BASE_FONT, 'normal');
-          doc.setFontSize(Math.min(7.0, Math.max(4.0, Math.min(ow, oh) / 4.5)));
           doc.setTextColor(30, 41, 59);
-          drawText(`${fmt(off.height)} × ${fmt(off.width)} ${displayUnit}`, ox + ow / 2, oy + oh / 2, {
-            align: 'center',
-            baseline: 'middle',
-          });
+          drawMeasures({ x: ox, y: oy, width: ow, height: oh }, off, scale);
         }
       });
 
@@ -941,16 +965,9 @@ export async function POST(req: Request) {
           doc.setLineDashPattern([], 0);
         }
 
-        const dimText = `${fmt(p.height)} × ${fmt(p.width)} ${displayUnit}`;
         doc.setFont(BASE_FONT, 'normal');
-        doc.setFontSize(Math.min(7.5, Math.max(4.2, Math.min(pw, ph) / 4)));
         doc.setTextColor(0, 0, 0);
-
-        if (pw > 14 && ph > 6) {
-          drawText(dimText, px + pw / 2, py + ph / 2, { align: 'center', baseline: 'middle' });
-        } else if (ph > 9) {
-          drawText(`${fmt(p.height)}\n×\n${fmt(p.width)}`, px + pw / 2, py + ph / 2 - 2, { align: 'center' });
-        }
+        drawMeasures({ x: px, y: py, width: pw, height: ph }, p, scale);
       });
     });
 
