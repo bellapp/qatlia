@@ -128,7 +128,7 @@ const NO_TOFU = (text) => assert.doesNotMatch(text, /�/, 'extracted text must 
 // ─── Locale coverage: catalog labels, digits/MAD/dimensions, Arabic shaping ──
 
 for (const locale of ['fr', 'en', 'ar']) {
-  test(`${locale}: generates a real, parseable, two-page PDF with locale-correct labels`, async () => {
+  test(`${locale}: generates a real, parseable, three-page PDF with locale-correct labels`, async () => {
     const { pdfCatalogFor } = loadTsModule('src/lib/exports/pdf-catalog.ts');
     const cat = pdfCatalogFor(locale);
 
@@ -137,9 +137,9 @@ for (const locale of ['fr', 'en', 'ar']) {
     assert.ok(buf.length > 5000, `expected a real multi-page PDF, got ${buf.length} bytes`);
 
     const doc = await loadPdf(buf);
-    // Page 1: portrait cover/recap. Page 2: the single cutting-pattern schema
+    // Page 1: portrait cover/recap. Page 2: the piece sheet. Page 3: the single cutting-pattern schema
     // (both fixture pieces sit on the same sheet, so uniquePatterns.length === 1).
-    assert.equal(doc.numPages, 2);
+    assert.equal(doc.numPages, 3);
 
     const { text: page1Text } = await pageText(doc, 1);
     NO_TOFU(page1Text);
@@ -187,6 +187,11 @@ for (const locale of ['fr', 'en', 'ar']) {
 
     const { text: page2Text } = await pageText(doc, 2);
     NO_TOFU(page2Text);
+    const sheetTitle = locale === 'ar' ? new jsPDF().processArabic(cat.pieceList.title) : cat.pieceList.title;
+    assert.ok(page2Text.includes(sheetTitle), `expected the piece sheet on page 2: ${page2Text}`);
+
+    const { text: page3Text } = await pageText(doc, 3);
+    NO_TOFU(page3Text);
   });
 }
 
