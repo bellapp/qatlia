@@ -25,6 +25,7 @@ import { materialLabelKey } from '@/i18n/domain';
 import { type TranslationKey } from '@/i18n';
 import { readHistoryView, restoreSeedFromRow, toHistoryRow, writeHistoryView, type HistoryView } from '@/lib/projects/history-row';
 import { fileNameFromContentDisposition } from '@/lib/document-filename';
+import { readShowEdges } from '@/lib/show-edges';
 import type { DisplayUnit } from '@/lib/units';
 
 interface ProjectHistoryItem {
@@ -193,6 +194,7 @@ export default function HistoryPage() {
         result: optJson.result,
         displayUnit: optJson.displayUnit || 'cm',
         locale,
+        showEdges: readShowEdges(),
       };
       const res = await fetch('/api/export-pdf', {
         method: 'POST',

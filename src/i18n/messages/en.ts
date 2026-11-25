@@ -361,6 +361,8 @@ export const en: Catalog = {
       zoomIn: 'Zoom in',
       zoomReset: 'Reset zoom',
       zoomLevelAria: 'Zoom level',
+      edgeLegend: 'Edge to band',
+      edgeToggle: 'Show and print edge banding',
     },
     exports: {
       csv: 'CSV',

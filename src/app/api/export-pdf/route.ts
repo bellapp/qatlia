@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { jsPDF, type TextOptionsLight } from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { fromCanonicalCm } from '@/lib/units';
+import { EDGE_COLOR, EDGE_DASH_CM, EDGE_INSET_PDF_CM, EDGE_STROKE_CM, edgeLines, edgeSidesOnPlan, hasEdgeLines } from '@/lib/cutting/edge-lines';
 import { ExportSchema } from '@/lib/exports/pdf-schema';
 import { computeCostBreakdown } from '@/lib/costing';
 import { buildCostDetail, hasLaborCharge } from '@/lib/cost-detail';
@@ -69,6 +70,11 @@ export async function POST(req: Request) {
     const fmtNumber = (value: number, decimals: number) =>
       String(Number(value.toFixed(decimals))).replace('.', ',');
 
+    // « Sans chants » : a drawing choice. The price comes from costingInput, untouched.
+    if (!parsed.data.showEdges) {
+      for (const placed of result.placedPieces) placed.edges = undefined;
+    }
+
     const sheetAreaM2 = toM2(sheet.width, sheet.height);
     const totalSheetsAreaM2 = sheetAreaM2 * result.sheetsUsed;
     const totalPiecesAreaM2 = result.placedPieces.reduce((sum, p) => sum + toM2(p.width, p.height), 0);
@@ -111,7 +117,12 @@ export async function POST(req: Request) {
       // Signature precision only needs to distinguish patterns; rounding to
       // the nearest 0.1cm (an mm-equivalent step) is unrelated to `displayUnit`.
       const signature = sPieces
-        .map((p) => `${Math.round(p.width * 10)}x${Math.round(p.height * 10)}@${Math.round(p.x)}_${Math.round(p.y)}`)
+        .map((p) => {
+          // The chants count too: two panels cut alike but banded differently are two drawings.
+          const sides = edgeSidesOnPlan(p);
+          const banded = `${sides.top ? 't' : ''}${sides.right ? 'r' : ''}${sides.bottom ? 'b' : ''}${sides.left ? 'l' : ''}`;
+          return `${Math.round(p.width * 10)}x${Math.round(p.height * 10)}@${Math.round(p.x)}_${Math.round(p.y)}${banded}`;
+        })
         .sort()
         .join('|');
 
@@ -685,6 +696,19 @@ export async function POST(req: Request) {
         32
       );
 
+      // What the blue dashes are, at the end of the header line.
+      if (hasEdgeLines(pat.pieces)) {
+        doc.setDrawColor(EDGE_COLOR);
+        doc.setLineWidth(0.5);
+        doc.setLineDashPattern([1.6, 1], 0);
+        doc.line(pW - 48, 31, pW - 36, 31);
+        doc.setLineDashPattern([], 0);
+        doc.setFont(BASE_FONT, 'normal');
+        doc.setFontSize(8);
+        doc.setTextColor(0, 0, 0);
+        drawText(cat.schema.edgeLegend, pW - 34, 32);
+      }
+
       const drawX = 14;
       const drawY = 36;
       const maxDrawW = pW - 28;
@@ -789,6 +813,18 @@ export async function POST(req: Request) {
         doc.setDrawColor(0, 0, 0);
         doc.setLineWidth(0.4);
         doc.rect(px, py, pw, ph, 'FD');
+
+        // Les chants : pointillés bleus le long des côtés à plaquer (src/lib/cutting/edge-lines.ts).
+        const chants = edgeLines(p, EDGE_INSET_PDF_CM);
+        if (chants.length > 0) {
+          doc.setDrawColor(EDGE_COLOR);
+          doc.setLineWidth(Math.max(0.3, EDGE_STROKE_CM * scale));
+          doc.setLineDashPattern([Math.max(0.9, EDGE_DASH_CM[0] * scale), Math.max(0.6, EDGE_DASH_CM[1] * scale)], 0);
+          for (const l of chants) {
+            doc.line(drawX + l.x1 * scale, drawY + l.y1 * scale, drawX + l.x2 * scale, drawY + l.y2 * scale);
+          }
+          doc.setLineDashPattern([], 0);
+        }
 
         const dimText = `${fmt(p.height)} × ${fmt(p.width)} ${displayUnit}`;
         doc.setFont(BASE_FONT, 'normal');

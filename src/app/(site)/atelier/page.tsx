@@ -95,6 +95,8 @@ import { writeLocalHistoryItem, renameLocalHistoryItem, markLocalHistoryPdf, typ
 import { saveProjectName, type RenameOutcome } from '@/lib/projects/rename';
 import { deriveQuotationPanels, deriveQuotationPieces } from '@/lib/quotation-items';
 import { buildPdfPayload } from '@/lib/pdf-payload';
+import { readShowEdges, saveShowEdges } from '@/lib/show-edges';
+import { EDGE_COLOR, EDGE_DASH_CM, EDGE_HALO, EDGE_HALO_CM, EDGE_STROKE_CM, edgeLines, hasEdgeLines } from '@/lib/cutting/edge-lines';
 import { buildPersistedProjectPayload } from '@/lib/projects/persistence-payload';
 import {
   adoptSavedJob,
@@ -139,6 +141,8 @@ const RESTORED_DATE_OPTIONS: Intl.DateTimeFormatOptions = {
 /** CSS length for the whole content width of the plan viewport. Kept as the
  *  bare literal the claims audit recognises as geometry, not as a figure. */
 const FULL_WIDTH = '100%';
+/** The PNG of the plan, before the canvas doubles it: a 280 × 207 panel is 1656 × 2240 px. */
+const PNG_PX_PER_CM = 4;
 /** Width of the cutting plan at 100% zoom: 560px, or the whole viewport when
  *  that is narrower (a phone). Every zoom step multiplies this width. */
 const PLAN_FIT_WIDTH = `min(560px, ${FULL_WIDTH})`;
@@ -258,6 +262,9 @@ export default function Dashboard() {
   const [isProcessingVision, setIsProcessingVision] = useState(false);
   const [activeSheetIndex, setActiveSheetIndex] = useState(0);
   const [zoomLevel, setZoomLevel] = useState(1);
+  /** The chants on the plan, its PNG and its PDF: kept on the device, read once mounted. */
+  const [showEdges, setShowEdges] = useState(true);
+  useEffect(() => setShowEdges(readShowEdges()), []);
   // null until the signed-in artisan's real balance is loaded — never a
   // hardcoded placeholder the customer could mistake for their actual solde.
   const [userCredits, setUserCredits] = useState<number | null>(null);
@@ -1600,9 +1607,13 @@ const commitPanelName = () => {
 
   const handleDownloadPng = async () => {
     if (await previewBlocksExport()) return;
-    const svg = document.querySelector('svg');
+    // The plan, not the first drawing of the page (the header's logo).
+    const svg = document.querySelector<SVGSVGElement>('[data-testid="cut-plan-svg"]');
     if (!svg) return;
     const clone = svg.cloneNode(true) as SVGSVGElement;
+    // Its size on the page comes from CSS, which the file does not carry.
+    clone.setAttribute('width', String(Math.round(svg.viewBox.baseVal.width * PNG_PX_PER_CM)));
+    clone.setAttribute('height', String(Math.round(svg.viewBox.baseVal.height * PNG_PX_PER_CM)));
     const serializer = new XMLSerializer();
     const svgStr = serializer.serializeToString(clone);
     const canvas = document.createElement('canvas');
@@ -1686,7 +1697,7 @@ const commitPanelName = () => {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(
-          buildPdfPayload(derivedProjectName, activeSheet, pieces, result, displayUnit, locale, currency)
+          buildPdfPayload(derivedProjectName, activeSheet, pieces, result, displayUnit, locale, currency, showEdges)
         ),
       });
 
@@ -2647,6 +2658,7 @@ const commitPanelName = () => {
                           const col = p.color || PIECE_COLOR_PALETTE[(p.pieceNumber - 1) % PIECE_COLOR_PALETTE.length];
                           const gradId = `g_${p.sheetIndex}_${p.pieceNumber}`;
                           const minSide = Math.min(p.width, p.height);
+                          const edgePath = (showEdges ? edgeLines(p) : []).map((l) => `M${l.x1} ${l.y1}L${l.x2} ${l.y2}`).join('');
                           return (
                             <g key={`${p.sheetIndex}_${p.pieceNumber}`}>
                               <defs>
@@ -2656,6 +2668,13 @@ const commitPanelName = () => {
                               </defs>
                               <rect x={p.x} y={p.y} width={p.width} height={p.height} fill={`url(#${gradId})`}
                                 stroke={isDark ? '#050A14' : '#334155'} strokeWidth={Math.max(0.4, (options.kerfWidth||3)/10)} />
+                              {/* The chants: blue dashes along the sides to band (src/lib/cutting/edge-lines.ts). */}
+                              {edgePath && (
+                                <g data-testid="cut-plan-edges" pointerEvents="none" fill="none">
+                                  <path d={edgePath} stroke={EDGE_HALO} strokeWidth={EDGE_HALO_CM} strokeOpacity="0.85" />
+                                  <path d={edgePath} stroke={EDGE_COLOR} strokeWidth={EDGE_STROKE_CM} strokeDasharray={EDGE_DASH_CM.join(' ')} />
+                                </g>
+                              )}
                               {options.showLabels && (<>
                                 <text x={p.x+p.width/2} y={p.y+p.height/2-(minSide>=20?3:0)} textAnchor="middle" dominantBaseline="central"
                                   fill={isDark ? '#050A14' : '#1E293B'} fontSize={Math.min(5.5,Math.max(2.5,minSide/12))}
@@ -2673,6 +2692,27 @@ const commitPanelName = () => {
                     </div>
                     </div>
                   </div>
+                  {/* Any banded panel: the switch stays in reach from a panel without chants, and once off. */}
+                  {hasEdgeLines(result.placedPieces) && (
+                    <div className="flex flex-wrap items-center justify-between gap-x-4 border-t border-studio-border px-4 text-xs font-semibold text-slate-600 dark:text-slate-300">
+                      <label className="flex min-h-11 cursor-pointer items-center gap-2">
+                        <input
+                          type="checkbox"
+                          data-testid="cut-plan-edge-toggle"
+                          checked={showEdges}
+                          onChange={(e) => { setShowEdges(e.target.checked); saveShowEdges(e.target.checked); }}
+                          className="h-4 w-4 accent-brand-500"
+                        />
+                        {t('atelier.plan.edgeToggle')}
+                      </label>
+                      {showEdges && (
+                        <p data-testid="cut-plan-edge-legend" className="flex items-center gap-2 py-2">
+                          <span aria-hidden="true" className="w-8 border-t-2 border-dashed border-[#1D4ED8] dark:border-[#60A5FA]" />
+                          {t('atelier.plan.edgeLegend')}
+                        </p>
+                      )}
+                    </div>
+                  )}
                 </div>
 
                 {/* Export Actions */}

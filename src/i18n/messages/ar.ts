@@ -362,6 +362,8 @@ export const ar: Catalog = {
       zoomIn: 'تكبير',
       zoomReset: 'إعادة ضبط التكبير',
       zoomLevelAria: 'مستوى التكبير',
+      edgeLegend: 'حافة للتلبيس',
+      edgeToggle: 'إظهار الحواف وطباعتها',
     },
     exports: {
       csv: 'CSV',
