@@ -183,7 +183,7 @@ test('the WhatsApp picture carries the chants of its panel and their legend', ()
 
   const plain = planImageLayout(photoPreviewPlan(draft(null)));
   assert.equal(plain.edges, null);
-  assert.equal(plain.edgeLegend, null);
+  assert.equal(plain.legend.edges, null);
 
   const layout = planImageLayout(photoPreviewPlan(draft({ left: true, right: true, top: true, bottom: true })));
   assert.equal(layout.edges.lines.length, 8);
@@ -192,8 +192,8 @@ test('the WhatsApp picture carries the chants of its panel and their legend', ()
       assert.ok(x > 0 && x < layout.panel.width && y > 0 && y < layout.panel.height, 'inside the panel');
     }
   }
-  assert.equal(layout.edgeLegend.label, 'Chant');
-  assert.ok(layout.edgeLegend.top >= layout.panel.top + layout.panel.height);
-  assert.ok(layout.edgeLegend.top + layout.edgeLegend.height <= layout.card.top + layout.card.height);
-  assert.equal(layout.height, plain.height + layout.edgeLegend.height, 'the picture grows by the legend only');
+  assert.equal(layout.legend.edges, 'Chant');
+  assert.ok(layout.legend.top >= layout.panel.top + layout.panel.height);
+  assert.ok(layout.legend.top + layout.legend.height <= layout.card.top + layout.card.height);
+  assert.equal(layout.height, plain.height, 'the line under the panel is there for the unit anyway');
 });
