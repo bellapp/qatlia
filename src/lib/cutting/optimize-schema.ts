@@ -62,6 +62,10 @@ export const SheetSchema = z.object({
   // Listed here because z.object drops keys it does not know.
   color: z.string().max(60).optional(),
   pricePerSheet: z.number().finite().min(0).max(MAX_UNIT_PRICE).optional(),
+  // The panel's grain (ramage): the pieces left unset keep their first
+  // measure along it. Dropped before 2026-11-25, so a grained panel locked nothing.
+  hasGrain: z.boolean().optional(),
+  grainOrientation: z.enum(['vertical', 'horizontal']).optional(),
 });
 
 export const OptimizeSchema = z.object({

@@ -2154,6 +2154,7 @@ const commitPanelName = () => {
                 showMaterialCol={options.considerMaterial}
                 disabled={isOptimizing}
                 showScanMarks={scanSheets.length > 1}
+                panelHasGrain={cutMode !== '1d' && !!activeSheet.hasGrain}
               />
             </div>
 
