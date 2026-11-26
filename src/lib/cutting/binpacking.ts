@@ -160,7 +160,9 @@ export interface Piece {
    * - 'vertical'   — grain lines run along the piece's height axis
    * - 'horizontal' — grain lines run along the piece's width axis
    * A constrained piece may only be placed with its grain axis parallel to the
-   * sheet's grain direction (sheet.height = vertical grain by convention).
+   * sheet's grain direction (sheet.grainOrientation; vertical = along height).
+   * Left unset on a grained panel, a piece takes 'vertical': its first
+   * measure along the grain. 'none' frees it.
    */
   grain?: 'none' | 'vertical' | 'horizontal';
   /** The cut-list sheet (from 1) this piece was read from; absent for a piece added by hand. */
@@ -411,16 +413,49 @@ export interface ExpandedPiece extends Required<Pick<Piece, 'height' | 'width' |
   unplacedReason?: string;
 }
 
-function expandPieces(pieces: Piece[], defaultMaterial: MaterialType, globalGrain: boolean): ExpandedPiece[] {
+/**
+ * The grain of the panels a piece may be cut from: 'vertical' (along the
+ * panel's height) or 'horizontal' (along its width). Null when none of them
+ * has grain, or when grained panels disagree (each piece then keeps its own
+ * setting, laid as for a vertical grain).
+ */
+export function panelGrainOf(sheets: Sheet[]): 'vertical' | 'horizontal' | null {
+  const directions = new Set(
+    sheets.filter((s) => s.hasGrain).map((s) => (s.grainOrientation === 'horizontal' ? 'horizontal' : 'vertical')),
+  );
+  return directions.size === 1 ? Array.from(directions)[0] : null;
+}
+
+/**
+ * The grain a piece is cut with. The artisan's own setting wins: 'none' frees
+ * the piece. A piece nobody set follows a grained panel with its first
+ * measure (its height) along the grain, the carpenters' rule (customer voice
+ * note, 2026-11-25: « the first measure is always the ramage »).
+ */
+function effectivePieceGrain(p: Piece, panelGrain: 'vertical' | 'horizontal' | null): 'vertical' | 'horizontal' | null {
+  if (p.grain === 'vertical' || p.grain === 'horizontal') return p.grain;
+  if (p.grain === 'none') return null;
+  return panelGrain ? 'vertical' : null;
+}
+
+function expandPieces(
+  pieces: Piece[],
+  defaultMaterial: MaterialType,
+  globalGrain: boolean,
+  panelGrainFor: (material: MaterialType) => 'vertical' | 'horizontal' | null = () => null,
+): ExpandedPiece[] {
   const result: ExpandedPiece[] = [];
   pieces.forEach((p, i) => {
     const qty = Math.max(1, p.quantity || 1);
-    // Grain (ramage) alignment: the packer treats sheet grain as vertical
-    // (along sheet height). A 'horizontal'-grain piece is pre-rotated here
-    // (dims swapped) so its veining lands parallel to the sheet grain; a
-    // 'vertical' one already matches. Either way rotation stays locked.
-    const grainConstrained = p.grain === 'vertical' || p.grain === 'horizontal';
-    const dimsSwappedForGrain = p.grain === 'horizontal';
+    // Grain (ramage) alignment: the packer places a piece unturned with its
+    // height along the panel's height. A piece's grain axis must lie along
+    // the panel's grain, so it is swapped here when the two differ (a
+    // 'horizontal' piece on a vertical-grain panel, a 'vertical' one on a
+    // horizontal-grain panel). Either way rotation stays locked.
+    const panelGrain = panelGrainFor((p.material || defaultMaterial) as MaterialType);
+    const pieceGrain = effectivePieceGrain(p, panelGrain);
+    const grainConstrained = pieceGrain !== null;
+    const dimsSwappedForGrain = grainConstrained && (pieceGrain === 'horizontal') !== (panelGrain === 'horizontal');
     const baseName = p.name && p.name.trim() ? p.name.trim() : undefined;
     const isUnnamed = baseName === undefined;
     for (let j = 0; j < qty; j++) {
@@ -431,10 +466,9 @@ function expandPieces(pieces: Piece[], defaultMaterial: MaterialType, globalGrai
         name: qty > 1 ? `${baseName ?? `Pièce ${i + 1}`} ×${qty}` : baseName ?? `Pièce ${i + 1}`,
         baseName,
         isUnnamed,
-        // Grain (ramage) alignment: the packer treats sheet grain as vertical
-        // (along sheet height). A piece whose grain axis is 'horizontal' is
-        // pre-rotated HERE (dims swapped) and rotation-locked, so its veining
-        // always lands parallel to the sheet grain.
+        // Grain (ramage) alignment: a piece whose grain axis differs from the
+        // panel's is pre-rotated HERE (dims swapped) and rotation-locked, so
+        // its veining always lands parallel to the panel grain.
         height: dimsSwappedForGrain ? p.width : p.height,
         width: dimsSwappedForGrain ? p.height : p.width,
         quantity: 1,
@@ -447,7 +481,8 @@ function expandPieces(pieces: Piece[], defaultMaterial: MaterialType, globalGrai
           && !grainConstrained,
         edges: p.edges,
         color: p.color,
-        grain: grainConstrained ? (p.grain as 'vertical' | 'horizontal') : undefined,
+        // As placed, the piece's grain runs along the panel's.
+        grain: grainConstrained ? panelGrain ?? 'vertical' : undefined,
       });
     }
   });
@@ -2253,7 +2288,11 @@ export function optimizeCutting2D(
 ): OptimizationResult {
   const mergedOptions: OptimizationOptions = { ...OPTIONS_DEFAULTS, ...options };
   const defaultMat: MaterialType = mergedOptions.defaultMaterial || 'mdf';
-  const allExpanded = expandPieces(pieces, defaultMat, mergedOptions.grainDirection);
+  // With materials kept apart, a piece only meets the panels of its material.
+  const panelGrainFor = (material: MaterialType) => panelGrainOf(
+    mergedOptions.considerMaterial ? sheets.filter((s) => (s.material || defaultMat) === material) : sheets,
+  );
+  const allExpanded = expandPieces(pieces, defaultMat, mergedOptions.grainDirection, panelGrainFor);
 
   const { plan: finalPlan, candidatesEvaluated } = mergedOptions.considerMaterial
     ? runMaterialGroupedSearch(allExpanded, sheets, mergedOptions, defaultMat)

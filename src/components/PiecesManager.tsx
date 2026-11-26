@@ -262,6 +262,8 @@ interface PiecesManagerProps {
   disabled?: boolean;
   /** Marks each piece read from a photo with its sheet (F1–F4): only useful once a project has several. */
   showScanMarks?: boolean;
+  /** The panel has grain: a piece left unset keeps its first measure along it (shown as vertical). */
+  panelHasGrain?: boolean;
 }
 
 type ActivePanel = 'quick-add' | 'import' | 'template' | null;
@@ -302,8 +304,14 @@ export const PiecesManager: React.FC<PiecesManagerProps> = ({
   displayUnit,
   disabled = false,
   showScanMarks = false,
+  panelHasGrain = false,
 }) => {
   const { t, tn } = useLocale();
+  /** The grain the plan applies to a piece (src/lib/cutting/binpacking.ts, effectivePieceGrain). */
+  const shownGrain = (piece: Piece): 'none' | 'vertical' | 'horizontal' =>
+    piece.grain === 'vertical' || piece.grain === 'horizontal' || piece.grain === 'none'
+      ? piece.grain
+      : panelHasGrain ? 'vertical' : 'none';
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [activePanel, setActivePanel] = useState<ActivePanel>(null);
@@ -560,15 +568,17 @@ export const PiecesManager: React.FC<PiecesManagerProps> = ({
     onUpdatePieces(updated);
   };
 
-  /** Cycles a piece's grain (ramage) constraint: none -> vertical -> horizontal
-   *  -> none. Locks orientation while constrained so the packer cannot rotate
-   *  the grain away from the sheet direction. */
+  /** Cycles a piece's grain (ramage) constraint, from what the row shows:
+   *  none -> vertical -> horizontal -> none. Locks orientation while
+   *  constrained so the packer cannot rotate the grain away from the sheet
+   *  direction. On a grained panel an unset piece shows vertical, so the
+   *  first click turns it horizontal. */
   const handleCycleGrain = (id: string) => {
-    const next = (current?: string): 'none' | 'vertical' | 'horizontal' =>
+    const next = (current: 'none' | 'vertical' | 'horizontal'): 'none' | 'vertical' | 'horizontal' =>
       current === 'vertical' ? 'horizontal' : current === 'horizontal' ? 'none' : 'vertical';
     const updated = pieces.map((piece) => {
       if (piece.id !== id) return piece;
-      const grain = next(piece.grain);
+      const grain = next(shownGrain(piece));
       return {
         ...piece,
         grain,
@@ -1066,16 +1076,16 @@ export const PiecesManager: React.FC<PiecesManagerProps> = ({
                       onClick={() => handleCycleGrain(piece.id || '')}
                       disabled={disabled}
                       className={`w-[18px] h-[18px] sm:w-5 sm:h-5 rounded transition-colors flex items-center justify-center disabled:opacity-40 shrink-0 ${
-                        (piece.grain ?? 'none') !== 'none'
+                        shownGrain(piece) !== 'none'
                           ? 'bg-amber-600 text-white'
                           : 'bg-studio-field text-slate-500 dark:text-slate-400 hover:bg-studio-border'
                       }`}
-                      title={t(`pieces.row.grainTitle.${piece.grain === 'vertical' ? 'vertical' : piece.grain === 'horizontal' ? 'horizontal' : 'none'}`)}
+                      title={t(`pieces.row.grainTitle.${shownGrain(piece)}`)}
                       aria-label={t('pieces.row.grainAria', { name: piece.name || String(index + 1) })}
                     >
-                      {piece.grain === 'vertical' ? (
+                      {shownGrain(piece) === 'vertical' ? (
                         <MoveVertical className="w-3 h-3" />
-                      ) : piece.grain === 'horizontal' ? (
+                      ) : shownGrain(piece) === 'horizontal' ? (
                         <MoveHorizontal className="w-3 h-3" />
                       ) : (
                         <Waves className="w-3 h-3" />
