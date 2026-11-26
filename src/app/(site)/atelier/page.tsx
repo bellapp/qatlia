@@ -2320,8 +2320,10 @@ const commitPanelName = () => {
                         key={dir}
                         type="button"
                         onClick={() => setSheets([{ ...activeSheet, grainOrientation: dir }])}
-                        aria-pressed={activeSheet.grainOrientation === dir}
-                        className={`px-2.5 py-1 rounded-md text-[10px] font-bold transition-all ${activeSheet.grainOrientation === dir ? 'bg-brand-400 text-slate-950' : 'text-slate-500 hover:text-slate-300'}`}
+                        // No direction set yet (just ticked) is vertical, as
+                        // the plan and the panel drawing already treat it.
+                        aria-pressed={(activeSheet.grainOrientation ?? 'vertical') === dir}
+                        className={`px-2.5 py-1 rounded-md text-[10px] font-bold transition-all ${(activeSheet.grainOrientation ?? 'vertical') === dir ? 'bg-brand-400 text-slate-950' : 'text-slate-500 hover:text-slate-300'}`}
                       >
                         {t(`atelier.stock.grain${dir === 'vertical' ? 'Vertical' : 'Horizontal'}`)}
                       </button>
