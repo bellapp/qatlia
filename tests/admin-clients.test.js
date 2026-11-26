@@ -239,3 +239,41 @@ test('getClientDetail : le numéro WhatsApp vient du lien de fiche ouvert avant 
   state.tableErrors = { whatsapp_photo_reads: { code: '42P01', message: 'missing' } };
   assert.equal((await getClientDetail(client, UUID)).client.identity.whatsapp, null);
 });
+
+// ─── Téléphones et tri par en-tête (spec 2026-11-25) ────────────────────────
+
+test('parseClientListParams accepte chaque tri des en-têtes, les deux sens', () => {
+  for (const sort of ['created_asc', 'last_activity_asc', 'paid_asc', 'scans_asc', 'purchases_desc', 'purchases_asc', 'projects_desc', 'projects_asc', 'email_asc', 'email_desc']) {
+    assert.equal(parseClientListParams({ sort }).sort, sort);
+  }
+});
+
+test('listClients lit les numéros WhatsApp et entreprise (021), vides avant 021', async () => {
+  const { client, state } = freshDb();
+  const row = { user_id: UUID, email: 'a@b.ma', total_count: 1 };
+  state.rpcResult = () => ({ data: [{ ...row, phone: '06 12 34 56 78', whatsapp: '212612345678', atelier_phone: '0522 11 22 33' }], error: null });
+  const after = await listClients(client, defaults);
+  assert.deepEqual([after.rows[0].phone, after.rows[0].whatsapp, after.rows[0].atelierPhone], ['06 12 34 56 78', '+212612345678', '0522 11 22 33']);
+
+  state.rpcResult = () => ({ data: [{ ...row, whatsapp: 'MA.1163ab' }], error: null });
+  assert.equal((await listClients(client, defaults)).rows[0].whatsapp, 'MA.1163ab');
+
+  // Before 021 the SQL returns neither column.
+  state.rpcResult = () => ({ data: [row], error: null });
+  const before = await listClients(client, defaults);
+  assert.deepEqual([before.rows[0].whatsapp, before.rows[0].atelierPhone], [null, null]);
+});
+
+test('getClientDetail lit le téléphone de « Mon entreprise », sans casser si la table manque', async () => {
+  const { client, state } = freshDb();
+  state.tables.ateliers = { phone: '0522 11 22 33' };
+  assert.equal((await getClientDetail(client, UUID)).client.identity.atelierPhone, '0522 11 22 33');
+
+  state.tables.ateliers = null;
+  assert.equal((await getClientDetail(client, UUID)).client.identity.atelierPhone, null);
+
+  state.tableErrors.ateliers = { code: '42P01', message: 'relation "public.ateliers" does not exist' };
+  const r = await getClientDetail(client, UUID);
+  assert.equal(r.status, 'ok');
+  assert.equal(r.client.identity.atelierPhone, null);
+});

@@ -17,7 +17,9 @@ import {
   formatRelativeDays,
   packLabel,
 } from '@/lib/admin/format';
-import { Badge, EmptyRow, Field, Notice, Section, Stat, td, th } from '../../ui';
+import { buildClientTimeline, AUDIT_LABELS, describeAudit, type TimelineEvent } from '@/lib/admin/timeline';
+import { Badge, Field, Notice, Section, Stat } from '../../ui';
+import { SortableTable } from '../../SortableTable';
 import { ClientNoteForm, CreditAdjustForm, DeleteAccountForm } from './ClientActions';
 
 export const dynamic = 'force-dynamic';
@@ -53,6 +55,13 @@ export default async function ClientPage({ params }: { params: { id: string } })
     .filter((d): d is string => typeof d === 'string')
     .sort()
     .pop() ?? null;
+  const timeline = buildClientTimeline({
+    identity,
+    ledger: client.ledger,
+    orders: client.orders,
+    projects: client.projects,
+    audit: client.audit,
+  });
   // The delete route checks all of this again, on the whole ledger.
   const deleteBlockedReason = isAdminUserId(identity.userId)
     ? 'Compte admin : il ne peut pas être supprimé d’ici.'
@@ -138,6 +147,9 @@ export default async function ClientPage({ params }: { params: { id: string } })
               '—'
             )}
           </Field>
+          <Field label="Téléphone entreprise">
+            {identity.atelierPhone ? <span dir="ltr">{identity.atelierPhone}</span> : '—'}
+          </Field>
           <Field label="Dernière connexion">
             {formatDateTime(identity.lastSignInAt)}
             {identity.lastSignInAt ? <span className="text-slate-500"> ({formatRelativeDays(identity.lastSignInAt, now)})</span> : null}
@@ -174,54 +186,85 @@ export default async function ClientPage({ params }: { params: { id: string } })
         </div>
       </Section>
 
+      <Section title="Dernières activités" aside={timeline.length > 0 ? `${timeline.length} dernière${timeline.length > 1 ? 's' : ''}` : undefined}>
+        {timeline.length === 0 ? (
+          <p className="text-xs text-slate-500">Aucune activité enregistrée.</p>
+        ) : (
+          <ol className="max-h-[420px] overflow-y-auto divide-y divide-white/5">
+            {timeline.map((event, index) => (
+              <li key={`${event.at}-${index}`} className="py-2 flex flex-wrap items-baseline justify-between gap-x-3 gap-y-0.5">
+                <span className="min-w-0 text-xs text-slate-200">
+                  <TimelineLabel event={event} clientId={identity.userId} />
+                  {event.detail ? <span className="text-slate-400"> · {event.detail}</span> : null}
+                </span>
+                <span className="text-[11px] text-slate-500 whitespace-nowrap tabular-nums">
+                  {event.amount !== null ? (
+                    <strong className={`me-2 ${event.amount < 0 ? 'text-rose-400' : 'text-emerald-400'}`}>
+                      {event.amount > 0 ? `+${event.amount}` : event.amount} cr
+                    </strong>
+                  ) : null}
+                  {formatDateTime(event.at)}
+                </span>
+              </li>
+            ))}
+          </ol>
+        )}
+      </Section>
+
       <Section title="Ajuster les crédits">
         <CreditAdjustForm userId={identity.userId} balance={client.balance} />
       </Section>
 
       <Section title="Commandes manuelles" aside={`${client.orders.length} commande${client.orders.length > 1 ? 's' : ''}`}>
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[760px]">
-            <thead>
-              <tr>
-                <th className={th}>Commande</th>
-                <th className={th}>Pack</th>
-                <th className={`${th} text-end`}>Montant</th>
-                <th className={th}>Méthode</th>
-                <th className={th}>Statut</th>
-                <th className={th}>Créée</th>
-                <th className={th}>Décidée</th>
-                <th className={th}>Référence / note</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-white/5">
-              {client.orders.length === 0 ? (
-                <EmptyRow colSpan={8}>Aucune commande manuelle.</EmptyRow>
-              ) : (
-                client.orders.map((order) => (
-                  <tr key={order.order_number}>
-                    <td className={`${td} font-mono font-bold text-amber-400 whitespace-nowrap`} dir="ltr">
-                      {order.order_number}
-                    </td>
-                    <td className={td}>{packLabel(order.pack_id)}</td>
-                    <td className={`${td} text-end tabular-nums whitespace-nowrap`}>
-                      {formatMad(order.amount_mad)}
-                      <span className="block text-[10px] text-slate-500">{order.credits} cr</span>
-                    </td>
-                    <td className={td}>{order.method ? PAYMENT_METHOD_LABELS[order.method] ?? order.method : '—'}</td>
-                    <td className={td}>
-                      <Badge className={ORDER_STATUS_STYLES[order.status] ?? ORDER_STATUS_STYLES.expired}>{ORDER_STATUS_LABELS[order.status] ?? order.status}</Badge>
-                    </td>
-                    <td className={`${td} whitespace-nowrap`}>{formatDateTime(order.created_at)}</td>
-                    <td className={`${td} whitespace-nowrap`}>{formatDateTime(order.decided_at)}</td>
-                    <td className={`${td} break-words`}>
-                      {order.payment_reference || '—'}
-                      {order.operator_note ? <span className="block text-[11px] text-slate-500">{order.operator_note}</span> : null}
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
+          <SortableTable
+            minWidth={760}
+            columns={[
+              { label: 'Commande', firstDir: 'asc' },
+              { label: 'Pack', firstDir: 'asc' },
+              { label: 'Montant', align: 'end' },
+              { label: 'Méthode', firstDir: 'asc' },
+              { label: 'Statut', firstDir: 'asc' },
+              { label: 'Créée' },
+              { label: 'Décidée' },
+              { label: 'Référence / note', sortable: false },
+            ]}
+            initial={{ col: 5, dir: 'desc' }}
+            rows={client.orders.map((order) => ({
+              key: order.order_number,
+              cells: [
+                <span key="n" className="font-mono font-bold text-amber-400 whitespace-nowrap" dir="ltr">
+                  {order.order_number}
+                </span>,
+                packLabel(order.pack_id),
+                <span key="m" className="whitespace-nowrap">
+                  {formatMad(order.amount_mad)}
+                  <span className="block text-[10px] text-slate-500">{order.credits} cr</span>
+                </span>,
+                order.method ? PAYMENT_METHOD_LABELS[order.method] ?? order.method : '—',
+                <Badge key="s" className={ORDER_STATUS_STYLES[order.status] ?? ORDER_STATUS_STYLES.expired}>
+                  {ORDER_STATUS_LABELS[order.status] ?? order.status}
+                </Badge>,
+                <span key="c" className="whitespace-nowrap">{formatDateTime(order.created_at)}</span>,
+                <span key="d" className="whitespace-nowrap">{formatDateTime(order.decided_at)}</span>,
+                <span key="r" className="break-words">
+                  {order.payment_reference || '—'}
+                  {order.operator_note ? <span className="block text-[11px] text-slate-500">{order.operator_note}</span> : null}
+                </span>,
+              ],
+              sort: [
+                order.order_number,
+                packLabel(order.pack_id),
+                order.amount_mad,
+                order.method,
+                ORDER_STATUS_LABELS[order.status] ?? order.status,
+                order.created_at,
+                order.decided_at,
+                null,
+              ],
+            }))}
+            empty="Aucune commande manuelle."
+          />
         </div>
       </Section>
 
@@ -230,92 +273,106 @@ export default async function ClientPage({ params }: { params: { id: string } })
         aside={client.ledgerTruncated ? `${LEDGER_LIMIT} derniers mouvements` : `${client.ledger.length} mouvement${client.ledger.length > 1 ? 's' : ''}`}
       >
         <div className="overflow-x-auto max-h-[480px] overflow-y-auto">
-          <table className="w-full min-w-[720px]">
-            <thead className="sticky top-0 bg-[#0B1220]">
-              <tr>
-                <th className={th}>Date</th>
-                <th className={th}>Mouvement</th>
-                <th className={th}>Pack</th>
-                <th className={`${th} text-end`}>Crédits</th>
-                <th className={`${th} text-end`}>Solde après</th>
-                <th className={th}>Montant / clé</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-white/5">
-              {client.ledger.length === 0 ? (
-                <EmptyRow colSpan={6}>Aucun mouvement.</EmptyRow>
-              ) : (
-                client.ledger.map((row) => {
-                  const kind = classifyLedgerEntry(row);
-                  const payment = isPaymentKind(kind);
-                  return (
-                    <tr key={row.id}>
-                      <td className={`${td} whitespace-nowrap`}>{formatDateTime(row.created_at)}</td>
-                      <td className={td}>{KIND_LABELS[kind]}</td>
-                      <td className={td}>{payment ? packLabel(row.reason) : '—'}</td>
-                      <td className={`${td} text-end tabular-nums font-bold ${row.amount < 0 ? 'text-rose-400' : 'text-emerald-400'}`}>
-                        {row.amount > 0 ? `+${row.amount}` : row.amount}
-                      </td>
-                      <td className={`${td} text-end tabular-nums`}>{row.balance_after ?? '—'}</td>
-                      <td className={`${td} font-mono text-[10px] text-slate-500 break-all`}>
-                        {row.amount_paid !== null && row.amount_paid !== undefined ? (
-                          <span className="block font-sans text-xs text-slate-300">{formatMoney(row.amount_paid, row.currency)}</span>
-                        ) : null}
-                        {row.stripe_payment_id || ''}
-                      </td>
-                    </tr>
-                  );
-                })
-              )}
-            </tbody>
-          </table>
+          <SortableTable
+            minWidth={720}
+            stickyHead
+            columns={[
+              { label: 'Date' },
+              { label: 'Mouvement', firstDir: 'asc' },
+              { label: 'Pack', firstDir: 'asc' },
+              { label: 'Crédits', align: 'end' },
+              { label: 'Solde après', align: 'end' },
+              { label: 'Montant / clé', sortable: false },
+            ]}
+            initial={{ col: 0, dir: 'desc' }}
+            rows={client.ledger.map((row) => {
+              const kind = classifyLedgerEntry(row);
+              const payment = isPaymentKind(kind);
+              return {
+                key: row.id,
+                cells: [
+                  <span key="d" className="whitespace-nowrap">{formatDateTime(row.created_at)}</span>,
+                  KIND_LABELS[kind],
+                  payment ? packLabel(row.reason) : '—',
+                  <strong key="a" className={row.amount < 0 ? 'text-rose-400' : 'text-emerald-400'}>
+                    {row.amount > 0 ? `+${row.amount}` : row.amount}
+                  </strong>,
+                  row.balance_after ?? '—',
+                  <span key="k" className="font-mono text-[10px] text-slate-500 break-all">
+                    {row.amount_paid !== null && row.amount_paid !== undefined ? (
+                      <span className="block font-sans text-xs text-slate-300">{formatMoney(row.amount_paid, row.currency)}</span>
+                    ) : null}
+                    {row.stripe_payment_id || ''}
+                  </span>,
+                ],
+                sort: [row.created_at, KIND_LABELS[kind], payment ? packLabel(row.reason) : null, row.amount, row.balance_after, null],
+              };
+            })}
+            empty="Aucun mouvement."
+          />
         </div>
       </Section>
 
       <Section title="Projets" aside={`${client.projects.length} projet${client.projects.length > 1 ? 's' : ''}`}>
-        {client.projects.length === 0 ? (
-          <p className="text-xs text-slate-500">Aucun projet enregistré dans le cloud.</p>
-        ) : (
-          <ul className="divide-y divide-white/5">
-            {client.projects.map((project) => (
-              <li key={project.id} className="py-2.5 space-y-1.5">
-                <div className="flex flex-wrap items-baseline justify-between gap-2">
-                  <span className="text-sm font-bold text-slate-100 break-words">{project.name}</span>
-                  <span className="text-[11px] text-slate-500 whitespace-nowrap">{formatDateTime(project.createdAt)}</span>
-                </div>
-                <div className="flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-slate-400">
-                  <span>Matériau : {project.material.toUpperCase()}</span>
-                  <span dir="ltr">
-                    Panneau : {project.sheetWidth} × {project.sheetHeight}
+        <p className="text-[11px] text-slate-500">Un projet est enregistré chaque fois que le client calcule un plan. Ouvrez-le pour voir la photo, les pièces et le plan.</p>
+        <div className="overflow-x-auto">
+          <SortableTable
+            minWidth={760}
+            columns={[
+              { label: 'Projet', firstDir: 'asc' },
+              { label: 'Calculé le' },
+              { label: 'Matériau', firstDir: 'asc' },
+              { label: 'Pièces', align: 'end' },
+              { label: 'Panneaux', align: 'end' },
+              { label: 'Chute', align: 'end' },
+              { label: 'Photos', align: 'end' },
+              { label: 'PDF' },
+            ]}
+            initial={{ col: 1, dir: 'desc' }}
+            rows={client.projects.map((project) => ({
+              key: project.id,
+              cells: [
+                <Link
+                  key="p"
+                  href={`/admin/clients/${identity.userId}/projets/${project.id}`}
+                  className="flex items-center gap-2 font-bold text-slate-100 hover:text-amber-400 break-words"
+                >
+                  {project.scanThumb ? (
+                    // eslint-disable-next-line @next/next/no-img-element -- a stored data: URL, not an optimisable asset
+                    <img src={project.scanThumb} alt="" className="w-9 h-9 shrink-0 object-cover rounded border border-white/10" />
+                  ) : null}
+                  <span>
+                    {project.name}
+                    {project.hasQuotation ? <Badge className="ms-1.5 bg-sky-500/15 text-sky-400 border-sky-500/30">Devis</Badge> : null}
                   </span>
-                  <span>Pièces : {project.pieceCount}</span>
-                  <span>Panneaux utilisés : {project.sheetsUsed ?? '—'}</span>
-                  <span>Chute : {project.wastePercentage === null ? '—' : `${project.wastePercentage.toFixed(1)} %`}</span>
-                  {project.pdfGeneratedAt ? <span>PDF : {formatDateTime(project.pdfGeneratedAt)}</span> : null}
-                  {project.hasQuotation ? <Badge className="bg-sky-500/15 text-sky-400 border-sky-500/30">Devis</Badge> : null}
-                </div>
-                {project.scanThumbs.length > 0 ? (
-                  <details>
-                    <summary className="cursor-pointer text-[11px] text-amber-400">
-                      {project.scanThumbs.length > 1 ? `Voir les ${project.scanThumbs.length} fiches scannées` : 'Voir la photo scannée'}
-                    </summary>
-                    <div className="mt-2 flex flex-wrap gap-2">
-                      {project.scanThumbs.map((thumb, index) => (
-                        // eslint-disable-next-line @next/next/no-img-element -- a stored data: URL, not an optimisable asset
-                        <img
-                          key={index}
-                          src={thumb}
-                          alt={project.scanThumbs.length > 1 ? `Fiche ${index + 1} du projet ${project.name}` : `Photo scannée du projet ${project.name}`}
-                          className="max-h-80 max-w-full rounded-lg border border-white/10"
-                        />
-                      ))}
-                    </div>
-                  </details>
-                ) : null}
-              </li>
-            ))}
-          </ul>
-        )}
+                </Link>,
+                <span key="c" className="whitespace-nowrap">{formatDateTime(project.createdAt)}</span>,
+                <span key="m" className="whitespace-nowrap">
+                  {project.material.toUpperCase()}
+                  <span className="block text-[10px] text-slate-500" dir="ltr">
+                    {project.sheetWidth} × {project.sheetHeight}
+                  </span>
+                </span>,
+                project.pieceCount,
+                project.sheetsUsed ?? '—',
+                project.wastePercentage === null ? '—' : `${project.wastePercentage.toFixed(1)} %`,
+                project.scanThumbs.length,
+                <span key="f" className="whitespace-nowrap">{project.pdfGeneratedAt ? formatDateTime(project.pdfGeneratedAt) : '—'}</span>,
+              ],
+              sort: [
+                project.name,
+                project.createdAt,
+                project.material,
+                project.pieceCount,
+                project.sheetsUsed,
+                project.wastePercentage,
+                project.scanThumbs.length,
+                project.pdfGeneratedAt,
+              ],
+            }))}
+            empty="Aucun projet enregistré dans le cloud."
+          />
+        </div>
       </Section>
 
       <Section title="Note, téléphone, étiquettes" aside={client.note?.updatedAt ? `modifiée le ${formatDateTime(client.note.updatedAt)}` : undefined}>
@@ -350,29 +407,14 @@ export default async function ClientPage({ params }: { params: { id: string } })
   );
 }
 
-const AUDIT_LABELS: Record<string, string> = {
-  payment_granted: 'Paiement validé',
-  payment_refused: 'Paiement refusé',
-  credits_adjusted: 'Crédits ajustés',
-  note_updated: 'Note modifiée',
-  account_deleted: 'Compte supprimé',
-};
-
-const FIELD_LABELS: Record<string, string> = { phone: 'téléphone', tags: 'étiquettes', note: 'note' };
-
-function describeAudit(action: string, details: Record<string, unknown>): string {
-  if (action === 'credits_adjusted') {
-    const delta = Number(details.delta);
-    const sign = delta > 0 ? `+${delta}` : String(delta);
-    return `${sign} cr${typeof details.reason === 'string' ? ` — ${details.reason}` : ''}${details.balance !== null && details.balance !== undefined ? ` (solde ${details.balance})` : ''}`;
+/** The event's label; a computed plan opens its project page. */
+function TimelineLabel({ event, clientId }: { event: TimelineEvent; clientId: string }) {
+  if (event.projectId) {
+    return (
+      <Link href={`/admin/clients/${clientId}/projets/${event.projectId}`} className="font-bold text-amber-400 hover:underline">
+        {event.label}
+      </Link>
+    );
   }
-  if (action === 'payment_granted' || action === 'payment_refused') {
-    return [details.order_number, details.amount_mad !== undefined ? formatMad(Number(details.amount_mad)) : null, details.operator_note]
-      .filter((part) => typeof part === 'string' && part !== '')
-      .join(' · ');
-  }
-  if (action === 'note_updated' && Array.isArray(details.fields)) {
-    return details.fields.map((field) => FIELD_LABELS[String(field)] ?? String(field)).join(', ');
-  }
-  return '';
+  return <strong>{event.label}</strong>;
 }

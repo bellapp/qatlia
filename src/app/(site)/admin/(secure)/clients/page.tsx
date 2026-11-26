@@ -5,6 +5,7 @@ import { getAdminDb } from '@/lib/admin/db';
 import { listClients, parseClientListParams, type ClientListParams, type ClientSegment, type ClientSort } from '@/lib/admin/clients';
 import { formatDate, formatMad, formatRelativeDays } from '@/lib/admin/format';
 import { Badge, EmptyRow, MigrationBanner, Notice, td, th } from '../ui';
+import { PhoneList } from './PhoneList';
 
 export const dynamic = 'force-dynamic';
 
@@ -17,14 +18,32 @@ const SEGMENT_LABELS: Record<ClientSegment, string> = {
   pending_order: 'Commande en attente',
 };
 
-const SORT_LABELS: Record<ClientSort, string> = {
-  created_desc: 'Inscription récente',
-  last_activity_desc: 'Activité récente',
-  credits_asc: 'Solde croissant',
-  credits_desc: 'Solde décroissant',
-  paid_desc: 'Montant payé',
-  scans_desc: 'Nombre d’analyses',
+/**
+ * The sortable columns: the sort of a first click (dates and counts start with
+ * the largest, names with A), and the reverse of a second one.
+ */
+const SORTABLE: Record<string, { first: ClientSort; second: ClientSort }> = {
+  Client: { first: 'email_asc', second: 'email_desc' },
+  Inscrit: { first: 'created_desc', second: 'created_asc' },
+  Activité: { first: 'last_activity_desc', second: 'last_activity_asc' },
+  Solde: { first: 'credits_desc', second: 'credits_asc' },
+  Analyses: { first: 'scans_desc', second: 'scans_asc' },
+  Achats: { first: 'purchases_desc', second: 'purchases_asc' },
+  'Payé (manuel)': { first: 'paid_desc', second: 'paid_asc' },
+  Projets: { first: 'projects_desc', second: 'projects_asc' },
 };
+
+const COLUMNS: { label: string; end?: boolean }[] = [
+  { label: 'Client' },
+  { label: 'Inscrit' },
+  { label: 'Activité' },
+  { label: 'Solde', end: true },
+  { label: 'Analyses', end: true },
+  { label: 'Achats', end: true },
+  { label: 'Payé (manuel)', end: true },
+  { label: 'Projets', end: true },
+  { label: 'Téléphones' },
+];
 
 function hrefWith(params: ClientListParams, overrides: Partial<ClientListParams>): string {
   const next = { ...params, ...overrides };
@@ -63,23 +82,12 @@ export default async function ClientsPage({ searchParams }: { searchParams: Reco
             type="search"
             name="q"
             defaultValue={params.search}
-            placeholder="Email, nom, téléphone ou identifiant"
+            placeholder="Email, nom, téléphone (0612…, +212…) ou identifiant"
             aria-label="Rechercher un client"
             className="w-full ps-8 pe-3 py-2 rounded-lg bg-white/5 border border-white/10 text-xs text-slate-200 outline-none focus:border-amber-500/40"
           />
         </div>
-        <select
-          name="sort"
-          defaultValue={params.sort}
-          aria-label="Trier"
-          className="py-2 px-2 rounded-lg bg-[#0B1220] border border-white/10 text-xs text-slate-200 outline-none focus:border-amber-500/40"
-        >
-          {(Object.keys(SORT_LABELS) as ClientSort[]).map((sort) => (
-            <option key={sort} value={sort}>
-              {SORT_LABELS[sort]}
-            </option>
-          ))}
-        </select>
+        {params.sort !== 'created_desc' ? <input type="hidden" name="sort" value={params.sort} /> : null}
         <button type="submit" className="px-3 py-2 rounded-lg bg-amber-500 hover:bg-amber-600 text-black text-[11px] font-black uppercase tracking-wider">
           Filtrer
         </button>
@@ -110,15 +118,35 @@ export default async function ClientsPage({ searchParams }: { searchParams: Reco
             <table className="w-full min-w-[860px]">
               <thead className="bg-white/[0.03]">
                 <tr>
-                  <th className={th}>Client</th>
-                  <th className={th}>Inscrit</th>
-                  <th className={th}>Activité</th>
-                  <th className={`${th} text-end`}>Solde</th>
-                  <th className={`${th} text-end`}>Analyses</th>
-                  <th className={`${th} text-end`}>Achats</th>
-                  <th className={`${th} text-end`}>Payé (manuel)</th>
-                  <th className={`${th} text-end`}>Projets</th>
-                  <th className={th}>Téléphone</th>
+                  {COLUMNS.map((column) => {
+                    const sortable = SORTABLE[column.label];
+                    const align = column.end ? 'text-end' : '';
+                    if (!sortable) {
+                      return (
+                        <th key={column.label} className={`${th} ${align}`}>
+                          {column.label}
+                        </th>
+                      );
+                    }
+                    const active = params.sort === sortable.first ? 'first' : params.sort === sortable.second ? 'second' : null;
+                    const next = active === 'first' ? sortable.second : sortable.first;
+                    const arrow = active ? (params.sort.endsWith('_asc') ? '↑' : '↓') : '↕';
+                    return (
+                      <th
+                        key={column.label}
+                        className={`${th} ${align}`}
+                        aria-sort={active ? (params.sort.endsWith('_asc') ? 'ascending' : 'descending') : 'none'}
+                      >
+                        <Link
+                          href={hrefWith(params, { sort: next, page: 1 })}
+                          className={`inline-flex items-center gap-1 hover:text-slate-200 ${active ? 'text-amber-400' : ''}`}
+                        >
+                          {column.label}
+                          <span aria-hidden="true">{arrow}</span>
+                        </Link>
+                      </th>
+                    );
+                  })}
                 </tr>
               </thead>
               <tbody className="divide-y divide-white/5">
@@ -155,8 +183,8 @@ export default async function ClientsPage({ searchParams }: { searchParams: Reco
                       </td>
                       <td className={`${td} text-end tabular-nums whitespace-nowrap`}>{row.paidMad > 0 ? formatMad(row.paidMad) : '—'}</td>
                       <td className={`${td} text-end tabular-nums`}>{row.projects}</td>
-                      <td className={`${td} whitespace-nowrap`} dir="ltr">
-                        {row.phone || '—'}
+                      <td className={td}>
+                        <PhoneList note={row.phone} whatsapp={row.whatsapp} atelier={row.atelierPhone} />
                       </td>
                     </tr>
                   ))

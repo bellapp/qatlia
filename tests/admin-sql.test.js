@@ -139,4 +139,47 @@ test('014 : verrou, clé idempotente admin:, refus du solde négatif', () => {
   assertNoExistingFunctionTouched(SQL_014);
 });
 
+// ─── 021 ────────────────────────────────────────────────────────────────────
+
+const SQL_021 = read('021_admin_client_phones.sql');
+const { CLIENT_SORTS } = loadTsModule('src/lib/admin/clients.ts');
+const fn021 = () => flat(SQL_021).find((s) => /CREATE OR REPLACE FUNCTION public\.admin_client_list/i.test(s));
+
+test('021 : admin_client_list garde sa signature, SECURITY DEFINER, service_role seul, LANGUAGE sql', () => {
+  assertServiceRoleFunction(SQL_021, 'admin_client_list', '(TEXT, TEXT, TEXT, INT, INT)');
+  assert.match(fn021(), /LANGUAGE sql/i);
+  // Dropped first: the result gains two columns.
+  const statements = flat(SQL_021);
+  const drop = statements.findIndex((s) => /^DROP FUNCTION IF EXISTS public\.admin_client_list\(TEXT, TEXT, TEXT, INT, INT\)$/i.test(s));
+  assert.ok(drop >= 0 && drop < statements.indexOf(fn021()));
+});
+
+test('021 : chaque tri de CLIENT_SORTS a son propre CASE (sauf le tri par défaut)', () => {
+  const fn = fn021();
+  for (const sort of CLIENT_SORTS.filter((s) => s !== 'created_desc')) {
+    assert.match(fn, new RegExp(`CASE WHEN p_sort = '${sort}' THEN [^;]+? END (ASC|DESC) NULLS LAST`), `missing CASE for ${sort}`);
+  }
+  assert.match(fn, /f\.signed_up_at DESC NULLS LAST,\s*f\.user_id/);
+});
+
+test('021 : numéros WhatsApp et entreprise renvoyés et cherchés par leurs chiffres', () => {
+  const fn = fn021();
+  assert.match(fn, /whatsapp\s+TEXT,\s*atelier_phone\s+TEXT,\s*total_count\s+BIGINT/i);
+  assert.match(fn, /LEFT JOIN public\.whatsapp_photo_reads wr ON wr\.code = \(u\.raw_user_meta_data->>'whatsapp_code'\)/);
+  assert.match(fn, /LEFT JOIN public\.ateliers a ON a\.user_id = u\.id/);
+  // 00212 / 212 / 0 removed from the term, at least 6 digits left.
+  assert.ok(fn.includes("'^(00212|212|00|0)'"));
+  assert.match(fn, /\) >= 6/);
+  for (const column of ['b.phone', 'b.whatsapp', 'b.atelier_phone']) {
+    assert.ok(fn.includes(`regexp_replace(COALESCE(${column}, ''), '\\D', '', 'g') LIKE '%' || s.phone_core || '%'`), column);
+  }
+});
+
+test('021 : rien d’autre n’est touché, aucun SQL dynamique', () => {
+  assert.doesNotMatch(SQL_021, /\bEXECUTE\s+(format|')/i);
+  assert.doesNotMatch(SQL_021, /\b(CREATE|ALTER|DROP) TABLE\b/i);
+  assertNoExistingFunctionTouched(SQL_021);
+  assert.match(SQL_021, /REQUIRES 019 \(whatsapp_photo_reads\) and 020 \(ateliers\)/);
+});
+
 module.exports = { assertClosedTable, assertServiceRoleFunction, assertNoExistingFunctionTouched, read, flat };
