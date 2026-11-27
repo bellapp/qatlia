@@ -40,7 +40,9 @@ test('French: the share of a panel and its value at the average price', () => {
 test('Arabic: the same line, numbers kept left-to-right', () => {
   const half = (278 * 208) / 2 / 10000;
   const caption = photoResultCaption('ar', { ...base, reusableM2: half }, LINK);
-  assert.match(caption, /♻️ الهدر اللي تقدر تعاود تخدم بيه: ⁦50%⁩ ديال لوحة \(تقريبا ⁦300⁩ درهم\)/);
+  // « الشوت » (les chutes, the workshop word), not « الهدر » (owner, 27/11/2026).
+  assert.match(caption, /♻️ الشوت اللي تقدر تعاود تخدم بيهم: ⁦50%⁩ ديال لوحة \(تقريبا ⁦300⁩ درهم\)/);
+  assert.doesNotMatch(caption, /الهدر/);
   const twoAndAHalf = photoResultCaption('ar', { ...base, sheetsUsed: 5, reusableM2: half * 5 }, LINK);
   assert.match(twoAndAHalf, /⁦2\.5⁩ لوحة/, 'from one panel on, the count of panels');
 });

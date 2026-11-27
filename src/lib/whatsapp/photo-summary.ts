@@ -158,8 +158,9 @@ function offcutLines(lang: Lang, summary: PhotoSummary): string[] {
   const value = Math.round((summary.reusableM2 * AVERAGE_PANEL_PRICE_MAD) / AVERAGE_PANEL_AREA_M2 / 10) * 10;
   if (lang === 'ar') {
     const share = panels < 1 ? `${ltr(lang, `${percent}%`)} ديال لوحة` : `${ltr(lang, number(panels, lang))} لوحة`;
-    // « الهدر », the artisans' word for the offcuts (owner, 27/11/2026): the part of it that can be used again.
-    return [`♻️ الهدر اللي تقدر تعاود تخدم بيه: ${share} (تقريبا ${ltr(lang, String(value))} درهم)`];
+    // « الشوت », the French « les chutes » the artisans say in the workshop
+    // (owner, 27/11/2026: better than « الهدر »), the ones that can be used again.
+    return [`♻️ الشوت اللي تقدر تعاود تخدم بيهم: ${share} (تقريبا ${ltr(lang, String(value))} درهم)`];
   }
   const share = panels < 1 ? `${percent} % d'un panneau` : `${number(panels, lang)} ${panels >= 2 ? 'panneaux' : 'panneau'}`;
   return [`♻️ Chutes réutilisables : ${share} (≈ ${value} DH)`];
