@@ -8,6 +8,22 @@ import { useLocale } from '@/components/LocaleProvider';
 import type { TranslationKey } from '@/i18n';
 import { SIGNUP_FREE_CREDITS } from '@/lib/billing/policy';
 import { browserSignupMetadata } from '@/lib/acquisition';
+import { CHROME_HANDOFF_MS, PHOTO_CODE_SESSION_KEY, chromeHandoff } from '@/lib/open-in-chrome';
+import { isStoreAppDocument } from '@/lib/store-app';
+
+/** The Chrome link to open before Google sign-in, or null (see src/lib/open-in-chrome.ts). */
+function chromeHandoffHere(): string | null {
+  try {
+    return chromeHandoff({
+      userAgent: navigator.userAgent,
+      origin: window.location.origin,
+      photoCode: window.sessionStorage.getItem(PHOTO_CODE_SESSION_KEY),
+      storeApp: isStoreAppDocument(),
+    });
+  } catch {
+    return null;
+  }
+}
 
 /**
  * Vision analyses granted on sign-up, read from the credit policy so the copy
@@ -204,9 +220,25 @@ export const AuthModal: React.FC<AuthModalProps> = ({
     setErrorMsg(t(authErrorKey(error, fallback), { min: MIN_PASSWORD_LENGTH }));
   };
 
-  const handleOAuthGoogle = async () => {
+  const handleOAuthGoogle = () => {
     setOauthLoading(true);
     setErrorMsg(null);
+    // In WhatsApp's browser on Android, Google lists none of the phone's
+    // accounts: the plan opens in Chrome first. Still on screen after the
+    // wait, Chrome did not open, and the sign-in goes on here as before.
+    const chrome = chromeHandoffHere();
+    if (chrome) {
+      window.location.href = chrome;
+      setTimeout(() => {
+        if (document.visibilityState === 'visible') void signInWithGoogle();
+        else setOauthLoading(false);
+      }, CHROME_HANDOFF_MS);
+      return;
+    }
+    void signInWithGoogle();
+  };
+
+  const signInWithGoogle = async () => {
     const supabase = createClient();
     try {
       const origin = typeof window !== 'undefined' ? window.location.origin : 'https://qatlia.vercel.app';

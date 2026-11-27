@@ -123,6 +123,9 @@ function loadAuthErrorMapper() {
     '@/lib/billing/policy': loadTsModule(path.join(PROJECT_ROOT, 'src/lib/billing/policy.ts')),
     // Pure module (the sign-up source tags), loaded for real.
     '@/lib/acquisition': loadTsModule(path.join(PROJECT_ROOT, 'src/lib/acquisition.ts')),
+    // Pure modules (Google sign-in from WhatsApp's browser opens Chrome first), loaded for real.
+    '@/lib/open-in-chrome': loadTsModule(path.join(PROJECT_ROOT, 'src/lib/open-in-chrome.ts')),
+    '@/lib/store-app': loadTsModule(path.join(PROJECT_ROOT, 'src/lib/store-app.ts')),
   };
   const mod = new Module.Module(AUTH_MODAL_PATH, module);
   mod.filename = AUTH_MODAL_PATH;
