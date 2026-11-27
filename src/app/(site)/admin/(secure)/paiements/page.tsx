@@ -14,6 +14,7 @@ const STATUS_LABELS: Record<PaymentFilters['status'], string> = {
   pending: 'En attente',
   granted: 'Crédits ajoutés',
   refused: 'Refusés',
+  refunded: 'Remboursés',
   all: 'Tous',
 };
 const SOURCE_BADGES = {

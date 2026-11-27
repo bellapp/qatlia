@@ -130,6 +130,35 @@ test('recherche sur numéro de commande, email, référence', async () => {
   assert.equal(byEmail.payments.length, 3);
 });
 
+// A purchase refunded from the client page (refund_purchase, migrations 022-023).
+function withRefundedCard() {
+  const fake = seeded();
+  fake.state.tables.credit_transactions = (call) =>
+    call.ops.some(([op]) => op === 'in')
+      ? [{ stripe_payment_id: 'purchase_refund:creem:tran_1' }]
+      : [ledger({ created_at: '2026-11-10T11:00:00Z' }), ledger({ id: 'l2', stripe_payment_id: 'cs:cs_2', created_at: '2026-11-08T11:00:00Z' })];
+  return fake;
+}
+
+test('carte remboursée : statut « refunded », lu par clé exacte', async () => {
+  const fake = withRefundedCard();
+  const r = await listPayments(fake.client, { source: 'card', status: 'all', search: '' });
+  assert.deepEqual(r.payments.map((p) => [p.reference, p.status]), [['creem:tran_1', 'refunded'], ['cs:cs_2', 'granted']]);
+  assert.deepEqual(fake.ops('credit_transactions', 'in'), [['stripe_payment_id', ['purchase_refund:creem:tran_1', 'purchase_refund:cs:cs_2']]]);
+});
+
+test('filtres « crédits ajoutés » et « remboursés » : une carte remboursée change de filtre', async () => {
+  let r = await listPayments(withRefundedCard().client, { source: 'card', status: 'granted', search: '' });
+  assert.deepEqual(r.payments.map((p) => p.reference), ['cs:cs_2']);
+  r = await listPayments(withRefundedCard().client, { source: 'card', status: 'refunded', search: '' });
+  assert.deepEqual(r.payments.map((p) => p.reference), ['creem:tran_1']);
+  assert.equal(parsePaymentFilters({ status: 'refunded' }).status, 'refunded');
+});
+
+test('commande manuelle remboursée : statut repris tel quel', () => {
+  assert.equal(toManualPaymentView(order({ status: 'refunded' })).status, 'refunded');
+});
+
 test('échec de lecture : error', async () => {
   const fake = seeded();
   fake.state.tableErrors = { manual_payments: { code: '57014', message: 'timeout' } };

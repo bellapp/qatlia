@@ -742,7 +742,7 @@ export const ar: Catalog = {
       keepReference: 'احتفظ بهذا الرقم أو التقط له صورة: إنه إثبات دفعك.',
       close: 'حفظت المرجع',
       historyTitle: 'طلبات الدفع الخاصة بي',
-      status: { pending: 'في الانتظار', granted: 'تمت الإضافة', refused: 'مرفوضة', expired: 'ملغاة' },
+      status: { pending: 'في الانتظار', granted: 'تمت الإضافة', refused: 'مرفوضة', expired: 'ملغاة', refunded: 'مستردّة' },
       existingTitle: 'لديك طلب في الانتظار',
       existingNotice: 'طلب واحد في كل مرة: ادفع هذا الطلب برقمه، أو ألغِه (في الأسفل) لاختيار باقة أخرى.',
       cancel: 'إلغاء هذا الطلب',

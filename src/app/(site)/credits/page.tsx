@@ -405,10 +405,11 @@ export default function CreditsPage() {
                     o.status === 'granted' ? 'bg-emerald-500/15 text-emerald-400' :
                     o.status === 'refused' ? 'bg-rose-500/15 text-rose-400' :
                     o.status === 'expired' ? 'bg-slate-500/15 text-slate-400' :
+                    o.status === 'refunded' ? 'bg-violet-500/15 text-violet-400' :
                     'bg-amber-500/15 text-amber-400'
                   }`}>
                     {t(`creditsPage.manual.status.${
-                      o.status === 'granted' ? 'granted' : o.status === 'refused' ? 'refused' : o.status === 'expired' ? 'expired' : 'pending'
+                      o.status === 'granted' ? 'granted' : o.status === 'refused' ? 'refused' : o.status === 'expired' ? 'expired' : o.status === 'refunded' ? 'refunded' : 'pending'
                     }`)}
                   </span>
                 </span>

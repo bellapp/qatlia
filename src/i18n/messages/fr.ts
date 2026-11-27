@@ -820,7 +820,7 @@ export const fr = {
       keepReference: 'Notez ou capturez ce numéro : il est votre preuve de paiement.',
       close: 'J’ai noté ma référence',
       historyTitle: 'Mes commandes de paiement',
-      status: { pending: 'En attente', granted: 'Crédits ajoutés', refused: 'Refusée', expired: 'Annulée' },
+      status: { pending: 'En attente', granted: 'Crédits ajoutés', refused: 'Refusée', expired: 'Annulée', refunded: 'Remboursée' },
       existingTitle: 'Vous avez déjà une commande en attente',
       existingNotice: 'Une seule commande à la fois : payez celle-ci avec son numéro, ou annulez-la (en bas) pour choisir un autre pack.',
       cancel: 'Annuler cette commande',

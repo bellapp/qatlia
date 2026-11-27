@@ -183,3 +183,35 @@ test('021 : rien d’autre n’est touché, aucun SQL dynamique', () => {
 });
 
 module.exports = { assertClosedTable, assertServiceRoleFunction, assertNoExistingFunctionTouched, read, flat };
+
+// ─── 023 ────────────────────────────────────────────────────────────────────
+// A refunded purchase stops counting as a payment (manual order status
+// 'refunded', admin_kpis without refunded purchases). Run on PGlite while
+// written, on a manual_payments table created exactly as 006 creates it.
+
+const SQL_023 = read('023_refunded_purchases.sql');
+
+test('023 : une transaction, refund_purchase et admin_kpis réservées au service_role', () => {
+  const statements = flat(SQL_023);
+  assert.equal(statements[0].toUpperCase(), 'BEGIN');
+  assert.equal(statements[statements.length - 1].toUpperCase(), 'COMMIT');
+  assertServiceRoleFunction(SQL_023, 'refund_purchase', '(TEXT)');
+  assertServiceRoleFunction(SQL_023, 'admin_kpis', '()');
+  assertNoExistingFunctionTouched(SQL_023);
+  assert.match(SQL_023, /REQUIRES 022/);
+});
+
+test("023 : le CHECK de statut est remplacé quel que soit son nom, et accepte 'refunded'", () => {
+  assert.match(SQL_023, /pg_get_constraintdef\(oid\) ILIKE '%status%'/);
+  assert.match(SQL_023, /ADD CONSTRAINT manual_payments_status_check\s+CHECK \(status IN \('pending', 'paid', 'granted', 'refused', 'expired', 'refunded'\)\)/);
+});
+
+test('023 : une commande remboursée se retrouve par texte, jamais par conversion', () => {
+  assert.match(SQL_023, /WHERE 'manual:' \|\| id::text = p_purchase_key/);
+  assert.doesNotMatch(SQL_023, /::uuid/i);
+});
+
+test('023 : admin_kpis ne compte plus un achat qui a sa ligne de remboursement', () => {
+  const kpis = flat(SQL_023).find((s) => /FUNCTION public\.admin_kpis\b/i.test(s));
+  assert.ok(kpis.includes(`r.stripe_payment_id = '${LEDGER_KEY_PREFIXES.purchaseRefund}' || t.stripe_payment_id`));
+});
