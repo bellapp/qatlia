@@ -102,12 +102,34 @@ export function listSummary(pieces: ReadPiece[], sheet: ReadSheet | null): Photo
   };
 }
 
+/**
+ * The average price of a 278 × 208 panel (owner, 27/11/2026), for the value
+ * of the reusable offcuts; scaled to the area of another panel.
+ */
+export const AVERAGE_PANEL_PRICE_MAD = 600;
+const AVERAGE_PANEL_AREA_M2 = (DEFAULT_STOCK_SHEET.height * DEFAULT_STOCK_SHEET.width) / 10000;
+
+/**
+ * The area of a plan's reusable offcuts (at least 15 × 15 cm, the optimizer's
+ * rule), in m². Never more, on a panel, than what its pieces leave free.
+ */
+export function reusableOffcutM2(result: OptimizationResult): number {
+  let totalCm2 = 0;
+  for (const sheet of result.sheets) {
+    const reusable = sheet.offcuts.filter((o) => o.isReusable).reduce((sum, o) => sum + o.width * o.height, 0);
+    const free = Math.max(0, sheet.width * sheet.height - sheet.usedArea);
+    totalCm2 += Math.min(reusable, free);
+  }
+  return Math.round(totalCm2) / 10000;
+}
+
 export function summarizeCutList(pieces: ReadPiece[], sheet: ReadSheet | null): PhotoSummary {
   const { panel, fitted } = fittingPanel(pieces, sheet);
   const result = optimizeCutting2D(
     pieces.map((p, i): Piece => ({ ...p, id: String(i + 1), material: 'mdf', rotatable: true })),
     [{ ...DEFAULT_STOCK_SHEET, height: panel.height, width: panel.width }],
   );
+  const reusableM2 = reusableOffcutM2(result);
   return {
     pieceCount: pieces.reduce((sum, p) => sum + p.quantity, 0),
     lineCount: pieces.length,
@@ -116,7 +138,25 @@ export function summarizeCutList(pieces: ReadPiece[], sheet: ReadSheet | null): 
     sheet: panel,
     unplaced: result.unplacedPieces.length,
     ...(fitted ? { fitted: true as const } : {}),
+    ...(reusableM2 > 0 ? { reusableM2 } : {}),
   };
+}
+
+/**
+ * The reusable offcuts as a share of the panel and their value at the average
+ * price: a fact about this plan, never a promised gain (claims audit). None
+ * under a tenth of a panel, nor for a read made before they were measured.
+ */
+function offcutLines(lang: Lang, summary: PhotoSummary): string[] {
+  if (!summary.reusableM2) return [];
+  const panelM2 = (summary.sheet.height * summary.sheet.width) / 10000;
+  const panels = Math.round((summary.reusableM2 / panelM2) * 10) / 10;
+  if (!(panels >= 0.1)) return [];
+  const value = Math.round((summary.reusableM2 * AVERAGE_PANEL_PRICE_MAD) / AVERAGE_PANEL_AREA_M2 / 10) * 10;
+  if (lang === 'ar') {
+    return [`♻️ البقايا اللي تقدر تعاود تخدم بيها: ${ltr(lang, number(panels, lang))} لوحة (تقريبا ${ltr(lang, String(value))} درهم)`];
+  }
+  return [`♻️ Chutes réutilisables : ${number(panels, lang)} ${panels >= 2 ? 'panneaux' : 'panneau'} (≈ ${value} DH)`];
 }
 
 const isDefaultPanel = (sheet: ReadSheet) =>
@@ -179,7 +219,7 @@ export function photoResultText(lang: Lang, summary: PhotoSummary, pieces: ReadP
   const cta = lang === 'ar'
     ? `👉 شوف مخطط التقطيع ديالك (الرابط صالح ${ltr(lang, '24')} ساعة): ${link}`
     : `👉 Voir votre plan de coupe (lien valable 24 h) : ${link}`;
-  return [head, ...panelNote, pieceLines(pieces, lang), ...warning, cta].join('\n');
+  return [head, ...panelNote, ...offcutLines(lang, summary), pieceLines(pieces, lang), ...warning, cta].join('\n');
 }
 
 /**
@@ -192,7 +232,7 @@ export function photoResultCaption(lang: Lang, summary: PhotoSummary, link: stri
   const cta = lang === 'ar'
     ? `👆 هادا طرف من مخطط التقطيع ديالك. شوفو كامل هنا (الرابط صالح ${ltr(lang, '24')} ساعة): ${link}`
     : `👆 Voici le début de votre plan de coupe. Voyez-le en entier ici (lien valable 24 h) : ${link}`;
-  return [head, ...panelNote, ...warning, cta].join('\n');
+  return [head, ...panelNote, ...offcutLines(lang, summary), ...warning, cta].join('\n');
 }
 
 /** The button under the plan picture (WhatsApp: 20 characters at most). */
@@ -213,7 +253,7 @@ export function photoResultCard(lang: Lang, summary: PhotoSummary, link: string)
   const pointer = lang === 'ar'
     ? `👆 هادا طرف من مخطط التقطيع ديالك. كليكي على «${PLAN_BUTTON.ar}» باش تشوفو كامل (صالح ${ltr(lang, '24')} ساعة).`
     : `👆 Voici le début de votre plan de coupe. Touchez « ${PLAN_BUTTON.fr} » pour le voir en entier (valable 24 h).`;
-  return { image: `${link}/plan.jpg`, body: [head, ...panelNote, ...warning, pointer].join('\n'), button: PLAN_BUTTON[lang], url: link };
+  return { image: `${link}/plan.jpg`, body: [head, ...panelNote, ...offcutLines(lang, summary), ...warning, pointer].join('\n'), button: PLAN_BUTTON[lang], url: link };
 }
 
 /**

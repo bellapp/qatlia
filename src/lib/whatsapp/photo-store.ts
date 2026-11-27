@@ -39,6 +39,8 @@ export interface PhotoSummary {
   unplaced: number;
   /** True when no panel was written and a larger standard one was taken so the pieces fit (fittingPanel). */
   fitted?: true;
+  /** Area of the plan's reusable offcuts (each at least 15 × 15 cm), in m². Absent on reads before 27/11/2026. */
+  reusableM2?: number;
 }
 
 export type Reservation =
