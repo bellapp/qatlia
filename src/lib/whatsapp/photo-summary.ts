@@ -152,12 +152,17 @@ function offcutLines(lang: Lang, summary: PhotoSummary): string[] {
   const panelM2 = (summary.sheet.height * summary.sheet.width) / 10000;
   const panels = Math.round((summary.reusableM2 / panelM2) * 10) / 10;
   if (!(panels >= 0.1)) return [];
+  // Under a whole panel, a percentage of it (owner, 27/11/2026: « 0.8 لوحة, c'est mieux en pourcentage »);
+  // from one panel on, the count of panels.
+  const percent = Math.round(panels * 100);
   const value = Math.round((summary.reusableM2 * AVERAGE_PANEL_PRICE_MAD) / AVERAGE_PANEL_AREA_M2 / 10) * 10;
   if (lang === 'ar') {
-    // « الهدر », the word of the line above (owner, 27/11/2026): the part of it that can be used again.
-    return [`♻️ الهدر اللي تقدر تعاود تخدم بيه: ${ltr(lang, number(panels, lang))} لوحة (تقريبا ${ltr(lang, String(value))} درهم)`];
+    const share = panels < 1 ? `${ltr(lang, `${percent}%`)} ديال لوحة` : `${ltr(lang, number(panels, lang))} لوحة`;
+    // « الهدر », the artisans' word for the offcuts (owner, 27/11/2026): the part of it that can be used again.
+    return [`♻️ الهدر اللي تقدر تعاود تخدم بيه: ${share} (تقريبا ${ltr(lang, String(value))} درهم)`];
   }
-  return [`♻️ Chutes réutilisables : ${number(panels, lang)} ${panels >= 2 ? 'panneaux' : 'panneau'} (≈ ${value} DH)`];
+  const share = panels < 1 ? `${percent} % d'un panneau` : `${number(panels, lang)} ${panels >= 2 ? 'panneaux' : 'panneau'}`;
+  return [`♻️ Chutes réutilisables : ${share} (≈ ${value} DH)`];
 }
 
 const isDefaultPanel = (sheet: ReadSheet) =>
@@ -194,7 +199,8 @@ function resultLines(lang: Lang, summary: PhotoSummary): { head: string; panelNo
   if (lang === 'ar') {
     return {
       // Labelled figures (« القطع: 14 ») rather than counted nouns: no number agreement to get wrong.
-      head: `✅ القطع اللي تقرات: ${ltr(lang, String(summary.pieceCount))} · اللوحات: ${ltr(lang, String(summary.sheetsUsed))} (${ltr(lang, panel)}) · الهدر: ${ltr(lang, `${summary.wastePercent}%`)}`,
+      // No waste figure (owner, 27/11/2026): the reusable offcuts line says what is left.
+      head: `✅ القطع اللي تقرات: ${ltr(lang, String(summary.pieceCount))} · اللوحات: ${ltr(lang, String(summary.sheetsUsed))} (${ltr(lang, panel)})`,
       panelNote: summary.fitted
         ? [`(لوحة ${ltr(lang, panel)} حيت القطع طوال، تقدر تبدلها فالورشة)`]
         : standard ? ['(لوحة عادية، تقدر تبدلها فالورشة)'] : [],
@@ -206,7 +212,7 @@ function resultLines(lang: Lang, summary: PhotoSummary): { head: string; panelNo
   const panelWord = summary.sheetsUsed > 1 ? 'panneaux' : 'panneau';
   const unplacedWord = summary.unplaced > 1 ? 'pièces plus grandes' : 'pièce plus grande';
   return {
-    head: `✅ ${summary.pieceCount} ${pieceWord} · ${summary.sheetsUsed} ${panelWord} ${panel} · ${summary.wastePercent} % de chute`,
+    head: `✅ ${summary.pieceCount} ${pieceWord} · ${summary.sheetsUsed} ${panelWord} ${panel}`,
     panelNote: summary.fitted
       ? [`(panneau ${panel} choisi pour la longueur des pièces, modifiable dans l'atelier)`]
       : standard ? ['(panneau standard, modifiable dans l\'atelier)'] : [],

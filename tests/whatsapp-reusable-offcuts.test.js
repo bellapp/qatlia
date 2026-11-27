@@ -33,13 +33,16 @@ test('offcuts narrower than 15 cm are not counted as reusable', () => {
 test('French: the share of a panel and its value at the average price', () => {
   const half = (278 * 208) / 2 / 10000;
   const text = photoResultText('fr', { ...base, reusableM2: half }, [piece(139, 208)], LINK);
-  assert.match(text, /♻️ Chutes réutilisables : 0,5 panneau \(≈ 300 DH\)/);
+  // Under a whole panel, a percentage of it (owner: « c'est mieux en pourcentage »).
+  assert.match(text, /♻️ Chutes réutilisables : 50 % d'un panneau \(≈ 300 DH\)/);
 });
 
 test('Arabic: the same line, numbers kept left-to-right', () => {
   const half = (278 * 208) / 2 / 10000;
   const caption = photoResultCaption('ar', { ...base, reusableM2: half }, LINK);
-  assert.match(caption, /♻️ الهدر اللي تقدر تعاود تخدم بيه: ⁦0\.5⁩ لوحة \(تقريبا ⁦300⁩ درهم\)/);
+  assert.match(caption, /♻️ الهدر اللي تقدر تعاود تخدم بيه: ⁦50%⁩ ديال لوحة \(تقريبا ⁦300⁩ درهم\)/);
+  const twoAndAHalf = photoResultCaption('ar', { ...base, sheetsUsed: 5, reusableM2: half * 5 }, LINK);
+  assert.match(twoAndAHalf, /⁦2\.5⁩ لوحة/, 'from one panel on, the count of panels');
 });
 
 test('the value follows the panel size: a 244 × 122 panel is worth less than a 278 × 208', () => {
