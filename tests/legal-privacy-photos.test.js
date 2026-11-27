@@ -31,5 +31,8 @@ for (const locale of ['fr', 'en', 'ar']) {
 }
 
 test('the policy date moves with the change', () => {
-  assert.match(read('src/lib/legal.ts'), /LEGAL_UPDATED_AT = '2026-11-22'/);
+  // On or after the photo change; a later change of the policy moves it again
+  // (2026-11-27: referral data and cookie).
+  const date = read('src/lib/legal.ts').match(/LEGAL_UPDATED_AT = '(\d{4}-\d{2}-\d{2})'/)?.[1];
+  assert.ok(date && date >= '2026-11-22', `LEGAL_UPDATED_AT is ${date}`);
 });

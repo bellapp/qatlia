@@ -74,6 +74,16 @@ export const legalFr = {
         body:
           'Les crédits achetés et non utilisés sont remboursables pendant {days} jours après le paiement, dans les conditions de notre politique de remboursement.',
       },
+      referral: {
+        title: 'Parrainage',
+        body:
+          'Chaque compte a un code et un lien de parrainage. Un menuisier qui crée son compte avec votre code ou votre lien devient votre filleul :\n' +
+          '- à chaque achat de votre filleul, vous recevez {referralPercent} % des crédits du pack acheté ;\n' +
+          '- votre filleul reçoit {referralPercent} % de crédits en plus sur son premier achat.\n\n' +
+          'Le code se donne avant le premier achat ; ensuite, le parrain ne change plus. On ne peut pas être son propre filleul. Les crédits de parrainage sont des crédits offerts : ils ne sont ni remboursables ni échangeables contre de l’argent.\n\n' +
+          'Si un achat est remboursé, les crédits de parrainage qu’il a donnés sont repris, dans la limite du solde restant. En cas d’abus (par exemple des comptes créés pour se parrainer soi-même), nous pouvons retirer un parrainage et les crédits obtenus.\n\n' +
+          'Nous pouvons modifier le taux ou arrêter le parrainage : le changement vaut pour les achats suivants, jamais pour les crédits déjà reçus.',
+      },
       s8: {
         title: 'Vos contenus',
         body:
@@ -131,6 +141,7 @@ export const legalFr = {
           '- Devis : les coordonnées de votre entreprise et celles de votre client que vous saisissez dans un devis enregistré sur un projet.\n' +
           '- Photos de fiches de débit : envoyées pour analyse au moment où vous les soumettez. Quand vous enregistrez le projet, une version réduite de la photo est gardée avec le projet enregistré, pour que vous puissiez la revoir.\n' +
           '- Crédits et paiements : solde, historique des crédits, commandes manuelles (numéro, pack, mode de paiement, statut). Pour un paiement par carte, Creem nous confirme la transaction ; vos données de carte restent chez Creem.\n' +
+          '- Parrainage : le compte qui vous a invité et ceux que vous avez invités. Votre parrain voit votre prénom (ou le nom de votre entreprise, sinon votre e-mail masqué), si vous avez acheté et les crédits que vos achats lui ont donnés ; jamais votre e-mail complet, votre téléphone ni les montants payés.\n' +
           '- Support : les messages que vous nous envoyez par e-mail.\n' +
           '- WhatsApp : votre numéro WhatsApp (ou l’identifiant que WhatsApp nous donne à sa place si vous l’avez masqué derrière un nom d’utilisateur), votre nom de profil, les messages échangés avec notre assistant et notre équipe, et les mesures lues sur les photos de fiches de débit que vous y envoyez. Si vous ouvrez le lien d’une fiche reçu sur WhatsApp puis créez un compte, nous associons ce numéro à votre compte.\n' +
           '- Données techniques : journaux de connexion (adresse IP, navigateur) tenus par nos prestataires pour la sécurité.',
@@ -164,7 +175,8 @@ export const legalFr = {
           '- cookies de session, pour vous garder connecté ;\n' +
           '- votre langue, votre thème et votre unité d’affichage ;\n' +
           '- les coordonnées de votre entreprise pour les devis, gardées dans votre navigateur seulement ;\n' +
-          '- la provenance de votre première visite (par exemple un lien reçu sur WhatsApp), gardée 30 jours puis enregistrée avec votre compte si vous vous inscrivez.\n\n' +
+          '- la provenance de votre première visite (par exemple un lien reçu sur WhatsApp), gardée 30 jours puis enregistrée avec votre compte si vous vous inscrivez ;\n' +
+          '- le code de parrainage d’un lien reçu d’un ami, gardé 30 jours au plus, le temps de créer votre compte.\n\n' +
           'Aucun cookie publicitaire ni de mesure d’audience. La page de paiement Creem utilise ses propres cookies.',
       },
       s6: {
@@ -213,13 +225,14 @@ export const legalFr = {
         title: 'Comment les crédits utilisés sont comptés',
         body:
           'Les crédits sont consommés dans l’ordre où vous les avez reçus : d’abord les {freeCredits} crédits offerts à l’inscription, puis chaque achat, du plus ancien au plus récent.\n\n' +
-          'Les crédits remboursés sont retirés de votre solde.',
+          'Les crédits remboursés sont retirés de votre solde. Le remboursement d’un achat reprend aussi les crédits de parrainage qu’il a donnés, à vous et à votre parrain.',
       },
       s3: {
         title: 'Ce qui n’est pas remboursable',
         body:
           '- les crédits déjà utilisés ;\n' +
           '- les crédits offerts à l’inscription ;\n' +
+          '- les crédits de parrainage ;\n' +
           '- une demande faite plus de {days} jours après le paiement ;\n' +
           '- les crédits obtenus par fraude ou en violation de nos conditions générales.',
       },

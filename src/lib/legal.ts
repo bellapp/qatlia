@@ -11,7 +11,13 @@
  */
 
 import type { Metadata } from 'next';
-import { ANALYSIS_WINDOW_HOURS, MAX_SCANS_PER_ANALYSIS, SIGNUP_FREE_CREDITS, VISION_CREDIT_COST } from '@/lib/billing/policy';
+import {
+  ANALYSIS_WINDOW_HOURS,
+  MAX_SCANS_PER_ANALYSIS,
+  REFERRAL_BONUS_PERCENT,
+  SIGNUP_FREE_CREDITS,
+  VISION_CREDIT_COST,
+} from '@/lib/billing/policy';
 import { SUPPORT_EMAIL, SUPPORT_PHONE_E164 } from '@/lib/support';
 import { fr } from '@/i18n/messages/fr';
 import type { TranslationVars } from '@/i18n';
@@ -27,7 +33,7 @@ export const LEGAL_ROUTES: Record<LegalDoc, string> = {
 };
 
 /** Shown as « Dernière mise à jour ». Bump it with every change of substance. */
-export const LEGAL_UPDATED_AT = '2026-11-22';
+export const LEGAL_UPDATED_AT = '2026-11-27';
 
 /**
  * Days after a payment during which its unused credits can be refunded. Seven
@@ -45,6 +51,7 @@ export function legalVars(): TranslationVars {
     visionCost: VISION_CREDIT_COST,
     maxScans: MAX_SCANS_PER_ANALYSIS,
     windowHours: ANALYSIS_WINDOW_HOURS,
+    referralPercent: REFERRAL_BONUS_PERCENT,
   };
 }
 
