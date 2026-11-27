@@ -39,12 +39,15 @@ test('a piece larger than the panel is counted as unplaced, never a crash', () =
   assert.match(text, /1 pièce plus grande que le panneau/);
 });
 
-test('French reply : counts, panel, waste, first five lines, the rest counted, the link', () => {
+// Owner, 27/11/2026: the waste percentage left the first line; the reusable
+// offcuts line says what is left (tests/whatsapp-reusable-offcuts.test.js).
+test('French reply : counts, panel, first five lines, the rest counted, the link', () => {
   const pieces = Array.from({ length: 14 }, (_, i) => piece(41.8, 38, 1, i === 0 ? 'Côté G' : ''));
   const summary = { pieceCount: 14, lineCount: 14, sheetsUsed: 3, wastePercent: 8, sheet: { height: 278, width: 208 }, unplaced: 0 };
   const text = photoResultText('fr', summary, pieces, LINK);
   const lines = text.split('\n');
-  assert.equal(lines[0], '✅ 14 pièces lues · 3 panneaux 278×208 · 8 % de chute');
+  assert.equal(lines[0], '✅ 14 pièces lues · 3 panneaux 278×208');
+  assert.doesNotMatch(text, /% de chute/);
   assert.match(text, /panneau standard/);
   assert.match(text, /Côté G 41,8 × 38 ×1 · Pièce 2 41,8 × 38 ×1 · Pièce 3 41,8 × 38 ×1 · Pièce 4 41,8 × 38 ×1 · Pièce 5 41,8 × 38 ×1 … \(\+9 autres\)/);
   assert.ok(text.endsWith(LINK));
@@ -54,12 +57,12 @@ test('French reply : counts, panel, waste, first five lines, the rest counted, t
 test('French singular forms and a stated panel', () => {
   const summary = { pieceCount: 1, lineCount: 1, sheetsUsed: 1, wastePercent: 92, sheet: { height: 244, width: 122 }, unplaced: 0 };
   const text = photoResultText('fr', summary, [piece(50, 40)], LINK);
-  assert.match(text.split('\n')[0], /^✅ 1 pièce lue · 1 panneau 244×122 · 92 % de chute$/);
+  assert.match(text.split('\n')[0], /^✅ 1 pièce lue · 1 panneau 244×122$/);
   assert.doesNotMatch(text, /standard/);
   assert.doesNotMatch(text, /autres/);
 });
 
-test('Arabic reply : labelled figures (no number agreement to get wrong), the site word for waste, numbers kept left-to-right', () => {
+test('Arabic reply : labelled figures (no number agreement to get wrong), no waste percentage, numbers kept left-to-right', () => {
   const pieces = [piece(41.8, 38, 7, 'Côté G'), piece(53.1, 48, 4)];
   const summary = { pieceCount: 11, lineCount: 2, sheetsUsed: 1, wastePercent: 12, sheet: { height: 278, width: 208 }, unplaced: 1 };
   const text = photoResultText('ar', summary, pieces, LINK);
@@ -67,9 +70,8 @@ test('Arabic reply : labelled figures (no number agreement to get wrong), the si
   const PDI = '⁩';
   assert.ok(text.includes(`${LRI}11${PDI}`), 'count isolated');
   assert.ok(text.includes(`${LRI}278×208${PDI}`), 'panel isolated');
-  assert.ok(text.includes(`${LRI}12%${PDI}`), 'waste isolated');
   assert.ok(text.includes(`${LRI}41.8 × 38 ×7${PDI}`), 'piece sizes isolated');
-  assert.match(text, /الهدر/);
+  assert.doesNotMatch(text, /الهدر:|12%/, 'no waste percentage');
   assert.doesNotMatch(text, /ضياع/);
   assert.ok(text.endsWith(LINK));
   for (const word of ['pièce', 'panneau', 'chute', 'Voir', 'standard', 'autres']) {
