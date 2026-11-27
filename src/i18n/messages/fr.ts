@@ -651,22 +651,23 @@ export const fr = {
     button: 'Guide',
     buttonTitle: 'Visite guidée',
     /**
-     * Popover chrome of driver.js. `{current}`/`{total}` are filled by the
-     * library itself (it counts the steps), so the copy stays translatable
-     * without the component ever hardcoding "sur 4".
+     * `{current}`/`{total}` are filled by the tour (it counts the steps on
+     * screen), so the copy never hardcodes "sur 4".
      */
     next: 'Suivant',
     previous: 'Précédent',
     done: 'Terminer',
+    close: 'Fermer',
     progress: 'Étape {current} sur {total}',
-    step1Title: '1. Importez vos données',
-    step1Desc: 'Scannez une fiche de débit avec la caméra, ou ajoutez les pièces manuellement.',
-    step2Title: '2. Gérez vos pièces',
-    step2Desc: 'Ajoutez, modifiez ou supprimez les pièces. Indiquez la hauteur, largeur et quantité.',
-    step3Title: '3. Lancez l’optimisation',
-    step3Desc: 'Cliquez sur Optimiser pour calculer le placement optimal. Ajustez les options avancées.',
-    step4Title: '4. Exportez votre plan',
-    step4Desc: 'Téléchargez le rapport PDF, DXF pour CNC, PNG ou JSON. Visualisez le coût estimé.',
+    // One step per element of the atelier, in the order of the work (owner, 27/11/2026).
+    step1Title: 'La fiche',
+    step1Desc: 'Prenez votre fiche de débit en photo, ou choisissez la photo. QatliA lit les mesures toute seule.',
+    step2Title: 'Les pièces',
+    step2Desc: 'Vérifiez les mesures avec votre fiche. Vous pouvez ajouter, modifier ou supprimer une pièce.',
+    step3Title: 'Le panneau',
+    step3Desc: 'Choisissez le panneau dans lequel vous coupez, ou entrez ses mesures. S’il a un ramage, cochez la case.',
+    step4Title: 'Le plan',
+    step4Desc: 'Touchez ce bouton : le plan apparaît, chaque pièce à sa place. Ensuite, imprimez-le.',
   },
   lowCredits: {
     left: { one: 'Il vous reste {count} crédit.', many: 'Il vous reste {count} crédits.' },

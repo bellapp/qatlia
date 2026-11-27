@@ -2066,8 +2066,9 @@ const commitPanelName = () => {
               </div>
             )}
 
-            {/* Quick Actions: Hero Cards */}
-            <div className="grid grid-cols-2 gap-3">
+            {/* Quick Actions: Hero Cards. `data-tour` marks are the guided tour's
+                steps (src/components/OnboardingTour.tsx). */}
+            <div data-tour="photo" className="grid grid-cols-2 gap-3">
               {/* Take Photo Card */}
               <label className={`group relative flex flex-col gap-3 p-4 rounded-xl bg-studio-panel border border-studio-border shadow-sm hover:border-sky-500/40 hover:bg-studio-field cursor-pointer transition-all duration-200 overflow-hidden ${sheetsFull ? 'opacity-50 pointer-events-none' : ''}`}>
                 <input type="file" accept="image/*" capture="environment" className="hidden" onChange={handleImageUpload} disabled={isProcessingVision || sheetsFull} />
@@ -2149,7 +2150,7 @@ const commitPanelName = () => {
 
             {/* Pieces Manager Component: right under the scan that fills it,
                 ahead of the panel the pieces are cut from. */}
-            <div className="p-4 rounded-xl bg-studio-panel border border-studio-border shadow-sm">
+            <div data-tour="pieces" className="p-4 rounded-xl bg-studio-panel border border-studio-border shadow-sm">
               <PiecesManager
                 pieces={pieces}
                 onUpdatePieces={setPieces}
@@ -2163,7 +2164,7 @@ const commitPanelName = () => {
             </div>
 
             {/* Stock Panel Card */}
-            <div id="stock-card" className="overflow-hidden rounded-xl bg-studio-panel border border-studio-border shadow-sm">
+            <div id="stock-card" data-tour="panel" className="overflow-hidden rounded-xl bg-studio-panel border border-studio-border shadow-sm">
               <div className="flex items-center justify-between px-4 py-3.5 border-b border-studio-border">
                 <div className="flex items-center gap-2.5">
                   <span className="w-8 h-8 rounded-lg bg-brand-400/10 border border-brand-500/20 flex items-center justify-center">
@@ -2482,6 +2483,7 @@ const commitPanelName = () => {
             {/* Primary CTA Button */}
             <button
               ref={mainRunRef}
+              data-tour="plan"
               onClick={() => void handleRunOptimization()}
               disabled={isOptimizing || pieces.length === 0}
               className="w-full py-3.5 rounded-xl bg-brand-400 hover:bg-brand-500 text-slate-950 font-bold text-sm tracking-[0.08em] uppercase shadow-xl shadow-brand-500/30 ring-1 ring-brand-600/40 transition-all flex items-center justify-center gap-2.5 disabled:opacity-30 disabled:shadow-none disabled:ring-0 active:scale-[0.98]"
