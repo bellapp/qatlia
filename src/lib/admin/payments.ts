@@ -10,7 +10,7 @@ import { compareSortValues } from './sort';
  */
 
 export type PaymentSource = 'manual' | 'creem' | 'stripe';
-export type PaymentStatus = 'pending' | 'paid' | 'granted' | 'refused' | 'expired';
+export type PaymentStatus = 'pending' | 'paid' | 'granted' | 'refused' | 'expired' | 'refunded';
 
 export interface PaymentView {
   id: string;
@@ -31,7 +31,7 @@ export interface PaymentView {
   decidedAt: string | null;
 }
 
-const STATUSES: readonly PaymentStatus[] = ['pending', 'paid', 'granted', 'refused', 'expired'];
+const STATUSES: readonly PaymentStatus[] = ['pending', 'paid', 'granted', 'refused', 'expired', 'refunded'];
 const str = (value: unknown): string | null => (typeof value === 'string' && value !== '' ? value : null);
 
 export function toManualPaymentView(row: Record<string, unknown>): PaymentView {
@@ -98,7 +98,7 @@ export type PaymentSort = (typeof PAYMENT_SORTS)[number];
 
 export interface PaymentFilters {
   source: 'all' | 'manual' | 'card';
-  status: 'pending' | 'granted' | 'refused' | 'all';
+  status: 'pending' | 'granted' | 'refused' | 'refunded' | 'all';
   search: string;
   sort: PaymentSort;
 }
@@ -111,7 +111,7 @@ export function parsePaymentFilters(searchParams: SearchParams): PaymentFilters 
   const status = single(searchParams.status);
   return {
     source: source === 'manual' || source === 'card' ? source : 'all',
-    status: status === 'granted' || status === 'refused' || status === 'all' ? status : 'pending',
+    status: status === 'granted' || status === 'refused' || status === 'refunded' || status === 'all' ? status : 'pending',
     search: single(searchParams.q).trim().slice(0, 80),
     sort: (PAYMENT_SORTS as readonly string[]).includes(single(searchParams.sort)) ? (single(searchParams.sort) as PaymentSort) : 'date_desc',
   };
@@ -136,8 +136,10 @@ export type PaymentListResult = { status: 'ok'; payments: PaymentView[] } | { st
 
 export async function listPayments(db: SupabaseClient, filters: PaymentFilters): Promise<PaymentListResult> {
   const wantManual = filters.source !== 'card';
-  // Card payments are granted the moment they exist: never pending or refused.
-  const wantCard = filters.source !== 'manual' && (filters.status === 'all' || filters.status === 'granted');
+  // Card payments are granted the moment they exist (never pending or
+  // refused), then refunded once the ledger holds their refund row.
+  const wantCard =
+    filters.source !== 'manual' && (filters.status === 'all' || filters.status === 'granted' || filters.status === 'refunded');
 
   const manualQuery = wantManual
     ? (() => {
@@ -176,11 +178,36 @@ export async function listPayments(db: SupabaseClient, filters: PaymentFilters):
     cardRows.set(row.id, row);
   }
 
+  // A refunded card payment has a 'purchase_refund:<key>' row (migration 022).
+  // Asked by exact key, so the list limit cannot hide a refund.
+  const cardKeys = Array.from(cardRows.values())
+    .map((row) => row.stripe_payment_id)
+    .filter((key): key is string => typeof key === 'string' && key !== '');
+  const refundedKeys = new Set<string>();
+  if (cardKeys.length > 0) {
+    const { data: refunds, error: refundError } = await db
+      .from('credit_transactions')
+      .select('stripe_payment_id')
+      .in('stripe_payment_id', cardKeys.map((key) => `${LEDGER_KEY_PREFIXES.purchaseRefund}${key}`));
+    if (refundError) {
+      console.error('admin payments refunds read failed:', refundError.message);
+      return { status: 'error' };
+    }
+    for (const row of (refunds as { stripe_payment_id: string | null }[] | null) ?? []) {
+      const key = row.stripe_payment_id ?? '';
+      if (key.startsWith(LEDGER_KEY_PREFIXES.purchaseRefund)) refundedKeys.add(key.slice(LEDGER_KEY_PREFIXES.purchaseRefund.length));
+    }
+  }
+
+  const cardPayments = Array.from(cardRows.values())
+    .map(toCardPaymentView)
+    .filter((p): p is PaymentView => p !== null)
+    .map((p) => (p.reference !== null && refundedKeys.has(p.reference) ? { ...p, status: 'refunded' as const } : p))
+    .filter((p) => filters.status === 'all' || p.status === filters.status);
+
   const payments: PaymentView[] = [
     ...((manual?.data as Record<string, unknown>[] | null) ?? []).map(toManualPaymentView),
-    ...Array.from(cardRows.values())
-      .map(toCardPaymentView)
-      .filter((p): p is PaymentView => p !== null),
+    ...cardPayments,
   ];
 
   const userIds = Array.from(new Set(payments.map((p) => p.userId).filter(Boolean)));

@@ -69,7 +69,7 @@ export default async function ClientPage({ params }: { params: { id: string } })
   // The delete route checks all of this again, on the whole ledger.
   const deleteBlockedReason = isAdminUserId(identity.userId)
     ? 'Compte admin : il ne peut pas être supprimé d’ici.'
-    : summary.purchaseCount > 0 || client.orders.some((order) => ['pending', 'paid', 'granted'].includes(order.status))
+    : summary.purchaseCount > 0 || client.orders.some((order) => ['pending', 'paid', 'granted', 'refunded'].includes(order.status))
       ? 'Ce client a payé ou a une commande en cours : son compte ne peut pas être supprimé d’ici.'
       : null;
 

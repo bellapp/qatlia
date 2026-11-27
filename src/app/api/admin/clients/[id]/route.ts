@@ -26,7 +26,7 @@ export const dynamic = 'force-dynamic';
 const DeleteSchema = z.object({ confirm: z.string().trim().min(1).max(320) });
 
 /** Manual orders that mean money is, or may be, on its way. */
-const OPEN_OR_PAID_ORDER_STATUSES = ['pending', 'paid', 'granted'];
+const OPEN_OR_PAID_ORDER_STATUSES = ['pending', 'paid', 'granted', 'refunded'];
 
 /** More non-usage rows than this and the account is not a test account: refused. */
 const LEDGER_CHECK_LIMIT = 1000;

@@ -741,7 +741,7 @@ export const en: Catalog = {
       keepReference: 'Save or screenshot this number: it is your payment proof.',
       close: 'I saved my reference',
       historyTitle: 'My payment orders',
-      status: { pending: 'Pending', granted: 'Credits added', refused: 'Refused', expired: 'Cancelled' },
+      status: { pending: 'Pending', granted: 'Credits added', refused: 'Refused', expired: 'Cancelled', refunded: 'Refunded' },
       existingTitle: 'You already have a pending order',
       existingNotice: 'One order at a time: pay this one using its number, or cancel it (below) to choose another pack.',
       cancel: 'Cancel this order',

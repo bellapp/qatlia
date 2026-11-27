@@ -151,7 +151,8 @@ test('commande manuelle en cours : 409, et seuls les statuts ouverts ou payés s
   assert.equal((await DELETE(req(CONFIRM), ctx(CLIENT))).status, 409);
   assert.equal(deleted(), false);
   const filter = fake.state.fromCalls.find((c) => c.table === 'manual_payments').ops.find(([op]) => op === 'in');
-  assert.deepEqual(filter[1], ['status', ['pending', 'paid', 'granted']]);
+  // A refunded order (migration 023) still means money moved: it keeps the account.
+  assert.deepEqual(filter[1], ['status', ['pending', 'paid', 'granted', 'refunded']]);
 });
 
 test('remboursement ou ajustement admin seuls : supprimable', async () => {

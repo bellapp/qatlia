@@ -96,6 +96,7 @@ export const ORDER_STATUS_LABELS: Record<string, string> = {
   granted: 'Crédits ajoutés',
   refused: 'Refusée',
   expired: 'Expirée',
+  refunded: 'Remboursée',
 };
 
 export const ORDER_STATUS_STYLES: Record<string, string> = {
@@ -104,6 +105,7 @@ export const ORDER_STATUS_STYLES: Record<string, string> = {
   granted: 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30',
   refused: 'bg-rose-500/15 text-rose-400 border-rose-500/30',
   expired: 'bg-slate-500/15 text-slate-400 border-slate-500/30',
+  refunded: 'bg-violet-500/15 text-violet-300 border-violet-500/30',
 };
 
 export const PAYMENT_METHOD_LABELS: Record<string, string> = {
