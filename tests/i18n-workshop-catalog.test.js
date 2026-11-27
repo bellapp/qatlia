@@ -405,25 +405,24 @@ test('the guided tour translates its own buttons and step counter', () => {
   const { LOCALES, catalogs, translate } = loadI18n();
   for (const locale of LOCALES) {
     const flat = flatten(catalogs[locale]);
-    for (const key of ['tour.next', 'tour.previous', 'tour.done']) {
+    for (const key of ['tour.next', 'tour.previous', 'tour.done', 'tour.close']) {
       assert.ok(flat[key] && flat[key].trim().length > 0, `${locale}.${key} is missing`);
     }
-    // The step numbers belong to driver.js, which counts the steps itself: the
-    // copy must interpolate them instead of spelling "of 4" out.
+    // The tour counts the steps on screen: the copy must interpolate them
+    // instead of spelling "of 4" out.
     const progress = flat['tour.progress'];
     assert.ok(progress.includes('{current}'), `${locale}.tour.progress must interpolate {current}`);
     assert.ok(progress.includes('{total}'), `${locale}.tour.progress must interpolate {total}`);
     assert.ok(!/\d/.test(progress), `${locale}.tour.progress hardcodes a step number: "${progress}"`);
-    // Rendered with driver.js' own token syntax, the counter survives intact.
-    const rendered = translate(locale, 'tour.progress', { current: '{{current}}', total: '{{total}}' });
-    assert.ok(rendered.includes('{{current}}') && rendered.includes('{{total}}'));
+    const rendered = translate(locale, 'tour.progress', { current: 2, total: 4 });
+    assert.ok(rendered.includes('2') && rendered.includes('4'));
   }
 });
 
-test('the tour component configures every driver.js label from the catalog', () => {
+test('the tour component resolves every label from the catalog', () => {
   const source = fs.readFileSync(path.join(PROJECT_ROOT, 'src/components/OnboardingTour.tsx'), 'utf8');
-  for (const option of ['nextBtnText', 'prevBtnText', 'doneBtnText', 'progressText']) {
-    assert.match(source, new RegExp(`${option}:\\s*t\\(`), `${option} is not resolved from the catalog`);
+  for (const key of ['tour.next', 'tour.previous', 'tour.done', 'tour.close', 'tour.progress', 'tour.button', 'tour.buttonTitle']) {
+    assert.ok(source.includes(`'${key}'`), `${key} is not used by the tour`);
   }
 });
 
