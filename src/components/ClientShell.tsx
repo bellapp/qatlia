@@ -6,6 +6,7 @@ import { PwaShell } from '@/components/PwaShell';
 import { StoreAppGuard } from '@/components/StoreAppGuard';
 import { LocaleProvider } from '@/components/LocaleProvider';
 import { WhatsAppFloating } from '@/components/WhatsAppContact';
+import { ReferralAutoAttach } from '@/components/ReferralAutoAttach';
 import { recordBrowserVisit, withoutTracking } from '@/lib/acquisition';
 import type { Locale } from '@/i18n';
 
@@ -35,6 +36,8 @@ export function ClientShell({ children, pinnedLocale }: { children: React.ReactN
       <ThemeProvider>
         <PwaShell>
           <StoreAppGuard>{children}</StoreAppGuard>
+          {/* Attaches the account to its parrain while a referral link's code is kept here. */}
+          <ReferralAutoAttach />
           {/* The WhatsApp button, on the pages where it covers nothing (src/lib/whatsapp/site-contact.ts). */}
           <WhatsAppFloating />
         </PwaShell>

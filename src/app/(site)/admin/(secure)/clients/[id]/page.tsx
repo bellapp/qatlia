@@ -21,6 +21,8 @@ import { buildClientTimeline, AUDIT_LABELS, describeAudit, type TimelineEvent } 
 import { Badge, Field, Notice, Section, Stat } from '../../ui';
 import { SortableTable } from '../../SortableTable';
 import { ClientNoteForm, CreditAdjustForm, DeleteAccountForm } from './ClientActions';
+import { DetachReferralButton, RefundPurchaseButton } from './ReferralActions';
+import { getClientReferral, refundedPurchaseKeys } from '@/lib/admin/referrals';
 
 export const dynamic = 'force-dynamic';
 
@@ -41,7 +43,7 @@ export default async function ClientPage({ params }: { params: { id: string } })
   if (!db) {
     return <Notice tone="error">Base non configurée : NEXT_PUBLIC_SUPABASE_URL et SUPABASE_SERVICE_ROLE_KEY sont requis.</Notice>;
   }
-  const result = await getClientDetail(db, params.id);
+  const [result, referralResult] = await Promise.all([getClientDetail(db, params.id), getClientReferral(db, params.id)]);
   if (result.status === 'not_found') notFound();
   if (result.status === 'error') {
     return <Notice tone="error">Impossible de charger ce client. Réessayez dans un instant.</Notice>;
@@ -49,6 +51,8 @@ export default async function ClientPage({ params }: { params: { id: string } })
 
   const { client } = result;
   const { identity, summary } = client;
+  const referral = referralResult.status === 'ok' ? referralResult.referral : null;
+  const refunded = refundedPurchaseKeys(client.ledger);
   const now = new Date();
   const whatsapp = identity.phone ? whatsappHref(identity.phone) : null;
   const lastActivity = [identity.lastSignInAt, summary.lastEntryAt, client.projects[0]?.createdAt ?? null]
@@ -179,6 +183,10 @@ export default async function ClientPage({ params }: { params: { id: string } })
           <Stat label="Optimisations payées" value={summary.optimizations} />
           <Stat label="Total payé (manuel)" value={formatMad(client.paidMad)} tone={client.paidMad > 0 ? 'good' : undefined} />
           <Stat label="Remboursés / ajustés" value={`${summary.creditsRefunded} / ${summary.creditsAdjusted}`} hint="crédits" />
+          <Stat label="Parrainage" value={summary.creditsReferral} hint="crédits de bonus reçus (net)" />
+          {summary.creditsPurchaseRefunded > 0 ? (
+            <Stat label="Achats remboursés" value={summary.creditsPurchaseRefunded} tone="warn" hint="crédits repris" />
+          ) : null}
           <Stat label="Premier achat" value={formatDate(summary.firstPurchaseAt)} />
           <Stat label="Dernier achat" value={formatDate(summary.lastPurchaseAt)} />
           <Stat label="Dernière activité" value={formatRelativeDays(lastActivity, now)} hint={formatDate(lastActivity)} />
@@ -268,13 +276,61 @@ export default async function ClientPage({ params }: { params: { id: string } })
         </div>
       </Section>
 
+      <Section title="Parrainage" aside={referral ? `${referral.referees.length} filleul${referral.referees.length > 1 ? 's' : ''}` : undefined}>
+        {referralResult.status === 'unavailable' ? (
+          <p className="text-xs text-slate-500">Migration 022 non appliquée : le parrainage n’est pas encore actif.</p>
+        ) : !referral ? (
+          <p className="text-xs text-rose-400">Impossible de lire le parrainage de ce client.</p>
+        ) : (
+          <div className="space-y-4">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <p className="text-xs text-slate-300">
+                Parrain :{' '}
+                {referral.referrer ? (
+                  <>
+                    <Link href={`/admin/clients/${referral.referrer.id}`} className="font-bold text-amber-400 hover:underline">
+                      {referral.referrer.email ?? referral.referrer.id}
+                    </Link>{' '}
+                    <span className="text-slate-500">depuis le {formatDate(referral.referrer.since)}</span>
+                  </>
+                ) : (
+                  <span className="text-slate-500">aucun</span>
+                )}
+              </p>
+              {referral.referrer ? <DetachReferralButton userId={identity.userId} /> : null}
+            </div>
+            <div className="overflow-x-auto">
+              <SortableTable
+                minWidth={520}
+                columns={[{ label: 'Filleul', firstDir: 'asc' }, { label: 'Rattaché le' }, { label: 'Bonus gagnés', align: 'end' }]}
+                initial={{ col: 1, dir: 'desc' }}
+                rows={referral.referees.map((referee) => ({
+                  key: referee.id,
+                  cells: [
+                    <Link key="e" href={`/admin/clients/${referee.id}`} className="text-amber-400 hover:underline">
+                      {referee.email ?? referee.id}
+                    </Link>,
+                    formatDate(referee.joinedAt),
+                    <strong key="b" className={referee.earned > 0 ? 'text-emerald-400' : 'text-slate-500'}>
+                      {referee.earned > 0 ? `+${referee.earned}` : '0'}
+                    </strong>,
+                  ],
+                  sort: [referee.email, referee.joinedAt, referee.earned],
+                }))}
+                empty="Aucun filleul."
+              />
+            </div>
+          </div>
+        )}
+      </Section>
+
       <Section
         title="Mouvements de crédits"
         aside={client.ledgerTruncated ? `${LEDGER_LIMIT} derniers mouvements` : `${client.ledger.length} mouvement${client.ledger.length > 1 ? 's' : ''}`}
       >
         <div className="overflow-x-auto max-h-[480px] overflow-y-auto">
           <SortableTable
-            minWidth={720}
+            minWidth={920}
             stickyHead
             columns={[
               { label: 'Date' },
@@ -283,11 +339,14 @@ export default async function ClientPage({ params }: { params: { id: string } })
               { label: 'Crédits', align: 'end' },
               { label: 'Solde après', align: 'end' },
               { label: 'Montant / clé', sortable: false },
+              { label: 'Parrainage / remboursement', sortable: false },
             ]}
             initial={{ col: 0, dir: 'desc' }}
             rows={client.ledger.map((row) => {
               const kind = classifyLedgerEntry(row);
               const payment = isPaymentKind(kind);
+              const key = row.stripe_payment_id ?? '';
+              const bonuses = payment ? referral?.bonusesByPurchase[key] : undefined;
               return {
                 key: row.id,
                 cells: [
@@ -304,8 +363,26 @@ export default async function ClientPage({ params }: { params: { id: string } })
                     ) : null}
                     {row.stripe_payment_id || ''}
                   </span>,
+                  payment ? (
+                    <div key="r" className="space-y-1 text-[11px]">
+                      {bonuses && (bonuses.referral > 0 || bonuses.welcome > 0) ? (
+                        <p className="text-slate-400">
+                          {[bonuses.welcome > 0 ? `bienvenue +${bonuses.welcome}` : null, bonuses.referral > 0 ? `parrain +${bonuses.referral}` : null]
+                            .filter(Boolean)
+                            .join(' · ')}
+                        </p>
+                      ) : null}
+                      {refunded.has(key) ? (
+                        <Badge className="bg-rose-500/15 text-rose-300 border-rose-500/30">Remboursé</Badge>
+                      ) : referral ? (
+                        <RefundPurchaseButton userId={identity.userId} purchaseKey={key} credits={row.amount} />
+                      ) : null}
+                    </div>
+                  ) : (
+                    '—'
+                  ),
                 ],
-                sort: [row.created_at, KIND_LABELS[kind], payment ? packLabel(row.reason) : null, row.amount, row.balance_after, null],
+                sort: [row.created_at, KIND_LABELS[kind], payment ? packLabel(row.reason) : null, row.amount, row.balance_after, null, null],
               };
             })}
             empty="Aucun mouvement."

@@ -6,7 +6,7 @@ const { loadTsModule } = require('./helpers/load-ts-module');
 // Optimization refunds are stored with type 'purchase' — they must never be
 // counted as a purchase or as revenue.
 
-const { classifyLedgerEntry, summarizeLedger, LEDGER_KEY_PREFIXES } = loadTsModule('src/lib/admin/ledger.ts');
+const { classifyLedgerEntry, isPaymentKind, summarizeLedger, LEDGER_KEY_PREFIXES } = loadTsModule('src/lib/admin/ledger.ts');
 
 const row = (over) => ({
   id: 'x',
@@ -27,7 +27,45 @@ test('LEDGER_KEY_PREFIXES matches the keys the payment paths write', () => {
     stripe: 'cs:',
     refund: 'optimize_refund_',
     admin: 'admin:',
+    referral: 'referral:',
+    welcome: 'welcome:',
+    purchaseRefund: 'purchase_refund:',
+    referralReversal: 'referral_reversal:',
+    welcomeReversal: 'welcome_reversal:',
   });
+});
+
+test('parrainage : les clés de bonus et de remboursement ne sont jamais des paiements', () => {
+  const cases = [
+    [{ type: 'bonus', amount: 8, reason: 'referral', stripe_payment_id: 'referral:creem:ord1' }, 'referral_bonus'],
+    [{ type: 'bonus', amount: 8, reason: 'welcome', stripe_payment_id: 'welcome:cs:sess1' }, 'welcome_bonus'],
+    [{ type: 'reversal', amount: -80, reason: 'purchase_refund', stripe_payment_id: 'purchase_refund:manual:p1' }, 'purchase_refund'],
+    [{ type: 'reversal', amount: -3, reason: 'referral_reversal', stripe_payment_id: 'referral_reversal:manual:p1' }, 'bonus_reversal'],
+    [{ type: 'reversal', amount: -8, reason: 'welcome_reversal', stripe_payment_id: 'welcome_reversal:manual:p1' }, 'bonus_reversal'],
+  ];
+  for (const [fields, kind] of cases) {
+    const entry = row(fields);
+    assert.equal(classifyLedgerEntry(entry), kind, fields.stripe_payment_id);
+    assert.equal(isPaymentKind(classifyLedgerEntry(entry)), false, fields.stripe_payment_id);
+  }
+});
+
+test('summarizeLedger : bonus et achat remboursé ne sont ni des achats ni des crédits consommés', () => {
+  const rows = [
+    row({ type: 'purchase', amount: 80, reason: 'standard', stripe_payment_id: 'manual:p1', created_at: '2026-11-01T10:00:00Z' }),
+    row({ type: 'bonus', amount: 8, reason: 'welcome', stripe_payment_id: 'welcome:manual:p1', created_at: '2026-11-01T10:00:00Z' }),
+    row({ type: 'bonus', amount: 20, reason: 'referral', stripe_payment_id: 'referral:cs:x', created_at: '2026-11-02T10:00:00Z' }),
+    row({ type: 'reversal', amount: -80, reason: 'purchase_refund', stripe_payment_id: 'purchase_refund:manual:p1', created_at: '2026-11-03T10:00:00Z' }),
+    row({ type: 'reversal', amount: -8, reason: 'welcome_reversal', stripe_payment_id: 'welcome_reversal:manual:p1', created_at: '2026-11-03T10:00:00Z' }),
+  ];
+  const summary = summarizeLedger(rows, 40);
+  assert.equal(summary.purchaseCount, 1);
+  assert.equal(summary.creditsPurchased, 80);
+  assert.equal(summary.creditsUsed, 0);
+  assert.equal(summary.creditsReferral, 20);
+  assert.equal(summary.creditsPurchaseRefunded, 80);
+  // Balance 40 = ledger 20 + the sign-up grant.
+  assert.equal(summary.freeCredits, 20);
 });
 
 test("classifyLedgerEntry suit l'ordre des règles", () => {

@@ -64,6 +64,16 @@ export const legalEn: LegalCatalog = {
         body:
           'Purchased credits you have not used can be refunded for {days} days after the payment, under the conditions of our refund policy.',
       },
+      referral: {
+        title: 'Inviting friends',
+        body:
+          'Every account has a referral code and link. A woodworker who creates an account with your code or link becomes your referred friend:\n' +
+          '- each time they buy, you receive {referralPercent}% of the credits of the pack bought;\n' +
+          '- they receive {referralPercent}% extra credits on their first purchase.\n\n' +
+          'The code is given before the first purchase; after that, the referrer never changes. Nobody can refer themselves. Referral credits are free credits: they cannot be refunded or exchanged for money.\n\n' +
+          'If a purchase is refunded, the referral credits it gave are taken back, up to the remaining balance. In case of abuse (for instance accounts created to refer oneself), we may remove a referral and the credits it brought.\n\n' +
+          'We may change the rate or end the referral programme: the change applies to later purchases, never to credits already received.',
+      },
       s8: {
         title: 'Your content',
         body:
@@ -121,6 +131,7 @@ export const legalEn: LegalCatalog = {
           '- Quotes: your company’s details and your customer’s details that you enter in a quote saved on a project.\n' +
           '- Photos of cut lists: sent for analysis when you submit them. When you save the project, a reduced copy of the photo is kept with the saved project so you can see it again.\n' +
           '- Credits and payments: balance, credit history, manual orders (number, pack, payment method, status). For a card payment, Creem confirms the transaction to us; your card details stay with Creem.\n' +
+          '- Referrals: the account that invited you and the accounts you invited. Your referrer sees your first name (or your company name, otherwise your masked email), whether you bought and the credits your purchases gave them; never your full email, your phone or the amounts paid.\n' +
           '- Support: the messages you send us by email.\n' +
           '- WhatsApp: your WhatsApp number (or the identifier WhatsApp gives us instead if you hid it behind a username), your profile name, the messages exchanged with our assistant and our team, and the measurements read from the cut-list photos you send there. If you open a cut-list link received on WhatsApp and then create an account, we link that number to your account.\n' +
           '- Technical data: connection logs (IP address, browser) kept by our providers for security.',
@@ -154,7 +165,8 @@ export const legalEn: LegalCatalog = {
           '- session cookies, to keep you signed in;\n' +
           '- your language, theme and display unit;\n' +
           '- your company details for quotes, kept in your browser only;\n' +
-          '- where your first visit came from (for instance a link received on WhatsApp), kept for 30 days and then saved with your account if you sign up.\n\n' +
+          '- where your first visit came from (for instance a link received on WhatsApp), kept for 30 days and then saved with your account if you sign up;\n' +
+          '- the referral code of a link received from a friend, kept for 30 days at most, while you create your account.\n\n' +
           'No advertising or audience-measurement cookies. The Creem payment page uses its own cookies.',
       },
       s6: {
@@ -203,13 +215,14 @@ export const legalEn: LegalCatalog = {
         title: 'How used credits are counted',
         body:
           'Credits are used in the order you received them: first the {freeCredits} free sign-up credits, then each purchase, oldest first.\n\n' +
-          'Refunded credits are removed from your balance.',
+          'Refunded credits are removed from your balance. Refunding a purchase also takes back the referral credits it gave, to you and to your referrer.',
       },
       s3: {
         title: 'What is not refundable',
         body:
           '- credits already used;\n' +
           '- the free sign-up credits;\n' +
+          '- referral credits;\n' +
           '- a request made more than {days} days after the payment;\n' +
           '- credits obtained through fraud or in breach of our terms of service.',
       },

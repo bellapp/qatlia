@@ -4,7 +4,8 @@ import React, { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
-import { ChevronDown, KeyRound, LogOut, MessageCircle, Receipt, User, Zap } from 'lucide-react';
+import { ChevronDown, Gift, KeyRound, LogOut, MessageCircle, Receipt, User, Zap } from 'lucide-react';
+import { REFERRAL_PAGE_PATH } from '@/lib/referral';
 import { useLocale } from '@/components/LocaleProvider';
 import { supportWhatsAppUrl } from '@/lib/support';
 import { clearPendingWork } from '@/lib/pending-work';
@@ -82,6 +83,17 @@ export function AccountMenu({ email }: AccountMenuProps) {
           >
             <Receipt className="w-3.5 h-3.5 text-brand-400" />
             {t('account.creditsUsage')}
+          </Link>
+          {/* Parrainage pays in credits bought outside Google Play: hidden in the
+              Play Store app until Google has accepted it (docs/adr/0001). */}
+          <Link
+            href={REFERRAL_PAGE_PATH}
+            data-sells=""
+            onClick={() => setOpen(false)}
+            className="flex items-center gap-2 px-3 py-2 text-xs text-slate-700 dark:text-slate-300 hover:bg-studio-field/60 transition-colors"
+          >
+            <Gift className="w-3.5 h-3.5 text-brand-400" aria-hidden="true" />
+            {t('account.referral')}
           </Link>
           <div className="my-1 border-t border-studio-border" />
           <Link
