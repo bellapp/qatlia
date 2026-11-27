@@ -154,7 +154,8 @@ function offcutLines(lang: Lang, summary: PhotoSummary): string[] {
   if (!(panels >= 0.1)) return [];
   const value = Math.round((summary.reusableM2 * AVERAGE_PANEL_PRICE_MAD) / AVERAGE_PANEL_AREA_M2 / 10) * 10;
   if (lang === 'ar') {
-    return [`♻️ البقايا اللي تقدر تعاود تخدم بيها: ${ltr(lang, number(panels, lang))} لوحة (تقريبا ${ltr(lang, String(value))} درهم)`];
+    // « الهدر », the word of the line above (owner, 27/11/2026): the part of it that can be used again.
+    return [`♻️ الهدر اللي تقدر تعاود تخدم بيه: ${ltr(lang, number(panels, lang))} لوحة (تقريبا ${ltr(lang, String(value))} درهم)`];
   }
   return [`♻️ Chutes réutilisables : ${number(panels, lang)} ${panels >= 2 ? 'panneaux' : 'panneau'} (≈ ${value} DH)`];
 }

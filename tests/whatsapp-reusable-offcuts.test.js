@@ -39,7 +39,7 @@ test('French: the share of a panel and its value at the average price', () => {
 test('Arabic: the same line, numbers kept left-to-right', () => {
   const half = (278 * 208) / 2 / 10000;
   const caption = photoResultCaption('ar', { ...base, reusableM2: half }, LINK);
-  assert.match(caption, /♻️ البقايا اللي تقدر تعاود تخدم بيها: ⁦0\.5⁩ لوحة \(تقريبا ⁦300⁩ درهم\)/);
+  assert.match(caption, /♻️ الهدر اللي تقدر تعاود تخدم بيه: ⁦0\.5⁩ لوحة \(تقريبا ⁦300⁩ درهم\)/);
 });
 
 test('the value follows the panel size: a 244 × 122 panel is worth less than a 278 × 208', () => {
