@@ -7,6 +7,7 @@ import { writeAtelierDraft } from '@/lib/atelier-draft';
 import { readStoredDisplayUnit } from '@/lib/units';
 import { photoDraftToAtelierDraft, photoLinkTracking } from '@/lib/whatsapp/photo-summary';
 import { recordBrowserVisit } from '@/lib/acquisition';
+import { PHOTO_CODE_SESSION_KEY } from '@/lib/open-in-chrome';
 import type { PhotoDraft } from '@/lib/whatsapp/photo-store';
 import type { OptimizationResult } from '@/lib/cutting/binpacking';
 
@@ -22,6 +23,8 @@ export function OpenInAtelier({ code, draft, preview }: { code: string; draft: P
       // The visitor's own unit preference, as the atelier would read it.
       const unit = readStoredDisplayUnit(window.localStorage);
       writeAtelierDraft(window.sessionStorage, photoDraftToAtelierDraft(draft, Date.now(), unit, preview));
+      // For Google sign-in from WhatsApp's browser, which reopens this link in Chrome (src/lib/open-in-chrome.ts).
+      window.sessionStorage.setItem(PHOTO_CODE_SESSION_KEY, code);
     } catch {
       // Storage blocked: the atelier opens empty rather than not at all.
     }
