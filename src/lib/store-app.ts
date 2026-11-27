@@ -42,6 +42,9 @@ export const STORE_APP_REDIRECTS: Readonly<Record<string, string>> = {
   '/ar': '/atelier',
   '/credits': '/account/credits',
   '/credits/success': '/account/credits',
+  // Parrainage rewards purchases made outside Google Play: hidden in the app
+  // until Google has accepted it (docs/adr/0001-recompense-parrainage.md).
+  '/account/referral': '/account/credits',
 };
 
 /**

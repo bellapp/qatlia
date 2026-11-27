@@ -11,6 +11,7 @@ import { authErrorKey, isExistingAccount } from '@/components/AuthModal';
 import type { TranslationKey } from '@/i18n';
 import { SIGNUP_FREE_CREDITS } from '@/lib/billing/policy';
 import { browserSignupMetadata } from '@/lib/acquisition';
+import { ReferralCodeField, referralSignupMetadata } from '@/components/ReferralCodeField';
 
 /**
  * Vision analyses granted on sign-up, read from the credit policy so the copy
@@ -129,7 +130,7 @@ function AuthForm() {
         const { data, error } = await supabase.auth.signUp({
           email,
           password,
-          options: { data: { full_name: fullName, ...browserSignupMetadata() } },
+          options: { data: { full_name: fullName, ...browserSignupMetadata(), ...referralSignupMetadata() } },
         });
         if (error) throw error;
         if (isExistingAccount(data.user)) {
@@ -228,6 +229,9 @@ function AuthForm() {
             {oauthLoading ? t('auth.googleRedirect') : t('auth.google')}
           </button>
           {!isLogin && <p className="-mt-3 text-center text-xs text-slate-600 dark:text-slate-400">{t('auth.googleHint')}</p>}
+
+          {/* A friend's code rides on both the Google button and the email form. */}
+          {!isLogin && <ReferralCodeField />}
 
           {!showEmailForm && (
             <button

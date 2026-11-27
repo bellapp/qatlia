@@ -41,6 +41,8 @@ export const AUDIT_LABELS: Record<string, string> = {
   credits_adjusted: 'Crédits ajustés',
   note_updated: 'Note modifiée',
   account_deleted: 'Compte supprimé',
+  purchase_refunded: 'Achat remboursé',
+  referral_detached: 'Parrain détaché',
 };
 
 const FIELD_LABELS: Record<string, string> = { phone: 'téléphone', tags: 'étiquettes', note: 'note' };
@@ -53,6 +55,16 @@ export function describeAudit(action: string, details: Record<string, unknown>):
   }
   if (action === 'payment_granted' || action === 'payment_refused') {
     return [details.order_number, details.amount_mad !== undefined ? formatMad(Number(details.amount_mad)) : null, details.operator_note]
+      .filter((part) => typeof part === 'string' && part !== '')
+      .join(' · ');
+  }
+  if (action === 'purchase_refunded') {
+    const taken = [
+      `−${Number(details.removed_purchase ?? 0)} cr`,
+      Number(details.removed_welcome ?? 0) > 0 ? `bienvenue −${Number(details.removed_welcome)}` : null,
+      Number(details.removed_referral ?? 0) > 0 ? `parrain −${Number(details.removed_referral)}` : null,
+    ];
+    return [details.purchase_key, ...taken, details.reason]
       .filter((part) => typeof part === 'string' && part !== '')
       .join(' · ');
   }

@@ -126,6 +126,8 @@ function loadAuthErrorMapper() {
     // Pure modules (Google sign-in from WhatsApp's browser opens Chrome first), loaded for real.
     '@/lib/open-in-chrome': loadTsModule(path.join(PROJECT_ROOT, 'src/lib/open-in-chrome.ts')),
     '@/lib/store-app': loadTsModule(path.join(PROJECT_ROOT, 'src/lib/store-app.ts')),
+    // The friend's code on the sign-up form: a component, and the user_metadata it adds.
+    '@/components/ReferralCodeField': { ReferralCodeField: () => null, referralSignupMetadata: () => ({}) },
   };
   const mod = new Module.Module(AUTH_MODAL_PATH, module);
   mod.filename = AUTH_MODAL_PATH;

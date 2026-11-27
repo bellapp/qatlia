@@ -17,6 +17,12 @@ export const LEDGER_KEY_PREFIXES = {
   stripe: 'cs:',
   refund: 'optimize_refund_',
   admin: 'admin:',
+  // Parrainage (migration 022). Each starts its own key, then the purchase key.
+  referral: 'referral:',
+  welcome: 'welcome:',
+  purchaseRefund: 'purchase_refund:',
+  referralReversal: 'referral_reversal:',
+  welcomeReversal: 'welcome_reversal:',
 } as const;
 
 export type LedgerKind =
@@ -25,6 +31,10 @@ export type LedgerKind =
   | 'card_stripe'
   | 'refund'
   | 'admin_adjustment'
+  | 'referral_bonus'
+  | 'welcome_bonus'
+  | 'purchase_refund'
+  | 'bonus_reversal'
   | 'scan'
   | 'optimization'
   | 'other';
@@ -49,6 +59,10 @@ export function classifyLedgerEntry(row: LedgerRow): LedgerKind {
   if (key.startsWith(LEDGER_KEY_PREFIXES.manual)) return 'manual_payment';
   if (key.startsWith(LEDGER_KEY_PREFIXES.creem)) return 'card_creem';
   if (key.startsWith(LEDGER_KEY_PREFIXES.stripe)) return 'card_stripe';
+  if (key.startsWith(LEDGER_KEY_PREFIXES.referral)) return 'referral_bonus';
+  if (key.startsWith(LEDGER_KEY_PREFIXES.welcome)) return 'welcome_bonus';
+  if (key.startsWith(LEDGER_KEY_PREFIXES.purchaseRefund)) return 'purchase_refund';
+  if (key.startsWith(LEDGER_KEY_PREFIXES.referralReversal) || key.startsWith(LEDGER_KEY_PREFIXES.welcomeReversal)) return 'bonus_reversal';
   if (row.reason === 'refund' || key.startsWith(LEDGER_KEY_PREFIXES.refund)) return 'refund';
   if (key.startsWith(LEDGER_KEY_PREFIXES.admin) || row.type === 'adjustment') return 'admin_adjustment';
   if (row.type === 'usage' && row.reason === 'vision') return 'scan';
@@ -70,6 +84,10 @@ export interface LedgerSummary {
   creditsRefunded: number;
   /** Net credits added (or removed) by an admin. */
   creditsAdjusted: number;
+  /** Net referral credits received: parrain and welcome bonuses, refunds taken off. */
+  creditsReferral: number;
+  /** Pack credits taken back by purchase refunds (a positive number). */
+  creditsPurchaseRefunded: number;
   purchaseCount: number;
   firstPurchaseAt: string | null;
   lastPurchaseAt: string | null;
@@ -98,6 +116,8 @@ export function summarizeLedger(rows: LedgerRow[], balance: number | null): Ledg
     creditsPurchased: 0,
     creditsRefunded: 0,
     creditsAdjusted: 0,
+    creditsReferral: 0,
+    creditsPurchaseRefunded: 0,
     purchaseCount: 0,
     firstPurchaseAt: null,
     lastPurchaseAt: null,
@@ -128,6 +148,14 @@ export function summarizeLedger(rows: LedgerRow[], balance: number | null): Ledg
         break;
       case 'admin_adjustment':
         summary.creditsAdjusted += amount;
+        break;
+      case 'referral_bonus':
+      case 'welcome_bonus':
+      case 'bonus_reversal':
+        summary.creditsReferral += amount;
+        break;
+      case 'purchase_refund':
+        summary.creditsPurchaseRefunded += -amount;
         break;
       case 'scan':
         summary.scans += 1;

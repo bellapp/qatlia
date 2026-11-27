@@ -11,6 +11,7 @@ import { cardCurrencyFor, offersManualPayment, type AppCurrency } from '@/lib/cu
 import { CurrencySwitcher, useCurrency } from '@/components/CurrencySwitcher';
 import { LocaleSwitcher, useLocale } from '@/components/LocaleProvider';
 import { SupportContact } from '@/components/SupportContact';
+import { ReferralPurchaseCode } from '@/components/ReferralPurchaseCode';
 import { BankTransferDetails, type BankTransferDetailsData } from '@/components/BankTransferDetails';
 import { checkoutErrorKey, creditPackLabelKeys } from '@/i18n/domain';
 import { LEGAL_DOCS, LEGAL_ROUTES } from '@/lib/legal';
@@ -271,6 +272,9 @@ export default function CreditsPage() {
           </h1>
           <p className="text-sm text-slate-600 dark:text-slate-400 max-w-xl mx-auto">{t('creditsPage.policy', { cost: VISION_CREDIT_COST, sheets: MAX_SCANS_PER_ANALYSIS, hours: ANALYSIS_WINDOW_HOURS })}</p>
         </div>
+
+        {/* A friend's code, while the account can still take one (docs/adr/0002). */}
+        <ReferralPurchaseCode />
 
         {checkoutError && (
           <p role="alert" className="text-center text-xs font-semibold text-red-500">

@@ -51,6 +51,21 @@ export const MAX_SCANS_PER_ANALYSIS = 4;
  */
 export const SIGNUP_FREE_CREDITS = 20;
 
+/**
+ * The referral bonus (docs/adr/0001-recompense-parrainage.md, 2026-11-27):
+ * each purchase of a filleul gives the parrain this share of the pack's
+ * credits, and the filleul's first purchase gives the filleul the same share
+ * on top. The ledger grants it in SQL (`add_credits`, migration
+ * 022_referrals.sql), which states the same number; a test keeps them in step.
+ */
+export const REFERRAL_BONUS_PERCENT = 10;
+
+/** The bonus a purchase of `packCredits` gives, rounded down as the SQL does. */
+export function referralBonus(packCredits: number): number {
+  if (!Number.isFinite(packCredits) || packCredits <= 0) return 0;
+  return Math.floor((Math.floor(packCredits) * REFERRAL_BONUS_PERCENT) / 100);
+}
+
 /** Credits charged per action. Anything not listed here is not a known action. */
 export const CREDIT_POLICY: Record<BillableAction, number> = {
   vision: VISION_CREDIT_COST,

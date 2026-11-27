@@ -80,6 +80,7 @@ import { EmptyState } from '@/components/EmptyState';
 import { AccountMenu } from '@/components/AccountMenu';
 import { CREDIT_BADGE_TONES, useCreditLevel } from '@/components/useCreditLevel';
 import { LowCreditsBanner } from '@/components/LowCreditsBanner';
+import { ReferralRewardBanner } from '@/components/ReferralRewardBanner';
 import { useStoreApp } from '@/components/useStoreApp';
 import { isStoreAppDocument, storeAppCopyKey } from '@/lib/store-app';
 import { WorkspaceNav } from '@/components/WorkspaceNav';
@@ -1961,6 +1962,9 @@ const commitPanelName = () => {
           <div className="min-w-0 w-full space-y-4">
 
             <LowCreditsBanner balance={userCredits} level={creditLevel} dismissible />
+
+            {/* A parrain's new referral bonuses, once each; a signed-in account only. */}
+            {userCredits !== null && <ReferralRewardBanner />}
 
             {/* Project strip — always visible, independent of the result state. */}
             <div className="flex flex-wrap items-center gap-2.5 px-4 py-3 rounded-xl bg-studio-panel border border-studio-border shadow-sm">
