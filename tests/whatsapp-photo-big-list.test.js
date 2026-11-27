@@ -88,7 +88,7 @@ test('451 to 900 pieces: stored and linked without a plan, never "unreadable"', 
     assert.ok(answer.text.endsWith(photoLink('k7m2qx9dab')));
     assert.ok(answer.text.includes(String(total)));
     assert.notEqual(answer.text, PHOTO_COPY.unreadable[lang]);
-    assert.doesNotMatch(answer.text, /chute|الهدر|0 panneau/);
+    assert.doesNotMatch(answer.text, /chute|الهدر|الشوت|0 panneau/);
   }
 });
 
