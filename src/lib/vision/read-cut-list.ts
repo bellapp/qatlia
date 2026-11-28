@@ -43,14 +43,17 @@ Tu dois analyser attentivement l'image et extraire les dimensions EXACTES de cha
 
 Règles impératives :
 1. Extrais les cotes en centimètres (cm). Si l'image contient des millimètres (ex: 2300 x 1200 ou 418.00 x 380.00), convertis en centimètres (ex: 230 x 120, 41.8 x 38).
-2. La quantité est le nombre à droite (ex: "418 x 380   7" -> height: 41.8, width: 38, quantity: 7). Si la fiche a une colonne de quantité (العدد, Qté, Nb), la quantité est TOUJOURS le nombre de cette colonne : un trait dans une colonne de chants n'est jamais une quantité, même s'il ressemble à un "1".
+2. La quantité est le nombre à droite (ex: "418 x 380   7" -> height: 41.8, width: 38, quantity: 7), parfois entouré d'un cercle (ex: "①" -> 1). Si la fiche a une colonne de quantité (العدد, Qté, Nb), la quantité est TOUJOURS le nombre de cette colonne : un trait dans une colonne de chants, ou un trait au bout de la ligne après la quantité, n'est jamais une quantité, même s'il ressemble à un "1".
 3. "name" : le libellé écrit sur la ligne (ex: "Côté G"), recopié tel quel. Si la ligne n'en a pas, mets "" : n'invente jamais de nom.
-4. Chants (bandes de chant) : UNIQUEMENT si la fiche a une colonne dédiée aux chants (en-tête حواف, تسفيط, Chants ou équivalent). Pour chaque ligne, compte les chants marqués dans cette colonne :
+4. Chants (bandes de chant) : ils se notent de deux façons, et SEULEMENT de ces deux façons :
+   a) dans une colonne dédiée aux chants (en-tête حواف, تسفيط, Chants ou équivalent) ;
+   b) sur une fiche sans colonne de chants, par des traits écrits au BOUT de la ligne, à droite de la quantité (ex: "262 x 70  ①  ||" : quantité 1 et 2 chants le long de la hauteur).
+   Pour chaque ligne, compte les chants ainsi marqués :
    - "edgesHeight" = nombre de chants le long de la HAUTEUR (côtés de la première cote) : "|" = 1, "||" = 2 ;
    - "edgesWidth" = nombre de chants le long de la LARGEUR (côtés de la deuxième cote) : "—" = 1, "=" = 2 ;
    - un rectangle "□" = 4 chants : edgesHeight 2 et edgesWidth 2 ; "⊐" ou "[" = 3 chants : edgesHeight 1 et edgesWidth 2 ;
-   - case vide, marque illisible, ou fiche sans colonne de chants : edgesHeight 0 et edgesWidth 0. Les lignes du quadrillage ne sont jamais des chants. N'invente jamais de chant.
-   - SEULES les marques écrites DANS la colonne des chants comptent. Un signe « = » écrit sur la ligne des cotes, entre les dimensions et la quantité (ex: "88 x 32 = 4"), est un signe égal qui sépare la quantité : ce n'est JAMAIS un chant. De même, un « x », « × », « - » ou « / » entre deux cotes n'est jamais un chant.
+   - ligne sans marque (case vide, ou rien après la quantité), ou marque illisible : edgesHeight 0 et edgesWidth 0. Les lignes du quadrillage ne sont jamais des chants. N'invente jamais de chant.
+   - SEULES les marques écrites dans la colonne des chants, ou au bout de la ligne après la quantité, comptent. Un trait SOUS un chiffre (une cote soulignée) n'est jamais un chant. Un signe « = » écrit sur la ligne des cotes, entre les dimensions et la quantité (ex: "88 x 32 = 4"), est un signe égal qui sépare la quantité : ce n'est JAMAIS un chant. De même, un « x », « × », « - » ou « / » entre deux cotes n'est jamais un chant.
 5. Retourne STRICTEMENT un objet JSON :
 {
   "pieces": [
@@ -263,7 +266,17 @@ export async function readCutList(
   }
   const rawContent = data.choices?.[0]?.message?.content || '';
   const parsed = extractJson(rawContent);
-  if (!parsed || !Array.isArray(parsed.pieces) || parsed.pieces.length === 0) return { status: 'unreadable' };
+  if (!parsed || !Array.isArray(parsed.pieces) || parsed.pieces.length === 0) {
+    // Owner, 28/11/2026: a failed scan left no trace to explain it. The
+    // answer's start, never the image nor the key.
+    console.warn('Vision read gave no pieces:', JSON.stringify({
+      model,
+      finishReason: data.choices?.[0]?.finish_reason ?? null,
+      usage: data.usage ?? null,
+      content: String(rawContent).slice(0, 300),
+    }));
+    return { status: 'unreadable' };
+  }
 
   return {
     status: 'ok',

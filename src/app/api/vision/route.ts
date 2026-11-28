@@ -30,6 +30,9 @@ const visionRateLimiter = createRateLimiter(VISION_RATE_LIMIT);
 export const maxDuration = 60; // 60s timeout Vercel
 export const dynamic = 'force-dynamic';
 
+/** A read with no pieces is tried again only if it came back within this: two reads then fit in maxDuration. */
+const RETRY_UNREADABLE_WITHIN_MS = 25_000;
+
 type AdminClient = SupabaseClient;
 
 /** The service-role client, or null when the ledger is not configured. */
@@ -222,7 +225,15 @@ export async function POST(req: Request) {
 
     // The read itself (src/lib/vision/read-cut-list.ts): the same request the
     // site always sent. Any failure means the artisan got nothing, so nothing is debited.
-    const read = await readCutList(imageBase64);
+    const readStarted = Date.now();
+    let read = await readCutList(imageBase64);
+    // Owner, 28/11/2026: the same photo read again usually gives its pieces.
+    // One more try when the answer had none, only while it fits in the
+    // route's 60 s; it costs the artisan nothing more (a credit is only taken
+    // for pieces read).
+    if (read.status === 'unreadable' && Date.now() - readStarted < RETRY_UNREADABLE_WITHIN_MS) {
+      read = await readCutList(imageBase64);
+    }
     if (read.status === 'unavailable') {
       return NextResponse.json(
         {

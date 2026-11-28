@@ -54,9 +54,12 @@ async function scan(modelContent) {
   delete process.env.OPENAI_API_KEY;
   delete process.env.NODE_ENV;
   const originalFetch = globalThis.fetch;
+  // An array gives one answer per model call, in order (the retry tests).
+  const answers = Array.isArray(modelContent) ? [...modelContent] : null;
   globalThis.fetch = async (_url, init) => {
     state.fetchBodies.push(JSON.parse(init.body));
-    return new Response(JSON.stringify({ choices: [{ message: { content: modelContent } }] }), {
+    const content = answers ? answers.shift() : modelContent;
+    return new Response(JSON.stringify({ choices: [{ message: { content } }] }), {
       status: 200,
       headers: { 'Content-Type': 'application/json' },
     });
@@ -116,14 +119,26 @@ test('the model is asked for the chants column and the quantity column takes pre
   const prompt = state.fetchBodies[0].messages[0].content;
   assert.match(prompt, /edgesHeight/);
   assert.match(prompt, /edgesWidth/);
-  assert.match(prompt, /UNIQUEMENT si la fiche a une colonne dédiée aux chants/);
-  assert.match(prompt, /un trait dans une colonne de chants n'est jamais une quantité/);
+  assert.match(prompt, /dans une colonne dédiée aux chants/);
+  assert.match(prompt, /un trait dans une colonne de chants, ou un trait au bout de la ligne après la quantité, n'est jamais une quantité/);
+});
+
+// Owner, 28/11/2026: a sheet with no chants column marks them at the end of
+// the row, after the circled quantity: "262 x 70 ① ||" is two chants along the
+// height (the right and left sides). A number underlined is not a chant.
+test('without a chants column, strokes at the end of the row, after the quantity, are the chants', async () => {
+  await scan(JSON.stringify({ pieces: [{ name: '', height: 262, width: 70, quantity: 1, edgesHeight: 2, edgesWidth: 0 }] }));
+  const prompt = state.fetchBodies[0].messages[0].content;
+  assert.match(prompt, /sur une fiche sans colonne de chants, par des traits écrits au BOUT de la ligne, à droite de la quantité/);
+  assert.match(prompt, /"262 x 70  ①  \|\|" : quantité 1 et 2 chants le long de la hauteur/);
+  assert.match(prompt, /entouré d'un cercle \(ex: "①" -> 1\)/);
+  assert.match(prompt, /Un trait SOUS un chiffre \(une cote soulignée\) n'est jamais un chant/);
 });
 
 test('an equals sign between the dimensions and the quantity is declared a separator, not edges', async () => {
   await scan(JSON.stringify({ pieces: [{ name: '', height: 88, width: 32, quantity: 4 }] }));
   const prompt = state.fetchBodies[0].messages[0].content;
-  assert.match(prompt, /SEULES les marques écrites DANS la colonne des chants comptent/);
+  assert.match(prompt, /SEULES les marques écrites dans la colonne des chants, ou au bout de la ligne après la quantité, comptent/);
   assert.match(prompt, /"88 x 32 = 4"\), est un signe égal qui sépare la quantité : ce n'est JAMAIS un chant/);
 });
 
@@ -150,6 +165,30 @@ test('a reply without edge fields returns pieces exactly as before', async () =>
 test('an unreadable edge count bands nothing', async () => {
   const { body } = await scan(JSON.stringify({ pieces: [{ name: '', height: 50, width: 20, quantity: 6, edgesHeight: 3, edgesWidth: 'beaucoup' }] }));
   assert.equal('edges' in body.pieces[0], false);
+});
+
+// Owner, 28/11/2026: a clear sheet once came back "no measurement", and the
+// same photo read again gave its four pieces every time.
+test('a read with no pieces is tried once more, and the second answer counts', async () => {
+  const { status, body } = await scan([
+    JSON.stringify({ pieces: [] }),
+    JSON.stringify({ pieces: [{ name: '', height: 262, width: 70, quantity: 1 }] }),
+  ]);
+  assert.equal(state.fetchBodies.length, 2);
+  assert.equal(status, 200);
+  assert.equal(body.pieces[0].height, 262);
+});
+
+test('two reads with no pieces: one retry only, then the error', async () => {
+  const { status, body } = await scan([JSON.stringify({ pieces: [] }), 'pas du JSON', JSON.stringify({ pieces: [] })]);
+  assert.equal(state.fetchBodies.length, 2);
+  assert.equal(status, 422);
+  assert.equal(body.error, 'AI_PARSE_ERROR');
+});
+
+test('a read with pieces is never sent twice', async () => {
+  await scan(JSON.stringify({ pieces: [{ name: '', height: 50, width: 40, quantity: 1 }] }));
+  assert.equal(state.fetchBodies.length, 1);
 });
 
 test('a truncated reply still salvages its complete rows with their edges', async () => {

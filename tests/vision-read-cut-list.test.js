@@ -94,6 +94,23 @@ test('no pieces, or an answer that is not JSON : unreadable', async () => {
   assert.deepEqual((await read('je ne vois pas de fiche')).result, { status: 'unreadable' });
 });
 
+// Owner, 28/11/2026: a failed scan left nothing to explain it.
+test('a read with no pieces logs the model, the answer start and the token counts, never the image or the key', async () => {
+  const logged = [];
+  const originalWarn = console.warn;
+  console.warn = (...args) => logged.push(args.join(' '));
+  try {
+    await read(answer({ pieces: [] }), undefined, { env: { OPENROUTER_API_KEY: 'or_real', OPENROUTER_MODEL: 'google/gemini-3.8-flash' } });
+  } finally {
+    console.warn = originalWarn;
+  }
+  assert.equal(logged.length, 1);
+  assert.match(logged[0], /no pieces/);
+  assert.match(logged[0], /google\/gemini-3\.8-flash/);
+  assert.match(logged[0], /\\"pieces\\":\[\]/);
+  assert.doesNotMatch(logged[0], /or_real|base64/);
+});
+
 // 23/11/2026: the bot's photo read is left exactly as it was (the reads that
 // give plans today); what the photo showed is asked in a separate call
 // (classifyPhoto), only after a read with no pieces.
