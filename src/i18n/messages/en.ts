@@ -242,7 +242,7 @@ export const en: Catalog = {
       insufficientCreditsApp: 'You have no credits left. You can buy some on our website, qatlia.ma.',
       aiRateLimit: 'The service is temporarily saturated. Please try again in a moment.',
       aiServiceError: 'Analysis error. Please try again with a sharper photo.',
-      aiParseError: 'No readable measurement was detected. Check that the photo is sharp and well framed.',
+      aiParseError: 'The reading found no measurement. Try again; if it happens again, retake the photo closer, with the sheet lying flat.',
       processingFailed: 'The analysis failed. Try again with a sharper photo.',
     },
     stock: {

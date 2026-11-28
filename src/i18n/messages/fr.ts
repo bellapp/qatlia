@@ -283,7 +283,7 @@ export const fr = {
       insufficientCreditsApp: 'Vous n’avez plus de crédits. Vous pouvez en acheter sur notre site qatlia.ma.',
       aiRateLimit: 'Service temporairement saturé. Veuillez réessayer dans un instant.',
       aiServiceError: 'Erreur d’analyse. Veuillez réessayer avec une photo plus nette.',
-      aiParseError: 'Aucune mesure lisible n’a été détectée. Vérifiez que la photo est nette et bien cadrée.',
+      aiParseError: 'La lecture n’a trouvé aucune mesure. Réessayez ; si ça recommence, reprenez la photo de plus près, la fiche bien à plat.',
       processingFailed: 'L’analyse a échoué. Réessayez avec une photo plus nette.',
     },
     stock: {
